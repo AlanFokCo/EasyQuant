@@ -9,6 +9,7 @@ Provides:
 import os
 import hashlib
 import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -64,6 +65,7 @@ def _save_to_disk(df: pd.DataFrame, security: str, start: str, end: str, adjust:
         pass
 
 
+@lru_cache(maxsize=None)
 def _has_pyarrow() -> bool:
     try:
         import pyarrow  # noqa: F401
