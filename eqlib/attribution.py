@@ -65,7 +65,7 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     # Sortino ratio — require at least 2 downside observations for a stable
     # sample std (ddof=1); fewer observations produce an unreliable estimate.
     downside = daily_ret[daily_ret < 0]
-    downside_std = downside.std() * np.sqrt(ann_factor) if len(downside) >= 2 else 0.0
+    downside_std = downside.std(ddof=1) * np.sqrt(ann_factor) if len(downside) >= 2 else 0.0
     sortino = (ann_return - risk_free_rate) / downside_std if downside_std > 0 else 0.0
 
     # Max drawdown
@@ -134,7 +134,9 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         if len(strat) < 10:
             return 0.0, 1.0, 0.0
 
-        # Use np.cov for both covariance and variance — consistent ddof=1
+        # Use np.cov with ddof=1 so covariance and variance are both sample
+        # estimates — cov_matrix[0,1] is cov(strat,bench),
+        # cov_matrix[1,1] is var(bench).
         cov_matrix = np.cov(strat, bench, ddof=1)
         bench_var = cov_matrix[1, 1]
         if bench_var < 1e-15:
