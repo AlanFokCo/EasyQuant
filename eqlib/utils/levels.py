@@ -132,23 +132,49 @@ def swing_highs_lows(high: pd.Series, low: pd.Series,
                      left_bars: int = 5, right_bars: int = 5):
     """Identify swing highs and swing lows (fractal pivots).
 
-    A swing high: a bar whose high is higher than N bars to the left and right.
-    A swing low:  a bar whose low  is lower  than N bars to the left and right.
+    A swing high: a bar whose high is *strictly* greater than the
+    `left_bars` bars immediately before it AND the `right_bars` bars
+    immediately after it.
+
+    A swing low: a bar whose low is *strictly* less than the
+    `left_bars` bars before it AND the `right_bars` bars after it.
+
+    The left and right windows are treated independently so that
+    asymmetric values (e.g., left_bars=5, right_bars=3) are handled
+    correctly.  Ties (two adjacent bars at the same price) are *not*
+    flagged as swing points, preventing false signals on flat candles.
 
     Returns:
         tuple: (swing_high_levels, swing_low_levels) — Series with
                numeric values at swing positions and NaN elsewhere.
     """
+    # Left neighbors: max of the left_bars bars strictly to the left of each position.
+    # min_periods=left_bars ensures partial windows at the start of the series
+    # are not used — a pivot requires a full confirmation window on each side.
+    left_max_h = high.shift(1).rolling(left_bars, min_periods=left_bars).max()
+    # Max of the right_bars bars strictly to the right — reverse-roll trick
+    right_max_h = (
+        high.shift(-1).iloc[::-1]
+        .rolling(right_bars, min_periods=right_bars)
+        .max()
+        .iloc[::-1]
+    )
+    # Min of the left_bars bars strictly to the left
+    left_min_l = low.shift(1).rolling(left_bars, min_periods=left_bars).min()
+    # Min of the right_bars bars strictly to the right
+    right_min_l = (
+        low.shift(-1).iloc[::-1]
+        .rolling(right_bars, min_periods=right_bars)
+        .min()
+        .iloc[::-1]
+    )
+
+    # Strict comparison: the pivot bar must be greater/less than all neighbors
+    is_swing_high = (high > left_max_h) & (high > right_max_h)
+    is_swing_low = (low < left_min_l) & (low < right_min_l)
+
     swing_high = pd.Series(np.nan, index=high.index)
     swing_low = pd.Series(np.nan, index=low.index)
-
-    window = left_bars + right_bars + 1
-    roll_max = high.rolling(window, center=True).max()
-    roll_min = low.rolling(window, center=True).min()
-
-    is_swing_high = (high == roll_max)
-    is_swing_low = (low == roll_min)
-
     swing_high[is_swing_high] = high[is_swing_high]
     swing_low[is_swing_low] = low[is_swing_low]
 
@@ -189,17 +215,26 @@ def support_resistance_levels(high: pd.Series, low: pd.Series,
     lows = swing_l.dropna().values
 
     def cluster(levels, tol):
-        """Cluster nearby price levels."""
+        """Cluster nearby price levels into consolidated zones.
+
+        Each cluster's representative is its true mean (not a pairwise
+        running mean that double-weights the most recent value).  A new
+        point is assigned to the last cluster when it lies within `tol`
+        fraction of that cluster's current mean; otherwise it starts a
+        new cluster.
+        """
         if len(levels) == 0:
             return []
         levels = np.sort(levels)
-        clusters = [levels[0]]
+        # Each element is a list of raw prices in that cluster
+        clusters: list[list] = [[levels[0]]]
         for p in levels[1:]:
-            if abs(p - clusters[-1]) / max(clusters[-1], 1e-9) > tol:
-                clusters.append(p)
+            rep = float(np.mean(clusters[-1]))
+            if abs(p - rep) / max(rep, 1e-9) > tol:
+                clusters.append([p])
             else:
-                clusters[-1] = (clusters[-1] + p) / 2
-        return sorted(clusters)
+                clusters[-1].append(p)
+        return sorted(float(np.mean(c)) for c in clusters)
 
     resistances = cluster(highs, tolerance)
     supports = cluster(lows, tolerance)
@@ -252,6 +287,14 @@ def fibonacci_retracement(high: pd.Series, low: pd.Series,
     swing_high_val = recent_h.max()
     swing_low_val = recent_l.min()
     diff = swing_high_val - swing_low_val
+
+    if diff == 0:
+        # Degenerate range: all levels collapse to the same price
+        levels = {r: swing_high_val for r in ratios}
+        levels['uptrend'] = True
+        levels['swing_high'] = swing_high_val
+        levels['swing_low'] = swing_low_val
+        return levels
 
     if close is not None:
         uptrend = close.iloc[-1] > (swing_high_val + swing_low_val) / 2
@@ -343,11 +386,16 @@ def volume_profile_support_resistance(close: pd.Series, volume: pd.Series,
     bin_edges = np.linspace(price_min, price_max, n_bins + 1)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
+    # Use np.digitize for vectorized, accurate bin assignment.
+    # np.digitize returns 1-based indices; subtract 1 and clip so that
+    # prices exactly at price_max land in the last valid bin rather than
+    # falling outside all bins.
+    bin_indices = np.clip(
+        np.digitize(c.values, bin_edges) - 1, 0, n_bins - 1
+    )
     vol_profile = np.zeros(n_bins)
     for i in range(n_bins):
-        lo, hi = bin_edges[i], bin_edges[i + 1]
-        mask = (c >= lo) & (c < hi)
-        vol_profile[i] = v[mask].sum()
+        vol_profile[i] = v.values[bin_indices == i].sum()
 
     poc_idx = np.argmax(vol_profile)
     poc = bin_centers[poc_idx]
@@ -373,9 +421,16 @@ def volume_profile_support_resistance(close: pd.Series, volume: pd.Series,
         else:
             break
 
-    # Find significant nodes (above median volume)
-    median_vol = np.median(vol_profile)
-    sig_nodes = [bin_centers[i] for i in range(n_bins) if vol_profile[i] > median_vol]
+    # Significant nodes: bins whose volume exceeds the mean of non-zero bins.
+    # Using the median as threshold is unreliable when many bins are empty
+    # (median = 0 → every non-empty bin is flagged as significant).
+    nonzero_vols = vol_profile[vol_profile > 0]
+    threshold = float(nonzero_vols.mean()) if len(nonzero_vols) > 0 else 0.0
+    sig_nodes = [
+        bin_centers[i]
+        for i in range(n_bins)
+        if vol_profile[i] > threshold
+    ]
 
     return {
         'poc': poc,

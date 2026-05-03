@@ -146,19 +146,30 @@ def _fetch_index_returns(index_symbol, start, end, recorded):
 
 
 def generate_chart(result, out_path):
-    """Generate backtest chart with price, MA lines, buy/sell markers, and holding period shading."""
+    """Generate backtest chart with two panels:
+    - Top: price, MA5/MA20, buy/sell markers, holding shading,
+      portfolio value (secondary axis), key metrics annotation
+    - Bottom: portfolio drawdown (%)
+    """
+    from eqlib.attribution import analyze_returns
+
     ctx = result["context"]
     trade_log = result["trade_log"]
     recorded = result["recorded_values"]
 
-    fig, ax = plt.subplots(figsize=(16, 8))
+    analytics = analyze_returns(result)
+
+    fig, (ax, ax_dd) = plt.subplots(
+        2, 1, figsize=(16, 10),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
+    fig.subplots_adjust(hspace=0.05)
 
     start = ctx.start_date
     end = ctx.end_date
 
-    securities = set()
-    for t in trade_log:
-        securities.add(t["security"])
+    securities = set(t["security"] for t in trade_log)
     if not securities and ctx.universe:
         securities.add(ctx.universe[0])
     if not securities:
@@ -185,42 +196,79 @@ def generate_chart(result, out_path):
     sells = [t for t in trade_log if t["type"] == "SELL"]
 
     for b in buys:
-        ax.annotate("BUY", xy=(b["date"], b["price"]), xytext=(0, 12),
-                     textcoords="offset points", ha="center", fontsize=10, fontweight="bold",
-                     color="white", bbox=dict(boxstyle="circle,pad=0.25", facecolor="green", edgecolor="darkgreen"))
+        ax.annotate(
+            "B", xy=(b["date"], b["price"]), xytext=(0, 10),
+            textcoords="offset points", ha="center", fontsize=8, fontweight="bold",
+            color="white", bbox=dict(boxstyle="circle,pad=0.3", facecolor="#4CAF50", edgecolor="#388E3C"),
+        )
     for s in sells:
-        ax.annotate("SELL", xy=(s["date"], s["price"]), xytext=(0, -14),
-                     textcoords="offset points", ha="center", fontsize=10, fontweight="bold",
-                     color="white", bbox=dict(boxstyle="circle,pad=0.25", facecolor="red", edgecolor="darkred"))
+        ax.annotate(
+            "S", xy=(s["date"], s["price"]), xytext=(0, -12),
+            textcoords="offset points", ha="center", fontsize=8, fontweight="bold",
+            color="white", bbox=dict(boxstyle="circle,pad=0.3", facecolor="#F44336", edgecolor="#C62828"),
+        )
 
     n_pairs = min(len(buys), len(sells))
     for i in range(n_pairs):
-        ax.axvspan(buys[i]["date"], sells[i]["date"], color="green", alpha=0.05, zorder=0)
+        ax.axvspan(buys[i]["date"], sells[i]["date"], color="#4CAF50", alpha=0.04, zorder=0)
 
-    if recorded:
-        rec_dates = [r["date"] for r in recorded]
-        if "total_value" in recorded[0]:
-            values = [r.get("total_value", 0) for r in recorded]
-            ax2 = ax.twinx()
-            ax2.plot(rec_dates, values, color="#4CAF50", linewidth=0.8, alpha=0.5, label="Portfolio Value")
-            ax2.set_ylabel("Portfolio Value", color="#4CAF50")
+    # Portfolio value on secondary axis
+    pf_records = [r for r in recorded if "total_value" in r]
+    pf_dates = [r["date"] for r in pf_records]
+    pf_values = [r["total_value"] for r in pf_records]
+
+    ax2 = None
+    if pf_dates:
+        ax2 = ax.twinx()
+        ax2.plot(pf_dates, pf_values, color="#9C27B0", linewidth=1.2, alpha=0.6, label="Portfolio")
+        ax2.set_ylabel("Portfolio Value", color="#9C27B0", fontsize=10)
+        ax2.tick_params(axis="y", labelcolor="#9C27B0")
+
+    handles, labels = ax.get_legend_handles_labels()
+    if ax2:
+        h2, l2 = ax2.get_legend_handles_labels()
+        handles += h2
+        labels += l2
+    ax.legend(handles, labels, loc="upper left", fontsize=9)
+
+    # Key metrics annotation
+    if analytics:
+        ann_ret = analytics.get("annual_return", 0.0)
+        sharpe = analytics.get("sharpe_ratio", 0.0)
+        max_dd = analytics.get("max_drawdown", 0.0)
+        win = analytics.get("win_rate", 0.0)
+        ax.text(
+            0.02, 0.04, f"Ann.Ret: {ann_ret:+.2%}   Sharpe: {sharpe:.2f}\nMax DD: {max_dd:.2%}   Win: {win:.1%}",
+            transform=ax.transAxes, fontsize=9, verticalalignment="bottom",
+            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="#cccccc", alpha=0.85),
+        )
 
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
     pnl_pct = (pnl / initial) * 100
 
-    ax.set_title(f"{symbol} Backtest: PnL={pnl:+.2f} ({pnl_pct:+.2f}%)", fontsize=14)
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Price")
-    ax.legend(loc="upper left")
-    ax.grid(True, alpha=0.3)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.set_title(f"{symbol} — PnL: {pnl:+,.2f} ({pnl_pct:+.2f}%)", fontsize=13, fontweight="bold")
+    ax.set_ylabel("Price", fontsize=10)
+    ax.grid(True, alpha=0.25)
+
+    # Drawdown panel
+    if pf_dates and pf_values:
+        pf_s = pd.Series(pf_values, index=pd.DatetimeIndex(pf_dates))
+        rolling_max = pf_s.cummax()
+        dd_pct = (pf_s - rolling_max) / rolling_max * 100
+        ax_dd.fill_between(dd_pct.index, dd_pct.values, 0, where=dd_pct.values < 0, color="#F44336", alpha=0.35, interpolate=True)
+        ax_dd.plot(dd_pct.index, dd_pct.values, color="#F44336", linewidth=0.9)
+        ax_dd.axhline(0, color="#555555", linewidth=0.6, linestyle="--")
+    ax_dd.set_ylabel("Drawdown (%)", fontsize=10)
+    ax_dd.grid(True, alpha=0.25)
+
+    ax_dd.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax_dd.xaxis.set_major_locator(mdates.MonthLocator())
     fig.autofmt_xdate()
 
     plt.tight_layout()
-    plt.savefig(out_path, dpi=150)
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"Chart saved: {out_path}")
 
