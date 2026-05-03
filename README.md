@@ -4,7 +4,7 @@ A quantitative strategy and backtesting tool for the **China A-share market**.
 
 This project provides the `eqlib` Python package — the core library that implements the event-driven backtesting engine, data APIs, and analysis tools.
 
-[中文文档](README_zh.md) · [用户手册](doc/user_guide.md) · [API 参考](doc/api_reference.md) · [示例](examples/)
+[中文文档](README_zh.md) · [新手教程](tutorials/) · [用户手册](doc/user_guide.md) · [API 参考](doc/api_reference.md) · [示例](examples/)
 
 ---
 
@@ -16,6 +16,7 @@ This project provides the `eqlib` Python package — the core library that imple
 - **Risk analysis** — Sharpe, Sortino, max drawdown, alpha/beta, Brinson attribution, Fama-French factor analysis
 - **Portfolio optimization** — minimum variance, maximum Sharpe, risk parity
 - **Paper trading** — run strategies live with real-time market data
+- **PTrade/QMT adapter** — export EasyQuant strategies to PTrade/QMT platform with minimal changes
 - **Utility library** — technical indicators (MA, MACD, RSI, KDJ, Bollinger, ATR), statistical tools, position sizing (Kelly, ATR-based, fixed fractional)
 - **Reports** — chart (PNG), Markdown, and JSON output
 
@@ -87,14 +88,24 @@ See the [`examples/`](examples/) directory for complete scripts:
 | 09 | `09_attribution_analysis.py` | Attribution analysis |
 | 10 | `10_index_concept.py` | Index & concept boards |
 | 11 | `11_utils_library.py` | Technical indicators, statistics, money management |
+| 12 | `12_portfolio_backtest.py` | Portfolio backtest with `StrategyConfig` |
+| 13 | `13_ptrade_export.py` | Export strategies to PTrade/QMT |
+| 14 | `14_bollinger_strategy.py` | Bollinger Band mean reversion |
+| 15 | `15_macd_volume_strategy.py` | MACD trend + volume confirmation |
+| 16 | `16_multi_factor_strategy.py` | Multi-factor stock selection |
+| 17 | `17_grid_trading_strategy.py` | Grid trading for range-bound markets |
+| 18 | `18_strategy_comparison.py` | Compare multiple strategies side by side |
+| 19 | `19_local_data_backtest.py` | Local data mode (download once, backtest offline) |
 
 ---
 
 ## Documentation
 
+- [**Tutorials**](tutorials/) — beginner guide: from zero to live trading, 5-part series
 - [**User Guide**](doc/user_guide.md) — tutorial: writing strategies, running backtests, reading reports
 - [**API Reference**](doc/api_reference.md) — full API: structures, parameters, usage
 - [**Utils Reference**](doc/utils_reference.md) — calculation tools: indicators, statistics, money management, support/resistance
+- [**PTrade/QMT Adapter**](doc/ptrade_adapter.md) — export EasyQuant strategies to PTrade/QMT platform
 
 ---
 

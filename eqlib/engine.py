@@ -196,7 +196,8 @@ def _make_bar_from_row(row):
 
 def run_backtest(initialize_func, start_date, end_date,
                  starting_cash=100000.0, frequency: str = "daily",
-                 benchmark: str = "000300.XSHG", securities=None):
+                 benchmark: str = "000300.XSHG", securities=None,
+                 use_local: bool = False):
     """Main backtest runner.
 
     Parameters:
@@ -207,6 +208,10 @@ def run_backtest(initialize_func, start_date, end_date,
         frequency: 'daily' or 'minute'
         benchmark: benchmark stock code
         securities: list of stock codes to preload data for
+        use_local: if True, load data from local CSV files first.
+                   Downloads and saves to local CSV if not found.
+                   Subsequent runs will use the saved local data,
+                   avoiding network requests.
     """
     global _preloaded
 
@@ -229,8 +234,8 @@ def run_backtest(initialize_func, start_date, end_date,
         return None
 
     if securities:
-        log.info(f"Preloading data for {len(securities)} securities...")
-        _preloaded.load(securities, start_date, end_date, adjust="qfq")
+        log.info(f"Preloading data for {len(securities)} securities{' (local)' if use_local else ''}...")
+        _preloaded.load(securities, start_date, end_date, adjust="qfq", use_local=use_local)
         log.info("Data preloaded.")
 
     _context = Context(start_date, end_date, frequency, starting_cash)
@@ -283,12 +288,17 @@ def run_backtest(initialize_func, start_date, end_date,
         # Update portfolio values
         _context.portfolio._sync_total_value(prices)
 
-        # Record daily portfolio value
-        st._recorded_values.append({
-            "date": day,
-            "total_value": _context.portfolio.total_value,
-            "cash": _context.portfolio.available_cash,
-        })
+        # Record daily portfolio value — merge into same-day entry if it exists
+        day_entry = None
+        for rv in reversed(st._recorded_values):
+            if rv.get("date") == day:
+                day_entry = rv
+                break
+        if day_entry is None:
+            day_entry = {"date": day}
+            st._recorded_values.append(day_entry)
+        day_entry["total_value"] = _context.portfolio.total_value
+        day_entry["cash"] = _context.portfolio.available_cash
 
         # After trading end callbacks
         _context.current_dt = datetime.datetime.combine(day, datetime.time(15, 0))

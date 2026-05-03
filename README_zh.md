@@ -4,7 +4,7 @@
 
 本项目提供 `eqlib` Python 包——核心库，包含事件驱动回测引擎、数据 API 和分析工具。
 
-[English](README.md) · [用户手册](doc/user_guide.md) · [API 参考](doc/api_reference.md) · [示例](examples/)
+[English](README.md) · [新手教程](tutorials/) · [用户手册](doc/user_guide.md) · [API 参考](doc/api_reference.md) · [示例](examples/)
 
 ---
 
@@ -16,6 +16,7 @@
 - **风险分析** — 夏普 / 索提诺 / 最大回撤 / alpha & beta / Brinson 归因 / Fama-French 因子分析
 - **组合优化** — 最小方差、最大夏普、风险平价
 - **模拟盘** — 使用实时行情运行策略
+- **PTrade/QMT 适配器** — 将 EasyQuant 策略一键导出为 PTrade/QMT 平台格式，无缝上线实盘
 - **工具库** — 技术指标（MA、MACD、RSI、KDJ、布林带、ATR）、统计分析、仓位管理（Kelly、ATR、固定比例）
 - **报告输出** — 图表（PNG）、Markdown、JSON
 
@@ -87,14 +88,24 @@ result = run_strategy(
 | 09 | `09_attribution_analysis.py` | 归因分析 |
 | 10 | `10_index_concept.py` | 指数与概念板块 |
 | 11 | `11_utils_library.py` | 技术指标、统计分析、资金管理 |
+| 12 | `12_portfolio_backtest.py` | 组合回测模式（StrategyConfig） |
+| 13 | `13_ptrade_export.py` | 导出 PTrade/QMT 策略 |
+| 14 | `14_bollinger_strategy.py` | 布林带均值回归策略 |
+| 15 | `15_macd_volume_strategy.py` | MACD 趋势跟踪 + 成交量确认 |
+| 16 | `16_multi_factor_strategy.py` | 多因子选股 + 每周轮动 |
+| 17 | `17_grid_trading_strategy.py` | 网格交易策略 |
+| 18 | `18_strategy_comparison.py` | 多策略横向对比 |
+| 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） |
 
 ---
 
 ## 文档
 
+- [**新手教程**](tutorials/) — 从零基础到实盘部署，5 篇系列教程
 - [**用户手册**](doc/user_guide.md) — 教程：编写策略、运行回测、解读报告
 - [**API 参考**](doc/api_reference.md) — 完整 API：结构体、参数说明、用法
 - [**工具库参考**](doc/utils_reference.md) — 计算工具：技术指标、统计分析、资金管理、支撑阻力位
+- [**PTrade/QMT 适配器**](doc/ptrade_adapter.md) — 将 EasyQuant 策略导出为 PTrade/QMT 平台格式
 
 ---
 

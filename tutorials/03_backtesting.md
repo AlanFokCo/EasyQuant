@@ -1,0 +1,450 @@
+# Tutorial 03: 回测验证
+
+> 深入理解回测结果，解读报告和图表，判断策略是否真的有效。
+
+---
+
+## 目录
+
+1. [回测是什么](#1-回测是什么)
+2. [回测能告诉你什么](#2-回测能告诉你什么)
+3. [解读回测报告](#3-解读回测报告)
+4. [解读图表](#4-解读图表)
+5. [风险与归因分析](#5-风险与归因分析)
+6. [判断策略是否有效](#6-判断策略是否有效)
+7. [常见回测陷阱](#7-常见回测陷阱)
+8. [组合回测](#8-组合回测)
+9. [下一步](#9-下一步)
+
+---
+
+## 1. 回测是什么
+
+**回测（Backtesting）** 是把你的交易策略用历史数据"回放"一遍，看看如果当时真的按照这个策略交易，结果会怎样。
+
+```
+你的策略规则
+     +
+历史行情数据
+     ↓
+回测引擎 → 模拟交易 → 交易记录 + 组合价值曲线
+```
+
+### 回测的作用
+
+- **验证想法**：你觉得有效的策略，真的能赚钱吗？
+- **发现缺陷**：策略有没有你没想到的边界情况？
+- **参数选择**：哪个参数组合更合理？
+- **建立信心**：在投入真金白银之前，有一个量化的评估
+
+### 回测不能告诉你什么
+
+- **未来一定能赚钱**：历史表现不等于未来收益
+- **精确的盈利金额**：回测有各种偏差（滑点、流动性等）
+- **策略在所有市场环境都有效**：牛市有效的策略在熊市可能失效
+
+---
+
+## 2. 回测能告诉你什么
+
+运行回测后，你会得到一组核心指标：
+
+| 指标 | 含义 | 参考标准 |
+|------|------|---------|
+| **总收益率** | 回测期间的总盈利/亏损百分比 | 跑赢基准（沪深300）为好 |
+| **年化收益率** | 折算为每年的收益率 | > 10% 为合格，> 20% 为优秀 |
+| **年化波动率** | 收益的波动幅度 | 低一些更好（< 25% 为佳） |
+| **夏普比率** | 每承受一单位风险，获得多少超额收益 | > 1 为好，> 2 为优秀 |
+| **最大回撤** | 从最高点到最低点的最大亏损幅度 | 越小越好（< 15% 为佳） |
+| **索提诺比率** | 类似夏普，但只考虑下行波动 | > 1 为好 |
+| **Alpha** | 跑赢基准的超额收益 | 正数为好 |
+| **Beta** | 相对大盘的敏感度 | 接近 1 = 跟随大盘 |
+| **胜率** | 盈利天数占总交易天数的比例 | > 50% 为好 |
+
+---
+
+## 3. 解读回测报告
+
+### 3.1 运行回测生成报告
+
+```python
+from eqlib import *
+
+def initialize(context):
+    g.security = '601390'
+    set_benchmark('000300.XSHG')
+    set_order_cost(OrderCost(
+        open_tax=0, close_tax=0.001,
+        open_commission=0.0003, close_commission=0.0003,
+        min_commission=5,
+    ))
+    run_daily(market_open, time='every_bar')
+
+def market_open(context):
+    hist = attribute_history(g.security, 25, '1d', ['close'])
+    if hist.empty or len(hist) < 20:
+        return
+    ma5 = hist['close'].tail(5).mean()
+    ma20 = hist['close'].mean()
+    price = hist['close'].iloc[-1]
+
+    if price > ma5 > ma20:
+        if g.security not in context.portfolio.positions:
+            order_value(g.security, context.portfolio.available_cash)
+            log.info('BUY %s @ %.3f' % (g.security, price))
+    elif price < ma5 < ma20:
+        if g.security in context.portfolio.positions:
+            order_target(g.security, 0)
+            log.info('SELL %s @ %.3f' % (g.security, price))
+
+    record(price=price, ma5=ma5, ma20=ma20)
+
+result = run_strategy(
+    initialize,
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    starting_cash=100000,
+    benchmark='000300.XSHG',
+    securities=['601390'],
+)
+```
+
+### 3.2 Markdown 报告
+
+文件路径：`reports/backtest_YYYYMMDD_HHMMSS.md`
+
+```markdown
+# Backtest Report: 601390
+
+## Summary
+- **Period**: 2024-01-01 to 2024-12-31
+- **Initial Capital**: 100,000.00
+- **Final Value**: 108,234.56
+- **P&L**: +8,234.56 (+8.23%)
+- **Buy Orders**: 6
+- **Sell Orders**: 5
+
+## Trade Log
+| # | Date | Action | Security | Price | Amount | Commission |
+|---|------|--------|----------|-------|--------|------------|
+| 1 | 2024-01-15 | BUY | 601390 | 4.850 | 20,618 | 29.80 |
+| 2 | 2024-03-20 | SELL | 601390 | 5.120 | 20,618 | 31.75 |
+| 3 | 2024-04-10 | BUY | 601390 | 5.050 | 20,500 | 29.62 |
+...
+```
+
+**重点关注：**
+
+1. **P&L 盈亏**：
+   - 绝对收益（+8,234.56）和相对收益（+8.23%）
+   - 与同期沪深 300 对比：如果沪深 300 涨了 15%，你的策略只涨了 8%，说明跑输了基准
+
+2. **交易频率**：
+   - 买 6 次、卖 5 次 → 总共 11 笔交易
+   - 交易次数过多 = 换手率高 = 手续费吃利润
+   - 交易次数过少 = 可能信号不够灵敏
+
+3. **每笔交易盈亏**：
+   - 逐笔检查买入价和卖出价
+   - 如果大部分交易都亏损，说明信号质量不好
+
+4. **佣金成本**：
+   - 检查每笔佣金占比
+   - 小额交易的佣金占比可能很高（最低 5 元限制）
+
+### 3.3 JSON 报告
+
+文件路径：`reports/backtest_YYYYMMDD_HHMMSS.json`
+
+```python
+import json
+
+with open('reports/backtest_20260503_143000.json') as f:
+    report = json.load(f)
+
+# 基本指标
+print("总收益: %.2f%%" % report['pnl_pct'])
+print("交易次数:", report['num_trades'])
+
+# 每日组合价值曲线
+for entry in report['portfolio_values']:
+    print(entry['date'], entry['value'])
+
+# 自定义记录的数值（通过 record() 写入）
+for entry in report['recorded_values']:
+    print(entry['date'], entry['price'], entry['ma5'])
+```
+
+JSON 报告适合做进一步的数据分析，比如：
+- 计算最大连续亏损天数
+- 分析持仓/空仓天数比例
+- 画出累计收益曲线
+
+---
+
+## 4. 解读图表
+
+### 4.1 图表结构
+
+```
+  |                                                     |  Portfolio Value
+P |  ---MA5                                              |
+r |  ---MA20                                             |
+i |  ---Close                                            |
+c |                                                      |
+e |     [SELL]    [BUY]                                  |
+  |    o          o     o[SELL]                          |
+  |   / \  ===== / \___/   \                             |
+  |  /   \      /           \                            |
+  | /     \====/             \=====                      |
+  +------------------------------------------------------|-> Date
+```
+
+### 4.2 图表元素
+
+| 元素 | 含义 |
+|------|------|
+| **灰色线** | 股票每日收盘价 |
+| **蓝色线** | 5 日均线（短期趋势） |
+| **橙色线** | 20 日均线（中期趋势） |
+| **绿色圆圈** | 买入点（价格下方标注） |
+| **红色圆圈** | 卖出点（价格上方标注） |
+| **绿色阴影** | 持仓期间 |
+| **绿色线（右侧轴）** | 投资组合总资产价值 |
+
+### 4.3 如何看图
+
+**好的信号：**
+- BUY 点通常在价格低位（均线金叉附近）
+- SELL 点通常在价格高位（均线死叉附近）
+- 资产曲线（右轴）整体向上
+- 持仓期间（绿色阴影）价格有明显上涨
+
+**不好的信号：**
+- BUY 和 SELL 频繁交替 → 震荡市中反复被"打脸"
+- 资产曲线持续向下 → 策略亏损
+- 持仓期间价格无明显变化 → 无效信号
+
+---
+
+## 5. 风险与归因分析
+
+### 5.1 综合风险指标
+
+```python
+from eqlib import analyze_returns
+
+metrics = analyze_returns(result, risk_free_rate=0.03)
+
+print("年化收益:   %.2f%%" % (metrics['annual_return'] * 100))
+print("年化波动:   %.2f%%" % (metrics['annual_volatility'] * 100))
+print("夏普比率:   %.2f" % metrics['sharpe_ratio'])
+print("索提诺比率: %.2f" % metrics['sortino_ratio'])
+print("最大回撤:   %.2f%%" % (metrics['max_drawdown'] * 100))
+print("卡玛比率:   %.2f" % metrics['calmar_ratio'])
+print("Alpha:      %.4f" % metrics['alpha'])
+print("Beta:       %.3f" % metrics['beta'])
+print("日胜率:     %.2f%%" % (metrics['win_rate'] * 100))
+```
+
+### 5.2 Brinson 归因（多股票组合）
+
+将收益拆解为三个来源：
+
+```python
+from eqlib import brinson_attribution
+
+attr = brinson_attribution(result)
+
+print("配置效应: %.4f  ← 资产配置（选行业/板块）带来的收益" % attr['allocation_effect'])
+print("选股效应:   %.4f  ← 个股选择带来的收益" % attr['selection_effect'])
+print("交互效应:   %.4f  ← 配置与选股的交互作用" % attr['interaction_effect'])
+```
+
+- **配置效应 > 0**：说明你的板块/行业选择是对的
+- **选股效应 > 0**：说明你在板块内选的股票是对的
+- **交互效应**：通常是小的调整项
+
+### 5.3 Fama-French 因子分析
+
+```python
+from eqlib import fama_french_analysis
+
+ff = fama_french_analysis(result)
+
+print("市场 Beta:    %.3f  ← 大盘敏感度" % ff['market_beta'])
+print("年化 Alpha:   %.4f  ← 市场无法解释的超额收益" % ff['alpha_annual'])
+print("动量相关性:   %.3f" % ff['momentum_corr'])
+print("残差波动率:   %.3f" % ff['residual_volatility'])
+```
+
+---
+
+## 6. 判断策略是否有效
+
+### 6.1 核心判断标准
+
+| 问题 | 判断标准 |
+|------|---------|
+| **策略赚钱了吗？** | 总收益率 > 0 |
+| **跑赢大盘了吗？** | 策略收益 > 基准收益（沪深300） |
+| **风险调整后的表现好吗？** | 夏普比率 > 1 |
+| **最大回撤能接受吗？** | 最大回撤 < 你的心理承受范围 |
+| **交易频率合理吗？** | 不是一天一换，也不是半年一换 |
+
+### 6.2 综合评估模板
+
+```python
+metrics = analyze_returns(result, risk_free_rate=0.03)
+
+checks = []
+checks.append(("收益 > 0", metrics['total_return'] > 0))
+checks.append(("跑赢基准", metrics['alpha'] > 0))
+checks.append(("夏普 > 1", metrics['sharpe_ratio'] > 1))
+checks.append(("回撤 < 20%", abs(metrics['max_drawdown']) < 0.20))
+checks.append(("胜率 > 50%", metrics['win_rate'] > 0.50))
+
+print("--- 策略评估 ---")
+passed = 0
+for name, ok in checks:
+    status = "PASS" if ok else "FAIL"
+    if ok:
+        passed += 1
+    print("  [%s] %s" % (status, name))
+print("通过 %d/%d 项检查" % (passed, len(checks)))
+```
+
+### 6.3 样本外验证
+
+```python
+# 训练集：2020-2023，用来调整参数
+result_train = run_strategy(
+    initialize, '2020-01-01', '2023-12-31',
+    starting_cash=100000, securities=['601390'],
+)
+
+# 测试集：2024，用来验证
+result_test = run_strategy(
+    initialize, '2024-01-01', '2024-12-31',
+    starting_cash=100000, securities=['601390'],
+)
+
+# 如果训练集夏普 2.0，测试集夏普 0.3 → 过拟合
+# 如果训练集夏普 1.5，测试集夏普 1.2 → 参数稳定
+```
+
+---
+
+## 7. 常见回测陷阱
+
+### 7.1 过拟合
+
+```
+回测年化 50%，实盘年化 5%
+原因：参数在历史数据上反复调试，恰好"记住"了历史走势
+```
+
+**识别方法**：参数微调后结果剧烈变化 → 过拟合
+
+### 7.2 未来函数
+
+```python
+# 错误示例：使用当天收盘价做开盘决策
+# attribute_history 返回的是昨天的数据，这个是正确的
+# 但如果策略中用了 get_today_close() 或其他包含当天数据的方式，就是未来函数
+```
+
+### 7.3 幸存者偏差
+
+```
+只测了当前还在上市的股票 → 忽略了退市/ST 的股票
+→ 回测结果虚高
+```
+
+### 7.4 忽略流动性
+
+```
+回测用 100 万买入某股，但该股日均成交仅 50 万
+→ 实际无法成交，回测结果无效
+```
+
+### 7.5 回测期间太短
+
+```
+只回测了 3 个月 → 可能刚好遇到牛市/熊市
+→ 建议至少回测 1-2 年，涵盖不同市场环境
+```
+
+---
+
+## 8. 组合回测
+
+### 8.1 单股 vs 组合
+
+| | 单股回测 | 组合回测 |
+|--|---------|---------|
+| 适用场景 | 验证单个策略逻辑 | 多股轮动、资产配置 |
+| API | `run_strategy` / `run_backtest` | `run_portfolio_backtest` |
+| 股票池 | 一只股票 | 多只股票 |
+| 仓位控制 | `context.portfolio.available_cash` | `position_pct` 或 `position_amount` |
+
+### 8.2 组合回测示例
+
+```python
+from eqlib import StrategyConfig, run_portfolio_backtest
+
+# 定义配置
+config = StrategyConfig(
+    starting_cash=200000,
+    securities=['601390', '600519', '000858'],
+    benchmark='000300.XSHG',
+    position_pct=0.33,       # 每只股票最多用 33% 可用资金
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    report_suffix='multi_stock_v1',
+)
+
+# 策略函数
+def my_strategy(context):
+    for sec in context.universe:
+        hist = attribute_history(sec, 25, '1d', ['close'])
+        if hist.empty:
+            continue
+        ma20 = hist['close'].tail(20).mean()
+        price = hist['close'].iloc[-1]
+
+        if price > ma20 * 1.02:
+            order_value(sec, context.portfolio.available_cash * 0.33)
+        elif price < ma20 * 0.98 and context.portfolio.positions.get(sec):
+            order_target(sec, 0)
+
+# 运行回测
+result = run_portfolio_backtest(config, my_strategy)
+```
+
+### 8.3 组合回测输出
+
+```
+==================================================
+Portfolio Backtest: 2024-01-01 → 2024-12-31
+Universe: ['601390', '600519', '000858']
+==================================================
+Starting Cash:         200,000.00
+Final Value:           215,342.00
+P&L:                 +15,342.00 (+7.67%)
+Total Trades:              12
+
+--- Per-Stock Summary ---
+  600519: 3 buys, 3 sells, net shares 0, realized ¥5,200.00
+  601390: 4 buys, 4 sells, net shares 0, realized ¥3,100.00
+  000858: 5 buys, 5 sells, net shares 0, realized ¥7,042.00
+```
+
+---
+
+## 9. 下一步
+
+学会了解读回测结果后，接下来：
+
+- **[Tutorial 04: 策略优化与改进](04_strategy_optimization.md)** — 参数调优、组合优化、归因分析、避免过拟合
+- **[Tutorial 05: 模拟盘到实盘](05_live_trading.md)** — 从模拟盘到 PTrade/QMT 实盘部署

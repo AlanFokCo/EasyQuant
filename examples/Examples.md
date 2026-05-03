@@ -196,6 +196,190 @@ python examples/11_utils_library.py
 
 ---
 
+## 12_portfolio_backtest.py — 组合回测模式
+
+使用 `StrategyConfig` 和 `run_portfolio_backtest` 进行多股票组合回测：
+
+- 定义初始资金、股票池、每只股票的仓位比例
+- 策略函数遍历 `context.universe`，从股票池中选择标的交易
+- 自动生成包含每只股票操作明细、整体盈亏、与大盘对比的综合报告
+- 通过 `report_suffix` 参数区分不同版本或参数的回测结果
+
+**涉及 API：** `StrategyConfig`、`run_portfolio_backtest`、`context.universe`、`order_value`、`order_target`
+
+**运行方式：**
+```bash
+python examples/12_portfolio_backtest.py
+```
+
+---
+
+## 13_ptrade_export.py — 导出 PTrade/QMT 策略
+
+将 EasyQuant 策略一键转换为 PTrade/QMT 平台可运行的格式：
+
+- 自动生成 QMT 所需的 `init()` / `handlebar()` 入口函数
+- 透明转换股票代码格式（`601390` → `601390.SH`）
+- 兼容 EasyQuant 的全部 API：`attribute_history`、`order_value`、`run_daily` 等
+- 提供 `start()` / `on_bar()` 生命周期桥接
+
+**涉及 API：** `start`、`on_bar`、`export_ptrade_script`、`QMT_TEMPLATE`
+
+**运行方式：**
+```bash
+# 生成 QMT 策略文件
+python examples/13_ptrade_export.py
+
+# 输出 ptrade_strategy.py，复制到 QMT 编辑器即可运行
+```
+
+---
+
+## 14_bollinger_strategy.py — 布林带均值回归策略
+
+演示经典的布林带均值回归策略：
+
+- 价格触及下轨买入，触及上轨卖出
+- 内置止损机制（亏损超过设定比例强制平仓）
+- 适合震荡市中的高抛低吸操作
+
+**涉及 API：** `utils.boll`、`order_value`、`order_target`、`set_order_cost`
+
+**运行方式：**
+```bash
+python examples/14_bollinger_strategy.py
+```
+
+---
+
+## 15_macd_volume_strategy.py — MACD 趋势跟踪 + 成交量确认
+
+演示结合 MACD 和成交量的趋势跟踪策略：
+
+- MACD 金叉/死叉判断趋势方向
+- 成交量放大确认信号有效性
+- ATR 追踪止损，根据波动率动态调整止损位
+
+**涉及 API：** `utils.macd`、`utils.atr`、`order_value`、`order_target`
+
+**运行方式：**
+```bash
+python examples/15_macd_volume_strategy.py
+```
+
+---
+
+## 16_multi_factor_strategy.py — 多因子选股 + 每周轮动
+
+演示多因子量化选股策略：
+
+- 动量因子：过去 20 天收益率
+- 成交量因子：短期成交量与长期均值的比值
+- 价格过滤：排除低价股和高价股
+- 每周一调仓，等权配置排名前 N 的股票
+
+**涉及 API：** `run_weekly`、`attribute_history`、`context.universe`、`order_value`
+
+**运行方式：**
+```bash
+python examples/16_multi_factor_strategy.py
+```
+
+---
+
+## 17_grid_trading_strategy.py — 网格交易策略
+
+演示适用于震荡市的网格交易策略：
+
+- 设定价格区间并划分为 N 个网格级别
+- 价格下跌到网格级别时买入一批
+- 价格上涨到网格级别时卖出一批
+- 从价格的上下波动中获利
+
+适合低波动、区间震荡的股票（如银行股）。
+
+**涉及 API：** `order_value`、`order`、`attribute_history`
+
+**运行方式：**
+```bash
+python examples/17_grid_trading_strategy.py
+```
+
+---
+
+## 18_strategy_comparison.py — 多策略对比
+
+在同一只股票和同一时间段内，横向对比多种策略的表现：
+
+- 买入持有（基准）
+- 均线交叉（趋势跟踪）
+- RSI 均值回归（反向交易）
+- 布林带（均值回归）
+
+输出格式化的对比表格，按夏普比率排序，便于客观评估哪种方法更有效。
+
+**涉及 API：** `run_backtest`、`analyze_returns`、`record`
+
+**运行方式：**
+```bash
+python examples/18_strategy_comparison.py
+```
+
+---
+
+## 18_strategy_comparison.py — 多策略对比
+
+在同一只股票和同一时间段内，横向对比多种策略的表现：
+
+- 买入持有（基准）
+- 均线交叉（趋势跟踪）
+- RSI 均值回归（反向交易）
+- 布林带（均值回归）
+
+输出格式化的对比表格，按夏普比率排序，便于客观评估哪种方法更有效。
+
+**涉及 API：** `run_backtest`、`analyze_returns`、`record`
+
+**运行方式：**
+```bash
+python examples/18_strategy_comparison.py
+```
+
+---
+
+## 19_local_data_backtest.py — 本地数据回测模式
+
+演示 `use_local` 参数的用法：
+
+- 首次运行：从网络下载数据，保存到本地 CSV
+- 后续运行：从本地 CSV 加载数据，无需网络
+- 手动管理：列出、下载、删除本地数据文件
+
+适合以下场景：
+- 离线回测（无网络环境）
+- 节省重复下载的时间
+- 管理自己的历史数据版本
+- 批量预下载数据
+
+**涉及 API：** `use_local`、`has_local_data`、`list_local_stocks`、`save_stock_local`、`clear_all_local_data`
+
+**运行方式：**
+```bash
+# 首次运行 — 下载数据并回测
+python examples/19_local_data_backtest.py
+
+# 再次运行 — 使用本地数据（无网络请求）
+python examples/19_local_data_backtest.py
+
+# 查看本地数据列表
+python examples/19_local_data_backtest.py --list
+
+# 批量预下载数据
+python examples/19_local_data_backtest.py --download-all
+```
+
+---
+
 ## 速查表
 
 | # | 文件 | 主题 | 运行时间 |
@@ -211,6 +395,14 @@ python examples/11_utils_library.py
 | 09 | `09_attribution_analysis.py` | 绩效归因 | ~15s |
 | 10 | `10_index_concept.py` | 指数与概念策略 | ~30s |
 | 11 | `11_utils_library.py` | 工具库：技术指标 / 统计 / 资金管理 / 支撑阻力位 | ~5s |
+| 12 | `12_portfolio_backtest.py` | 组合回测模式（StrategyConfig） | ~15s |
+| 13 | `13_ptrade_export.py` | 导出 PTrade/QMT 策略 | ~1s |
+| 14 | `14_bollinger_strategy.py` | 布林带均值回归策略 | ~15s |
+| 15 | `15_macd_volume_strategy.py` | MACD 趋势跟踪 + 成交量确认 | ~15s |
+| 16 | `16_multi_factor_strategy.py` | 多因子选股 + 每周轮动 | ~30s |
+| 17 | `17_grid_trading_strategy.py` | 网格交易策略 | ~15s |
+| 18 | `18_strategy_comparison.py` | 多策略横向对比（同股同时段） | ~30s |
+| 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） | ~15s |
 
 ## 环境要求
 
