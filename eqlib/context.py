@@ -44,7 +44,7 @@ class Portfolio:
 
     def _sync_total_value(self, prices):
         self.total_value = self.available_cash
-        for sec, pos in self.positions.items():
+        for sec, pos in list(self.positions.items()):
             p = prices.get(sec, pos.avg_cost)
             pos.update(p)
             self.total_value += pos.total_value
