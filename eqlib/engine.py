@@ -6,7 +6,7 @@ import time
 import pandas as pd
 from typing import Optional
 from eqlib.context import Context
-from eqlib.data import fetch_stock_data, get_price
+from eqlib.data import fetch_stock_data, get_price, _iter_days
 from eqlib.data_cache import PreloadedData
 from eqlib._state import (
     _scheduled_funcs, _recorded_values, _trade_log, _handle_data_func,
@@ -164,14 +164,14 @@ class _LazyData(dict):
 
         if not df.empty:
             row = df.iloc[-1]
-            result = _make_bar_from_row(row)
+            result = _make_bar(row)
             self[key] = result
             return result
         return None
 
 
-def _make_bar(bar: dict):
-    """Create a SecurityBar-like object from a dict."""
+def _make_bar(bar):
+    """Create a SecurityBar-like object from a dict or DataFrame row."""
     obj = type("SecurityBar", (), {})()
     obj.open = bar.get("open", 0)
     obj.high = bar.get("high", 0)
@@ -179,18 +179,6 @@ def _make_bar(bar: dict):
     obj.close = bar.get("close", 0)
     obj.volume = bar.get("volume", 0)
     obj.money = bar.get("money", 0)
-    return obj
-
-
-def _make_bar_from_row(row):
-    """Create a SecurityBar-like object from a DataFrame row."""
-    obj = type("SecurityBar", (), {})()
-    obj.open = row.get("open", 0)
-    obj.high = row.get("high", 0)
-    obj.low = row.get("low", 0)
-    obj.close = row.get("close", 0)
-    obj.volume = row.get("volume", 0)
-    obj.money = row.get("money", 0)
     return obj
 
 
@@ -320,15 +308,6 @@ def _get_trading_days(start, end) -> list[datetime.date]:
         return sorted(df["日期"].dt.date.unique().tolist())
     except Exception:
         return [d for d in _iter_days(start, end) if d.weekday() < 5]
-
-
-def _iter_days(start, end):
-    """Iterate days between start and end inclusive."""
-    current = start
-    while current <= end:
-        yield current
-        current += datetime.timedelta(days=1)
-
 
 # Re-export for external access
 def get_context():
