@@ -148,7 +148,9 @@ def swing_highs_lows(high: pd.Series, low: pd.Series,
         tuple: (swing_high_levels, swing_low_levels) — Series with
                numeric values at swing positions and NaN elsewhere.
     """
-    # Max of the left_bars bars strictly to the left of each position
+    # Left neighbors: max of the left_bars bars strictly to the left of each position.
+    # min_periods=left_bars ensures partial windows at the start of the series
+    # are not used — a pivot requires a full confirmation window on each side.
     left_max_h = high.shift(1).rolling(left_bars, min_periods=left_bars).max()
     # Max of the right_bars bars strictly to the right — reverse-roll trick
     right_max_h = (
