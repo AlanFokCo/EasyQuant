@@ -62,7 +62,8 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     daily_rf = risk_free_rate / ann_factor
     sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor) if std > 0 else 0.0
 
-    # Sortino ratio — require at least 2 downside observations for stable std
+    # Sortino ratio — require at least 2 downside observations for a stable
+    # sample std (ddof=1); fewer observations produce an unreliable estimate.
     downside = daily_ret[daily_ret < 0]
     downside_std = downside.std() * np.sqrt(ann_factor) if len(downside) >= 2 else 0.0
     sortino = (ann_return - risk_free_rate) / downside_std if downside_std > 0 else 0.0
@@ -113,6 +114,8 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         from eqlib.data import fetch_stock_data
         import datetime
 
+        # Fetch 30 extra days before the strategy start so the benchmark
+        # pct_change() series covers the full strategy return window after dropna().
         start = strategy_returns.index[0] - datetime.timedelta(days=30)
         end = strategy_returns.index[-1]
 
@@ -280,7 +283,10 @@ def fama_french_analysis(result, factors=None):
     benchmark = result.get("benchmark", "000300.XSHG")
     alpha_annual, beta, _ = _calc_alpha_beta(strat_ret, benchmark, 0.03, 252)
 
-    # Momentum: lag-5 autocorrelation using value-based alignment (no index misalignment)
+    # Momentum: lag-5 autocorrelation of daily returns.
+    # Lag 5 (one trading week) is a conventional short-term momentum window
+    # that captures weekly serial correlation in equity returns.
+    # `.values` is used to avoid DatetimeIndex misalignment.
     arr = strat_ret.values
     if len(arr) > 10:
         momentum_corr = float(np.corrcoef(arr[:-5], arr[5:])[0, 1])
