@@ -5,10 +5,24 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "eqlib"
 version = "0.1.0"
-description = "A quant backtesting framework for China A-share market"
+description = "Event-driven quantitative trading framework for local backtesting"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [
+    {name = "AlanFokCo", email = "alanfok2868@gmail.com"},
+]
+keywords = ["quantitative", "trading", "backtest", "finance", "akshare"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
 dependencies = [
     "akshare>=1.10.0",
     "pandas>=1.5.0",
@@ -18,7 +32,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 cache = ["pyarrow>=12.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/AlanFokCo/EasyQuant"
+Repository = "https://github.com/AlanFokCo/EasyQuant"
 
 [tool.setuptools.packages.find]
 include = ["eqlib*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
