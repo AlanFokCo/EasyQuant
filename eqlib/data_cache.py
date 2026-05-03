@@ -9,6 +9,7 @@ Provides:
 import os
 import hashlib
 import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -16,9 +17,6 @@ import pandas as pd
 
 # Disk cache directory (relative to project root or configurable)
 _CACHE_DIR = os.environ.get("EQLIB_CACHE_DIR", None)
-
-# Cached result of pyarrow availability check (None = not yet checked)
-_PYARROW_AVAILABLE: Optional[bool] = None
 
 
 def _get_cache_dir() -> Path:
@@ -67,15 +65,13 @@ def _save_to_disk(df: pd.DataFrame, security: str, start: str, end: str, adjust:
         pass
 
 
+@lru_cache(maxsize=None)
 def _has_pyarrow() -> bool:
-    global _PYARROW_AVAILABLE
-    if _PYARROW_AVAILABLE is None:
-        try:
-            import pyarrow  # noqa: F401
-            _PYARROW_AVAILABLE = True
-        except ImportError:
-            _PYARROW_AVAILABLE = False
-    return _PYARROW_AVAILABLE
+    try:
+        import pyarrow  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
 
 def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
