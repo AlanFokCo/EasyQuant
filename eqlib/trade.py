@@ -140,9 +140,7 @@ def order(security, amount, style=None):
         pos.closeable_amount -= sell_amount
 
         if pos.amount <= 0:
-            pos.amount = 0
-            pos.closeable_amount = 0
-            pos.avg_cost = 0
+            del portfolio.positions[security]
 
         log.info(f"order SELL {security}: {sell_amount} shares @ {price:.3f}, commission={commission:.2f}")
 
@@ -303,9 +301,7 @@ def order_market(security, amount, price, style=None):
         pos.amount -= sell_amount
         pos.closeable_amount -= sell_amount
         if pos.amount <= 0:
-            pos.amount = 0
-            pos.closeable_amount = 0
-            pos.avg_cost = 0
+            del portfolio.positions[security]
 
         return {
             "type": "SELL",
