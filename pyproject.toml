@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eqlib"
+version = "0.1.0"
+description = "A quant backtesting framework for China A-share market"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "akshare>=1.10.0",
+    "pandas>=1.5.0",
+    "numpy>=1.23.0",
+    "matplotlib>=3.6.0",
+    "scipy>=1.10.0",
+]
+
+[project.optional-dependencies]
+cache = ["pyarrow>=12.0.0"]
+
+[tool.setuptools.packages.find]
+include = ["eqlib*"]

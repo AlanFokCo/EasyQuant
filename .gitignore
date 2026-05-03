@@ -1,0 +1,66 @@
+# Byte-compiled / optimized / distributed files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Data directories (downloaded / generated data)
+data/
+*.csv
+*.h5
+*.hdf5
+*.parquet
+*.feather
+*.pkl
+
+# Backtest / strategy output
+backtest_results/
+strategy_results/
+reports/
+*.log
+
+# Local config (may contain API keys, secrets)
+.env
+.env.local
+*.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data cache (disk-cached price data)
+.eqlib_cache/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Testing
+.pytest_cache/

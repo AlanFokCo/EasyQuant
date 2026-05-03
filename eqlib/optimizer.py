@@ -1,0 +1,167 @@
+"""Portfolio optimization utilities.
+
+Provides mathematical optimization for asset allocation:
+- Minimum variance
+- Maximum Sharpe ratio
+- Equal risk contribution (risk parity)
+"""
+
+import numpy as np
+import pandas as pd
+
+
+class Bound:
+    """Weight bounds for a single asset."""
+
+    def __init__(self, lower=0.0, upper=1.0):
+        self.lower = lower
+        self.upper = upper
+
+
+class MinVariance:
+    """Target: minimize portfolio variance."""
+    name = "min_variance"
+
+
+class MaxSharpe:
+    """Target: maximize Sharpe ratio."""
+    name = "max_sharpe"
+
+    def __init__(self, risk_free_rate=0.03):
+        self.risk_free_rate = risk_free_rate
+
+
+class RiskParity:
+    """Target: equal risk contribution across assets."""
+    name = "risk_parity"
+
+
+def _get_returns(prices, days=250):
+    """Convert price DataFrame to daily returns matrix."""
+    ret = prices.pct_change().dropna().tail(days)
+    return ret
+
+
+def _annual_stats(weights, returns, days=252):
+    """Calculate annualized return, volatility, and Sharpe for a weight vector."""
+    port_ret = returns.dot(weights)
+    ann_ret = port_ret.mean() * days
+    ann_vol = port_ret.std() * np.sqrt(days)
+    return ann_ret, ann_vol
+
+
+def portfolio_optimizer(securities, prices, target=None, constraints=None,
+                        bounds=None, default_range=(0.0, 1.0),
+                        ftol=1e-9, return_none_if_fail=True):
+    """
+    Optimize portfolio weights under given constraints.
+
+    Parameters:
+        securities: list of stock codes
+        prices: DataFrame of prices, columns=securities, index=date
+        target: optimization objective
+            - MinVariance(): minimize portfolio variance
+            - MaxSharpe(risk_free_rate): maximize Sharpe ratio
+            - RiskParity(): equal risk contribution
+            Default: MinVariance
+        constraints: dict with optional keys:
+            - max_weight: maximum weight for any single asset (default 1.0)
+            - min_weight: minimum weight for any single asset (default 0.0)
+            - max_assets: limit number of non-zero assets (not enforced, soft)
+        bounds: list of Bound objects, one per security
+            Default: same bounds for all assets from default_range
+        default_range: (min, max) weight range when bounds is None
+        ftol: optimization tolerance
+        return_none_if_fail: return None on failure instead of raising
+
+    Returns:
+        pd.Series of optimized weights (security -> weight), or None on failure
+    """
+    from scipy.optimize import minimize
+
+    if target is None:
+        target = MinVariance()
+
+    returns = _get_returns(prices, days=250)
+    if returns.empty or len(returns) < 20:
+        return None
+
+    securities = [s for s in securities if s in returns.columns]
+    if len(securities) < 2:
+        return None
+
+    returns = returns[securities]
+    cov = returns.cov().values
+    mean_ret = returns.mean().values
+    n = len(securities)
+
+    # Build bounds
+    if bounds is None:
+        min_w = constraints.get("min_weight", 0.0) if constraints else 0.0
+        max_w = constraints.get("max_weight", 1.0) if constraints else 1.0
+        bounds = [(min_w, max_w)] * n
+    else:
+        bounds = [(b.lower, b.upper) if isinstance(b, Bound) else b for b in bounds]
+
+    # Initial weights: equal
+    w0 = np.array([1.0 / n] * n)
+
+    # Sum-to-one constraint
+    eq_constraint = {"type": "eq", "fun": lambda w: np.sum(w) - 1.0}
+
+    try:
+        if isinstance(target, MinVariance):
+            def objective(w):
+                return w @ cov @ w
+
+            res = minimize(objective, w0, method="SLSQP",
+                           bounds=bounds, constraints=eq_constraint,
+                           options={"ftol": ftol, "maxiter": 1000})
+
+        elif isinstance(target, MaxSharpe):
+            rf = getattr(target, "risk_free_rate", 0.03)
+
+            def neg_sharpe(w):
+                ret, vol = _annual_stats(w, returns)
+                if vol < 1e-10:
+                    return 0
+                return -(ret - rf) / vol
+
+            res = minimize(neg_sharpe, w0, method="SLSQP",
+                           bounds=bounds, constraints=eq_constraint,
+                           options={"ftol": ftol, "maxiter": 1000})
+
+        elif isinstance(target, RiskParity):
+            # Risk parity: minimize sum of (risk_contrib_i - target)^2
+            def risk_parity_obj(w):
+                w = np.maximum(w, 1e-10)
+                sigma = np.sqrt(w @ cov @ w)
+                marginal_risk = cov @ w
+                risk_contrib = w * marginal_risk / sigma
+                target_rc = sigma / n
+                return np.sum((risk_contrib - target_rc) ** 2)
+
+            res = minimize(risk_parity_obj, w0, method="SLSQP",
+                           bounds=bounds, constraints=eq_constraint,
+                           options={"ftol": ftol, "maxiter": 1000})
+        else:
+            return None
+
+        if res.success:
+            weights = res.x
+            # Normalize to sum to 1
+            weights = weights / weights.sum()
+            # Zero out tiny weights
+            weights[np.abs(weights) < 1e-6] = 0
+            # Re-normalize
+            weights = weights / weights.sum()
+            return pd.Series(weights, index=securities)
+
+        if return_none_if_fail:
+            return None
+        raise RuntimeError(f"Optimization failed: {res.message}")
+
+    except Exception:
+        if return_none_if_fail:
+            return None
+        raise
