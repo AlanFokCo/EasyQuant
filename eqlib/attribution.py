@@ -2,7 +2,10 @@
 
 Provides:
 - Risk/return metrics (Sharpe, Sortino, max drawdown, Calmar, alpha, beta)
+- Trade-level win rate (matched round-trip buy/sell pairs)
+- Turnover and total commission cost metrics
 - Brinson attribution (allocation, selection, interaction effects)
+  with optional real benchmark_returns Series
 - Fama-French factor analysis
 """
 
@@ -12,8 +15,7 @@ import pandas as pd
 
 
 def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
-    """
-    Calculate comprehensive risk and return metrics from a backtest result.
+    """Calculate comprehensive risk and return metrics from a backtest result.
 
     Parameters:
         result: dict returned by run_backtest or run_strategy
@@ -21,10 +23,16 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
         trading_days: number of trading days per year (default 252)
 
     Returns:
-        dict with metrics:
+        dict with metrics including:
             total_return, annual_return, annual_volatility, sharpe_ratio,
-            sortino_ratio, max_drawdown, max_drawdown_start, max_drawdown_end,
-            calmar_ratio, alpha, beta, information_ratio, win_rate
+            sortino_ratio, max_drawdown, calmar_ratio, alpha, beta,
+            information_ratio,
+            win_rate_daily: daily win rate (fraction of profitable days),
+            win_rate_trade: round-trip trade win rate (matched buy/sell pairs),
+            trade_count: number of completed round-trip trades,
+            annual_turnover: total traded value / avg portfolio value / years,
+            total_commission: sum of all commissions paid,
+            net_return: total return after deducting all commissions.
     """
     ctx = result["context"]
     trades = result["trade_log"]
@@ -67,12 +75,11 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     std = daily_ret.std()
     ann_vol = std * np.sqrt(ann_factor)
 
-    # Sharpe ratio — guard against zero volatility
+    # Sharpe ratio
     daily_rf = risk_free_rate / ann_factor
     sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor) if std > 0 else 0.0
 
-    # Sortino ratio — require at least 2 downside observations for a stable
-    # sample std (ddof=1); fewer observations produce an unreliable estimate.
+    # Sortino ratio
     downside = daily_ret[daily_ret < 0]
     downside_std = downside.std(ddof=1) * np.sqrt(ann_factor) if len(downside) >= 2 else 0.0
     sortino = (ann_return - risk_free_rate) / downside_std if downside_std > 0 else 0.0
@@ -82,7 +89,6 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     drawdown = (values - rolling_max) / rolling_max
     max_dd = drawdown.min()
     dd_end_idx = drawdown.idxmin()
-    # Guard against empty peak slice (drawdown starts at first bar)
     peak_slice = values[:dd_end_idx]
     dd_start_idx = peak_slice.idxmax() if not peak_slice.empty else values.index[0]
 
@@ -90,7 +96,22 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     calmar = ann_return / abs(max_dd) if max_dd != 0 else 0.0
 
     # Win rate (by day)
-    win_rate = float((daily_ret > 0).sum()) / n_days
+    win_rate_daily = float((daily_ret > 0).sum()) / n_days
+
+    # ── Trade-level win rate (item 12) ────────────────────────────────────
+    win_rate_trade, trade_count = _calc_trade_win_rate(trades)
+
+    # ── Turnover & commission metrics (item 13) ───────────────────────────
+    years = n_days / ann_factor if ann_factor > 0 else 1.0
+    avg_portfolio_value = float(values.mean()) if not values.empty else initial
+    total_buy_value = sum(
+        t["price"] * t["amount"]
+        for t in trades if t.get("type") == "BUY"
+    )
+    annual_turnover = (total_buy_value / avg_portfolio_value / years
+                       if avg_portfolio_value > 0 and years > 0 else 0.0)
+    total_commission = sum(t.get("commission", 0.0) for t in trades)
+    net_return = total_return - total_commission / initial
 
     # Benchmark comparison
     benchmark_name = result.get("benchmark", "000300.XSHG")
@@ -111,20 +132,75 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
         "alpha": alpha,
         "beta": beta,
         "information_ratio": info_ratio,
-        "win_rate": win_rate,
+        "win_rate": win_rate_daily,           # backward-compatible alias
+        "win_rate_daily": win_rate_daily,
+        "win_rate_trade": win_rate_trade,
+        "trade_count": trade_count,
+        "annual_turnover": annual_turnover,
+        "total_commission": total_commission,
+        "net_return": net_return,
         "trading_days": n_days,
         "num_trades": len(trades),
     }
+
+
+def _calc_trade_win_rate(trades):
+    """Compute win rate by completed round-trip buy/sell pairs (item 12).
+
+    Uses FIFO matching: each sell is matched against the oldest outstanding
+    buy lot for that security.  A completed round trip is a "win" when the
+    sell price exceeds the average buy cost of the matched shares.
+
+    Returns:
+        tuple: (win_rate, completed_trade_count)
+    """
+    from collections import deque
+
+    buy_queues: dict = {}    # security -> deque of (price, amount) lots
+    wins = 0
+    total = 0
+
+    for trade in trades:
+        sec = trade["security"]
+        t_type = trade.get("type")
+        price = trade["price"]
+        amount = trade["amount"]
+
+        if t_type == "BUY":
+            buy_queues.setdefault(sec, deque()).append((price, amount))
+
+        elif t_type == "SELL":
+            remaining = amount
+            q = buy_queues.get(sec, deque())
+            total_buy_cost = 0.0
+            total_matched = 0
+
+            while remaining > 0 and q:
+                buy_price, buy_amt = q[0]
+                matched = min(buy_amt, remaining)
+                total_buy_cost += buy_price * matched
+                total_matched += matched
+                remaining -= matched
+                if matched == buy_amt:
+                    q.popleft()
+                else:
+                    q[0] = (buy_price, buy_amt - matched)
+
+            if total_matched > 0:
+                avg_buy = total_buy_cost / total_matched
+                total += 1
+                if price > avg_buy:
+                    wins += 1
+
+    win_rate = wins / total if total > 0 else 0.0
+    return win_rate, total
 
 
 def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
     """Calculate alpha, beta, and information ratio vs benchmark."""
     try:
         from eqlib.data import fetch_stock_data
-        import datetime
 
-        # Fetch 30 extra days before the strategy start so the benchmark
-        # pct_change() series covers the full strategy return window after dropna().
         start = strategy_returns.index[0] - datetime.timedelta(days=30)
         end = strategy_returns.index[-1]
 
@@ -135,7 +211,6 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         bench_ret = bench_df["close"].pct_change().dropna()
         bench_ret = bench_ret.reindex(strategy_returns.index).fillna(0)
 
-        # Align
         common = strategy_returns.index.intersection(bench_ret.index)
         strat = strategy_returns.loc[common].values
         bench = bench_ret.loc[common].values
@@ -143,9 +218,6 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         if len(strat) < 10:
             return 0.0, 1.0, 0.0
 
-        # Use np.cov with ddof=1 so covariance and variance are both sample
-        # estimates — cov_matrix[0,1] is cov(strat,bench),
-        # cov_matrix[1,1] is var(bench).
         cov_matrix = np.cov(strat, bench, ddof=1)
         bench_var = cov_matrix[1, 1]
         if bench_var < 1e-15:
@@ -155,36 +227,29 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         alpha_daily = strat.mean() - beta * bench.mean()
         alpha_annual = alpha_daily * ann_factor
 
-        # Information ratio: annualized alpha / annualized tracking error
         residual = strat - beta * bench
         residual_std = residual.std(ddof=1)
-        info_ratio = alpha_daily / residual_std * np.sqrt(ann_factor) if residual_std > 0 else 0.0
+        info_ratio = (alpha_daily / residual_std * np.sqrt(ann_factor)
+                      if residual_std > 0 else 0.0)
 
         return alpha_annual, beta, info_ratio
     except Exception:
         return 0.0, 1.0, 0.0
 
 
-def brinson_attribution(result, sector_data=None):
-    """
-    Brinson attribution: allocation + selection + interaction effects.
-
-    Per-security returns are derived from the trade log (realized proceeds
-    plus remaining open-position market value vs total buy cost), giving
-    accurate attribution rather than a hardcoded proxy.
-
-    For single-stock strategies this reduces to selection effect.
-    For multi-stock strategies with sector assignments, provides
-    full Brinson decomposition.
+def brinson_attribution(result, sector_data=None, benchmark_returns=None):
+    """Brinson attribution: allocation + selection + interaction effects.
 
     Parameters:
         result: dict returned by run_backtest
         sector_data: dict mapping security -> sector (optional)
-            If None, assumes single-sector portfolio
+        benchmark_returns: optional pd.Series with benchmark daily returns
+            indexed by date, used for realistic benchmark comparison.
+            When None, falls back to an equal-weight universe approximation.
 
     Returns:
         dict with allocation_effect, selection_effect, interaction_effect,
-        total_active_return, or None if no trades or positions exist
+        total_active_return; or None if no trades or positions exist.
     """
     ctx = result["context"]
     trade_log = result.get("trade_log", [])
@@ -223,29 +288,34 @@ def brinson_attribution(result, sector_data=None):
         remaining = pos.total_value if pos else 0.0
         sec_returns[sec] = (sell_proceeds + remaining) / buy_cost - 1.0
 
-    # Final portfolio weights by open-position market value
+    # Portfolio weights by open-position market value
     weights = {
         sec: pos.total_value / total_value
         for sec, pos in positions.items()
     }
 
-    # Benchmark: equal weight across strategy universe
-    universe = ctx.universe or sorted(all_secs)
-    bench_weight = 1.0 / len(universe) if universe else 0.0
-
-    # Benchmark return: equal-weighted average of individual security returns
-    bench_return = (
-        sum(sec_returns.get(s, 0.0) for s in universe) / len(universe)
-        if universe else 0.0
-    )
+    # ── Benchmark return (item 14) ────────────────────────────────────────
+    # Use caller-supplied benchmark_returns if available, otherwise fall back
+    # to the equal-weight universe approximation.
+    if benchmark_returns is not None and isinstance(benchmark_returns, pd.Series):
+        bench_return = float((1 + benchmark_returns).prod() - 1)
+        bench_weight = 1.0 / len(all_secs) if all_secs else 0.0
+    else:
+        universe = ctx.universe or sorted(all_secs)
+        bench_weight = 1.0 / len(universe) if universe else 0.0
+        bench_return = (
+            sum(sec_returns.get(s, 0.0) for s in universe) / len(universe)
+            if universe else 0.0
+        )
 
     allocation = 0.0
     selection = 0.0
     interaction = 0.0
 
+    universe_set = set(ctx.universe or all_secs)
     for sec in all_secs:
         w = weights.get(sec, 0.0)
-        wb = bench_weight if sec in universe else 0.0
+        wb = bench_weight if sec in universe_set else 0.0
         r_sec = sec_returns.get(sec, 0.0)
 
         allocation += (w - wb) * bench_return
@@ -261,8 +331,7 @@ def brinson_attribution(result, sector_data=None):
 
 
 def fama_french_analysis(result, factors=None):
-    """
-    Simplified Fama-French style factor analysis.
+    """Simplified Fama-French style factor analysis.
 
     Decomposes strategy returns into:
     - Market factor (beta)
@@ -281,7 +350,6 @@ def fama_french_analysis(result, factors=None):
     if not recorded:
         return None
 
-    # Build strategy returns
     if isinstance(recorded, dict):
         entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min))
     else:
@@ -302,10 +370,6 @@ def fama_french_analysis(result, factors=None):
     benchmark = result.get("benchmark", "000300.XSHG")
     alpha_annual, beta, _ = _calc_alpha_beta(strat_ret, benchmark, 0.03, 252)
 
-    # Momentum: lag-5 autocorrelation of daily returns.
-    # Lag 5 (one trading week) is a conventional short-term momentum window
-    # that captures weekly serial correlation in equity returns.
-    # `.values` is used to avoid DatetimeIndex misalignment.
     arr = strat_ret.values
     if len(arr) > 10:
         momentum_corr = float(np.corrcoef(arr[:-5], arr[5:])[0, 1])
@@ -314,16 +378,13 @@ def fama_french_analysis(result, factors=None):
     else:
         momentum_corr = 0.0
 
-    # Volatility regime
     rolling_vol = strat_ret.rolling(20).std()
     vol_of_vol = float(rolling_vol.std()) if not rolling_vol.dropna().empty else 0.0
 
-    # Residual volatility and R² using actual benchmark returns
     residual_vol = 0.0
     explained_var = 0.0
     try:
         from eqlib.data import fetch_stock_data
-        import datetime
 
         start = strat_ret.index[0] - datetime.timedelta(days=30)
         end = strat_ret.index[-1]
@@ -338,7 +399,6 @@ def fama_french_analysis(result, factors=None):
                 residual = s - beta * b
                 residual_vol = float(residual.std(ddof=1)) * np.sqrt(252)
                 strat_var = s.var(ddof=1)
-                # R² = 1 - var(residual) / var(strat)
                 explained_var = float(
                     np.clip(1.0 - residual.var(ddof=1) / strat_var, 0.0, 1.0)
                 ) if strat_var > 0 else 0.0

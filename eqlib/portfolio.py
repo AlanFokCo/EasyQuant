@@ -8,13 +8,13 @@ Usage:
         starting_cash=200000,
         securities=['601390', '600519', '000858'],
         benchmark='000300.XSHG',
-        position_pct=0.33,       # 33% of cash per stock
+        position_pct=0.33,
         start_date='2024-01-01',
         end_date='2024-12-31',
+        rebalance_frequency='monthly',
     )
 
     def my_strategy(context):
-        # pick stocks from context.universe
         for sec in context.universe:
             ...
 
@@ -32,16 +32,18 @@ class StrategyConfig:
         starting_cash: initial capital (default 100,000)
         securities: list of stock codes to include in the universe
         benchmark: benchmark index code (default '000300.XSHG')
-        position_pct: fraction of available cash to allocate per stock
-            when the strategy signals a buy. 1.0 = full cash on one stock,
-            0.33 = one-third of cash per stock. (default 0.33)
-        position_amount: fixed number of shares to buy per signal.
-            If set (non-zero), overrides position_pct. (default 0)
+        position_pct: fraction of available cash per stock (default 0.33)
+        position_amount: fixed share count per signal (overrides position_pct when > 0)
         start_date: backtest start date
         end_date: backtest end date
-        report_suffix: optional string appended to report filenames
-            to distinguish versions (e.g., 'v1', 'ma_crossover_test')
+        report_suffix: optional suffix for report filenames
         frequency: 'daily' or 'minute'
+        rebalance_frequency: how often to re-run portfolio optimization /
+            strategy logic.  One of 'daily' (default), 'weekly', or 'monthly'.
+            When set to 'weekly' or 'monthly', strategy_func is only called on
+            the first trading day of each week/month; otherwise the portfolio
+            is held as-is.  This reduces trading costs and models realistic
+            rebalancing schedules.
     """
 
     def __init__(
@@ -55,6 +57,7 @@ class StrategyConfig:
         position_amount: int = 0,
         report_suffix: str = "",
         frequency: str = "daily",
+        rebalance_frequency: str = "daily",
     ):
         self.starting_cash = starting_cash
         self.securities = list(securities)
@@ -65,14 +68,39 @@ class StrategyConfig:
         self.start_date = start_date
         self.end_date = end_date
         self.frequency = frequency
+        if rebalance_frequency not in ("daily", "weekly", "monthly"):
+            raise ValueError("rebalance_frequency must be 'daily', 'weekly', or 'monthly'")
+        self.rebalance_frequency = rebalance_frequency
 
     def __repr__(self):
         return (
             f"StrategyConfig(securities={self.securities}, "
             f"start={self.start_date}, end={self.end_date}, "
             f"cash={self.starting_cash:,.0f}, "
-            f"pct={self.position_pct}, amt={self.position_amount})"
+            f"pct={self.position_pct}, amt={self.position_amount}, "
+            f"rebalance={self.rebalance_frequency})"
         )
+
+
+def _should_rebalance(rebalance_frequency: str, day: datetime.date,
+                      prev_day: Optional[datetime.date]) -> bool:
+    """Return True if strategy_func should be called on *day*.
+
+    Parameters:
+        rebalance_frequency: 'daily', 'weekly', or 'monthly'
+        day: current trading day
+        prev_day: previous trading day (None on the first bar)
+    """
+    if rebalance_frequency == "daily":
+        return True
+    if prev_day is None:
+        return True   # Always run on the first bar
+    if rebalance_frequency == "weekly":
+        # Rebalance on Monday (or the first trading day of the week)
+        return day.isocalendar()[1] != prev_day.isocalendar()[1]
+    if rebalance_frequency == "monthly":
+        return day.month != prev_day.month
+    return True
 
 
 def run_portfolio_backtest(config: StrategyConfig, strategy_func,
@@ -83,16 +111,11 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
     Parameters:
         config: StrategyConfig with capital, universe, and settings
         strategy_func: callable taking (context) — the daily logic.
-            Within this function, use `context.universe` to access
-            the stock list, and the standard trade APIs (order,
-            order_value, etc.) to execute trades.
         report_dir: directory for output reports
         generate_reports: whether to generate chart/md/json/html reports
 
     Returns:
-        dict with keys:
-            context, trade_log, recorded_values, benchmark,
-            config (the StrategyConfig used)
+        dict with context, trade_log, recorded_values, benchmark, config
     """
     from eqlib.engine import run_backtest, run_daily
     from eqlib import set_benchmark, set_universe
@@ -100,11 +123,21 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
     start_date = _parse_date(config.start_date)
     end_date = _parse_date(config.end_date)
 
+    rebalance_freq = config.rebalance_frequency
+    # Closure state: track the last rebalance day
+    _state = {"prev_day": None}
+
+    def _wrapped_strategy(context):
+        day = context.current_dt.date()
+        if _should_rebalance(rebalance_freq, day, _state["prev_day"]):
+            strategy_func(context)
+            _state["prev_day"] = day
+
     def initialize(context):
         context.universe = config.securities
         set_benchmark(config.benchmark)
         set_universe(config.securities)
-        run_daily(strategy_func, time="every_bar")
+        run_daily(_wrapped_strategy, time="every_bar")
 
     result = run_backtest(
         initialize, start_date, end_date,
@@ -118,7 +151,6 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
         print("Backtest failed: no result returned.")
         return None
 
-    # Attach config to result
     result["config"] = config
 
     if generate_reports:
@@ -138,20 +170,20 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
 
         ctx = result["context"]
         pnl = ctx.portfolio.total_value - ctx.portfolio.starting_cash
-        pnl_pct = (pnl / ctx.portfolio.starting_cash) * 100
+        pnl_pct = pnl / ctx.portfolio.starting_cash * 100
 
         print(f"\n{'='*50}")
         print(f"Portfolio Backtest: {config.start_date} → {config.end_date}")
         print(f"Universe: {config.securities}")
+        print(f"Rebalance: {config.rebalance_frequency}")
         print(f"{'='*50}")
         print(f"Starting Cash:    {ctx.portfolio.starting_cash:>15,.2f}")
         print(f"Final Value:      {ctx.portfolio.total_value:>15,.2f}")
         print(f"P&L:              {pnl:>+14,.2f} ({pnl_pct:+.2f}%)")
         print(f"Total Trades:     {len(result['trade_log'])}")
 
-        # Per-stock summary
         print(f"\n--- Per-Stock Summary ---")
-        stock_trades = {}
+        stock_trades: dict = {}
         for t in result["trade_log"]:
             sec = t["security"]
             if sec not in stock_trades:
@@ -166,14 +198,12 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
                 st["shares"] -= t["amount"]
                 st["revenue"] += t["price"] * t["amount"] - t.get("commission", 0)
 
-        for sec, st in sorted(stock_trades.items()):
-            info = ctx.portfolio.positions.get(sec)
-            holding = ""
-            if info and info.amount > 0:
-                holding = f" (holding {info.amount} shares)"
-            print(f"  {sec}: {st['buys']} buys, {st['sells']} sells, "
-                  f"net shares {st['shares']}, "
-                  f"realized ¥{st['revenue']:,.2f}{holding}")
+        for sec, st_stats in sorted(stock_trades.items()):
+            pos = ctx.portfolio.positions.get(sec)
+            holding = f" (holding {pos.amount} shares)" if pos and pos.amount > 0 else ""
+            print(f"  {sec}: {st_stats['buys']} buys, {st_stats['sells']} sells, "
+                  f"net shares {st_stats['shares']}, "
+                  f"realized ¥{st_stats['revenue']:,.2f}{holding}")
 
         print(f"\nChart:  {report_dir}/backtest_{ts}{suffix}.png")
         print(f"Report: {report_dir}/backtest_{ts}{suffix}.html")
