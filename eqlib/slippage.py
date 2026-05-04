@@ -1,0 +1,72 @@
+"""Slippage models for realistic trade simulation.
+
+Provides:
+- SlippageModel: base class / no-op
+- FixedSlippage: constant percentage per trade
+- VolumeSlippage: impact proportional to order size relative to daily volume
+"""
+
+
+class SlippageModel:
+    """Base slippage model — no slippage (pass-through)."""
+
+    def get_execution_price(self, price: float, amount: int, is_buy: bool,
+                            daily_volume: float = 0) -> float:
+        """Return the execution price after applying slippage.
+
+        Parameters:
+            price: theoretical execution price (e.g., next-day open)
+            amount: number of shares being traded
+            is_buy: True for buys, False for sells
+            daily_volume: today's total volume for the security
+
+        Returns:
+            Adjusted execution price.
+        """
+        return price
+
+
+class FixedSlippage(SlippageModel):
+    """Fixed-percentage slippage applied uniformly to every trade.
+
+    Buys execute at ``price * (1 + pct)``; sells at ``price * (1 - pct)``.
+
+    Parameters:
+        pct: slippage fraction (default 0.001 = 0.1 %)
+    """
+
+    def __init__(self, pct: float = 0.001):
+        self.pct = pct
+
+    def get_execution_price(self, price: float, amount: int, is_buy: bool,
+                            daily_volume: float = 0) -> float:
+        if is_buy:
+            return price * (1.0 + self.pct)
+        return price * (1.0 - self.pct)
+
+
+class VolumeSlippage(SlippageModel):
+    """Volume-proportional slippage (similar to Zipline's VolumeShareSlippage).
+
+    Price impact scales with the fraction of daily volume being traded::
+
+        impact_pct = impact * (order_shares / daily_volume)
+
+    Buys execute at ``price * (1 + impact_pct)``; sells at the inverse.
+    When ``daily_volume`` is 0 or unknown, falls back to no slippage.
+
+    Parameters:
+        impact: price impact coefficient (default 0.1)
+    """
+
+    def __init__(self, impact: float = 0.1):
+        self.impact = impact
+
+    def get_execution_price(self, price: float, amount: int, is_buy: bool,
+                            daily_volume: float = 0) -> float:
+        if daily_volume <= 0:
+            return price
+        impact_pct = self.impact * (amount / daily_volume)
+        if is_buy:
+            return price * (1.0 + impact_pct)
+        return price * (1.0 - impact_pct)

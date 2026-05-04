@@ -44,30 +44,53 @@ def set_cache_dir(path: str):
     _CACHE_DIR = path
 
 
-def _cache_path(security: str, start: str, end: str, adjust: str) -> Path:
-    """Generate a deterministic cache file path for a security+date range."""
-    key = f"{security}_{start}_{end}_{adjust}"
+def _cache_path(security: str, adjust: str) -> Path:
+    """Generate a deterministic cache file path for a security.
+
+    The key uses only ``security`` and ``adjust`` — *not* a date range — so
+    that all requests for the same security reuse the same file regardless of
+    the requested date window.  The stored frame always covers the full
+    available history; callers slice to the dates they need after loading.
+    """
+    key = f"{security}_{adjust}"
     hash_ = hashlib.md5(key.encode()).hexdigest()[:12]
     return _get_cache_dir() / f"{hash_}.parquet"
 
 
 def _load_from_disk(security: str, start: str, end: str, adjust: str) -> Optional[pd.DataFrame]:
-    """Try to load cached data from parquet."""
+    """Try to load cached data from parquet and slice to [start, end]."""
     try:
-        path = _cache_path(security, start, end, adjust)
+        path = _cache_path(security, adjust)
         if path.exists():
             df = pd.read_parquet(path)
-            if not df.empty:
-                return df
+            if df.empty:
+                return None
+            # Slice to the requested date window
+            start_ts = pd.Timestamp(start)
+            end_ts = pd.Timestamp(end)
+            sliced = df.loc[
+                (df.index >= start_ts) & (df.index <= end_ts)
+            ]
+            return sliced if not sliced.empty else None
     except Exception:
         pass
     return None
 
 
-def _save_to_disk(df: pd.DataFrame, security: str, start: str, end: str, adjust: str):
-    """Save data to parquet cache."""
+def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
+    """Save data to parquet cache, merging with any existing cached frame.
+
+    When the cache file already exists the new data is merged with the stored
+    frame (union of dates, new values overwrite old ones) so the file always
+    holds the most complete history available.
+    """
     try:
-        path = _cache_path(security, start, end, adjust)
+        path = _cache_path(security, adjust)
+        if path.exists():
+            existing = pd.read_parquet(path)
+            if not existing.empty:
+                df = pd.concat([existing, df])
+                df = df[~df.index.duplicated(keep='last')].sort_index()
         df.to_parquet(path, engine="pyarrow" if _has_pyarrow() else "fastparquet")
     except Exception:
         pass
@@ -107,7 +130,7 @@ def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd
 
     df = fetch_stock_data(security, start_date, end_date, adjust)
     if not df.empty:
-        _save_to_disk(df, security, start_str, end_str, adjust)
+        _save_to_disk(df, security, adjust)
 
     return df
 
@@ -226,7 +249,7 @@ class PreloadedData:
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
-                    _save_to_disk(df, sec, start_str, end_str, adjust)
+                    _save_to_disk(df, sec, adjust)
                     save_stock_local(sec, start_date, end_date, adjust)
             else:
                 df = _load_from_disk(sec, start_str, end_str, adjust)
@@ -234,7 +257,7 @@ class PreloadedData:
                     from eqlib.data import fetch_stock_data
                     df = fetch_stock_data(sec, start_date, end_date, adjust)
                     if not df.empty:
-                        _save_to_disk(df, sec, start_str, end_str, adjust)
+                        _save_to_disk(df, sec, adjust)
             return (sec, df)
 
         with concurrent.futures.ThreadPoolExecutor(

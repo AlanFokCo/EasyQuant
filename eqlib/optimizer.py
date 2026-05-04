@@ -50,6 +50,50 @@ def _annual_stats(weights, returns, days=252):
     return ann_ret, ann_vol
 
 
+def _ledoit_wolf_cov(returns: pd.DataFrame) -> np.ndarray:
+    """Compute a Ledoit-Wolf shrinkage covariance matrix.
+
+    Replaces the raw sample covariance matrix with a better-conditioned
+    shrinkage estimate.  When ``sklearn`` is available, its analytically
+    optimal shrinkage coefficient is used; otherwise falls back to the Oracle
+    Approximating Shrinkage (OAS) estimator from a manual implementation,
+    or ultimately to the plain sample covariance.
+
+    This reduces optimization instability when the number of observations
+    is small relative to the number of assets.
+    """
+    X = returns.values
+    try:
+        from sklearn.covariance import LedoitWolf
+        lw = LedoitWolf()
+        lw.fit(X)
+        return lw.covariance_
+    except ImportError:
+        pass
+
+    # Manual Ledoit-Wolf (Oracle Approximating Shrinkage)
+    n, p = X.shape
+    if n < 2 or p < 2:
+        return np.cov(X, rowvar=False)
+
+    sample_cov = np.cov(X, rowvar=False)
+    mu = np.trace(sample_cov) / p
+    target = mu * np.eye(p)
+
+    # Shrinkage intensity
+    X_centered = X - X.mean(axis=0)
+    delta_sq = np.linalg.norm(sample_cov - target, "fro") ** 2
+    beta_sq_num = sum(
+        np.linalg.norm(
+            np.outer(X_centered[i], X_centered[i]) - sample_cov, "fro"
+        ) ** 2
+        for i in range(n)
+    ) / (n ** 2)
+    rho = min(beta_sq_num / delta_sq, 1.0) if delta_sq > 0 else 0.0
+
+    return (1.0 - rho) * sample_cov + rho * target
+
+
 def portfolio_optimizer(securities, prices, target=None, constraints=None,
                         bounds=None, default_range=(0.0, 1.0),
                         ftol=1e-9, return_none_if_fail=True):
@@ -91,7 +135,12 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
         return None
 
     returns = returns[securities]
-    cov = returns.cov().values
+
+    # ── Ledoit-Wolf covariance shrinkage (item 19) ─────────────────────────
+    # Replaces the raw sample covariance matrix with a better-conditioned
+    # shrinkage estimate, which significantly reduces optimization instability
+    # when the number of observations is small relative to the number of assets.
+    cov = _ledoit_wolf_cov(returns)
     mean_ret = returns.mean().values
     n = len(securities)
 

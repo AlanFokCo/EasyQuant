@@ -43,8 +43,14 @@ from eqlib.engine import (
 )
 
 # Configuration
-from eqlib.engine import set_benchmark, set_option, set_order_cost
+from eqlib.engine import set_benchmark, set_option, set_order_cost, set_slippage
 from eqlib.objects import OrderCost
+
+# Slippage models
+from eqlib.slippage import SlippageModel, FixedSlippage, VolumeSlippage
+
+# Session management (for advanced / concurrent usage)
+from eqlib._state import BacktestSession, get_session
 
 # Trading
 from eqlib.trade import order, order_target, order_value, order_target_value
@@ -128,7 +134,11 @@ __all__ = [
     "run_backtest", "run_daily", "run_weekly", "run_monthly",
     "set_handle_data", "record", "run_paper_trade",
     # Config
-    "set_benchmark", "set_option", "set_order_cost", "OrderCost",
+    "set_benchmark", "set_option", "set_order_cost", "set_slippage", "OrderCost",
+    # Slippage models
+    "SlippageModel", "FixedSlippage", "VolumeSlippage",
+    # Session management
+    "BacktestSession", "get_session",
     # Trading
     "order", "order_target", "order_value", "order_target_value",
     # Data

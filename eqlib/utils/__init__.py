@@ -8,7 +8,7 @@ Submodules:
 """
 
 from eqlib.utils.indicators import (
-    ma, ema, sma, wma, vwap,
+    ma, ema, sma, smma, wma, vwap,
     macd, rsi, kdj, boll, atr, cci, wr, roc, obv, adx,
     golden_cross, death_cross,
 )
@@ -47,7 +47,7 @@ from eqlib.utils.levels import (
 
 __all__ = [
     # Indicators
-    "ma", "ema", "sma", "wma", "vwap",
+    "ma", "ema", "sma", "smma", "wma", "vwap",
     "macd", "rsi", "kdj", "boll", "atr", "cci", "wr", "roc", "obv", "adx",
     "golden_cross", "death_cross",
     # Stats
