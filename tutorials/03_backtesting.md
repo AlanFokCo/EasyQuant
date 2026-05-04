@@ -447,4 +447,5 @@ Total Trades:              12
 学会了解读回测结果后，接下来：
 
 - **[Tutorial 04: 策略优化与改进](04_strategy_optimization.md)** — 参数调优、组合优化、归因分析、避免过拟合
+- **[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告，可直接查看策略表现
 - **[Tutorial 05: 模拟盘到实盘](05_live_trading.md)** — 从模拟盘到 PTrade/QMT 实盘部署

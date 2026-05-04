@@ -6,6 +6,7 @@ Provides:
 - Fama-French factor analysis
 """
 
+import datetime
 import numpy as np
 import pandas as pd
 
@@ -29,13 +30,21 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     trades = result["trade_log"]
     recorded = result["recorded_values"]
 
-    if not recorded or "total_value" not in recorded[0]:
+    if not recorded:
         return None
 
     # Build daily portfolio value series
+    if isinstance(recorded, dict):
+        entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min))
+    else:
+        entries = recorded
+
+    if not entries or "total_value" not in entries[0]:
+        return None
+
     values = pd.Series(
-        [r["total_value"] for r in recorded],
-        index=pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in recorded]),
+        [r["total_value"] for r in entries],
+        index=pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in entries]),
     )
 
     initial = ctx.portfolio.starting_cash
@@ -269,13 +278,21 @@ def fama_french_analysis(result, factors=None):
     """
     recorded = result["recorded_values"]
 
-    if not recorded or "total_value" not in recorded[0]:
+    if not recorded:
         return None
 
     # Build strategy returns
+    if isinstance(recorded, dict):
+        entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min))
+    else:
+        entries = recorded
+
+    if "total_value" not in entries[0]:
+        return None
+
     values = pd.Series(
-        [r["total_value"] for r in recorded],
-        index=pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in recorded]),
+        [r["total_value"] for r in entries],
+        index=pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in entries]),
     )
     strat_ret = values.pct_change().dropna()
 

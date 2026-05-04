@@ -22,6 +22,17 @@ This project provides the `eqlib` Python package — the core library that imple
 
 ---
 
+## Performance
+
+- **Memory-aware data loading** — preload data from disk cache (parquet) or local CSV files
+  with automatic memory limit (default 1 GB). Exceed the limit? The engine falls back to
+  compact slicing — results are identical, just slightly slower.
+- **Fast I/O** — `attribute_history` reads from in-memory data instead of hitting disk/network
+  on every call, reducing typical 6+ year backtests from ~20 min to ~1 min.
+- **Parallel data loading** — multi-threaded preload for faster startup.
+
+---
+
 ## Installation
 
 ```bash
@@ -96,6 +107,7 @@ See the [`examples/`](examples/) directory for complete scripts:
 | 17 | `17_grid_trading_strategy.py` | Grid trading for range-bound markets |
 | 18 | `18_strategy_comparison.py` | Compare multiple strategies side by side |
 | 19 | `19_local_data_backtest.py` | Local data mode (download once, backtest offline) |
+| 20 | `20_sr_strategy/` | Support & Resistance portfolio strategy (real-world case) |
 
 ---
 

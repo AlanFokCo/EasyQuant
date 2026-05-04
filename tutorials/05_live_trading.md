@@ -435,4 +435,5 @@ def handlebar(ContextInfo):
 - [PTrade/QMT 适配器文档](../doc/ptrade_adapter.md) — 适配器 API 详解
 - [API 参考](../doc/api_reference.md) — 完整的 API 列表
 - [工具库参考](../doc/utils_reference.md) — 技术指标、统计工具、资金管理
-- [示例代码](../examples/) — 13 个可直接运行的示例
+- [示例代码](../examples/) — 20 个可直接运行的示例
+- **[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告

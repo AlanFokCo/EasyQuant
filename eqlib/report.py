@@ -51,8 +51,14 @@ def _build_return_series(recorded, initial):
     if not recorded:
         return returns
 
+    # Support both dict (date -> entry) and list
+    if isinstance(recorded, dict):
+        entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min))
+    else:
+        entries = recorded
+
     by_date = {}
-    for r in recorded:
+    for r in entries:
         if "total_value" in r:
             d = _to_tv_date(r["date"])
             by_date[d] = r["total_value"]
@@ -83,7 +89,8 @@ def _build_daily_pnl(recorded, initial):
         return pnl_bars, ret_bars
 
     by_date = {}
-    for r in recorded:
+    entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min)) if isinstance(recorded, dict) else recorded
+    for r in entries:
         if "total_value" in r:
             d = _to_tv_date(r["date"])
             by_date[d] = r["total_value"]
@@ -131,7 +138,8 @@ def _fetch_index_returns(index_symbol, start, end, recorded):
         init_price = df["close"].iloc[0]
         if init_price <= 0:
             return result_data
-        for r in recorded:
+        entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min)) if isinstance(recorded, dict) else recorded
+        for r in entries:
             rd = r["date"]
             if isinstance(rd, str):
                 rd = datetime.datetime.strptime(rd, "%Y-%m-%d").date()
@@ -146,128 +154,127 @@ def _fetch_index_returns(index_symbol, start, end, recorded):
 
 
 def generate_chart(result, out_path):
-    """Generate backtest chart with two panels:
-    - Top: price, MA5/MA20, buy/sell markers, holding shading,
-      portfolio value (secondary axis), key metrics annotation
+    """Generate professional backtest chart:
+    - Top: strategy cumulative return (%) vs benchmark (%)
     - Bottom: portfolio drawdown (%)
+    - Key metrics annotation box
     """
     from eqlib.attribution import analyze_returns
+    from eqlib.data import fetch_stock_data
 
     ctx = result["context"]
     trade_log = result["trade_log"]
     recorded = result["recorded_values"]
+    benchmark = result.get("benchmark", "000300.XSHG")
 
     analytics = analyze_returns(result)
 
-    fig, (ax, ax_dd) = plt.subplots(
-        2, 1, figsize=(16, 10),
-        gridspec_kw={"height_ratios": [3, 1]},
-        sharex=True,
-    )
-    fig.subplots_adjust(hspace=0.05)
-
-    start = ctx.start_date
-    end = ctx.end_date
-
-    securities = set(t["security"] for t in trade_log)
-    if not securities and ctx.universe:
-        securities.add(ctx.universe[0])
-    if not securities:
-        securities.add("601390")
-
-    symbol = list(securities)[0]
-    df = fetch_stock_data(symbol, start, end)
-
-    if df.empty:
+    # --- Portfolio value series ---
+    pf_entries = sorted(
+        recorded.values(), key=lambda x: x.get("date", datetime.date.min)
+    ) if isinstance(recorded, dict) else recorded
+    pf_records = [r for r in pf_entries if "total_value" in r]
+    if not pf_records:
         plt.close()
         return
-
-    dates = df.index.to_numpy()
-    closes = df["close"].to_numpy()
-
-    ax.plot(dates, closes, color="#333333", linewidth=1.2, label="Close")
-
-    ma_fast = df["close"].rolling(5).mean().to_numpy()
-    ma_slow = df["close"].rolling(20).mean().to_numpy()
-    ax.plot(dates, ma_fast, color="#2196F3", linewidth=1.0, alpha=0.7, label="MA5")
-    ax.plot(dates, ma_slow, color="#FF9800", linewidth=1.0, alpha=0.7, label="MA20")
-
-    buys = [t for t in trade_log if t["type"] == "BUY"]
-    sells = [t for t in trade_log if t["type"] == "SELL"]
-
-    for b in buys:
-        ax.annotate(
-            "B", xy=(b["date"], b["price"]), xytext=(0, 10),
-            textcoords="offset points", ha="center", fontsize=8, fontweight="bold",
-            color="white", bbox=dict(boxstyle="circle,pad=0.3", facecolor="#4CAF50", edgecolor="#388E3C"),
-        )
-    for s in sells:
-        ax.annotate(
-            "S", xy=(s["date"], s["price"]), xytext=(0, -12),
-            textcoords="offset points", ha="center", fontsize=8, fontweight="bold",
-            color="white", bbox=dict(boxstyle="circle,pad=0.3", facecolor="#F44336", edgecolor="#C62828"),
-        )
-
-    n_pairs = min(len(buys), len(sells))
-    for i in range(n_pairs):
-        ax.axvspan(buys[i]["date"], sells[i]["date"], color="#4CAF50", alpha=0.04, zorder=0)
-
-    # Portfolio value on secondary axis
-    pf_records = [r for r in recorded if "total_value" in r]
-    pf_dates = [r["date"] for r in pf_records]
-    pf_values = [r["total_value"] for r in pf_records]
-
-    ax2 = None
-    if pf_dates:
-        ax2 = ax.twinx()
-        ax2.plot(pf_dates, pf_values, color="#9C27B0", linewidth=1.2, alpha=0.6, label="Portfolio")
-        ax2.set_ylabel("Portfolio Value", color="#9C27B0", fontsize=10)
-        ax2.tick_params(axis="y", labelcolor="#9C27B0")
-
-    handles, labels = ax.get_legend_handles_labels()
-    if ax2:
-        h2, l2 = ax2.get_legend_handles_labels()
-        handles += h2
-        labels += l2
-    ax.legend(handles, labels, loc="upper left", fontsize=9)
-
-    # Key metrics annotation
-    if analytics:
-        ann_ret = analytics.get("annual_return", 0.0)
-        sharpe = analytics.get("sharpe_ratio", 0.0)
-        max_dd = analytics.get("max_drawdown", 0.0)
-        win = analytics.get("win_rate", 0.0)
-        ax.text(
-            0.02, 0.04, f"Ann.Ret: {ann_ret:+.2%}   Sharpe: {sharpe:.2f}\nMax DD: {max_dd:.2%}   Win: {win:.1%}",
-            transform=ax.transAxes, fontsize=9, verticalalignment="bottom",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="#cccccc", alpha=0.85),
-        )
 
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
     pnl_pct = (pnl / initial) * 100
 
-    ax.set_title(f"{symbol} — PnL: {pnl:+,.2f} ({pnl_pct:+.2f}%)", fontsize=13, fontweight="bold")
-    ax.set_ylabel("Price", fontsize=10)
-    ax.grid(True, alpha=0.25)
+    pf_dates = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in pf_records])
+    pf_values = pd.Series([r["total_value"] for r in pf_records], index=pf_dates)
+    strat_cum_ret = (pf_values / initial - 1) * 100  # percentage
 
-    # Drawdown panel
-    if pf_dates and pf_values:
-        pf_s = pd.Series(pf_values, index=pd.DatetimeIndex(pf_dates))
-        rolling_max = pf_s.cummax()
-        dd_pct = (pf_s - rolling_max) / rolling_max * 100
-        ax_dd.fill_between(dd_pct.index, dd_pct.values, 0, where=dd_pct.values < 0, color="#F44336", alpha=0.35, interpolate=True)
-        ax_dd.plot(dd_pct.index, dd_pct.values, color="#F44336", linewidth=0.9)
-        ax_dd.axhline(0, color="#555555", linewidth=0.6, linestyle="--")
+    # --- Benchmark cumulative return ---
+    bench_cum_ret = None
+    try:
+        bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
+        if not bench_df.empty and "close" in bench_df.columns:
+            bench_df = bench_df.sort_index()
+            bench_dates = bench_df.index
+            bench_init = bench_df["close"].iloc[0]
+            bench_cum_ret = pd.Series(
+                (bench_df["close"] / bench_init - 1) * 100,
+                index=bench_dates,
+            )
+    except Exception:
+        pass
+
+    # --- Figure ---
+    fig, (ax, ax_dd) = plt.subplots(
+        2, 1, figsize=(14, 8),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
+    fig.subplots_adjust(hspace=0.08, left=0.08, right=0.96, top=0.94, bottom=0.08)
+
+    # Strategy return
+    strat_dates_np = pf_dates.to_numpy()
+    ax.plot(strat_dates_np, strat_cum_ret.values, color="#1976D2", linewidth=1.8,
+            label="Strategy", zorder=5)
+
+    # Benchmark return
+    bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
+    if bench_cum_ret is not None:
+        ax.plot(bench_cum_ret.index.to_numpy(), bench_cum_ret.values, color="#757575",
+                linewidth=1.2, alpha=0.7, label=bench_label, zorder=4)
+
+    # Zero line
+    ax.axhline(0, color="#555555", linewidth=0.6, linestyle="--", zorder=0)
+
+    # Buy/sell trade markers (sparse if too many)
+    buys = [t for t in trade_log if t["type"] == "BUY"]
+    sells = [t for t in trade_log if t["type"] == "SELL"]
+    if len(buys) <= 50:
+        for b in buys:
+            ret_at_buy = (pf_values.reindex([pd.Timestamp(b["date"])], method="nearest").iloc[0] / initial - 1) * 100
+            ax.plot(b["date"], ret_at_buy, marker="^", color="#2E7D32",
+                    markersize=5, zorder=3)
+    if len(sells) <= 50:
+        for s in sells:
+            ret_at_sell = (pf_values.reindex([pd.Timestamp(s["date"])], method="nearest").iloc[0] / initial - 1) * 100
+            ax.plot(s["date"], ret_at_sell, marker="v", color="#C62828",
+                    markersize=5, zorder=3)
+
+    ax.legend(loc="upper left", fontsize=9, framealpha=0.9)
+    ax.set_ylabel("Cumulative Return (%)", fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.set_title(
+        f"PnL: {pnl:+,.0f} ({pnl_pct:+.2f}%)  |  Trades: {len(trade_log)}",
+        fontsize=12, fontweight="bold",
+    )
+
+    # Metrics annotation
+    if analytics:
+        ann_ret = analytics.get("annual_return", 0.0)
+        sharpe = analytics.get("sharpe_ratio", 0.0)
+        max_dd = analytics.get("max_drawdown", 0.0)
+        win = analytics.get("win_rate", 0.0)
+        beta = analytics.get("beta", 1.0)
+        alpha = analytics.get("alpha", 0.0)
+        ax.text(
+            0.98, 0.03,
+            f"Ann.Ret  {ann_ret:+.2%}    Sharpe  {sharpe:.2f}    MaxDD  {max_dd:.2%}\n"
+            f"Beta     {beta:.2f}      Alpha   {alpha:+.2%}   Win    {win:.1%}",
+            transform=ax.transAxes, fontsize=9, fontfamily="monospace",
+            ha="right", va="bottom",
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="white",
+                      edgecolor="#bbbbbb", alpha=0.9),
+        )
+
+    # --- Drawdown panel ---
+    rolling_max = pf_values.cummax()
+    dd_pct = (pf_values - rolling_max) / rolling_max * 100
+    ax_dd.fill_between(dd_pct.index.to_numpy(), dd_pct.values, 0, color="#EF5350",
+                       alpha=0.4, zorder=2)
+    ax_dd.axhline(0, color="#555555", linewidth=0.6, linestyle="--")
     ax_dd.set_ylabel("Drawdown (%)", fontsize=10)
-    ax_dd.grid(True, alpha=0.25)
-
+    ax_dd.grid(True, alpha=0.3)
     ax_dd.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax_dd.xaxis.set_major_locator(mdates.MonthLocator())
-    fig.autofmt_xdate()
+    ax_dd.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1, len(pf_dates) // 12)))
 
-    plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"Chart saved: {out_path}")
@@ -519,6 +526,9 @@ def generate_html_report(result, out_path):
     # ============================================================
     # Build HTML
     # ============================================================
+    bench_code = benchmark.replace(".XSHG", "").replace(".XSHE", "")
+    bench_label = {"000300": "沪深300", "000001": "上证指数"}.get(bench_code, bench_code)
+
     html = _HTML_TEMPLATE.format(
         symbol=symbol,
         start_date=str(start),
@@ -556,7 +566,7 @@ def generate_html_report(result, out_path):
         ann_ret=metrics["ann_ret"],
         ann_ret_pct=metrics["ann_ret_pct"],
         win_rate=metrics["win_rate"],
-        benchmark_name="沪深300",
+        benchmark_name=bench_label,
         benchmark_ret=metrics["benchmark_ret"],
         benchmark_ret_pct=metrics["benchmark_ret_pct"],
         alpha=metrics["alpha"],
@@ -593,9 +603,11 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
     if not recorded or len(recorded) < 2:
         return metrics
 
+    entries = sorted(recorded.values(), key=lambda x: x.get("date", datetime.date.min)) if isinstance(recorded, dict) else recorded
+
     # Extract unique daily values
     by_date = {}
-    for r in recorded:
+    for r in entries:
         if "total_value" in r:
             d = _to_tv_date(r["date"])
             by_date[d] = r["total_value"]
@@ -1050,70 +1062,173 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 
 
 def generate_report_md(result, out_path):
-    """Generate human-readable Markdown report."""
+    """Generate professional Markdown report with risk metrics,
+    trade analysis, benchmark comparison, and per-stock breakdown.
+    """
+    from eqlib.attribution import analyze_returns, brinson_attribution, fama_french_analysis
+    from eqlib.data import fetch_stock_data
+
     ctx = result["context"]
     trade_log = result["trade_log"]
     recorded = result["recorded_values"]
+    benchmark = result.get("benchmark", "000300.XSHG")
 
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
     pnl_pct = (pnl / initial) * 100
 
-    symbol = list(set(t["security"] for t in trade_log) or ["N/A"])
+    analytics = analyze_returns(result)
+    bench_data = {}
+    try:
+        bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
+        if not bench_df.empty and "close" in bench_df.columns:
+            bench_init = bench_df["close"].iloc[0]
+            bench_final = bench_df["close"].iloc[-1]
+            bench_ret = (bench_final - bench_init) / bench_init * 100
+            bench_data["return"] = bench_ret
+            bench_data["init"] = bench_init
+            bench_data["final"] = bench_final
+    except Exception:
+        pass
+
+    securities = set(t["security"] for t in trade_log)
+    bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
 
     lines = []
-    lines.append(f"# Backtest Report: {', '.join(symbol)}")
+    # ============================================================
+    # Header
+    # ============================================================
+    lines.append(f"# Backtest Report")
     lines.append("")
-    lines.append("## Summary")
-    lines.append(f"- **Period**: {ctx.start_date} to {ctx.end_date}")
-    lines.append(f"- **Initial Capital**: {initial:,.2f}")
-    lines.append(f"- **Final Value**: {final:,.2f}")
-    pnl_str = f"+{pnl:,.2f}" if pnl >= 0 else f"{pnl:,.2f}"
-    pnl_pct_str = f"+{pnl_pct:.2f}%" if pnl_pct >= 0 else f"{pnl_pct:.2f}%"
-    lines.append(f"- **P&L**: {pnl_str} ({pnl_pct_str})")
+    lines.append(f"| | |")
+    lines.append(f"|---|---|")
+    lines.append(f"| **Period** | {ctx.start_date} to {ctx.end_date} |")
+    lines.append(f"| **Initial Capital** | {initial:,.2f} |")
+    lines.append(f"| **Final Value** | {final:,.2f} |")
+    lines.append(f"| **P&L** | {pnl:+,.2f} ({pnl_pct:+.2f}%) |")
+    lines.append(f"| **Benchmark** | {bench_label} |")
+    if bench_data:
+        bench_str = f"+{bench_data['return']:.2f}%" if bench_data["return"] >= 0 else f"{bench_data['return']:.2f}%"
+        lines.append(f"| **Benchmark Return** | {bench_str} |")
+    lines.append("")
 
+    # ============================================================
+    # Risk Metrics
+    # ============================================================
+    if analytics:
+        lines.append("## Risk Metrics")
+        lines.append("")
+        lines.append("| Metric | Value |")
+        lines.append("|--------|-------|")
+        lines.append(f"| Annual Return | {analytics['annual_return']:+.2%} |")
+        lines.append(f"| Annual Volatility | {analytics['annual_volatility']:.2%} |")
+        lines.append(f"| Sharpe Ratio | {analytics['sharpe_ratio']:.2f} |")
+        lines.append(f"| Sortino Ratio | {analytics['sortino_ratio']:.2f} |")
+        lines.append(f"| Max Drawdown | {analytics['max_drawdown']:.2%} |")
+        if analytics.get("max_drawdown_start"):
+            lines.append(f"| Max DD Period | {analytics['max_drawdown_start']} to {analytics['max_drawdown_end']} |")
+        lines.append(f"| Calmar Ratio | {analytics['calmar_ratio']:.2f} |")
+        lines.append(f"| Alpha (annual) | {analytics['alpha']:+.2%} |")
+        lines.append(f"| Beta | {analytics['beta']:.2f} |")
+        lines.append(f"| Information Ratio | {analytics['information_ratio']:.2f} |")
+        lines.append(f"| Win Rate (daily) | {analytics['win_rate']:.1%} |")
+        lines.append(f"| Trading Days | {analytics['trading_days']} |")
+        lines.append("")
+
+    # ============================================================
+    # Trade Summary
+    # ============================================================
     buy_count = sum(1 for t in trade_log if t["type"] == "BUY")
     sell_count = sum(1 for t in trade_log if t["type"] == "SELL")
-    lines.append(f"- **Buy Orders**: {buy_count}")
-    lines.append(f"- **Sell Orders**: {sell_count}")
+    total_commission = sum(t.get("commission", 0) for t in trade_log)
+    lines.append("## Trade Summary")
+    lines.append("")
+    lines.append(f"- Buy orders: {buy_count}")
+    lines.append(f"- Sell orders: {sell_count}")
+    lines.append(f"- Total commission: {total_commission:,.2f}")
+    lines.append(f"- Securities traded: {len(securities)}")
     lines.append("")
 
-    lines.append("## Trade Log")
-    lines.append("")
+    # Per-trade P&L (pair buy/sell by security)
     if trade_log:
-        lines.append("| # | Date | Action | Security | Price | Amount | Commission |")
-        lines.append("|---|------|--------|----------|-------|--------|------------|")
-        for i, t in enumerate(trade_log, 1):
-            action = "BUY" if t["type"] == "BUY" else "SELL"
-            comm = f"{t.get('commission', 0):.2f}"
-            lines.append(
-                f"| {i} | {t['date']} | {action} | {t['security']} "
-                f"| {t['price']:.3f} | {t['amount']:,} | {comm} |"
-            )
-    else:
-        lines.append("No trades executed.")
-    lines.append("")
+        lines.append("## Trade P&L")
+        lines.append("")
+        lines.append("| # | Security | Buy Date | Buy Price | Sell Date | Sell Price | P&L |")
+        lines.append("|---|----------|----------|-----------|-----------|------------|-----|")
 
+        trade_pairs: dict = {}  # sec -> list of buys
+        for t in trade_log:
+            sec = t["security"]
+            if sec not in trade_pairs:
+                trade_pairs[sec] = []
+            if t["type"] == "BUY":
+                trade_pairs[sec].append(t)
+            elif t["type"] == "SELL" and trade_pairs[sec]:
+                buy_t = trade_pairs[sec].pop(0)
+                buy_val = buy_t["price"] * buy_t["amount"] + buy_t.get("commission", 0)
+                sell_val = t["price"] * t["amount"] - t.get("commission", 0)
+                trade_pnl = sell_val - buy_val
+                pnl_str = f"+{trade_pnl:,.0f}" if trade_pnl >= 0 else f"{trade_pnl:,.0f}"
+                lines.append(
+                    f"| {len(lines)} | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
+                    f"| {t['date']} | {t['price']:.3f} | {pnl_str} |"
+                )
+
+        # Open positions (unmatched buys)
+        for sec, buys in trade_pairs.items():
+            for buy_t in buys:
+                lines.append(
+                    f"| - | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
+                    f"| — open — | — | — |"
+                )
+        lines.append("")
+
+    # ============================================================
+    # Positions
+    # ============================================================
     lines.append("## Positions")
     lines.append("")
     if ctx.portfolio.positions:
+        lines.append("| Security | Shares | Avg Cost | Market Value |")
+        lines.append("|----------|--------|----------|-------------|")
         for sec, pos in ctx.portfolio.positions.items():
             if pos.amount > 0:
-                lines.append(f"- **{sec}**: {pos.amount} shares, avg_cost={pos.avg_cost:.3f}")
+                lines.append(f"| {sec} | {pos.amount:,} | {pos.avg_cost:.3f} | {pos.total_value:,.2f} |")
     else:
         lines.append("Flat (no positions).")
     lines.append("")
 
-    if recorded:
-        lines.append("## Portfolio Values")
+    # ============================================================
+    # Factor Analysis
+    # ============================================================
+    ff = fama_french_analysis(result)
+    if ff:
+        lines.append("## Factor Analysis")
         lines.append("")
-        lines.append(f"{len(recorded)} data points recorded.")
-        if recorded:
-            first = recorded[0]
-            last = recorded[-1]
-            lines.append(f"- Start: {first['date']}")
-            lines.append(f"- End: {last['date']}")
+        lines.append("| Factor | Value |")
+        lines.append("|--------|-------|")
+        lines.append(f"| Market Beta | {ff['market_beta']:.2f} |")
+        lines.append(f"| Market Exposure | {ff['market_exposure']:+.2f} |")
+        lines.append(f"| Annual Alpha | {ff['alpha_annual']:+.2%} |")
+        lines.append(f"| Momentum Correlation | {ff['momentum_correlation']:.3f} |")
+        lines.append(f"| Residual Volatility | {ff['residual_volatility']:.2%} |")
+        lines.append(f"| Explained Variance (R²) | {ff['explained_variance']:.2%} |")
+        lines.append("")
+
+    # ============================================================
+    # Brinson Attribution
+    # ============================================================
+    br = brinson_attribution(result)
+    if br:
+        lines.append("## Brinson Attribution")
+        lines.append("")
+        lines.append("| Component | Effect |")
+        lines.append("|-----------|--------|")
+        lines.append(f"| Allocation | {br['allocation_effect']:+.2%} |")
+        lines.append(f"| Selection | {br['selection_effect']:+.2%} |")
+        lines.append(f"| Interaction | {br['interaction_effect']:+.2%} |")
+        lines.append(f"| Total Active Return | {br['total_active_return']:+.2%} |")
         lines.append("")
 
     with open(out_path, "w") as f:
@@ -1123,25 +1238,62 @@ def generate_report_md(result, out_path):
 
 
 def generate_report_json(result, out_path):
-    """Generate machine-readable JSON report."""
+    """Generate machine-readable JSON report with risk metrics,
+    benchmark comparison, and full trade/position data.
+    """
+    from eqlib.attribution import analyze_returns, brinson_attribution, fama_french_analysis
+    from eqlib.data import fetch_stock_data
+
     ctx = result["context"]
     trade_log = result["trade_log"]
     recorded = result["recorded_values"]
+    benchmark = result.get("benchmark", "000300.XSHG")
 
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
     pnl_pct = (pnl / initial) * 100
 
+    analytics = analyze_returns(result)
+
+    # Benchmark data
+    bench_return = None
+    try:
+        bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
+        if not bench_df.empty and "close" in bench_df.columns:
+            bench_init = bench_df["close"].iloc[0]
+            bench_final = bench_df["close"].iloc[-1]
+            bench_return = (bench_final - bench_init) / bench_init
+    except Exception:
+        pass
+
+    # Cumulative return series
+    pf_entries = sorted(
+        recorded.values(), key=lambda x: x.get("date", datetime.date.min)
+    ) if isinstance(recorded, dict) else recorded
+    cumulative_returns = []
+    for r in pf_entries:
+        if "total_value" in r:
+            cumulative_returns.append({
+                "date": str(r["date"]),
+                "total_value": round(r["total_value"], 2),
+                "cumulative_return": round(r["total_value"] / initial - 1, 6),
+            })
+
     report = {
-        "symbol": list(set(t["security"] for t in trade_log) or ["N/A"]),
-        "start_date": str(ctx.start_date),
-        "end_date": str(ctx.end_date),
-        "initial_capital": initial,
-        "final_value": round(final, 2),
-        "pnl": round(pnl, 2),
-        "pnl_pct": round(pnl_pct, 2),
-        "num_trades": len(trade_log),
+        "summary": {
+            "start_date": str(ctx.start_date),
+            "end_date": str(ctx.end_date),
+            "initial_capital": initial,
+            "final_value": round(final, 2),
+            "pnl": round(pnl, 2),
+            "pnl_pct": round(pnl_pct, 2),
+            "num_trades": len(trade_log),
+            "securities": list(set(t["security"] for t in trade_log) or []),
+            "benchmark": benchmark,
+            "benchmark_return": round(bench_return, 4) if bench_return is not None else None,
+        },
+        "risk_metrics": None,
         "trades": [
             {
                 "type": t["type"],
@@ -1149,25 +1301,62 @@ def generate_report_json(result, out_path):
                 "security": t["security"],
                 "price": t["price"],
                 "amount": t["amount"],
-                "commission": t.get("commission", 0),
+                "commission": round(t.get("commission", 0), 2),
             }
             for t in trade_log
         ],
         "positions": {
             sec: {
                 "amount": pos.amount,
-                "avg_cost": pos.avg_cost,
-                "total_value": pos.total_value,
+                "avg_cost": round(pos.avg_cost, 3),
+                "total_value": round(pos.total_value, 2),
             }
             for sec, pos in ctx.portfolio.positions.items()
             if pos.amount > 0
         },
-        "recorded_values": [
-            {k: (str(v) if isinstance(v, (datetime.date, datetime.datetime)) else v)
-             for k, v in r.items()}
-            for r in recorded
-        ],
+        "cumulative_returns": cumulative_returns,
     }
+
+    # Add risk metrics
+    if analytics:
+        report["risk_metrics"] = {
+            "total_return": round(analytics["total_return"], 4),
+            "annual_return": round(analytics["annual_return"], 4),
+            "annual_volatility": round(analytics["annual_volatility"], 4),
+            "sharpe_ratio": round(analytics["sharpe_ratio"], 2),
+            "sortino_ratio": round(analytics["sortino_ratio"], 2),
+            "max_drawdown": round(analytics["max_drawdown"], 4),
+            "max_drawdown_start": str(analytics["max_drawdown_start"]) if analytics.get("max_drawdown_start") else None,
+            "max_drawdown_end": str(analytics["max_drawdown_end"]) if analytics.get("max_drawdown_end") else None,
+            "calmar_ratio": round(analytics["calmar_ratio"], 2),
+            "alpha": round(analytics["alpha"], 4),
+            "beta": round(analytics["beta"], 2),
+            "information_ratio": round(analytics["information_ratio"], 2),
+            "win_rate": round(analytics["win_rate"], 4),
+            "trading_days": analytics["trading_days"],
+        }
+
+    # Brinson attribution
+    br = brinson_attribution(result)
+    if br:
+        report["brinson_attribution"] = {
+            "allocation_effect": round(br["allocation_effect"], 4),
+            "selection_effect": round(br["selection_effect"], 4),
+            "interaction_effect": round(br["interaction_effect"], 4),
+            "total_active_return": round(br["total_active_return"], 4),
+        }
+
+    # Factor analysis
+    ff = fama_french_analysis(result)
+    if ff:
+        report["factor_analysis"] = {
+            "market_beta": round(ff["market_beta"], 2),
+            "market_exposure": round(ff["market_exposure"], 2),
+            "alpha_annual": round(ff["alpha_annual"], 4),
+            "momentum_correlation": round(ff["momentum_correlation"], 3),
+            "residual_volatility": round(ff["residual_volatility"], 4),
+            "explained_variance": round(ff["explained_variance"], 4),
+        }
 
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
