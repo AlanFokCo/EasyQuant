@@ -326,3 +326,6 @@ avg_volume = vol['volume'].mean()
 - **[Tutorial 03: 回测验证](03_backtesting.md)** — 深入理解回测，检验策略的历史表现
 - **[Tutorial 04: 策略优化与改进](04_strategy_optimization.md)** — 参数调优、避免过拟合、组合策略
 - **[Tutorial 05: 模拟盘到实盘](05_live_trading.md)** — 从模拟盘到 PTrade/QMT 实盘部署
+- **[Tutorial 06: RSI 均值回归策略](06_rsi_mean_reversion.md)** — 深入学习均值回归这一经典策略类型
+- **[Tutorial 07: 行业轮动策略](07_sector_rotation.md)** — 利用 A 股行业轮动特性赚取超额收益
+- **[Tutorial 08: 多因子选股](08_multi_factor.md)** — 系统化地用多个因子组合选出优质股票
