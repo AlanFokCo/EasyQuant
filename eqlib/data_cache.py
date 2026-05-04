@@ -27,6 +27,19 @@ _LOCAL_DATA_DIR = os.environ.get("EQLIB_LOCAL_DATA_DIR", None)
 _DEFAULT_MAX_MEMORY_MB = 1024
 
 
+def _slice_by_date(df: pd.DataFrame, start, end) -> pd.DataFrame:
+    """Return rows of *df* whose DatetimeIndex falls in [start, end].
+
+    Shared by ``data.py`` and ``data_cache.py`` to avoid duplicating the
+    filtering logic in each caller.
+    """
+    if df.empty:
+        return df
+    start_ts = pd.Timestamp(start)
+    end_ts = pd.Timestamp(end)
+    return df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
+
+
 def _get_cache_dir() -> Path:
     """Get or create the cache directory."""
     global _CACHE_DIR
@@ -65,12 +78,7 @@ def _load_from_disk(security: str, start: str, end: str, adjust: str) -> Optiona
             df = pd.read_parquet(path)
             if df.empty:
                 return None
-            # Slice to the requested date window
-            start_ts = pd.Timestamp(start)
-            end_ts = pd.Timestamp(end)
-            sliced = df.loc[
-                (df.index >= start_ts) & (df.index <= end_ts)
-            ]
+            sliced = _slice_by_date(df, start, end)
             return sliced if not sliced.empty else None
     except Exception:
         pass
