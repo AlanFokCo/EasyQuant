@@ -29,7 +29,6 @@ def _get_preloaded() -> PreloadedData:
 _preloaded_fallback = PreloadedData()
 
 
-@property
 def _preloaded_compat():
     return _get_preloaded()
 
@@ -37,6 +36,10 @@ def _preloaded_compat():
 # Keep a direct reference that trade.py / data.py can import for backward compat.
 # This is updated to point at the active session's instance each run_backtest call.
 _preloaded = _preloaded_fallback
+
+# Slight over-estimate of effective cost rate used when computing the max
+# affordable shares for a buy order (avoids fractional-lot overshoot).
+_COMMISSION_BUFFER = 1.001
 
 
 class SecurityBar:
@@ -310,7 +313,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date):
 
             if total_cost > portfolio.available_cash:
                 # Buy as many as we can afford
-                rounded = int(portfolio.available_cash / (exec_price * 1.001) // 100) * 100
+                rounded = int(portfolio.available_cash / (exec_price * _COMMISSION_BUFFER) // 100) * 100
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash")
                     continue

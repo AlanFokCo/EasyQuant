@@ -74,6 +74,11 @@ def _ledoit_wolf_cov(returns: pd.DataFrame) -> np.ndarray:
     # Manual Ledoit-Wolf (Oracle Approximating Shrinkage)
     n, p = X.shape
     if n < 2 or p < 2:
+        import warnings
+        warnings.warn(
+            "LedoitWolf fallback: sample covariance used (n<2 or p<2 — matrix may be ill-conditioned).",
+            UserWarning, stacklevel=2,
+        )
         return np.cov(X, rowvar=False)
 
     sample_cov = np.cov(X, rowvar=False)

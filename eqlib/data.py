@@ -6,6 +6,7 @@ from typing import Optional
 
 import akshare as ak
 import pandas as pd
+from eqlib.data_cache import _slice_by_date
 
 
 # ============================================================
@@ -128,11 +129,7 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         df_cached = _cache[cache_key]
         # For index data cached without date range, slice to the requested window
         if is_idx and start_date and end_date:
-            start_ts = pd.Timestamp(start_date)
-            end_ts = pd.Timestamp(end_date)
-            return df_cached.loc[
-                (df_cached.index >= start_ts) & (df_cached.index <= end_ts)
-            ]
+            return _slice_by_date(df_cached, start_date, end_date)
         return df_cached
 
     try:
@@ -173,9 +170,7 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
 
     # Slice to the requested window before returning
     if is_idx and start_date and end_date:
-        start_ts = pd.Timestamp(start_date)
-        end_ts = pd.Timestamp(end_date)
-        return df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
+        return _slice_by_date(df, start_date, end_date)
 
     return df
 

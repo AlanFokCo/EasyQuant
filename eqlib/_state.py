@@ -125,14 +125,9 @@ class _StateModule(types.ModuleType):
         raise AttributeError(f"module 'eqlib._state' has no attribute {name!r}")
 
     def __setattr__(self, name: str, value):
-        # Use object.__getattribute__ to avoid recursion when reading _DELEGATED.
-        try:
-            delegated = object.__getattribute__(self, '__dict__').get(
-                '_DELEGATED', frozenset()
-            )
-        except Exception:
-            delegated = frozenset()
-        if name in delegated:
+        # _DELEGATED is defined at module scope; access it directly to avoid
+        # the dict-lookup indirection used during module initialisation.
+        if name in _DELEGATED:
             setattr(get_session(), name, value)
         else:
             object.__setattr__(self, name, value)
