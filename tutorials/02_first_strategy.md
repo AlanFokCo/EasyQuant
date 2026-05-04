@@ -387,6 +387,7 @@ def market_open(context):
 - **[Tutorial 03: 回测验证](03_backtesting.md)** — 深入理解回测结果，解读报告，判断策略是否有效
 - **[Tutorial 04: 策略优化与改进](04_strategy_optimization.md)** — 参数调优、组合优化、归因分析
 - **[Tutorial 05: 模拟盘到实盘](05_live_trading.md)** — 实时行情验证和 PTrade/QMT 实盘部署
+- **[Tutorial 06: RSI 均值回归策略](06_rsi_mean_reversion.md)** — 学习另一类经典策略：均值回归
 
 ### 练习
 

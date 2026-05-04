@@ -89,10 +89,22 @@ def _is_etf(code: str) -> bool:
 
 def _is_index(code: str) -> bool:
     """Check if a code is a common A-share index.
-    000xxx.XSHG / 399xxx.XSHE indices like 000001 (上证指数),
-    000300 (沪深300), 000905 (中证500), etc.
+
+    Uses the exchange suffix to disambiguate Shanghai indices from Shenzhen
+    stocks that share the same 000xxx code prefix:
+
+    - ``000xxx.XSHG`` → Shanghai index  (e.g. 000300.XSHG 沪深300)
+    - ``399xxx``       → Shenzhen index (e.g. 399001.XSHE 深证成指)
+    - ``000xxx.XSHE``  → Shenzhen stock (e.g. 000858.XSHE 五粮液)
+    - ``000xxx``       → treated as stock (no suffix → ambiguous, safe default)
     """
-    return code.startswith(("000", "399"))
+    stripped = code.replace(".XSHG", "").replace(".XSHE", "")
+    # Shanghai indices: require the explicit .XSHG suffix so that plain
+    # 000xxx codes (Shenzhen stocks like 000858 五粮液) are NOT misclassified.
+    if ".XSHG" in code and stripped.startswith("000"):
+        return True
+    # Shenzhen indices always start with 399 regardless of suffix presence.
+    return stripped.startswith("399")
 
 
 def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
@@ -103,7 +115,7 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         return _cache[cache_key]
 
     try:
-        if _is_index(symbol):
+        if _is_index(code):
             # Indices use stock_zh_index_daily_em with 'sh'/'sz' prefix
             prefix = "sh" if ".XSHG" in code else "sz"
             df = ak.stock_zh_index_daily_em(

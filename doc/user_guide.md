@@ -523,8 +523,8 @@ weights = utils.risk_parity_weights([0.15, 0.25, 0.20])
 ### 8.4 支撑阻力位
 
 ```python
-# 枢轴点
-pp, r1, s1, r2, s2 = utils.pivot_classic(high, low, close)
+# 枢轴点（返回 pp, r1, s1, r2, s2, r3, s3 共 7 个值）
+pp, r1, s1, r2, s2, r3, s3 = utils.pivot_classic(high, low, close)
 
 # 支撑/阻力位（摆动点聚类）
 sr = utils.support_resistance_levels(high, low, close)
