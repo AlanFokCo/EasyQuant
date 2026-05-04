@@ -36,9 +36,18 @@ class OrderCost:
         commission = max(value * self.open_commission, self.min_commission)
         return tax + commission
 
-    def calc_close_cost(self, price, amount, is_today=False):
+    def calc_close_cost(self, price, amount, is_today=False, is_etf=False):
+        """Calculate total closing cost (stamp duty + commission).
+
+        Parameters:
+            price: execution price
+            amount: number of shares sold
+            is_today: True for intraday close (uses close_today_commission)
+            is_etf: True for ETF sells — stamp duty is waived for ETFs
+        """
         value = price * amount
-        tax = value * self.close_tax
+        # ETFs are exempt from stamp duty (close_tax only applies to stocks)
+        tax = 0.0 if is_etf else value * self.close_tax
         comm_rate = self.close_today_commission if is_today else self.close_commission
         commission = max(value * comm_rate, self.min_commission)
         return tax + commission

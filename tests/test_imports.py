@@ -89,6 +89,8 @@ def test_import_utils():
     from eqlib import utils
     # Indicators
     assert callable(utils.ma)
+    assert callable(utils.sma)
+    assert callable(utils.smma)
     assert callable(utils.macd)
     assert callable(utils.rsi)
     assert callable(utils.boll)

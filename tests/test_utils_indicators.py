@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from eqlib.utils.indicators import (
-    ma, ema, sma, wma,
+    ma, ema, sma, smma, wma,
     macd, rsi, kdj, boll, atr, cci, wr, roc, obv, adx,
     golden_cross, death_cross,
 )
@@ -35,6 +35,18 @@ class TestMovingAverages:
         result = sma(prices, period=10)
         assert len(result) == 50
         assert result.iloc[-1] > 0
+        # sma is a plain rolling mean — first 9 values should be NaN
+        assert pd.isna(result.iloc[:9]).all()
+        assert pd.notna(result.iloc[9])
+
+    def test_smma(self):
+        prices = _make_prices(50, base=10.0)
+        result = smma(prices, period=10)
+        assert len(result) == 50
+        assert result.iloc[-1] > 0
+        # smma and sma should diverge: smma is exponentially smoothed
+        sma_result = sma(prices, period=10)
+        assert not (result == sma_result).all()
 
     def test_wma(self):
         prices = _make_prices(50, base=10.0)
