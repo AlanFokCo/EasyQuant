@@ -23,6 +23,7 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 | 06 | [RSI 均值回归策略](06_rsi_mean_reversion.md) | 均值回归 | RSI、布林带二次确认、止损 | 20 min |
 | 07 | [行业轮动策略](07_sector_rotation.md) | 行业轮动 | 动量打分、等权调仓、行业 API | 20 min |
 | 08 | [多因子选股](08_multi_factor.md) | 因子选股 | Z-Score 标准化、因子合成、IC 检验 | 25 min |
+| 09 | [全天候 Alpha 综合策略](09_combined_strategy.md) | 综合策略 | 多因子+行业轮动+RSI/布林/MACD+ATR止损 | 30 min |
 
 ---
 
@@ -70,6 +71,14 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 
 适合：有一定基础，想尽快把策略部署到 PTrade/QMT 的用户
 
+### 路径 F：综合策略实战（推荐进阶用户）
+
+```
+06 RSI 均值回归 → 07 行业轮动 → 08 多因子选股 → 09 综合策略
+```
+
+适合：已掌握单一策略，希望将所有技术融合到一个生产级策略的用户
+
 ---
 
 ## 按策略类型查找
@@ -82,6 +91,7 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 | **MACD 趋势确认** | [Tutorial 04 §3.4](04_strategy_optimization.md#34-macd-辅助确认) | [Example 15](../examples/15_macd_volume_strategy.py) |
 | **行业轮动** | [Tutorial 07](07_sector_rotation.md) | [Example 10](../examples/10_index_concept.py) |
 | **多因子选股** | [Tutorial 08](08_multi_factor.md) | [Example 16](../examples/16_multi_factor_strategy.py)、[Example 09](../examples/09_attribution_analysis.py) |
+| **综合策略（全天候 Alpha）** | [Tutorial 09](09_combined_strategy.md) | [Example 21](../examples/21_combined_strategy/) |
 | **网格交易** | — | [Example 17](../examples/17_grid_trading_strategy.py) |
 | **支撑阻力位** | — | [Example 11](../examples/11_utils_library.py)、[Example 20](../examples/20_sr_strategy/) |
 | **组合回测** | [Tutorial 03 §8](03_backtesting.md#8-组合回测) | [Example 12](../examples/12_portfolio_backtest.py) |
@@ -112,6 +122,15 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 ## 实战案例
 
 完成教程后，查看以下真实策略案例：
+
+### 全天候 Alpha 综合策略（完整生产级案例）
+
+**[Tutorial 09: 全天候 Alpha 综合策略](09_combined_strategy.md)** —
+将所有教程的策略技术融合为一个完整的生产级综合策略，包含多因子选股、行业轮动、
+RSI/布林带/MACD/ATR 技术信号、支撑阻力位和生命周期回调，配有完整的回测和模拟盘代码。
+
+**[Example 21: 全天候 Alpha 综合策略](../examples/21_combined_strategy/)** —
+完整可运行的综合策略代码，包含策略模块、回测脚本和模拟盘脚本。
 
 ### 支撑阻力位组合策略（完整实盘案例）
 
