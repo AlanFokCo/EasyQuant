@@ -432,6 +432,9 @@ def handlebar(ContextInfo):
 
 ### 进一步学习
 
+- **[Tutorial 06: RSI 均值回归策略](../tutorials/06_rsi_mean_reversion.md)** — 学习与趋势跟踪截然不同的均值回归策略思路
+- **[Tutorial 07: 行业轮动策略](../tutorials/07_sector_rotation.md)** — 利用 A 股行业轮动构建超额收益策略
+- **[Tutorial 08: 多因子选股](../tutorials/08_multi_factor.md)** — 系统性量化选股方法
 - [PTrade/QMT 适配器文档](../doc/ptrade_adapter.md) — 适配器 API 详解
 - [API 参考](../doc/api_reference.md) — 完整的 API 列表
 - [工具库参考](../doc/utils_reference.md) — 技术指标、统计工具、资金管理
