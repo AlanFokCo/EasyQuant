@@ -108,6 +108,7 @@ See the [`examples/`](examples/) directory for complete scripts:
 | 18 | `18_strategy_comparison.py` | Compare multiple strategies side by side |
 | 19 | `19_local_data_backtest.py` | Local data mode (download once, backtest offline) |
 | 20 | `20_sr_strategy/` | Support & Resistance portfolio strategy (real-world case) |
+| 21 | `21_combined_strategy/` | **All-Weather Alpha** — comprehensive combined strategy (multi-factor + sector rotation + RSI/MACD/Bollinger + ATR) |
 
 ---
 

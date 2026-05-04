@@ -360,6 +360,40 @@ python examples/19_local_data_backtest.py --download-all
 
 ---
 
+## 21_combined_strategy/ — 全天候 Alpha 综合策略（生产级综合案例）
+
+将所有教程和示例的策略技术融合为一个完整的、可投入实盘的综合策略：
+
+策略逻辑（四层架构）：
+- **第一层**：多因子选股 — 动量（35%）+ 成交量（30%）+ 反转修正（15%）+ 低波动率（20%）
+  四因子经 Z-Score 标准化后加权合成，每周选出 Top 5 股票
+- **第二层**：行业轮动加成 — 对各行业代表股计算 10 日动量，以 +10% 权重加成综合得分
+- **第三层**：技术指标入场/离场 — RSI + 布林带（入场超卖确认）、MACD 金叉/死叉（趋势确认）、
+  成交量确认（量比 ≥ 1.2×）、支撑阻力位（精确位置确认）、ATR 追踪止损 + 唐奇安通道
+- **第四层**：风险管理 — 硬止损 -8%、每股最大仓位 20%（最多 5 只）、生命周期回调集成
+
+**股票池（12 只，覆盖 8 个行业）：**
+  601398（工商银行）、600519（贵州茅台）、002594（比亚迪）、601857（中国石油）、
+  601088（中国神华）、601390（中国中铁）、600276（恒瑞医药）、000333（美的集团）、
+  600916（中国黄金）、000858（五粮液）、601318（中国平安）、600887（伊利股份）
+
+**涉及 API：** `utils.rsi`、`utils.boll`、`utils.macd`、`utils.atr`、`utils.donchian`、
+`utils.support_resistance_levels`、`before_trading_start`、`after_trading_end`、
+`run_weekly`、`run_daily`、`order_value`、`order_target`、`record`、`analyze_returns`
+
+**运行方式：**
+```bash
+# 回测（约 60 秒）
+python examples/21_combined_strategy/run_backtest.py
+
+# 模拟盘（持续运行，按 Ctrl+C 停止）
+python examples/21_combined_strategy/run_paper_trade.py
+```
+
+**配套教程：** [Tutorial 09: 全天候 Alpha 综合策略](../tutorials/09_combined_strategy.md)
+
+---
+
 ## 20_sr_strategy/ — 支撑阻力位组合策略（完整实盘案例）
 
 一个真实的多股票组合策略实战案例：基于支撑阻力位、RSI、MACD、ATR 和唐奇安通道，
@@ -417,6 +451,7 @@ python examples/20_sr_strategy/run_backtest.py
 | 18 | `18_strategy_comparison.py` | 多策略横向对比（同股同时段） | ~30s |
 | 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） | ~15s |
 | 20 | `20_sr_strategy/` | 支撑阻力位组合策略（完整实盘案例） | ~30s |
+| 21 | `21_combined_strategy/` | 全天候 Alpha 综合策略（多因子+行业轮动+RSI/MACD/布林+ATR） | ~60s |
 
 ## 环境要求
 
