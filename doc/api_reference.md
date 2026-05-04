@@ -603,7 +603,61 @@ print(info['price'], info['pe'])
 }
 ```
 
-### 4.3 `estimate_memory_mb(securities, rows_per_sec)`
+### 4.3 `run_portfolio_backtest(config, strategy_func, report_dir='reports')`
+
+面向多股票组合的高层回测接口。使用 `StrategyConfig` 定义初始资金、股票池、仓位比例和报告后缀，策略函数从 `context.universe` 中选股并交易。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `config` | `StrategyConfig` | 策略配置对象 |
+| `strategy_func` | `callable` | 策略函数，签名 `func(context)` |
+| `report_dir` | `str` | 报告输出目录，默认 `'reports'` |
+
+#### `StrategyConfig` 类
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `securities` | `list[str]` | 必填 | 股票池代码列表 |
+| `start_date` | `str`/`date` | 必填 | 回测开始日期 |
+| `end_date` | `str`/`date` | 必填 | 回测结束日期 |
+| `starting_cash` | `float` | `100000` | 初始资金 |
+| `benchmark` | `str` | `"000300.XSHG"` | 基准指数 |
+| `position_pct` | `float` | `0.33` | 每只股票最大仓位比例（可用资金的百分比） |
+| `position_amount` | `int` | `0` | 固定买入股数（非零时覆盖 `position_pct`） |
+| `report_suffix` | `str` | `""` | 报告文件名后缀，用于区分不同版本 |
+| `frequency` | `str` | `"daily"` | `"daily"` 或 `"minute"` |
+
+```python
+from eqlib import StrategyConfig, run_portfolio_backtest
+
+config = StrategyConfig(
+    starting_cash=200000,
+    securities=['601390', '600519', '000858'],
+    benchmark='000300.XSHG',
+    position_pct=0.33,
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    report_suffix='v1',
+)
+
+def my_strategy(context):
+    for sec in context.universe:
+        hist = attribute_history(sec, 20, '1d', ['close'])
+        if hist.empty:
+            continue
+        price = hist['close'].iloc[-1]
+        ma20 = hist['close'].mean()
+        if price > ma20 * 1.02:
+            order_value(sec, context.portfolio.available_cash * config.position_pct)
+        elif price < ma20 * 0.98 and context.portfolio.positions.get(sec):
+            order_target(sec, 0)
+
+result = run_portfolio_backtest(config, my_strategy, report_dir='reports')
+```
+
+### 4.4 `estimate_memory_mb(securities, rows_per_sec)`
 
 估算预加载数据的内存需求。
 
@@ -622,7 +676,7 @@ est = estimate_memory_mb(['601390', '600519'], 1500)
 print(f"预计内存: {est['total_mb']} MB")
 ```
 
-### 4.3 `run_paper_trade(initialize_func, starting_cash=100000.0, benchmark='000300.XSHG', interval=60)`
+### 4.5 `run_paper_trade(initialize_func, starting_cash=100000.0, benchmark='000300.XSHG', interval=60)`
 
 模拟盘交易。
 
@@ -637,7 +691,7 @@ print(f"预计内存: {est['total_mb']} MB")
 
 **说明：** 模拟盘会持续运行直到 `Ctrl+C` 终止，使用实时行情数据。
 
-### 4.4 `record(**kwargs)`
+### 4.6 `record(**kwargs)`
 
 在策略中记录自定义数据点。
 
@@ -647,7 +701,7 @@ record(price=current_price, ma5=ma5, signal='BUY')
 
 记录的数据出现在报告 JSON 的 `recorded_values` 字段中。
 
-### 4.5 调度函数
+### 4.7 调度函数
 
 #### `run_daily(func, time='every_bar')`
 
@@ -661,7 +715,7 @@ record(price=current_price, ma5=ma5, signal='BUY')
 
 每月定时执行。`day_of_month`：1-31。
 
-### 4.6 生命周期回调
+### 4.8 生命周期回调
 
 #### `before_trading_start(func)`
 
@@ -741,7 +795,15 @@ set_option('use_real_price', True)
 
 生成 JSON 格式回测报告（结构化数据）。
 
-### 6.4 `analyze_returns(result, risk_free_rate=0.03, trading_days=252)`
+### 6.4 `generate_html_report(result, out_path)`
+
+生成交互式 HTML 回测报告（图表 + 汇总统计，可直接在浏览器打开）。
+
+**参数：**
+- `result` — `run_backtest` 返回的字典
+- `out_path` — 输出路径，如 `'reports/chart.html'`
+
+### 6.5 `analyze_returns(result, risk_free_rate=0.03, trading_days=252)`
 
 计算综合风险指标。
 
@@ -773,13 +835,13 @@ set_option('use_real_price', True)
 | `trading_days` | `int` | 回测天数 |
 | `num_trades` | `int` | 交易次数 |
 
-### 6.5 `brinson_attribution(result, sector_data=None)`
+### 6.6 `brinson_attribution(result, sector_data=None)`
 
 Brinson 归因分析：配置效应 + 选股效应 + 交互效应。
 
 **返回：** `dict`（allocation_effect, selection_effect, interaction_effect, total_active_return）
 
-### 6.6 `fama_french_analysis(result, factors=None)`
+### 6.7 `fama_french_analysis(result, factors=None)`
 
 Fama-French 风格因子分析。
 
@@ -851,7 +913,7 @@ weights = portfolio_optimizer(
 
 ### 8.3 `estimate_memory_mb(securities, rows_per_sec)`
 
-估算预加载数据的内存需求。详见 4.3 节。
+估算预加载数据的内存需求。详见 4.4 节。
 
 ### 8.4 本地 CSV 数据
 
@@ -903,43 +965,45 @@ log.error("数据获取失败")
 ```python
 from eqlib import (
     # === 生命周期 ===
-    "run_backtest", "run_strategy", "run_daily", "run_weekly", "run_monthly",
-    "set_handle_data", "record", "run_paper_trade",
+    run_backtest, run_strategy, run_portfolio_backtest,
+    run_daily, run_weekly, run_monthly,
+    set_handle_data, record, run_paper_trade,
     # === 配置 ===
-    "set_benchmark", "set_option", "set_order_cost", "OrderCost",
+    set_benchmark, set_option, set_order_cost, OrderCost,
     # === 交易 ===
-    "order", "order_target", "order_value", "order_target_value",
+    order, order_target, order_value, order_target_value,
     # === 数据 ===
-    "get_price", "history", "attribute_history", "get_all_securities",
-    "download_stock_data", "load_csv", "clear_cache",
+    get_price, history, attribute_history, get_all_securities,
+    fetch_stock_data, download_stock_data, load_csv, clear_cache,
     # === 扫描 ===
-    "scan_market", "check_golden_cross", "get_financial_screen",
+    scan_market, check_golden_cross, get_financial_screen,
     # === 指数/行业/概念 ===
-    "get_index_stocks", "get_industry_list", "get_industry_stocks",
-    "get_concept_list", "get_concept_stocks", "get_industry",
+    get_index_stocks, get_industry_list, get_industry_stocks,
+    get_concept_list, get_concept_stocks, get_industry,
     # === 分钟线 / Tick ===
-    "fetch_minute_data", "get_price_minute", "get_tick_data",
+    fetch_minute_data, get_price_minute, get_tick_data,
     # === 行情快照 / 基本面 ===
-    "get_current_data", "get_security_info", "get_trade_days",
-    "get_fundamentals", "get_money_flow", "get_billboard_list",
-    "get_valuation", "get_index_weights", "get_extras",
+    get_current_data, get_security_info, get_trade_days,
+    get_fundamentals, get_financial_abstract, get_money_flow,
+    get_billboard_list, get_valuation, get_index_weights, get_extras,
     # === 股票池 ===
-    "set_universe", "get_universe",
+    set_universe, get_universe,
     # === 生命周期回调 ===
-    "before_trading_start", "after_trading_end",
+    before_trading_start, after_trading_end,
     # === 日志 ===
-    "log",
+    log,
     # === 对象 ===
-    "g", "GlobalObject", "Context", "Portfolio", "Position",
+    g, GlobalObject, Context, Portfolio, Position,
+    StrategyConfig,
     # === 报告 ===
-    "generate_chart", "generate_report_md", "generate_report_json",
+    generate_chart, generate_report_md, generate_report_json, generate_html_report,
     # === 组合优化 ===
-    "portfolio_optimizer", "Bound", "MinVariance", "MaxSharpe", "RiskParity",
+    portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
     # === 分析 ===
-    "analyze_returns", "brinson_attribution", "fama_french_analysis",
+    analyze_returns, brinson_attribution, fama_french_analysis,
     # === 缓存 ===
-    "set_cache_dir", "fetch_cached", "estimate_memory_mb",
-    "save_stock_local", "load_stock_local", "has_local_data",
-    "list_local_stocks", "remove_local_data", "clear_all_local_data",
+    set_cache_dir, set_local_data_dir, fetch_cached, estimate_memory_mb,
+    save_stock_local, load_stock_local, has_local_data,
+    list_local_stocks, remove_local_data, clear_all_local_data,
 )
 ```

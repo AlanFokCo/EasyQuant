@@ -327,26 +327,6 @@ python examples/18_strategy_comparison.py
 
 ---
 
-## 18_strategy_comparison.py — 多策略对比
-
-在同一只股票和同一时间段内，横向对比多种策略的表现：
-
-- 买入持有（基准）
-- 均线交叉（趋势跟踪）
-- RSI 均值回归（反向交易）
-- 布林带（均值回归）
-
-输出格式化的对比表格，按夏普比率排序，便于客观评估哪种方法更有效。
-
-**涉及 API：** `run_backtest`、`analyze_returns`、`record`
-
-**运行方式：**
-```bash
-python examples/18_strategy_comparison.py
-```
-
----
-
 ## 19_local_data_backtest.py — 本地数据回测模式
 
 演示 `use_local` 参数的用法：
