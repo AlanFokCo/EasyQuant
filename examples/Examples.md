@@ -380,6 +380,39 @@ python examples/19_local_data_backtest.py --download-all
 
 ---
 
+## 20_sr_strategy/ — 支撑阻力位组合策略（完整实盘案例）
+
+一个真实的多股票组合策略实战案例：基于支撑阻力位、RSI、MACD、ATR 和唐奇安通道，
+在 8 只不同行业的 A 股中进行交易。
+
+策略逻辑：
+- **买入**：价格接近支撑位 + RSI 超卖 或 MACD 金叉
+- **卖出**：价格接近阻力位 + RSI 超买 或 MACD 死叉
+- **止损**：ATR 追踪止损
+- **仓位**：每只股票最多 25% 资金，等权配置
+
+回测结果（2020-01-01 至 2026-03-30）：
+- 初始资金：1,000,000
+- 最终价值：2,371,889.70
+- 总收益率：+137.19%
+- 交易次数：226 笔
+
+本目录包含完整的策略代码、回测脚本和预生成的报告文件（PNG、HTML、Markdown、JSON），
+用户可以查看报告了解策略表现，也可以直接运行回测验证。
+
+**涉及 API：** `utils.support_resistance_levels`、`utils.rsi`、`utils.macd`、`utils.atr`、`utils.donchian`、`order_value`、`order_target`、`record`
+
+**运行方式：**
+```bash
+# 查看预生成的报告
+# 打开 examples/20_sr_strategy/sr_backtest.html（浏览器）
+
+# 运行回测（需要 data/ 目录中的本地数据）
+python examples/20_sr_strategy/run_backtest.py
+```
+
+---
+
 ## 速查表
 
 | # | 文件 | 主题 | 运行时间 |
@@ -403,6 +436,7 @@ python examples/19_local_data_backtest.py --download-all
 | 17 | `17_grid_trading_strategy.py` | 网格交易策略 | ~15s |
 | 18 | `18_strategy_comparison.py` | 多策略横向对比（同股同时段） | ~30s |
 | 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） | ~15s |
+| 20 | `20_sr_strategy/` | 支撑阻力位组合策略（完整实盘案例） | ~30s |
 
 ## 环境要求
 

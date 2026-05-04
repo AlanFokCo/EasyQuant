@@ -7,7 +7,7 @@ _order_cost_config = None
 _benchmark = None
 _options = {}
 _scheduled_funcs = []
-_recorded_values = []
+_recorded_values: dict = {}   # date -> dict (was list, now O(1) lookup)
 _trade_log = []
 _handle_data_func = None
 _before_trading_start_funcs = []
@@ -26,7 +26,7 @@ def reset_all():
     _benchmark = None
     _options = {}
     _scheduled_funcs = []
-    _recorded_values = []
+    _recorded_values = {}
     _trade_log = []
     _handle_data_func = None
     _before_trading_start_funcs = []

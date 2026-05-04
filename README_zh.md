@@ -96,6 +96,7 @@ result = run_strategy(
 | 17 | `17_grid_trading_strategy.py` | 网格交易策略 |
 | 18 | `18_strategy_comparison.py` | 多策略横向对比 |
 | 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） |
+| 20 | `20_sr_strategy/` | 支撑阻力位组合策略（完整实盘案例） |
 
 ---
 

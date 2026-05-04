@@ -82,19 +82,45 @@ def _rename_cols(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
 # Daily OHLCV
 # ============================================================
 
+def _is_etf(code: str) -> bool:
+    """Check if a code is an ETF (51xxxx, 15xxxx, 16xxxx, 18xxxx)."""
+    return code.startswith(("51", "15", "16", "18"))
+
+
+def _is_index(code: str) -> bool:
+    """Check if a code is a common A-share index.
+    000xxx.XSHG / 399xxx.XSHE indices like 000001 (上证指数),
+    000300 (沪深300), 000905 (中证500), etc.
+    """
+    return code.startswith(("000", "399"))
+
+
 def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
-    """Fetch daily OHLCV data from akshare for a single stock."""
+    """Fetch daily OHLCV data from akshare for a single stock, ETF, or index."""
     symbol = _code_to_akshare(code)
     cache_key = (symbol, str(start_date), str(end_date), adjust)
     if cache_key in _cache:
-        return _cache[cache_key].copy()
+        return _cache[cache_key]
 
     try:
-        df = ak.stock_zh_a_hist(
-            symbol=symbol, period="daily",
-            start_date=_normalize_date(start_date),
-            end_date=_normalize_date(end_date), adjust=adjust,
-        )
+        if _is_index(symbol):
+            # Indices use stock_zh_index_daily_em with 'sh'/'sz' prefix
+            prefix = "sh" if ".XSHG" in code else "sz"
+            df = ak.stock_zh_index_daily_em(
+                symbol=f"{prefix}{symbol}",
+            )
+        elif _is_etf(symbol):
+            df = ak.fund_etf_hist_em(
+                symbol=symbol, period="daily",
+                start_date=_normalize_date(start_date),
+                end_date=_normalize_date(end_date), adjust=adjust,
+            )
+        else:
+            df = ak.stock_zh_a_hist(
+                symbol=symbol, period="daily",
+                start_date=_normalize_date(start_date),
+                end_date=_normalize_date(end_date), adjust=adjust,
+            )
     except Exception:
         return pd.DataFrame()
 
@@ -111,7 +137,13 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         df["date"] = pd.to_datetime(df["date"])
         df.set_index("date", inplace=True)
 
-    _cache[cache_key] = df.copy()
+    # Index data spans all history — filter to requested date range
+    if _is_index(symbol) and start_date and end_date:
+        start_ts = pd.Timestamp(start_date)
+        end_ts = pd.Timestamp(end_date)
+        df = df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
+
+    _cache[cache_key] = df
     return df
 
 
@@ -175,7 +207,23 @@ def attribute_history(security, count: int, unit: str = "1d",
                       skip_paused: bool = True, fq: str = "pre"):
     """Get historical attribute data for a single security."""
     from eqlib._state import _context
+    from eqlib.engine import _preloaded
 
+    # Fast path: slice from preloaded in-memory data
+    if _preloaded.panel is not None:
+        sec_df = _preloaded.panel.get(security)
+        if sec_df is not None and not sec_df.empty:
+            available = [f for f in fields if f in sec_df.columns]
+            if not available:
+                return pd.DataFrame()
+            # Filter up to current date (avoid future data leakage)
+            current = _context.current_dt
+            if current is not None:
+                sec_df = sec_df[sec_df.index <= current]
+            result = sec_df[available].tail(count)
+            return result
+
+    # Fallback: fetch from disk/network
     end_date = _context.current_dt
     start_date = end_date - datetime.timedelta(days=count * 2 + 60)
 

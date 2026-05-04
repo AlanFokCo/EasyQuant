@@ -93,7 +93,7 @@ from eqlib import engine
 
 # Data cache (disk caching + preloaded data)
 from eqlib.data_cache import (
-    set_cache_dir, fetch_cached,
+    set_cache_dir, fetch_cached, estimate_memory_mb,
     # Local CSV data store
     set_local_data_dir, save_stock_local, load_stock_local,
     has_local_data, list_local_stocks, remove_local_data,
@@ -168,7 +168,7 @@ __all__ = [
     # Attribution analysis
     "analyze_returns", "brinson_attribution", "fama_french_analysis",
     # Data cache
-    "set_cache_dir", "fetch_cached",
+    "set_cache_dir", "fetch_cached", "estimate_memory_mb",
     # Local CSV data store
     "set_local_data_dir", "save_stock_local", "load_stock_local",
     "has_local_data", "list_local_stocks", "remove_local_data",
@@ -183,7 +183,8 @@ __all__ = [
 def run_strategy(initialize_func, start_date=None, end_date=None,
                   starting_cash=100000.0, benchmark="000300.XSHG",
                   handle_data=None, securities=None,
-                  report_dir="reports", use_local: bool = False):
+                  report_dir="reports", use_local: bool = False,
+                  max_memory_mb: int = 1024):
     """
     High-level strategy runner. Runs backtest and generates all reports.
 
@@ -200,6 +201,9 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
         use_local: if True, load data from local CSV files first.
                    Downloads and saves to local CSV if not found.
                    Subsequent runs will use the saved local data.
+        max_memory_mb: memory limit in MB for in-memory dict caches.
+                       Default 1024 (1 GB). Results are identical
+                       regardless of whether dict caches are used.
 
     Returns:
         Backtest result dict
@@ -221,6 +225,7 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
         initialize_func, start_date, end_date,
         starting_cash=starting_cash, benchmark=benchmark,
         securities=securities, use_local=use_local,
+        max_memory_mb=max_memory_mb,
     )
 
     if result is None:

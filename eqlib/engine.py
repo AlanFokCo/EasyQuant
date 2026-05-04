@@ -20,6 +20,19 @@ from eqlib.logger import log
 _preloaded = PreloadedData()
 
 
+class SecurityBar:
+    """Lightweight bar object with __slots__ to avoid per-call class creation."""
+    __slots__ = ("open", "high", "low", "close", "volume", "money")
+
+    def __init__(self, d: dict):
+        self.open = d.get("open", 0)
+        self.high = d.get("high", 0)
+        self.low = d.get("low", 0)
+        self.close = d.get("close", 0)
+        self.volume = d.get("volume", 0)
+        self.money = d.get("money", 0)
+
+
 def set_order_cost(cost, type: str = "stock", ref=None):
     """Set order cost parameters."""
     import eqlib._state as st
@@ -121,18 +134,17 @@ def record(**kwargs):
     import eqlib._state as st
     entry = {"date": st._context.current_dt.date()}
     entry.update(kwargs)
-    st._recorded_values.append(entry)
+    # O(1) dict write — replaces O(N) list append + linear scan
+    st._recorded_values[st._context.current_dt.date()] = entry
 
 
 def _get_price_fast(security, day) -> Optional[float]:
-    """Get closing price for a security on a given day."""
-    price = _preloaded.get_close(day, security)
-    if price is not None:
-        return price
-    df = fetch_stock_data(security, day, day)
-    if not df.empty and "close" in df.columns:
-        return float(df["close"].iloc[-1])
-    return None
+    """Get closing price for a security on a given day.
+
+    When data is preloaded (normal backtest), this is a pure dict lookup.
+    No fallback to network/disk I/O — if preload is set, it's authoritative.
+    """
+    return _preloaded.get_close(day, security)
 
 
 def set_handle_data(func):
@@ -152,40 +164,17 @@ class _LazyData(dict):
         day = self._context.current_dt.date()
         bar = _preloaded.get_bar(day, key)
         if bar is not None:
-            result = _make_bar(bar)
+            result = SecurityBar(bar)
             self[key] = result
             return result
-
-        df = fetch_stock_data(key, day, day)
-        if df.empty:
-            end = self._context.current_dt
-            start = end - datetime.timedelta(days=30)
-            df = fetch_stock_data(key, start, end)
-
-        if not df.empty:
-            row = df.iloc[-1]
-            result = _make_bar(row)
-            self[key] = result
-            return result
+        # No fallback to network/disk — preloaded data is authoritative
         return None
-
-
-def _make_bar(bar):
-    """Create a SecurityBar-like object from a dict or DataFrame row."""
-    obj = type("SecurityBar", (), {})()
-    obj.open = bar.get("open", 0)
-    obj.high = bar.get("high", 0)
-    obj.low = bar.get("low", 0)
-    obj.close = bar.get("close", 0)
-    obj.volume = bar.get("volume", 0)
-    obj.money = bar.get("money", 0)
-    return obj
 
 
 def run_backtest(initialize_func, start_date, end_date,
                  starting_cash=100000.0, frequency: str = "daily",
                  benchmark: str = "000300.XSHG", securities=None,
-                 use_local: bool = False):
+                 use_local: bool = False, max_memory_mb: int = 1024):
     """Main backtest runner.
 
     Parameters:
@@ -200,6 +189,10 @@ def run_backtest(initialize_func, start_date, end_date,
                    Downloads and saves to local CSV if not found.
                    Subsequent runs will use the saved local data,
                    avoiding network requests.
+        max_memory_mb: memory limit in MB for in-memory dict caches.
+                       Default 1024 (1 GB). If estimated memory exceeds
+                       this, falls back to compact panel slicing (slower
+                       but memory-safe). Results are identical either way.
     """
     global _preloaded
 
@@ -216,15 +209,19 @@ def run_backtest(initialize_func, start_date, end_date,
     )
     st._benchmark = benchmark
 
+    # Preload data first (if securities provided)
+    if securities:
+        log.info(f"Preloading data for {len(securities)} securities{' (local)' if use_local else ''}...")
+        # Add warmup period for indicator lookback (e.g. 110 bars needs ~280 calendar days)
+        warmup_start = start_date - datetime.timedelta(days=365) if isinstance(start_date, datetime.date) else start_date
+        _preloaded.load(securities, warmup_start, end_date, adjust="qfq", use_local=use_local, max_memory_mb=max_memory_mb)
+        log.info("Data preloaded.")
+
+    # Get trading days from preloaded data index (no network call)
     trading_days = _get_trading_days(start_date, end_date)
     if not trading_days:
         log.error("No trading days found")
         return None
-
-    if securities:
-        log.info(f"Preloading data for {len(securities)} securities{' (local)' if use_local else ''}...")
-        _preloaded.load(securities, start_date, end_date, adjust="qfq", use_local=use_local)
-        log.info("Data preloaded.")
 
     _context = Context(start_date, end_date, frequency, starting_cash)
     st._context = _context
@@ -250,9 +247,9 @@ def run_backtest(initialize_func, start_date, end_date,
         for func in st._before_trading_start_funcs:
             func(_context, data)
 
-        # Update portfolio prices
+        # Update portfolio prices (pure dict lookup, no I/O)
         prices = {}
-        for sec in list(_context.portfolio.positions.keys()):
+        for sec in _context.portfolio.positions:
             price = _get_price_fast(sec, day)
             prices[sec] = price if price is not None else _context.portfolio.positions[sec].avg_cost
 
@@ -276,15 +273,11 @@ def run_backtest(initialize_func, start_date, end_date,
         # Update portfolio values
         _context.portfolio._sync_total_value(prices)
 
-        # Record daily portfolio value — merge into same-day entry if it exists
-        day_entry = None
-        for rv in reversed(st._recorded_values):
-            if rv.get("date") == day:
-                day_entry = rv
-                break
+        # Record daily portfolio value — O(1) dict lookup/insert
+        day_entry = _recorded_values.get(day)
         if day_entry is None:
             day_entry = {"date": day}
-            st._recorded_values.append(day_entry)
+            _recorded_values[day] = day_entry
         day_entry["total_value"] = _context.portfolio.total_value
         day_entry["cash"] = _context.portfolio.available_cash
 
@@ -299,13 +292,25 @@ def run_backtest(initialize_func, start_date, end_date,
     return {
         "context": _context,
         "trade_log": st._trade_log,
-        "recorded_values": st._recorded_values,
+        "recorded_values": sorted(_recorded_values.values(), key=lambda x: x["date"]),
         "benchmark": st._benchmark,
     }
 
 
 def _get_trading_days(start, end) -> list[datetime.date]:
-    """Get list of trading days between start and end."""
+    """Get list of trading days between start and end.
+
+    If PreloadedData has been populated, uses its index directly (no network call).
+    """
+    if _preloaded._dates is not None and len(_preloaded._dates) > 0:
+        start_ts = pd.Timestamp(start)
+        end_ts = pd.Timestamp(end)
+        return sorted(
+            (pd.Timestamp(d).date() for d in _preloaded._dates
+             if start_ts <= pd.Timestamp(d) <= end_ts)
+        )
+
+    # Fallback: try akshare or simple weekday filter
     try:
         import akshare as ak
         df = ak.stock_zh_a_hist(symbol="601390", period="daily",
@@ -318,6 +323,7 @@ def _get_trading_days(start, end) -> list[datetime.date]:
         return sorted(df["日期"].dt.date.unique().tolist())
     except Exception:
         return [d for d in _iter_days(start, end) if d.weekday() < 5]
+
 
 # Re-export for external access
 def get_context():
@@ -339,7 +345,7 @@ def get_trade_log():
 
 def get_recorded_values():
     import eqlib._state as st
-    return st._recorded_values
+    return sorted(st._recorded_values.values(), key=lambda x: x["date"])
 
 
 def run_paper_trade(initialize_func, starting_cash=100000.0,
@@ -388,7 +394,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             spot_cache = _fetch_live_prices(spot_cache)
 
             prices = {}
-            for sec in list(_context.portfolio.positions.keys()):
+            for sec in _context.portfolio.positions:
                 prices[sec] = spot_cache.get(sec) or _context.portfolio.positions[sec].avg_cost
 
             today = _context.current_dt.date()
@@ -416,7 +422,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     return {
         "context": _context,
         "trade_log": st._trade_log,
-        "recorded_values": st._recorded_values,
+        "recorded_values": sorted(st._recorded_values.values(), key=lambda x: x["date"]),
     }
 
 

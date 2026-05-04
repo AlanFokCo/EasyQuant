@@ -563,7 +563,7 @@ print(info['price'], info['pe'])
 
 ## 4. 回测与模拟盘引擎
 
-### 4.1 `run_strategy(initialize_func, start_date, end_date, starting_cash=100000, benchmark='000300.XSHG', handle_data=None, securities=None, report_dir='reports')`
+### 4.1 `run_strategy(initialize_func, start_date, end_date, starting_cash=100000, benchmark='000300.XSHG', handle_data=None, securities=None, report_dir='reports', use_local=False, max_memory_mb=1024)`
 
 一站式回测 + 报告生成。
 
@@ -579,10 +579,14 @@ print(info['price'], info['pe'])
 | `handle_data` | `callable` | 否 | `handle_data(context, data)` 函数 |
 | `securities` | `list` | 否 | 预加载股票代码列表 |
 | `report_dir` | `str` | 否 | 报告输出目录 |
+| `use_local` | `bool` | 否 | 使用本地 CSV 数据，默认 False |
+| `max_memory_mb` | `int` | 否 | 内存限制（MB），默认 1024（1GB） |
 
 **返回：** `dict` 回测结果，包含 `context`, `trade_log`, `recorded_values`
 
-### 4.2 `run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency='daily', benchmark='000300.XSHG', securities=None)`
+**`max_memory_mb` 说明：** 回测引擎会在内存允许的情况下构建快速查找字典缓存（O(1)）。如果估计内存超过此限制，会自动回退到紧凑的 DataFrame 切片模式（O(log n)），结果完全一致但略慢。你可以通过 `estimate_memory_mb(securities, rows_per_sec)` 提前估算内存需求。
+
+### 4.2 `run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency='daily', benchmark='000300.XSHG', securities=None, use_local=False, max_memory_mb=1024)`
 
 运行回测（不生成报告）。
 
@@ -594,9 +598,28 @@ print(info['price'], info['pe'])
 {
     "context": Context,            # 策略上下文
     "trade_log": list[dict],       # 交易记录
-    "recorded_values": list[dict], # record() 记录
+    "recorded_values": dict,       # record() 记录 (date -> dict)
     "benchmark": str,              # 基准代码
 }
+```
+
+### 4.3 `estimate_memory_mb(securities, rows_per_sec)`
+
+估算预加载数据的内存需求。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `securities` | `list[str]` | 股票代码列表 |
+| `rows_per_sec` | `int` | 每只股票的数据行数（交易日数） |
+
+**返回：** `dict`，包含 `panel_mb`、`close_dict_mb`、`bar_cache_mb`、`total_mb`、`securities`、`rows_per_sec`
+
+```python
+from eqlib import estimate_memory_mb
+est = estimate_memory_mb(['601390', '600519'], 1500)
+print(f"预计内存: {est['total_mb']} MB")
 ```
 
 ### 4.3 `run_paper_trade(initialize_func, starting_cash=100000.0, benchmark='000300.XSHG', interval=60)`
@@ -826,6 +849,19 @@ weights = portfolio_optimizer(
 
 **返回：** `DataFrame`
 
+### 8.3 `estimate_memory_mb(securities, rows_per_sec)`
+
+估算预加载数据的内存需求。详见 4.3 节。
+
+### 8.4 本地 CSV 数据
+
+- `save_stock_local(security, start_date, end_date, adjust)` — 下载并保存
+- `load_stock_local(security, start_date, end_date, adjust)` — 从本地加载
+- `has_local_data(security, adjust)` — 检查是否存在
+- `list_local_stocks(adjust)` — 列出所有本地文件
+- `remove_local_data(security, adjust)` — 删除单个文件
+- `clear_all_local_data(adjust)` — 清空所有本地文件
+
 ---
 
 ## 9. 日志 API
@@ -902,6 +938,8 @@ from eqlib import (
     # === 分析 ===
     "analyze_returns", "brinson_attribution", "fama_french_analysis",
     # === 缓存 ===
-    "set_cache_dir", "fetch_cached",
+    "set_cache_dir", "fetch_cached", "estimate_memory_mb",
+    "save_stock_local", "load_stock_local", "has_local_data",
+    "list_local_stocks", "remove_local_data", "clear_all_local_data",
 )
 ```

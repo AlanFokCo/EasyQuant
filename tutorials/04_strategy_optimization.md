@@ -433,3 +433,4 @@ def market_open(context):
 策略优化完成后，下一步是用实时行情验证：
 
 - **[Tutorial 05: 模拟盘到实盘](05_live_trading.md)** — 用模拟盘验证策略，然后导出到 PTrade/QMT 实盘部署
+- **[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），可直接查看策略表现
