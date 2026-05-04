@@ -1,7 +1,7 @@
 """Technical indicators for quantitative analysis.
 
 Provides:
-- Moving averages: MA, EMA, SMA, WMA
+- Moving averages: MA, EMA, SMA, SMMA (Smoothed MA), WMA
 - Trend: MACD, DMI/ADX
 - Momentum: RSI, KDJ, CCI, ROC, WR (Williams %R), STOCH
 - Volatility: Bollinger Bands, ATR, STD
@@ -27,8 +27,30 @@ def ema(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(span=period, adjust=False).mean()
 
 
-def sma(series: pd.Series, period: int, weight: float = 1.0) -> pd.Series:
-    """Smoothed Moving Average (like TradingView sma)."""
+def sma(series: pd.Series, period: int) -> pd.Series:
+    """Simple Moving Average (identical to ``ma``; alias kept for compatibility).
+
+    Returns a plain rolling mean — *not* the Wilder/smoothed variant.
+    For the Smoothed Moving Average (SMMA/RMA/Wilder MA), use :func:`smma`.
+    """
+    return series.rolling(period).mean()
+
+
+def smma(series: pd.Series, period: int, weight: float = 1.0) -> pd.Series:
+    """Smoothed Moving Average (SMMA / RMA / Wilder MA).
+
+    This is the custom smoothed average previously named ``sma`` in earlier
+    versions of the library.  It uses an EMA-style recursive formula::
+
+        SMMA[i] = (SMMA[i-1] * (period - weight) + series[i] * weight) / period
+
+    Commonly used inside ADX, RSI, and similar Wilder-style indicators.
+
+    Parameters:
+        series: input price series
+        period: smoothing period
+        weight: weighting factor (default 1.0)
+    """
     result = series.rolling(period).mean()
     for i in range(period, len(series)):
         result.iloc[i] = (result.iloc[i - 1] * (period - weight) + series.iloc[i] * weight) / period
@@ -43,12 +65,32 @@ def wma(series: pd.Series, period: int) -> pd.Series:
     )
 
 
-def vwap(high, low, close, volume) -> pd.Series:
-    """Volume Weighted Average Price."""
+def vwap(high, low, close, volume, window: int = None) -> pd.Series:
+    """Volume Weighted Average Price.
+
+    Parameters:
+        high, low, close, volume: OHLCV series
+        window: rolling window size in bars.  When ``None`` (default) the VWAP
+            is cumulative from the start of the series — suitable for intraday
+            data where the series represents a single session.  For *daily*
+            data, pass an explicit ``window`` (e.g., ``window=20``) to compute
+            a rolling VWAP over the last *window* bars instead.
+
+    Note:
+        Cumulative VWAP (``window=None``) is only meaningful on intraday data
+        whose index resets at each session open.  On daily OHLCV, use a
+        rolling window to avoid a steadily drifting average.
+    """
     typical = (high + low + close) / 3
-    cum_vp = (typical * volume).cumsum()
-    cum_vol = volume.cumsum()
-    return cum_vp / cum_vol
+    if window is None:
+        # Cumulative VWAP — correct for intraday (single-session) series
+        cum_vp = (typical * volume).cumsum()
+        cum_vol = volume.cumsum()
+        return cum_vp / cum_vol
+    # Rolling VWAP — correct for multi-session (daily) usage
+    cum_vp = (typical * volume).rolling(window).sum()
+    cum_vol = volume.rolling(window).sum()
+    return cum_vp / cum_vol.replace(0, np.nan)
 
 
 # ============================================================
@@ -193,7 +235,11 @@ def obv(close: pd.Series, volume: pd.Series) -> pd.Series:
 
 def adx(high: pd.Series, low: pd.Series, close: pd.Series,
         period: int = 14):
-    """Average Directional Index.
+    """Average Directional Index (standard Wilder smoothing).
+
+    Uses a single Wilder EWM smoothing (``alpha=1/period``) for both the
+    directional movement components and the DX smoothing, matching the
+    standard definition used by most trading platforms.
 
     Returns:
         tuple: (pdi, mdi, adx, adxr)
@@ -204,20 +250,22 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series,
     plus_dm = (high - prev_high).clip(lower=0)
     minus_dm = (prev_low - low).clip(lower=0)
 
-    # Overlap: when DM+ and DM- conflict
+    # Overlap: when both DM+ and DM- move, keep only the larger one
     mask = plus_dm > minus_dm
     plus_dm = plus_dm.where(mask, 0)
     minus_dm = minus_dm.where(~mask, 0)
 
+    # Wilder smoothing for True Range and directional movements
+    wilder = dict(alpha=1 / period, min_periods=period, adjust=False)
     true_range = atr(high, low, close, period)
-    # Smoothed DM
-    plus_di = 100 * sma(plus_dm, period).ewm(
-        alpha=1 / period, min_periods=period, adjust=False).mean() / true_range
-    minus_di = 100 * sma(minus_dm, period).ewm(
-        alpha=1 / period, min_periods=period, adjust=False).mean() / true_range
+    smooth_plus = plus_dm.ewm(**wilder).mean()
+    smooth_minus = minus_dm.ewm(**wilder).mean()
+
+    plus_di = 100 * smooth_plus / true_range.replace(0, np.nan)
+    minus_di = 100 * smooth_minus / true_range.replace(0, np.nan)
 
     dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
-    adx_val = dx.ewm(alpha=1 / period, adjust=False).mean()
+    adx_val = dx.ewm(**wilder).mean()
     adxr = (adx_val + adx_val.shift(period)) / 2
 
     return plus_di, minus_di, adx_val, adxr

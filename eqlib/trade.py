@@ -1,312 +1,122 @@
 """Trade execution: order, order_target, order_value, order_target_value
-(mirrors EasyQuant's trade API)."""
+(mirrors EasyQuant's trade API).
 
-import datetime
-import math
-from eqlib.logger import log
+Orders placed during strategy execution (in handle_data or run_daily callbacks)
+are buffered in ``session._pending_orders`` and filled at the **next trading
+day's open price** by the engine.  This eliminates look-ahead bias: a signal
+generated from today's closing bar cannot affect today's execution.
+"""
+
 import eqlib._state as st
-from eqlib.data import get_price
+from eqlib.logger import log
 
 
-def _get_current_price(security):
-    """Get current price from preloaded data or fetch from network."""
-    ctx = st._context
+def _get_pending_price(security):
+    """Return a reference price for validation purposes only.
+
+    Used only for basic sanity checks (e.g., computing approximate shares from
+    a value order).  The actual execution price is determined by the engine at
+    fill time using tomorrow's open.
+    """
+    sess = st.get_session()
+    ctx = sess._context
     if ctx is None:
         return None
 
-    # Try preloaded data first
-    from eqlib.engine import _preloaded
+    from eqlib.engine import _get_preloaded, _get_open_fast
     day = ctx.current_dt.date()
-    price = _preloaded.get_close(day, security)
+    # Prefer today's open as a price reference; fall back to close
+    price = _get_open_fast(security, day)
     if price is not None:
         return price
-
-    # Fallback: fetch from network
-    from eqlib.data import fetch_stock_data
-    end_date = ctx.current_dt
-    days_back = max((ctx.current_dt.date() - ctx.start_date).days, 10)
-    start_date = end_date - datetime.timedelta(days=days_back)
-    df = fetch_stock_data(security, start_date, end_date)
-    if df.empty:
-        return None
-    return df["close"].iloc[-1]
+    return _get_preloaded().get_close(day, security)
 
 
-def _calc_commission(price, amount, is_buy):
-    """Calculate trading commission based on OrderCost settings."""
-    if st._order_cost is None:
-        from eqlib.objects import OrderCost
-        cost = OrderCost()
-    else:
-        cost = st._order_cost
-
-    if is_buy:
-        return cost.calc_open_cost(price, amount)
-    else:
-        return cost.calc_close_cost(price, amount)
-
-
-def _round_lot(amount):
-    """Round to nearest 100 shares (A-share lot size)."""
+def _round_lot(amount) -> int:
+    """Round down to nearest 100 shares (A-share lot size)."""
     return int(amount // 100) * 100
 
 
+def _buffer_order(action: str, **kwargs) -> str:
+    """Add an order request to the pending queue for next-day execution."""
+    sess = st.get_session()
+    if sess._context is None:
+        log.warn(f"_buffer_order: no active context (order ignored)")
+        return None
+    req = {"action": action, "security": kwargs.pop("security"), **kwargs}
+    sess._pending_orders.append(req)
+    return f"PENDING_{action}_{req['security']}"
+
+
 def order(security, amount, style=None):
-    """
-    Buy or sell a fixed number of shares
-    (mirrors EasyQuant's order).
+    """Buy or sell a fixed number of shares (mirrors EasyQuant's order).
+
+    Orders are buffered and filled at the next trading day's open price.
 
     Parameters:
         security: stock code, e.g., '601390'
-        amount: number of shares (positive=buy, negative=sell)
-        style: order style (None = market order)
+        amount: number of shares (positive = buy, negative = sell)
+        style: order style (reserved; currently ignored)
 
     Returns:
-        Order ID or None if order failed
+        Pending order ID string, or None if the request was invalid.
     """
     if amount == 0:
         return None
-
-    price = _get_current_price(security)
-    if price is None:
-        log.warn(f"order: no price data for {security}")
-        return None
-
-    portfolio = st._context.portfolio
-
-    if amount > 0:
-        # Buy
-        rounded = _round_lot(amount)
-        if rounded == 0:
-            return None
-        cost = price * rounded
-        commission = _calc_commission(price, rounded, is_buy=True)
-        total_cost = cost + commission
-
-        if total_cost > portfolio.available_cash:
-            # Max affordable
-            max_shares = int((portfolio.available_cash) / (price * 1.001) // 100) * 100
-            if max_shares <= 0:
-                log.warn(f"order: insufficient cash for {security}")
-                return None
-            rounded = max_shares
-            cost = price * rounded
-            commission = _calc_commission(price, rounded, is_buy=True)
-            total_cost = cost + commission
-
-        portfolio.available_cash -= total_cost
-
-        if security not in portfolio.positions:
-            from eqlib.context import Position
-            portfolio.positions[security] = Position(security)
-
-        pos = portfolio.positions[security]
-        total_cost_basis = pos.avg_cost * pos.amount + cost
-        pos.amount += rounded
-        pos.closeable_amount = pos.amount
-        pos.avg_cost = total_cost_basis / pos.amount if pos.amount > 0 else 0
-
-        log.info(f"order BUY {security}: {rounded} shares @ {price:.3f}, commission={commission:.2f}")
-
-        # Record trade
-        st._trade_log.append({
-            "type": "BUY",
-            "date": st._context.current_dt.date(),
-            "security": security,
-            "price": price,
-            "amount": rounded,
-            "commission": commission,
-        })
-
-        return f"BUY_{security}_{rounded}"
-
-    else:
-        # Sell
-        sell_amount = abs(amount)
-        if security not in portfolio.positions:
-            return None
-        pos = portfolio.positions[security]
-        sell_amount = min(sell_amount, int(pos.closeable_amount))
-
-        if sell_amount <= 0:
-            return None
-
-        revenue = price * sell_amount
-        commission = _calc_commission(price, sell_amount, is_buy=False)
-        net = revenue - commission
-
-        portfolio.available_cash += net
-        pos.amount -= sell_amount
-        pos.closeable_amount -= sell_amount
-
-        if pos.amount <= 0:
-            del portfolio.positions[security]
-
-        log.info(f"order SELL {security}: {sell_amount} shares @ {price:.3f}, commission={commission:.2f}")
-
-        # Record trade
-        st._trade_log.append({
-            "type": "SELL",
-            "date": st._context.current_dt.date(),
-            "security": security,
-            "price": price,
-            "amount": sell_amount,
-            "commission": commission,
-        })
-
-        return f"SELL_{security}_{sell_amount}"
+    log.info(f"order queued: {'+' if amount > 0 else ''}{amount} {security} "
+             f"(fills at next open)")
+    return _buffer_order("ORDER", security=security, amount=int(amount))
 
 
 def order_target(security, amount, style=None):
-    """
-    Adjust position to target number of shares
-    (mirrors EasyQuant's order_target).
+    """Adjust position to a target share count (mirrors EasyQuant's order_target).
+
+    Orders are buffered and filled at the next trading day's open price.
 
     Parameters:
         security: stock code
-        amount: target number of shares (0 = close position)
-        style: order style
+        amount: target number of shares (0 = close entire position)
+        style: order style (reserved)
 
     Returns:
-        Order ID or None
+        Pending order ID string, or None.
     """
-    if security in st._context.portfolio.positions:
-        current = st._context.portfolio.positions[security].amount
-    else:
-        current = 0
-
-    delta = amount - current
-    return order(security, delta, style)
+    log.info(f"order_target queued: {security} → {amount} shares (fills at next open)")
+    return _buffer_order("ORDER_TARGET", security=security, target_amount=int(amount))
 
 
 def order_value(security, value, style=None):
-    """
-    Buy or sell a target monetary value
-    (mirrors EasyQuant's order_value).
+    """Buy or sell a target monetary value (mirrors EasyQuant's order_value).
+
+    Orders are buffered and filled at the next trading day's open price.
 
     Parameters:
         security: stock code
-        value: target transaction value (positive=buy, negative=sell)
-        style: order style
+        value: transaction value in CNY (positive = buy, negative = sell)
+        style: order style (reserved)
 
     Returns:
-        Order ID or None
+        Pending order ID string, or None.
     """
     if value == 0:
         return None
-
-    price = _get_current_price(security)
-    if price is None or price <= 0:
-        return None
-
-    shares = abs(int(value / price))
-    shares = _round_lot(shares) if value > 0 else shares
-
-    if shares <= 0:
-        return None
-
-    if value < 0:
-        shares = -shares
-
-    return order(security, shares, style)
+    log.info(f"order_value queued: {security} {value:+.0f} CNY (fills at next open)")
+    return _buffer_order("ORDER_VALUE", security=security, value=float(value))
 
 
 def order_target_value(security, value, style=None):
-    """
-    Adjust position to target monetary value
-    (mirrors EasyQuant's order_target_value).
+    """Adjust position to a target monetary value (mirrors EasyQuant's order_target_value).
+
+    Orders are buffered and filled at the next trading day's open price.
 
     Parameters:
         security: stock code
-        value: target position value (0 = close position)
-        style: order style
+        value: target position value in CNY (0 = close entire position)
+        style: order style (reserved)
 
     Returns:
-        Order ID or None
+        Pending order ID string, or None.
     """
-    price = _get_current_price(security)
-    if price is None or price <= 0:
-        return None
+    log.info(f"order_target_value queued: {security} → {value:.0f} CNY (fills at next open)")
+    return _buffer_order("ORDER_TARGET_VALUE", security=security, target_value=float(value))
 
-    target_shares = int(value / price)
-    target_shares = _round_lot(target_shares) if value > 0 else target_shares
-
-    return order_target(security, target_shares, style)
-
-
-def order_market(security, amount, price, style=None):
-    """
-    Place an order with explicit price (for backtest engine use).
-
-    Parameters:
-        security: stock code
-        amount: number of shares (positive=buy, negative=sell)
-        price: execution price
-
-    Returns:
-        dict with order details
-    """
-    portfolio = st._context.portfolio
-
-    if amount > 0:
-        rounded = _round_lot(amount)
-        if rounded == 0:
-            return None
-        cost = price * rounded
-        commission = _calc_commission(price, rounded, is_buy=True)
-        total_cost = cost + commission
-
-        if total_cost > portfolio.available_cash:
-            max_shares = int(portfolio.available_cash / (price * 1.001) // 100) * 100
-            if max_shares <= 0:
-                return None
-            rounded = max_shares
-            cost = price * rounded
-            commission = _calc_commission(price, rounded, is_buy=True)
-            total_cost = cost + commission
-
-        portfolio.available_cash -= total_cost
-
-        if security not in portfolio.positions:
-            from eqlib.context import Position
-            portfolio.positions[security] = Position(security)
-
-        pos = portfolio.positions[security]
-        total_cb = pos.avg_cost * pos.amount + cost
-        pos.amount += rounded
-        pos.closeable_amount = pos.amount
-        pos.avg_cost = total_cb / pos.amount if pos.amount > 0 else 0
-
-        return {
-            "type": "BUY",
-            "security": security,
-            "price": price,
-            "amount": rounded,
-            "commission": commission,
-        }
-    else:
-        sell_amount = abs(amount)
-        if security not in portfolio.positions:
-            return None
-        pos = portfolio.positions[security]
-        sell_amount = min(sell_amount, int(pos.closeable_amount))
-        if sell_amount <= 0:
-            return None
-
-        revenue = price * sell_amount
-        commission = _calc_commission(price, sell_amount, is_buy=False)
-        net = revenue - commission
-
-        portfolio.available_cash += net
-        pos.amount -= sell_amount
-        pos.closeable_amount -= sell_amount
-        if pos.amount <= 0:
-            del portfolio.positions[security]
-
-        return {
-            "type": "SELL",
-            "security": security,
-            "price": price,
-            "amount": sell_amount,
-            "commission": commission,
-        }

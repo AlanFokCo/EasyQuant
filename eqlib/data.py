@@ -6,6 +6,7 @@ from typing import Optional
 
 import akshare as ak
 import pandas as pd
+from eqlib.data_cache import _slice_by_date
 
 
 # ============================================================
@@ -108,19 +109,34 @@ def _is_index(code: str) -> bool:
 
 
 def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
-    """Fetch daily OHLCV data from akshare for a single stock, ETF, or index."""
+    """Fetch daily OHLCV data from akshare for a single stock, ETF, or index.
+
+    Index data is cached by ``(symbol, adjust)`` only (without the date range)
+    because ``stock_zh_index_daily_em`` returns the full history in one call.
+    Subsequent requests for different date ranges reuse the same cached frame,
+    eliminating redundant full-history downloads.
+    """
     symbol = _code_to_akshare(code)
-    cache_key = (symbol, str(start_date), str(end_date), adjust)
+    is_idx = _is_index(code)
+
+    # Indices: canonical cache key excludes date range (full history is always fetched)
+    if is_idx:
+        cache_key = (symbol, "index", adjust)
+    else:
+        cache_key = (symbol, str(start_date), str(end_date), adjust)
+
     if cache_key in _cache:
-        return _cache[cache_key]
+        df_cached = _cache[cache_key]
+        # For index data cached without date range, slice to the requested window
+        if is_idx and start_date and end_date:
+            return _slice_by_date(df_cached, start_date, end_date)
+        return df_cached
 
     try:
-        if _is_index(code):
-            # Indices use stock_zh_index_daily_em with 'sh'/'sz' prefix
+        if is_idx:
+            # Indices: always download full history once and cache it all
             prefix = "sh" if ".XSHG" in code else "sz"
-            df = ak.stock_zh_index_daily_em(
-                symbol=f"{prefix}{symbol}",
-            )
+            df = ak.stock_zh_index_daily_em(symbol=f"{prefix}{symbol}")
         elif _is_etf(symbol):
             df = ak.fund_etf_hist_em(
                 symbol=symbol, period="daily",
@@ -149,13 +165,13 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         df["date"] = pd.to_datetime(df["date"])
         df.set_index("date", inplace=True)
 
-    # Index data spans all history — filter to requested date range
-    if _is_index(symbol) and start_date and end_date:
-        start_ts = pd.Timestamp(start_date)
-        end_ts = pd.Timestamp(end_date)
-        df = df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
-
+    # Store the full frame under the canonical key
     _cache[cache_key] = df
+
+    # Slice to the requested window before returning
+    if is_idx and start_date and end_date:
+        return _slice_by_date(df, start_date, end_date)
+
     return df
 
 
@@ -289,9 +305,102 @@ def get_trade_days(start_date=None, end_date=None, count=None) -> list[datetime.
             dates = [d for d in dates if d <= ed]
         return dates
     except Exception:
+        # Fallback: use bundled A-share holiday list to exclude non-trading days.
+        # This prevents including Chinese public holidays when akshare is offline.
         end_date = end_date or datetime.date.today()
         start_date = start_date or (end_date - datetime.timedelta(days=365))
-        return [d for d in _iter_days(start_date, end_date) if d.weekday() < 5]
+        return [d for d in _iter_days(start_date, end_date)
+                if d.weekday() < 5 and not _is_ashare_holiday(d)]
+
+
+# ── Bundled A-share holiday calendar (fallback when akshare is unavailable) ────
+#
+# Key mainland Chinese public holidays that cause trading halts.
+# Format: set of datetime.date objects.  This list covers 2020-2028 and should
+# be extended when adding backtests beyond that range.
+
+def _build_holiday_set() -> frozenset:
+    """Return a frozenset of known A-share non-trading dates (2020-2028)."""
+    raw = [
+        # 2020
+        "2020-01-01", "2020-01-24", "2020-01-27", "2020-01-28", "2020-01-29",
+        "2020-01-30", "2020-01-31", "2020-04-04", "2020-04-06",
+        "2020-05-01", "2020-05-04", "2020-05-05",
+        "2020-06-25", "2020-06-26",
+        "2020-10-01", "2020-10-02", "2020-10-05", "2020-10-06", "2020-10-07",
+        "2020-10-08",
+        # 2021
+        "2021-01-01",
+        "2021-02-11", "2021-02-12", "2021-02-15", "2021-02-16", "2021-02-17",
+        "2021-04-05",
+        "2021-05-03", "2021-05-04", "2021-05-05",
+        "2021-06-14",
+        "2021-09-20", "2021-09-21",
+        "2021-10-01", "2021-10-04", "2021-10-05", "2021-10-06", "2021-10-07",
+        # 2022
+        "2022-01-03",
+        "2022-01-31", "2022-02-01", "2022-02-02", "2022-02-03", "2022-02-04",
+        "2022-04-04", "2022-04-05",
+        "2022-05-02", "2022-05-03", "2022-05-04",
+        "2022-06-03",
+        "2022-09-12",
+        "2022-10-03", "2022-10-04", "2022-10-05", "2022-10-06", "2022-10-07",
+        # 2023
+        "2023-01-02",
+        "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27",
+        "2023-04-05",
+        "2023-05-01", "2023-05-02", "2023-05-03",
+        "2023-06-22", "2023-06-23",
+        "2023-09-29",
+        "2023-10-02", "2023-10-03", "2023-10-04", "2023-10-05", "2023-10-06",
+        # 2024
+        "2024-01-01",
+        "2024-02-12", "2024-02-13", "2024-02-14", "2024-02-15", "2024-02-16",
+        "2024-04-04", "2024-04-05",
+        "2024-05-01", "2024-05-02", "2024-05-03",
+        "2024-06-10",
+        "2024-09-17",
+        "2024-10-01", "2024-10-02", "2024-10-03", "2024-10-04", "2024-10-07",
+        # 2025
+        "2025-01-01",
+        "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31", "2025-02-03",
+        "2025-04-04",
+        "2025-05-01", "2025-05-02",
+        "2025-05-31",
+        "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07",
+        # 2026
+        "2026-01-01",
+        "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20",
+        "2026-04-06",
+        "2026-05-01",
+        "2026-06-19",
+        "2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07",
+        # 2027
+        "2027-01-01",
+        "2027-02-08", "2027-02-09", "2027-02-10", "2027-02-11",
+        "2027-04-05",
+        "2027-05-03",
+        "2027-06-09",
+        "2027-10-01", "2027-10-04", "2027-10-05", "2027-10-06", "2027-10-07",
+        # 2028
+        "2028-01-03",
+        "2028-01-27", "2028-01-28", "2028-01-31", "2028-02-01",
+        "2028-04-04",
+        "2028-05-01",
+        "2028-05-29",
+        "2028-10-02", "2028-10-03", "2028-10-04", "2028-10-05", "2028-10-06",
+    ]
+    return frozenset(
+        datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in raw
+    )
+
+
+_ASHARE_HOLIDAYS: frozenset = _build_holiday_set()
+
+
+def _is_ashare_holiday(date: datetime.date) -> bool:
+    """Return True if *date* is a known A-share public holiday (non-trading day)."""
+    return date in _ASHARE_HOLIDAYS
 
 
 def _iter_days(start, end):
