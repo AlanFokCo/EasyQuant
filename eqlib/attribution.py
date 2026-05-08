@@ -80,9 +80,10 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor) if std > 0 else 0.0
 
     # Sortino ratio
-    downside = daily_ret[daily_ret < 0]
-    downside_std = downside.std(ddof=1) * np.sqrt(ann_factor) if len(downside) >= 2 else 0.0
-    sortino = (ann_return - risk_free_rate) / downside_std if downside_std > 0 else 0.0
+    downside = daily_ret[daily_ret < daily_rf]
+    downside_std = downside.std(ddof=1) if len(downside) >= 2 else 0.0
+    sortino = ((daily_ret.mean() - daily_rf) / downside_std * np.sqrt(ann_factor)
+               if downside_std > 0 else 0.0)
 
     # Max drawdown
     rolling_max = values.cummax()
@@ -201,7 +202,13 @@ def _calc_trade_win_rate(trades):
 
 
 def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
-    """Calculate alpha, beta, and information ratio vs benchmark."""
+    """Calculate alpha, beta, and information ratio vs benchmark.
+
+    Requires at least 10 overlapping trading days between the strategy and the
+    benchmark return series.  When fewer data points are available this function
+    returns ``(0.0, 1.0, 0.0)`` as safe defaults — callers should not interpret
+    these as meaningful estimates.
+    """
     try:
         from eqlib.data import fetch_stock_data
 

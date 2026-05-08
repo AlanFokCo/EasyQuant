@@ -226,13 +226,22 @@ def _t1_unlock(sess: BacktestSession):
         pos.closeable_amount = pos.amount
 
 
-def _fill_pending_orders(sess: BacktestSession, day: datetime.date):
+def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
+                         exec_prices: Optional[dict] = None):
     """Fill all pending orders at today's open price.
 
     Orders buffered during yesterday's strategy execution are executed here,
     eliminating look-ahead bias.  Slippage is applied to each fill.
     After a buy is filled, the new shares are registered as T+1-locked
     (``closeable_amount`` is NOT increased for those shares until tomorrow).
+
+    Parameters:
+        sess: the active BacktestSession
+        day: the fill date (used for preloaded price lookup)
+        exec_prices: optional dict mapping security code (bare or full) to
+            execution price.  When provided (e.g. for live/paper trading),
+            these prices take precedence over preloaded data.  The suspension
+            check is skipped for securities whose price is found in this dict.
     """
     from eqlib.context import Position
     from eqlib.objects import OrderCost
@@ -283,16 +292,27 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date):
 
         is_buy = delta > 0
 
-        # ── Suspension check (item 6) ──────────────────────────────────────
-        vol = _get_volume_fast(security, day)
-        if vol == 0:
-            log.warn(f"fill_pending: {security} appears suspended on {day} (volume=0) — order skipped")
-            continue
-
         # ── Resolve execution price ────────────────────────────────────────
-        base_price = _get_open_fast(security, day)
+        # When exec_prices is provided (paper/live trading), use it first.
+        base_price = None
+        if exec_prices is not None:
+            bare_code = security.replace(".XSHG", "").replace(".XSHE", "")
+            base_price = exec_prices.get(security) or exec_prices.get(bare_code)
+        if not base_price:
+            base_price = _get_open_fast(security, day)
         if not base_price:
             log.warn(f"fill_pending: no open price for {security} on {day} — order skipped")
+            continue
+
+        # ── Suspension check (item 6) ──────────────────────────────────────
+        # Skip this check for live/paper trading (exec_prices provided) when
+        # a live price is available — the security is clearly trading.
+        vol = _get_volume_fast(security, day)
+        if exec_prices is not None and base_price:
+            # Use a large nominal volume so VolumeSlippage still works
+            vol = vol if vol > 0 else 1e9
+        elif vol == 0:
+            log.warn(f"fill_pending: {security} appears suspended on {day} (volume=0) — order skipped")
             continue
 
         if slippage:
@@ -319,6 +339,16 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date):
                     continue
                 commission = cost_cfg.calc_open_cost(exec_price, rounded)
                 total_cost = exec_price * rounded + commission
+                # Guard against min_commission pushing total_cost over budget
+                while total_cost > portfolio.available_cash and rounded > 0:
+                    rounded -= 100
+                    if rounded <= 0:
+                        break
+                    commission = cost_cfg.calc_open_cost(exec_price, rounded)
+                    total_cost = exec_price * rounded + commission
+                if rounded <= 0:
+                    log.warn(f"fill_pending BUY {security}: insufficient cash (after min_commission)")
+                    continue
 
             portfolio.available_cash -= total_cost
 
@@ -663,15 +693,29 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     log.info(f"Paper trading started: capital={starting_cash:,.0f}, interval={interval}s")
 
     spot_cache: dict = {}
+    prev_day: Optional[datetime.date] = None
     try:
         while True:
             context.current_dt = datetime.datetime.now()
             spot_cache = _fetch_live_prices(spot_cache)
 
-            prices = {sec: spot_cache.get(sec, pos.avg_cost)
-                      for sec, pos in context.portfolio.positions.items()}
-
             today = context.current_dt.date()
+
+            # Build a price map (bare code → price) from spot_cache for order fills.
+            # akshare returns bare codes (e.g. "601390"); securities in pending orders
+            # may have exchange suffixes, so _fill_pending_orders will strip them.
+            live_prices = {k: v for k, v in spot_cache.items() if k != "_ts"}
+
+            # On a new calendar day, unlock T+1 shares and fill yesterday's orders.
+            if today != prev_day:
+                _t1_unlock(session)
+                _fill_pending_orders(session, today, exec_prices=live_prices)
+                prev_day = today
+
+            prices = {sec: spot_cache.get(sec, spot_cache.get(
+                          sec.replace(".XSHG", "").replace(".XSHE", ""),
+                          pos.avg_cost))
+                      for sec, pos in context.portfolio.positions.items()}
             for sched in session._scheduled_funcs:
                 if _should_run_schedule(sched, today):
                     t = _get_sched_time(sched)

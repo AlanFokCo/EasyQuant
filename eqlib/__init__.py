@@ -221,8 +221,12 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
     import datetime as _dt
     import os as _os
 
+    if start_date is None:
+        start_date = _dt.date.today() - _dt.timedelta(days=365)
     if isinstance(start_date, str):
         start_date = _dt.datetime.strptime(start_date, "%Y-%m-%d").date()
+    if end_date is None:
+        end_date = _dt.date.today()
     if isinstance(end_date, str):
         end_date = _dt.datetime.strptime(end_date, "%Y-%m-%d").date()
 
