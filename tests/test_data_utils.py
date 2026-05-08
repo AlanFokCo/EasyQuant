@@ -1,6 +1,7 @@
 """Tests for pure data-utility functions (no network required)."""
 
-from eqlib.data import _is_index, _is_etf, _code_to_akshare
+import datetime
+from eqlib.data import _is_index, _is_etf, _code_to_akshare, _get_trading_days_range, _iter_days, _is_ashare_holiday
 
 
 class TestIsIndex:
@@ -48,3 +49,14 @@ class TestCodeNormalization:
         assert _code_to_akshare("000858.XSHE") == "000858"
         assert _code_to_akshare("000858") == "000858"
         assert _code_to_akshare("000300.XSHG") == "000300"
+
+
+class TestTradingDayFallback:
+    def test_cached_trading_day_range_matches_iter_days_filter(self):
+        start = datetime.date(2024, 1, 1)
+        end = datetime.date(2024, 1, 15)
+        expected = tuple(
+            d for d in _iter_days(start, end)
+            if d.weekday() < 5 and not _is_ashare_holiday(d)
+        )
+        assert _get_trading_days_range(start, end) == expected

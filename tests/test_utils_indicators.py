@@ -17,6 +17,15 @@ def _make_prices(n=100, base=10.0, trend=0.01, noise=0.02):
 
 
 class TestMovingAverages:
+    @staticmethod
+    def _legacy_smma(series: pd.Series, period: int, weight: float = 1.0) -> pd.Series:
+        result = series.rolling(period).mean()
+        if len(series) <= period:
+            return result
+        for i in range(period, len(series)):
+            result.iloc[i] = (result.iloc[i - 1] * (period - weight) + series.iloc[i] * weight) / period
+        return result
+
     def test_ma_simple(self):
         prices = _make_prices(50, base=10.0)
         result = ma(prices, period=10)
@@ -47,6 +56,18 @@ class TestMovingAverages:
         # smma and sma should diverge: smma is exponentially smoothed
         sma_result = sma(prices, period=10)
         assert not (result == sma_result).all()
+
+    def test_smma_matches_legacy_formula(self):
+        prices = _make_prices(80, base=15.0)
+        result = smma(prices, period=14, weight=1.0)
+        expected = self._legacy_smma(prices, period=14, weight=1.0)
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_smma_matches_legacy_formula_custom_weight(self):
+        prices = _make_prices(80, base=15.0)
+        result = smma(prices, period=14, weight=2.0)
+        expected = self._legacy_smma(prices, period=14, weight=2.0)
+        pd.testing.assert_series_equal(result, expected)
 
     def test_wma(self):
         prices = _make_prices(50, base=10.0)
