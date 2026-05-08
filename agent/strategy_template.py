@@ -1,22 +1,22 @@
 """EasyQuant AI Agent — Parameterized Strategy Template.
 
-This file is the default strategy used by agent/optimizer.py when no custom
-strategy is provided.  It implements a dual-MA crossover with:
+This file is the default strategy used for AI-driven optimization when no custom
+strategy is provided. It implements a dual-MA crossover with:
   - Volume confirmation
   - ATR-based or fixed stop-loss
   - RSI filter (optional)
   - Market (index) filter (optional)
 
 It is deliberately structured to expose ALL tunable knobs via the PARAMS dict
-and their valid search space via PARAM_RANGES, so the AI optimizer can vary
-them automatically across iterations.
+and their valid search space via PARAM_RANGES, so Claude Code can vary them
+automatically across optimization iterations.
 
-You can use this as a starting point for your own strategy:
+To use this as a starting point for your own strategy:
   1. Copy this file.
-  2. Adjust STOCK_POOL and PARAMS to match your target.
+  2. Adjust SECURITIES and PARAMS to match your target.
   3. Modify market_open() to implement your own trading logic.
-  4. Run the optimizer:
-       python agent/optimizer.py --strategy path/to/my_strategy.py
+  4. Tell Claude Code to optimize it — it will read PARAMS/PARAM_RANGES,
+     run backtests, analyze results, and edit PARAMS directly.
 
 Requirement:
   - Keep PARAMS and PARAM_RANGES at module level.

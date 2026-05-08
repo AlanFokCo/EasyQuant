@@ -1,35 +1,28 @@
-"""EasyQuant AI Agent — Autonomous Strategy Self-Optimization Loop.
+"""EasyQuant AI Agent — Reference Rule-Based Strategy Optimizer.
 
-This module drives the complete, human-free optimization workflow described in
-CLAUDE.md §5.  It:
+This module provides a **standalone, rule-based parameter search** for comparison
+with the AI-driven optimization workflow orchestrated by Claude Code.  It is **not**
+the primary optimization driver — Claude Code performs the full self-optimization
+loop directly (running backtests, analyzing results, editing strategy files, spawning
+code-review sub-agents), as documented in CLAUDE.md.
 
-  1. Loads a user-provided (or template) strategy module that exposes PARAMS
-     and PARAM_RANGES dicts.
-  2. Runs backtests across one or more time periods using eqlib.run_backtest and
-     eqlib.analyze_returns.
-  3. Evaluates the results against user-supplied acceptance criteria.
-  4. Generates data-driven parameter adjustments with explicit rationale.
-  5. Performs a code review check before applying each adjustment.
-  6. Logs every step to a structured audit log (JSONL + Markdown).
-  7. Repeats until all requirements are met or max_iterations is reached.
-  8. Optionally writes the final optimized strategy to a new file.
+Use this module to:
+  • Benchmark against the AI-driven approach
+  • Understand how a programmatic parameter search is implemented
+  • Run quick rule-based optimization without AI agent involvement
 
-Usage (command-line):
+The AI-driven workflow (Claude Code) uses only agent/audit_log.py from the agent/
+directory for structured logging.  All analysis, decision-making, and file editing
+are performed by Claude Code itself.
 
-    # Optimize the bundled template strategy with default requirements:
-    python agent/optimizer.py
+Usage (command-line, optional — reference only):
 
-    # Custom strategy with explicit requirements:
+    # Rule-based optimization of a parameterized strategy:
     python agent/optimizer.py \\
         --strategy path/to/my_strategy.py \\
         --min-sharpe 1.0 \\
         --max-drawdown 0.20 \\
-        --min-annual-return 0.10 \\
-        --min-win-rate 0.40 \\
-        --max-iterations 15 \\
-        --periods "2021-01-01:2022-12-31" "2022-01-01:2023-12-31" "2023-01-01:2024-12-31" \\
-        --output-strategy optimized_strategy.py \\
-        --audit-dir audit_log
+        --periods "2021-01-01:2022-12-31" "2022-01-01:2023-12-31"
 
 Usage (programmatic):
 

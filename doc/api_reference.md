@@ -18,6 +18,7 @@
 8. [缓存 API](#8-缓存-api)
 9. [日志 API](#9-日志-api)
 10. [辅助工具 API](#10-辅助工具-api)
+11. [AI Agent 自动化工作流](#11-ai-agent-自动化工作流)
 
 ---
 
@@ -957,6 +958,108 @@ log.error("数据获取失败")
 ### `engine.get_recorded_values()`
 
 获取 `record()` 记录列表。
+
+---
+
+## 11. AI Agent 自动化工作流
+
+`eqlib` 的 API 被设计为可与 Claude Code（AI 编码智能体）配合使用，实现从回测到优化到模拟盘的全自动工作流。以下是 Claude Code 如何调用 `eqlib` API 完成自动化策略优化。
+
+### 11.1 AI Agent 如何调用 eqlib API
+
+Claude Code 作为主驱，通过以下步骤完成自动化：
+
+| 步骤 | Claude Code 执行的动作 | 使用的 eqlib API |
+|------|----------------------|-----------------|
+| 基线回测 | 编写并运行 Python 脚本 | `run_backtest()` / `run_strategy()` |
+| 指标分析 | 调用分析函数 | `analyze_returns()` |
+| 归因分析 | 深度分析收益来源 | `brinson_attribution()` |
+| 因子分析 | 检查市场暴露 | `fama_french_analysis()` |
+| 数据查询 | 获取股票数据辅助诊断 | `get_price()`, `attribute_history()` |
+| 模拟盘 | 编写并启动模拟盘脚本 | `run_paper_trade()` |
+
+### 11.2 策略参数化约定
+
+Claude Code 通过策略文件中的 `PARAMS` 和 `PARAM_RANGES` 字典识别可调参数：
+
+```python
+PARAMS = {
+    'fast_period':      5,
+    'slow_period':      20,
+    'stop_loss_pct':    0.08,
+}
+
+PARAM_RANGES = {
+    'fast_period':      (2,   15,   1),    # (min, max, step)
+    'slow_period':      (10,  60,   5),
+    'stop_loss_pct':    (0.03, 0.15, 0.01),
+}
+```
+
+Claude Code 使用 Edit 工具直接修改策略文件中的 `PARAMS` 块，然后重新运行回测验证。
+
+### 11.3 用户如何触发 AI 优化
+
+无需运行任何命令 —— 直接在 Claude Code 对话中提出需求：
+
+```
+帮我优化 agent/strategy_template.py：
+- 夏普比率 > 1.0
+- 最大回撤 < 20%
+- 在 2021、2022、2023 三个年度分别验证
+```
+
+Claude Code 会自动完成：回测运行 → 结果分析 → 参数调整 → 代码审查 → 再回测 → 审计报告。
+
+### 11.4 代码审查子 Agent
+
+每次参数变更后，Claude Code 会调用专门的代码审查子 Agent 验证：
+
+1. **值域检查**：新参数值是否在 `PARAM_RANGES` 范围内
+2. **约束检查**：`fast_period < slow_period`、`rsi_oversold < rsi_overbought` 等
+3. **参数使用检查**：修改的参数是否在策略代码中通过 `PARAMS[key]` 引用
+4. **前视偏差检查**：修改是否引入了使用未来数据的逻辑
+
+### 11.5 审计日志
+
+所有决策记录在 `audit_log/` 目录下：
+
+```
+audit_log/
+├── session_<时间戳>.jsonl   # 机器可读，支持 jq 查询
+└── session_<时间戳>.md      # 人类可读 Markdown 报告
+```
+
+每次迭代记录：
+- 使用的参数集
+- 各时段回测指标
+- 需求满足情况
+- 调参诊断依据和数据证据
+- 代码审查结果
+
+### 11.6 AI Agent 模拟盘自动化
+
+除了回测优化，Claude Code 也可以自动化模拟盘流程：
+
+```python
+from eqlib import run_paper_trade
+
+def initialize(context):
+    g.security = '601390'
+    set_benchmark('000300.XSHG')
+    run_daily(market_open, time='every_bar')
+
+def market_open(context):
+    # 策略逻辑从 PARAMS 读取参数
+    hist = attribute_history(g.security, PARAMS['slow_period'], '1d', ['close'])
+    # ...
+```
+
+Claude Code 可以：
+- 编写模拟盘启动脚本
+- 添加盘前股票池扫描
+- 对比多个策略的模拟盘表现
+- 生成模拟盘日报
 
 ---
 
