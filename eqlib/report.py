@@ -175,6 +175,8 @@ def generate_chart(result, out_path):
     ) if isinstance(recorded, dict) else recorded
     pf_records = [r for r in pf_entries if "total_value" in r]
     if not pf_records:
+        from eqlib.logger import log as _log
+        _log.warning("generate_chart: no portfolio value data found in recorded_values")
         plt.close()
         return
 
@@ -624,6 +626,7 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
     n_days = len(returns)
     total_ret = final / initial - 1
     years = n_days / 252
+    ann_ret = 0.0
     if years > 0:
         ann_ret = (1 + total_ret) ** (1 / years) - 1
         metrics["ann_ret"] = f"{ann_ret:.2%}"
@@ -679,9 +682,10 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
                 if bm_var > 0:
                     beta_val = cov / bm_var
                     metrics["beta"] = f"{beta_val:.3f}"
-                    bm_ann_ret = (1 + bm_ret) ** (1 / years) - 1
-                    alpha_ann = ann_ret - (0.03 + beta_val * (bm_ann_ret - 0.03)) if years > 0 else 0
-                    metrics["alpha"] = f"{alpha_ann:.2%}"
+                    if years > 0:
+                        bm_ann_ret = (1 + bm_ret) ** (1 / years) - 1
+                        alpha_ann = ann_ret - (0.03 + beta_val * (bm_ann_ret - 0.03))
+                        metrics["alpha"] = f"{alpha_ann:.2%}"
 
     return metrics
 
@@ -1518,6 +1522,7 @@ def generate_report_md(result, out_path):
         lines.append("|---|----------|----------|-----------|-----------|------------|-----|")
 
         trade_pairs: dict = {}  # sec -> list of buys
+        trade_num = 0
         for t in trade_log:
             sec = t["security"]
             if sec not in trade_pairs:
@@ -1530,8 +1535,9 @@ def generate_report_md(result, out_path):
                 sell_val = t["price"] * t["amount"] - t.get("commission", 0)
                 trade_pnl = sell_val - buy_val
                 pnl_str = f"+{trade_pnl:,.0f}" if trade_pnl >= 0 else f"{trade_pnl:,.0f}"
+                trade_num += 1
                 lines.append(
-                    f"| {len(lines)} | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
+                    f"| {trade_num} | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
                     f"| {t['date']} | {t['price']:.3f} | {pnl_str} |"
                 )
 

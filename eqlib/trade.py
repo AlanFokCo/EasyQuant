@@ -78,6 +78,15 @@ def order_target(security, amount, style=None):
         amount: target number of shares (0 = close entire position)
         style: order style (reserved)
 
+    .. note::
+        The target delta is computed at *queue time* from the current position.
+        If multiple orders for the same security are queued in a single callback
+        (e.g., ``order('X', 100)`` followed by ``order_target('X', 200)``), the
+        target delta will not account for the earlier queued order, and the final
+        filled position may differ from the intended target.  To avoid this,
+        avoid mixing ``order`` and ``order_target`` calls for the same security
+        within a single callback execution.
+
     Returns:
         Pending order ID string, or None.
     """
@@ -113,6 +122,13 @@ def order_target_value(security, value, style=None):
         security: stock code
         value: target position value in CNY (0 = close entire position)
         style: order style (reserved)
+
+    .. note::
+        The target delta is computed at *fill time* from the current position
+        at tomorrow's open price.  However, the share count is derived from
+        today's buffered target value, so mixing ``order_value`` and
+        ``order_target_value`` calls for the same security in a single callback
+        may produce unexpected results.
 
     Returns:
         Pending order ID string, or None.
