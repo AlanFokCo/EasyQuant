@@ -20,6 +20,8 @@ class TestMovingAverages:
     @staticmethod
     def _legacy_smma(series: pd.Series, period: int, weight: float = 1.0) -> pd.Series:
         result = series.rolling(period).mean()
+        if len(series) <= period:
+            return result
         for i in range(period, len(series)):
             result.iloc[i] = (result.iloc[i - 1] * (period - weight) + series.iloc[i] * weight) / period
         return result
