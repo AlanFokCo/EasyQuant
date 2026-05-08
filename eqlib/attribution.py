@@ -12,9 +12,10 @@ Provides:
 import datetime
 import numpy as np
 import pandas as pd
+from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
 
 
-def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
+def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_DAYS_PER_YEAR):
     """Calculate comprehensive risk and return metrics from a backtest result.
 
     Parameters:

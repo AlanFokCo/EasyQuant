@@ -327,7 +327,6 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             rounded = _round_lot(delta)
             if rounded <= 0:
                 continue
-            is_etf_sec = _is_etf(security.replace(".XSHG", "").replace(".XSHE", ""))
             commission = cost_cfg.calc_open_cost(exec_price, rounded)
             total_cost = exec_price * rounded + commission
 
@@ -697,7 +696,17 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     try:
         while True:
             context.current_dt = datetime.datetime.now()
-            spot_cache = _fetch_live_prices(spot_cache)
+
+            # Restrict live price fetch to only the securities in the user's
+            # universe and current positions — avoids downloading all 5000+
+            # A-share quotes for a small strategy.
+            universe_bare: Optional[set] = None
+            universe_all = list(context.universe or []) + list(context.portfolio.positions.keys())
+            if universe_all:
+                universe_bare = {
+                    s.replace(".XSHG", "").replace(".XSHE", "") for s in universe_all
+                }
+            spot_cache = _fetch_live_prices(spot_cache, securities=universe_bare)
 
             today = context.current_dt.date()
 
@@ -757,8 +766,18 @@ def _resolve_live_price(spot_cache: dict, security: str, default: float) -> floa
     return price if price is not None else default
 
 
-def _fetch_live_prices(cache: dict, max_age: int = 30) -> dict:
-    """Fetch all A-share spot quotes and update the cache."""
+def _fetch_live_prices(cache: dict, max_age: int = 30,
+                       securities: Optional[set] = None) -> dict:
+    """Fetch A-share spot quotes and update the cache.
+
+    Parameters:
+        cache: previous cache dict (returned unchanged if still fresh).
+        max_age: cache TTL in seconds (default 30).
+        securities: optional set of bare security codes (e.g. ``{"601390"}``).
+            When provided only those codes are retained in the cache,
+            avoiding storing thousands of irrelevant quotes for a small
+            universe.  If ``None``, the full A-share universe is cached.
+    """
     import time as _time
     if _time.time() - cache.get("_ts", 0) < max_age:
         return cache
@@ -772,6 +791,8 @@ def _fetch_live_prices(cache: dict, max_age: int = 30) -> dict:
             code = row.get("代码")
             price = row.get("最新价")
             if code and price is not None:
+                if securities is not None and code not in securities:
+                    continue
                 try:
                     new_cache[code] = float(price)
                 except (ValueError, TypeError):

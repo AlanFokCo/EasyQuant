@@ -202,31 +202,27 @@ def max_drawdown(equity: pd.Series):
 # ============================================================
 
 def consecutive_wins(returns: pd.Series) -> pd.Series:
-    """Count consecutive winning days up to each point."""
-    sign = np.sign(returns)
-    streak = pd.Series(0, index=returns.index)
-    count = 0
-    for i in range(len(returns)):
-        if sign.iloc[i] > 0:
-            count += 1
-        else:
-            count = 0
-        streak.iloc[i] = count
-    return streak
+    """Count consecutive winning days up to each point.
+
+    Uses a vectorized implementation: group returns into contiguous win/non-win
+    blocks and compute the cumulative count within each block.
+    """
+    is_win = (returns > 0).astype(int)
+    # New group starts whenever the win flag changes
+    group = (is_win != is_win.shift(1)).cumsum()
+    return is_win.groupby(group).cumsum()
 
 
 def consecutive_losses(returns: pd.Series) -> pd.Series:
-    """Count consecutive losing days up to each point."""
-    sign = np.sign(returns)
-    streak = pd.Series(0, index=returns.index)
-    count = 0
-    for i in range(len(returns)):
-        if sign.iloc[i] < 0:
-            count += 1
-        else:
-            count = 0
-        streak.iloc[i] = count
-    return streak
+    """Count consecutive losing days up to each point.
+
+    Uses a vectorized implementation: group returns into contiguous loss/non-loss
+    blocks and compute the cumulative count within each block.
+    """
+    is_loss = (returns < 0).astype(int)
+    # New group starts whenever the loss flag changes
+    group = (is_loss != is_loss.shift(1)).cumsum()
+    return is_loss.groupby(group).cumsum()
 
 
 # ============================================================

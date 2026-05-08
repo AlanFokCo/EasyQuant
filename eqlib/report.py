@@ -12,6 +12,7 @@ plt.rcParams["font.sans-serif"] = ["PingFang HK", "Heiti TC", "Arial Unicode MS"
 plt.rcParams["axes.unicode_minus"] = False
 
 from eqlib.data import fetch_stock_data, get_price
+from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
 import pandas as pd
 import numpy as np
 
@@ -632,7 +633,7 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
         metrics["ann_ret"] = f"{ann_ret:.2%}"
         metrics["ann_ret_pct"] = f"{ann_ret:+.2f}%"
 
-    rf_daily = 0.03 / 252
+    rf_daily = RISK_FREE_RATE / TRADING_DAYS_PER_YEAR
     if ret_series.std() > 0:
         sharpe = (ret_series.mean() - rf_daily) / ret_series.std() * (252 ** 0.5)
         metrics["sharpe"] = f"{sharpe:.2f}"
@@ -684,7 +685,7 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
                     metrics["beta"] = f"{beta_val:.3f}"
                     if years > 0:
                         bm_ann_ret = (1 + bm_ret) ** (1 / years) - 1
-                        alpha_ann = ann_ret - (0.03 + beta_val * (bm_ann_ret - 0.03))
+                        alpha_ann = ann_ret - (RISK_FREE_RATE + beta_val * (bm_ann_ret - RISK_FREE_RATE))
                         metrics["alpha"] = f"{alpha_ann:.2%}"
 
     return metrics

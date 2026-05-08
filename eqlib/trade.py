@@ -17,6 +17,13 @@ def _get_pending_price(security):
     Used only for basic sanity checks (e.g., computing approximate shares from
     a value order).  The actual execution price is determined by the engine at
     fill time using tomorrow's open.
+
+    .. note::
+        This function uses a late import from ``eqlib.engine`` to avoid a
+        circular import: ``engine`` imports ``data`` which imports ``_state``,
+        while ``trade`` would otherwise need ``engine`` at module level.  The
+        late import is intentional and safe — it runs only when a strategy
+        callback is active (i.e. after ``engine`` is fully loaded).
     """
     sess = st.get_session()
     ctx = sess._context
@@ -30,11 +37,6 @@ def _get_pending_price(security):
     if price is not None:
         return price
     return _get_preloaded().get_close(day, security)
-
-
-def _round_lot(amount) -> int:
-    """Round down to nearest 100 shares (A-share lot size)."""
-    return int(amount // 100) * 100
 
 
 def _buffer_order(action: str, **kwargs) -> str:

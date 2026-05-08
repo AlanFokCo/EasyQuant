@@ -8,6 +8,7 @@ Provides mathematical optimization for asset allocation:
 
 import numpy as np
 import pandas as pd
+from eqlib.constants import RISK_FREE_RATE
 
 
 class Bound:
@@ -35,7 +36,7 @@ class MaxSharpe:
     """
     name = "max_sharpe"
 
-    def __init__(self, risk_free_rate=0.03):
+    def __init__(self, risk_free_rate=RISK_FREE_RATE):
         self.risk_free_rate = risk_free_rate
 
 
