@@ -224,9 +224,9 @@ class StrategyOptimizer:
             )
 
             # 10. Code review
-            corrections = self._apply_and_review(changes)
+            corrections = self._apply_and_review(changes, iteration=iteration)
 
-            adj_summary = [c["parameter"] + ": " + str(c["old_value"]) + "->" + str(c["new_value"]) for c in changes]
+            adj_summary = [f"{c['parameter']}: {c['old_value']}->{c['new_value']}" for c in changes]
             print("  -> Adjustment:", adj_summary)
 
         return self._best_params
@@ -503,7 +503,7 @@ class StrategyOptimizer:
     # Code review + apply
     # -----------------------------------------------------------------------
 
-    def _apply_and_review(self, changes: list[dict]) -> list[str]:
+    def _apply_and_review(self, changes: list[dict], iteration: int) -> list[str]:
         """Apply parameter changes and log a code review; return correction list."""
         params = self._strategy_mod.PARAMS
         ranges = self._strategy_mod.PARAM_RANGES
@@ -588,7 +588,7 @@ class StrategyOptimizer:
             )
 
         self.audit.log_code_review(
-            iteration=_current_iter_from_changes(changes),
+            iteration=iteration,
             checks=checks,
             corrections=corrections,
         )
@@ -723,6 +723,9 @@ def _has_param(params: dict, key: str) -> bool:
     return key in params
 
 
+_FLOAT_ROUND_DIGITS = 6  # decimal places used when rounding adjusted parameter values
+
+
 def _try_adjust(
     params: dict,
     ranges: dict,
@@ -740,16 +743,10 @@ def _try_adjust(
     old = params[key]
     new = old + direction * step
     # Round to avoid float precision issues
-    new = round(new, 6)
+    new = round(new, _FLOAT_ROUND_DIGITS)
     if new < lo or new > hi:
         return None
     return (old, new)
-
-
-def _current_iter_from_changes(changes: list[dict]) -> int:
-    """Best-effort: extract iteration from changes list."""
-    # changes don't carry iteration — optimizer passes it explicitly elsewhere
-    return -1
 
 
 # ===========================================================================
