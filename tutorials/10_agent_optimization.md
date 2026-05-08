@@ -1,6 +1,6 @@
 # Tutorial 10: AI Agent 自动化策略优化
 
-> 使用 Claude Code（或任何兼容的 AI 编码智能体）对 EasyQuant 策略进行全自动参数优化，无需人工干预。
+> 使用 Claude Code（AI 编码智能体）对 EasyQuant 策略进行全自动参数优化。Claude Code 本身驱动整个流程 —— 运行回测、分析结果、修改策略文件、调用代码审查子 Agent —— 而不是依赖独立的 Python 脚本。
 
 ---
 
@@ -11,12 +11,13 @@
 3. [快速上手](#3-快速上手)
 4. [策略文件要求](#4-策略文件要求)
 5. [优化目标（接受条件）](#5-优化目标接受条件)
-6. [自优化循环详解](#6-自优化循环详解)
+6. [AI 驱动的自优化循环详解](#6-ai-驱动的自优化循环详解)
 7. [审计日志解读](#7-审计日志解读)
 8. [代码审查机制](#8-代码审查机制)
 9. [高级用法](#9-高级用法)
 10. [示例：完整优化流程](#10-示例完整优化流程)
-11. [下一步](#11-下一步)
+11. [optimizer.py 的定位](#11-optimizerpy-的定位)
+12. [下一步](#12-下一步)
 
 ---
 
@@ -32,13 +33,22 @@
 | 决策无法追溯 | 不知道为什么选了这组参数 |
 | 耗时费力 | 每次调参都要人工介入 |
 
-AI Agent 优化的优势：
+传统脚本优化的局限：
 
-- **全自动** — 无需人工干预，从回测到调参到再回测全流程自动
-- **数据驱动** — 每次调参都有具体指标数据支撑
-- **多时段验证** — 同时在多个历史区间回测，避免过拟合
+| 局限 | 影响 |
+|------|------|
+| 规则死板 | 只能按预定义的规则调整参数 |
+| 无法修改策略逻辑 | 超出参数范围的优化无能为力 |
+| 诊断能力弱 | 只能识别预设的几种失败模式 |
+| 无代码理解 | 无法理解策略逻辑来提出有意义的改进建议 |
+
+AI Agent（Claude Code）优化的优势：
+
+- **智能诊断** — 不仅识别"回撤太大"，还能分析回测数据找出根本原因
+- **灵活调整** — 不仅能调参数，还能直接修改策略逻辑（例如添加大盘过滤）
 - **完整审计** — 每一步决策都记录到审计日志，可追溯
-- **代码审查** — 每次调参后自动检查参数合理性
+- **代码理解** — 理解策略逻辑，能提出超越参数范围的改进建议
+- **分工协作** — 主 Agent 负责分析决策，子 Agent 负责代码审查，各司其职
 
 ---
 
@@ -54,7 +64,7 @@ AI Agent 优化的优势：
 - 说明审计日志格式
 - 规定代码审查要求
 
-Claude Code 实例在进入仓库时会自动识别并读取该文件，据此规划和执行工作。
+Claude Code 实例在进入仓库时自动识别并读取该文件，据此规划和执行工作。
 
 ### 2.2 策略参数化
 
@@ -74,12 +84,28 @@ PARAM_RANGES = {
 }
 ```
 
-### 2.3 自优化循环
+### 2.3 AI 驱动的自优化循环
 
 ```
-用户需求 → 基线回测 → 评估指标 → 诊断问题 → 数据驱动调参
-    ↑                                              ↓
-达到目标 ← 再次评估 ← 新回测 ← 代码审查 ← 记录审计日志
+用户提出需求
+     ↓
+Claude Code 读取 CLAUDE.md + 策略文件
+     ↓
+Claude Code 运行基线回测（通过 eqlib API）
+     ↓
+Claude Code 分析结果，诊断问题
+     ↓
+Claude Code 提出参数调整方案（附数据依据）
+     ↓
+Claude Code 使用 Edit 工具直接修改策略文件
+     ↓
+Claude Code 调用代码审查子 Agent 验证修改
+     ↓
+子 Agent 返回审查结果
+     ↓
+Claude Code 记录审计日志，运行新回测
+     ↓
+重复评估-诊断-调整循环，直到满足要求
 ```
 
 ### 2.4 审计日志
@@ -96,51 +122,55 @@ audit_log/
 
 ## 3. 快速上手
 
-### 3.1 使用内置模板策略
+### 3.1 通过 Claude Code 优化策略
 
-最简单的方式：直接运行优化器，它会使用内置的双均线模板策略。
-
-```bash
-# 使用默认参数运行
-python agent/optimizer.py
-```
-
-这将：
-1. 加载 `agent/strategy_template.py`（双均线 + 成交量确认）
-2. 在默认 3 个时段（2021、2022、2023 年）运行回测
-3. 目标：夏普比率 ≥ 1.0，最大回撤 ≤ 20%
-4. 最多迭代 15 次
-5. 将审计日志写入 `audit_log/`
-
-### 3.2 优化自定义策略
-
-```bash
-python agent/optimizer.py \
-    --strategy my_strategy.py \
-    --min-sharpe 1.2 \
-    --max-drawdown 0.15 \
-    --min-annual-return 0.12 \
-    --max-iterations 20 \
-    --periods "2022-01-01:2022-12-31" "2023-01-01:2023-12-31" "2024-01-01:2024-12-31" \
-    --output-strategy my_strategy_optimized.py
-```
-
-### 3.3 通过 Claude Code 运行
-
-如果你使用 Claude Code（Claude 的 AI 编码智能体），只需描述你的需求：
+直接告诉 Claude Code 你的需求即可：
 
 ```
-优化 my_strategy.py，要求夏普比率 > 1.2，最大回撤 < 15%，
-在 2021-2024 年三个时段上均满足要求。
+优化 agent/strategy_template.py，要求夏普比率 > 1.0，最大回撤 < 20%，
+在 2021、2022、2023 三个年度分别验证。
 ```
 
 Claude Code 会：
+
 1. 读取 `CLAUDE.md` 获取操作指南
 2. 读取策略文件理解参数结构
-3. 调用 `python agent/optimizer.py ...`
-4. 监控优化进度
-5. 读取并解释审计日志
-6. 如有需要，直接修改策略逻辑（超出参数范围的情况）
+3. 使用 `eqlib` API 运行基线回测
+4. 分析回测结果，诊断问题
+5. 提出参数调整方案并直接修改策略文件
+6. 调用代码审查子 Agent 验证
+7. 运行新回测验证效果
+8. 重复直到满足要求
+9. 将完整过程记录到审计日志
+
+### 3.2 自定义接受条件
+
+你可以指定任意指标要求：
+
+```
+优化 my_strategy.py：
+- 夏普比率 > 1.2
+- 最大回撤 < 15%
+- 年化收益 > 10%
+- 交易胜率 > 45%
+- 在 2020-2024 五个年度分别验证
+```
+
+### 3.3 超出参数范围的优化
+
+如果参数调整已经无法进一步提升策略表现，可以让 Claude Code 直接修改策略逻辑：
+
+```
+当前参数已经优化到极限了。分析审计日志，找出瓶颈，
+建议并实施策略逻辑改进（例如添加 RSI 过滤或大盘择时）。
+```
+
+Claude Code 会：
+
+1. 读取审计日志找出当前瓶颈
+2. 诊断是否需要修改策略结构
+3. 直接编辑策略文件添加新逻辑
+4. 重新运行回测验证效果
 
 ---
 
@@ -180,7 +210,7 @@ def initialize(context):
 ### 4.2 可选但推荐
 
 ```python
-# 股票池（优化器会自动传给 run_backtest）
+# 股票池（AI Agent 会传给 run_backtest）
 SECURITIES = ['601390', '600519', ...]
 # 或
 STOCK_POOL = ['601390', '600519', ...]
@@ -192,7 +222,7 @@ STOCK_POOL = ['601390', '600519', ...]
 
 ### 4.4 不要硬编码参数
 
-❌ 错误写法（优化器无法修改这些值）：
+❌ 错误写法（AI Agent 无法修改这些值）：
 
 ```python
 def market_open(context):
@@ -225,13 +255,10 @@ def market_open(context):
 
 ### 5.2 自定义接受条件
 
-命令行参数：
+直接告诉 Claude Code 你的目标：
 
-```bash
---min-sharpe 1.2          # 最低夏普比率
---max-drawdown 0.15       # 最大允许回撤（正数，0.15 = 15%）
---min-annual-return 0.12  # 最低年化收益率
---min-win-rate 0.45       # 最低交易胜率
+```
+夏普 > 1.2，回撤 < 15%，年化 > 12%，胜率 > 45%
 ```
 
 ### 5.3 如何设定合理目标
@@ -249,42 +276,46 @@ def market_open(context):
 
 ---
 
-## 6. 自优化循环详解
+## 6. AI 驱动的自优化循环详解
 
 ### 6.1 完整流程图
 
 ```
 开始
  ↓
-读取用户需求（命令行参数或默认值）
- ↓
-加载策略模块（读取 PARAMS / PARAM_RANGES / initialize）
+Claude Code 读取 CLAUDE.md 和策略文件
  ↓
 迭代 0（基线回测）
- ├── 对所有时段运行 run_backtest + analyze_returns
+ ├── 创建 Python 辅助脚本调用 eqlib.run_backtest + analyze_returns
+ ├── 对所有时段运行回测
  ├── 计算聚合指标（avg_sharpe, worst_drawdown, ...）
- ├── 记录到审计日志：type="iteration"
+ ├── 使用 AuditLog 记录到审计日志：type="iteration"
  └── 检查是否满足所有要求
       ├── 满足 → 跳到"完成"
       └── 不满足 → 进入调参流程
  ↓
-诊断失败指标（回撤太大？夏普不足？胜率低？）
+Claude Code 分析失败指标，诊断根因
  ↓
 生成数据驱动的参数调整方案（≤2 个参数）
- ├── 记录到审计日志：type="adjustment"（含诊断依据）
- └── 记录到审计日志：type="code_review"
+ ├── 使用 AuditLog 记录：type="adjustment"（含诊断依据）
+ └── 使用 Edit 工具修改策略文件中的 PARAMS
  ↓
-应用参数调整（修改 PARAMS 字典）
+Claude Code 调用代码审查子 Agent
+ ├── 子 Agent 验证：值域、约束、参数使用、前视偏差
+ ├── 子 Agent 返回审查结果
+ └── Claude Code 记录：type="code_review"
+ ↓
+Claude Code 运行新回测验证
  ↓
 迭代 1, 2, 3, ...（循环）
  ↓
 完成（满足要求 or 达到最大迭代次数）
- └── 记录到审计日志：type="final"（含最优参数和建议）
+ └── Claude Code 记录：type="final"（含最优参数和建议）
 ```
 
 ### 6.2 参数调整规则
 
-优化器使用数据驱动的规则来决定调整哪个参数、往哪个方向调整：
+AI Agent 使用数据驱动的规则来决定调整哪个参数、往哪个方向调整：
 
 | 失败指标 | 诊断 | 调整方向 |
 |---------|------|---------|
@@ -299,7 +330,18 @@ def market_open(context):
 - 步长严格为 `PARAM_RANGES` 中定义的 1 步
 - 始终满足 `fast_period < slow_period`
 
-### 6.3 聚合指标
+### 6.3 与传统脚本的区别
+
+| 方面 | 传统脚本 (`optimizer.py`) | AI Agent (Claude Code) |
+|------|--------------------------|----------------------|
+| 决策方式 | 预定义规则 | 智能分析 + 规则参考 |
+| 参数修改 | 内存中修改 PARAMS | 直接编辑策略源文件 |
+| 代码审查 | 简单的文本搜索检查 | 专门的子 Agent 审查 |
+| 诊断能力 | 有限的预设诊断 | 深度分析 + 根因推断 |
+| 策略修改 | 只能调参数 | 可修改策略逻辑 |
+| 可追溯性 | 审计日志 | 审计日志 + git diff |
+
+### 6.4 聚合指标
 
 对多个时段的结果进行聚合：
 
@@ -420,7 +462,7 @@ jq 'select(.type=="final")' audit_log/session_20240115_143022.jsonl
 
 ## 8. 代码审查机制
 
-每次调参后，优化器会自动执行 3 项检查：
+每次调参后，Claude Code 会**调用专门的代码审查子 Agent** 来执行以下 4 项检查：
 
 ### 检查 1：值域合法性
 
@@ -442,146 +484,90 @@ rsi_oversold < rsi_overbought
 扫描策略源码，确认修改的参数通过 `PARAMS['key']` 引用。
 如果某参数没有被策略代码使用，记录警告（参数修改可能无效）。
 
+### 检查 4：无前视偏差
+
+确认修改不会引入前视偏差（look-ahead bias），即策略不会使用未来数据进行决策。
+
 ---
 
 ## 9. 高级用法
 
-### 9.1 编程调用
+### 9.1 策略逻辑级优化
 
-```python
-from agent.optimizer import StrategyOptimizer
-
-optimizer = StrategyOptimizer(
-    strategy_path="my_strategy.py",
-    requirements={
-        "min_sharpe":        1.2,
-        "max_drawdown":      0.15,
-        "min_annual_return": 0.10,
-        "min_win_rate":      0.45,
-    },
-    periods=[
-        ("2021-01-01", "2021-12-31"),
-        ("2022-01-01", "2022-12-31"),
-        ("2023-01-01", "2023-12-31"),
-    ],
-    max_iterations=20,
-    output_strategy="my_strategy_optimized.py",
-    audit_dir="audit_log",
-)
-
-best_params = optimizer.run()
-print("最优参数:", best_params)
-```
-
-### 9.2 自定义多时段（滚动窗口验证）
-
-```bash
-python agent/optimizer.py \
-    --strategy my_strategy.py \
-    --periods \
-        "2020-01-01:2020-12-31" \
-        "2021-01-01:2021-12-31" \
-        "2022-01-01:2022-12-31" \
-        "2023-01-01:2023-12-31" \
-        "2024-01-01:2024-12-31"
-```
-
-使用 5 个独立年度验证，大幅提升参数稳健性。
-
-### 9.3 保存优化后的策略文件
-
-```bash
-python agent/optimizer.py \
-    --strategy my_strategy.py \
-    --output-strategy my_strategy_optimized.py
-```
-
-优化器会将 `PARAMS` 块替换为最优参数并写入新文件。
-
-### 9.4 通过 Claude Code 进行深度优化
-
-对于超出参数范围的情况（例如需要修改策略逻辑），可以直接让 Claude Code：
+当参数优化达到极限时，可以让 Claude Code 直接改进策略结构：
 
 ```
-分析 audit_log/session_xxx.jsonl，找出哪些问题无法通过参数调整解决，
-建议并实施策略逻辑改进，然后重新运行优化器验证效果。
+当前参数优化已经无法进一步提升夏普比率。分析回测数据，
+找出哪些交易日造成了最大回撤，建议并实施策略逻辑改进。
 ```
 
 Claude Code 会：
-1. 读取审计日志找出瓶颈
-2. 诊断是否需要修改逻辑（例如添加大盘过滤）
-3. 实施代码修改
-4. 重新运行优化器
-5. 记录所有决策
+
+1. 运行深度分析脚本查看每笔交易详情
+2. 诊断问题（例如："2022 年 3-4 月的连续亏损占总回撤的 60%"）
+3. 实施逻辑改进（例如：添加大盘择时过滤）
+4. 重新运行完整优化循环
+
+### 9.2 自定义多时段（滚动窗口验证）
+
+```
+使用 2020-2024 五个独立年度分别验证，确保参数稳健性。
+```
+
+### 9.3 策略逻辑对比
+
+```
+对比优化前后的策略：
+1. 参数差异
+2. 交易信号差异（哪些交易日会做出不同决策）
+3. 指标差异（夏普、回撤、胜率）
+```
+
+Claude Code 会运行两组回测并生成对比报告。
 
 ---
 
 ## 10. 示例：完整优化流程
 
-下面是一个完整的优化流程示例（基于内置模板策略）：
+### 步骤 1：向 Claude Code 提出需求
 
-### 步骤 1：查看模板策略的初始参数
-
-```python
-# agent/strategy_template.py 中的初始参数
-PARAMS = {
-    'fast_period':      5,
-    'slow_period':      20,
-    'stop_loss_pct':    0.08,
-    'position_pct':     1.0,
-    'vol_confirm_mul':  1.5,
-}
+```
+优化 agent/strategy_template.py，要求：
+- 夏普比率 > 1.0
+- 最大回撤 < 20%
+- 在 2021、2022、2023 三个年度分别验证
 ```
 
-### 步骤 2：运行优化器
+### 步骤 2：Claude Code 自动执行
 
-```bash
-python agent/optimizer.py \
-    --min-sharpe 1.0 \
-    --max-drawdown 0.20 \
-    --max-iterations 10
-```
+Claude Code 会依次：
+
+1. 读取 `CLAUDE.md` 和策略文件
+2. 运行基线回测，记录初始指标
+3. 分析结果，诊断问题
+4. 修改参数，调用代码审查
+5. 运行新回测验证
+6. 重复直到满足要求
 
 ### 步骤 3：观察优化进度
 
+Claude Code 会在每次迭代后报告进度：
+
 ```
-=================================================================
-EasyQuant Autonomous Strategy Optimizer
-=================================================================
-Strategy   : agent/strategy_template.py
-Periods    : 3 × ['2021-01-01→2021-12-31', '2022-01-01→2022-12-31', '2023-01-01→2023-12-31']
-Requirements:
-  min_sharpe             = 1.0
-  max_drawdown           = 0.2
-  min_annual_return      = 0.0
-  min_win_rate           = 0.4
+[Baseline]  avg_sharpe=0.78  worst_dd=-24.3%  avg_ret=5.2%  avg_wr=38.1%  → ❌
+  诊断：2022 年回撤 -24.3% 超过 -20% 限制；夏普不足
+  调整：stop_loss_pct 0.08→0.07, vol_confirm_mul 1.5→1.75
+  [代码审查子 Agent] ✅ 通过
 
-─────────────────────────────────────────────────────────────────
-[Baseline] params: {'fast_period': 5, 'slow_period': 20, ...}
-  avg_sharpe=0.78  worst_dd=-24.3%  avg_ret=5.2%  avg_wr=38.1%  → ❌ NOT MET
-    ✗ 2022-01-01–2022-12-31: sharpe 0.62 < 1.0
-    ✗ 2022-01-01–2022-12-31: max_drawdown -24.3% worse than -20%
-  → Adjustment: ['stop_loss_pct: 0.08→0.07', 'vol_confirm_mul: 1.5→1.75']
-
-─────────────────────────────────────────────────────────────────
-[Iteration 1] params: {'fast_period': 5, 'slow_period': 20, 'stop_loss_pct': 0.07, ...}
-  avg_sharpe=0.91  worst_dd=-19.8%  avg_ret=5.8%  avg_wr=40.2%  → ❌ NOT MET
-    ✗ 2022-01-01–2022-12-31: sharpe 0.72 < 1.0
-  → Adjustment: ['slow_period: 20→25']
+[Iteration 1]  avg_sharpe=0.91  worst_dd=-19.8%  avg_ret=5.8%  avg_wr=40.2%  → ❌
+  诊断：2022 年夏普 0.72 < 1.0
+  调整：slow_period 20→25
+  [代码审查子 Agent] ✅ 通过
 
 ...（继续迭代）...
 
-─────────────────────────────────────────────────────────────────
-[Iteration 5] params: {'fast_period': 5, 'slow_period': 30, 'stop_loss_pct': 0.06, ...}
-  avg_sharpe=1.07  worst_dd=-17.2%  avg_ret=7.1%  avg_wr=43.5%  → ✅ MET
-
-✅  All requirements met after 5 iteration(s).
-
-Audit log  : audit_log/session_20240115_143022.jsonl
-Summary MD : audit_log/session_20240115_143022.md
-
-Final params: {'fast_period': 5, 'slow_period': 30, 'stop_loss_pct': 0.06, ...}
-Best avg Sharpe: 1.074
+[Iteration 5]  avg_sharpe=1.07  worst_dd=-17.2%  avg_ret=7.1%  avg_wr=43.5%  → ✅
+  所有要求已满足。
 ```
 
 ### 步骤 4：查看审计报告
@@ -593,15 +579,15 @@ cat audit_log/session_20240115_143022.md
 
 报告会显示：
 - 每次迭代的完整指标表
-- 每次调参的具体依据（"2022 年回撤 -24.3% 超过 -20% 限制，收紧止损"）
+- 每次调参的具体依据
 - 代码审查结果
 - 最终推荐参数和使用建议
 
-### 步骤 5：使用优化后的参数
+### 步骤 5：验证优化后的策略
 
 ```bash
-# 生成优化后的策略文件
-python agent/optimizer.py --output-strategy my_strategy_optimized.py
+# 查看 git diff 确认 PARAMS 变化
+git diff agent/strategy_template.py
 
 # 运行优化后的策略
 python examples/03_run_backtest.py
@@ -609,7 +595,38 @@ python examples/03_run_backtest.py
 
 ---
 
-## 11. 下一步
+## 11. optimizer.py 的定位
+
+`agent/optimizer.py` 是一个**独立的规则基参数搜索工具**，作为 AI 驱动优化方法的参考和对比。
+
+### 它的作用
+
+- **参考实现**：展示规则基参数搜索的程序化实现方式
+- **性能基准**：可以运行并与 AI 驱动方法的结果进行对比
+- **快速验证**：不需要 AI Agent 时，可以直接运行进行简单的参数搜索
+
+### 为什么不作为主要驱动
+
+| 方面 | optimizer.py 的局限 |
+|------|-------------------|
+| 诊断能力 | 只能识别预定义的几种失败模式 |
+| 灵活性 | 只能在 PARAM_RANGES 内搜索 |
+| 策略理解 | 无法理解策略逻辑，不能提出结构性改进 |
+| 代码审查 | 只做简单的文本检查，无深度分析 |
+
+### AI 驱动方法的优势
+
+Claude Code 直接驱动优化流程，可以：
+
+1. 理解策略的完整逻辑和意图
+2. 分析回测数据，推断根本原因
+3. 修改策略逻辑（不仅是参数）
+4. 使用专业的代码审查子 Agent
+5. 在 git 中保留完整的修改历史
+
+---
+
+## 12. 下一步
 
 - **[CLAUDE.md](../CLAUDE.md)** — AI Agent 完整操作手册（英文）
 - **[agent/strategy_template.py](../agent/strategy_template.py)** — 可参数化策略模板
@@ -623,11 +640,12 @@ python examples/03_run_backtest.py
 | 步骤 | 执行者 | 产出 |
 |------|-------|------|
 | 读取 CLAUDE.md | Claude Code | 理解项目结构和工作流 |
-| 加载策略模块 | optimizer.py | PARAMS / PARAM_RANGES / initialize |
-| 多时段回测 | eqlib.run_backtest | 每个时段的收益曲线和交易记录 |
-| 指标分析 | eqlib.analyze_returns | sharpe, max_drawdown, win_rate 等 |
-| 需求评估 | optimizer.py | 满足 / 不满足列表 |
-| 诊断与调参 | optimizer.py | 数据驱动的参数变更方案 |
-| 代码审查 | optimizer.py | 3 项检查 + 自动修正 |
-| 审计记录 | audit_log.py | JSONL + Markdown 文件 |
-| 迭代终止 | optimizer.py | 满足要求 / 达到最大次数 |
+| 读取策略文件 | Claude Code | 理解 PARAMS / PARAM_RANGES / 策略逻辑 |
+| 多时段回测 | Claude Code（调用 eqlib） | 每个时段的收益曲线和交易记录 |
+| 指标分析 | Claude Code（调用 eqlib.analyze_returns） | sharpe, max_drawdown, win_rate 等 |
+| 需求评估 | Claude Code | 满足 / 不满足列表 |
+| 诊断与调参 | Claude Code | 数据驱动的参数变更方案 |
+| 应用修改 | Claude Code（Edit 工具） | 策略文件 PARAMS 已更新 |
+| 代码审查 | 代码审查子 Agent | 4 项检查 + 自动修正 |
+| 审计记录 | Claude Code（audit_log.py） | JSONL + Markdown 文件 |
+| 迭代终止 | Claude Code | 满足要求 / 达到最大次数 |

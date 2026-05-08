@@ -125,43 +125,43 @@ See the [`examples/`](examples/) directory for complete scripts:
 
 ## AI Agent — Autonomous Strategy Optimization
 
-EasyQuant includes a built-in **AI agent workflow** that lets Claude Code (or any compatible AI coding agent) run a complete, human-free strategy optimization loop.
+EasyQuant includes a built-in **AI agent workflow** orchestrated by **Claude Code**. The AI agent (Claude Code itself) reads strategy files, runs backtests via `eqlib` APIs, analyzes results, edits strategy files directly, spawns a code-review sub-agent, and logs every decision — all without running a standalone optimization script.
 
-### What the agent does
+### How it works
 
-1. Loads your strategy and its tunable `PARAMS` / `PARAM_RANGES`
-2. Runs backtests across multiple historical periods
-3. Analyzes results with `analyze_returns` (Sharpe, drawdown, win rate, alpha, …)
-4. Generates **data-driven** parameter adjustments with explicit rationale
-5. Performs a code review before applying each change
-6. Repeats until all your requirements are met (or max iterations is reached)
-7. Logs every decision to a structured audit trail (JSONL + Markdown)
+1. You tell Claude Code your requirements (e.g. "Sharpe > 1.0, max drawdown < 20%")
+2. Claude Code reads `CLAUDE.md` and your strategy file
+3. It runs backtests using `eqlib` APIs, then analyzes the results
+4. Diagnoses issues and proposes data-driven parameter adjustments
+5. Edits the strategy file directly via the Edit tool
+6. Spawns a specialized code-review sub-agent to verify changes
+7. Repeats until all requirements are met
+8. Logs every decision to a structured audit trail (JSONL + Markdown)
+
+For the full workflow details, see [`CLAUDE.md`](CLAUDE.md) and [`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md).
 
 ### Quick start
 
-```bash
-# Optimize the bundled template strategy (default requirements)
-python agent/optimizer.py
+Just tell Claude Code what you want:
 
-# Optimize your own strategy with custom targets
-python agent/optimizer.py \
-    --strategy my_strategy.py \
-    --min-sharpe 1.0 \
-    --max-drawdown 0.20 \
-    --max-iterations 15 \
-    --periods "2022-01-01:2022-12-31" "2023-01-01:2023-12-31" "2024-01-01:2024-12-31" \
-    --output-strategy my_strategy_optimized.py
+```
+Optimize agent/strategy_template.py, requiring Sharpe > 1.0,
+max drawdown < 20%, validated across 2021, 2022, and 2023.
 ```
 
-### Agent configuration
+Claude Code handles the rest — no command to run.
 
-- **[`CLAUDE.md`](CLAUDE.md)** — AI agent configuration recognized by Claude Code.
-  Contains the full self-optimization workflow, parameter adjustment rules, audit log format,
-  and code review requirements.
-- **[`agent/optimizer.py`](agent/optimizer.py)** — Self-optimization orchestrator.
-- **[`agent/audit_log.py`](agent/audit_log.py)** — Structured audit logging (JSONL + Markdown).
-- **[`agent/strategy_template.py`](agent/strategy_template.py)** — Parameterized strategy template.
-- **[`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md)** — Tutorial (Chinese).
+### Reference utility
+
+The [`agent/optimizer.py`](agent/optimizer.py) script provides a standalone rule-based parameter search for comparison with the AI-driven approach. It can be run independently but is **not** the primary optimization driver.
+
+### Agent files
+
+- **[`CLAUDE.md`](CLAUDE.md)** — AI agent configuration: full self-optimization workflow, parameter rules, audit log format, code review
+- **[`agent/audit_log.py`](agent/audit_log.py)** — Structured audit logging (JSONL + Markdown)
+- **[`agent/strategy_template.py`](agent/strategy_template.py)** — Parameterized strategy template
+- **[`agent/optimizer.py`](agent/optimizer.py)** — Reference rule-based optimizer (optional, for comparison)
+- **[`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md)** — Tutorial (Chinese)
 
 ### Audit log
 
@@ -173,8 +173,7 @@ audit_log/
 └── session_<timestamp>.md      # human-readable Markdown report
 ```
 
-Every parameter change is logged with: the specific metric values that triggered it, the
-expected effect, and the code review result. Users can trace every decision back to data.
+Every parameter change is logged with: the specific metric values that triggered it, the expected effect, and the code review result. Users can trace every decision back to data.
 
 ---
 
