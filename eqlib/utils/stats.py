@@ -36,6 +36,7 @@ def rolling_beta(series: pd.Series, benchmark: pd.Series,
 def rolling_sharpe(returns: pd.Series, window: int,
                    risk_free: float = 0.0, annualize: int = 252) -> pd.Series:
     """Rolling annualized Sharpe ratio."""
+    # mean * annualize = annualized return (daily mean scaled to yearly)
     mean = returns.rolling(window).mean() * annualize
     std = returns.rolling(window).std() * np.sqrt(annualize)
     return (mean - risk_free) / std.replace(0, np.nan)
@@ -131,9 +132,17 @@ def downside_deviation(returns: pd.Series, target: float = 0.0,
                        annualize: int = 252) -> float:
     """Downside deviation (semi-standard deviation).
 
-    Only considers returns below the target.
+    Computes ``sqrt(mean(min(r - target, 0)^2)) * sqrt(annualize)``, the
+    square root of the mean squared deviation below the target return.
+
+    Parameters:
+        returns: series of periodic (e.g. daily) returns
+        target: minimum acceptable return per period (default 0.0).
+            For the Sortino ratio, pass the risk-free rate expressed in the
+            same frequency as ``returns`` (e.g. ``0.03 / 252`` for daily).
+        annualize: number of periods per year for annualization (default 252)
     """
-    downside = returns[returns < target]
+    downside = returns[returns < target] - target
     if len(downside) == 0:
         return 0.0
     return sqrt(np.mean(downside ** 2)) * sqrt(annualize)

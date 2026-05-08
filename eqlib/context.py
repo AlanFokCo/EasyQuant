@@ -12,12 +12,25 @@ class Position:
         self.avg_cost = 0.0
         self.total_value = 0.0
         self.closeable_amount = 0.0
+        self._current_price = 0.0
+
+    @property
+    def current_price(self):
+        """Current market price of the security."""
+        return self._current_price
 
     @property
     def price(self):
-        return self.avg_cost
+        """Alias for ``current_price``.
+
+        .. deprecated::
+            Access ``avg_cost`` for cost basis or ``current_price`` for the
+            latest market price.  This alias is kept for backward compatibility.
+        """
+        return self._current_price
 
     def update(self, price):
+        self._current_price = price
         self.total_value = self.amount * price
 
     def __repr__(self):
