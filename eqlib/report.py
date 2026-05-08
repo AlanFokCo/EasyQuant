@@ -679,7 +679,8 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
                 if bm_var > 0:
                     beta_val = cov / bm_var
                     metrics["beta"] = f"{beta_val:.3f}"
-                    alpha_ann = ann_ret - (0.03 + beta_val * ((1 + bm_ret) ** (1 / years) - 1 - 0.03)) if years > 0 else 0
+                    bm_ann_ret = (1 + bm_ret) ** (1 / years) - 1
+                    alpha_ann = ann_ret - (0.03 + beta_val * (bm_ann_ret - 0.03)) if years > 0 else 0
                     metrics["alpha"] = f"{alpha_ann:.2%}"
 
     return metrics
