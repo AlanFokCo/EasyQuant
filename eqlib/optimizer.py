@@ -24,7 +24,15 @@ class MinVariance:
 
 
 class MaxSharpe:
-    """Target: maximize Sharpe ratio."""
+    """Target: maximize Sharpe ratio.
+
+    Parameters:
+        risk_free_rate: annualized risk-free rate used in the Sharpe
+            denominator (default 0.03 = 3%, consistent with typical
+            Chinese government bond yields).  Ensure this matches the
+            risk-free rate used elsewhere in the backtest (e.g. in
+            ``analyze_returns``).
+    """
     name = "max_sharpe"
 
     def __init__(self, risk_free_rate=0.03):
@@ -176,7 +184,7 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
             rf = getattr(target, "risk_free_rate", 0.03)
 
             def neg_sharpe(w):
-                ret, vol = _annual_stats(w, returns)
+                ret, vol = _annual_stats(w, returns, days=252)
                 if vol < 1e-10:
                     return 0
                 return -(ret - rf) / vol

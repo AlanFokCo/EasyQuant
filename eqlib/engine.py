@@ -358,7 +358,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date):
                 continue
 
             is_etf_sec = _is_etf(security.replace(".XSHG", "").replace(".XSHE", ""))
-            commission = cost_cfg.calc_close_cost(exec_price, sell_amount, is_etf=is_etf_sec)
+            commission = cost_cfg.calc_close_cost(exec_price, sell_amount, is_etf=is_etf_sec,
+                                                  trade_date=day)
             net = exec_price * sell_amount - commission
 
             portfolio.available_cash += net
