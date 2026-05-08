@@ -519,8 +519,8 @@ def generate_html_report(result, out_path):
             "ma60": ma60_v,
             "atr14": round(float(atr14), 3) if atr14 else None,
             "vol_ratio": vol_ratio,
-            "high_52w": round(float(df_s["high"].max()), 3),
-            "low_52w": round(float(df_s["low"].min()), 3),
+            "period_high": round(float(df_s["high"].max()), 3),
+            "period_low": round(float(df_s["low"].min()), 3),
         }
 
     # ============================================================
@@ -1390,8 +1390,8 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
       ['MA60',     tech.ma60],
       ['ATR(14)',  tech.atr14],
       ['量比',     tech.vol_ratio],
-      ['期间最高', tech.high_52w],
-      ['期间最低', tech.low_52w],
+      ['期间最高', tech.period_high],
+      ['期间最低', tech.period_low],
     ].filter(([, v]) => v !== null && v !== undefined);
     document.getElementById('tech-stats').innerHTML = items.map(([lbl, val]) =>
       `<div class="tech-card"><div class="title">${{lbl}}</div>` +
