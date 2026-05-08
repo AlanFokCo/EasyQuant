@@ -6,7 +6,7 @@ import time
 import pandas as pd
 from typing import Optional
 from eqlib.context import Context
-from eqlib.data import fetch_stock_data, get_price, _iter_days
+from eqlib.data import fetch_stock_data, get_price, _get_trading_days_range
 from eqlib.data_cache import PreloadedData
 import eqlib._state as st
 from eqlib._state import BacktestSession, _set_session, _clear_session, reset_all
@@ -654,9 +654,7 @@ def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datet
     except Exception:
         pass
 
-    from eqlib.data import _is_ashare_holiday
-    return [d for d in _iter_days(start, end)
-            if d.weekday() < 5 and not _is_ashare_holiday(d)]
+    return list(_get_trading_days_range(start, end))
 
 
 # ── Paper trading ──────────────────────────────────────────────────────────────
