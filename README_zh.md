@@ -111,6 +111,59 @@ result = run_strategy(
 
 ---
 
+## AI Agent — 自动化策略优化
+
+EasyQuant 内置了 **AI Agent 工作流**，可让 Claude Code（或任何兼容的 AI 编码智能体）执行完整的无人值守策略优化循环。
+
+### Agent 能做什么
+
+1. 加载你的策略及其可调参数（`PARAMS` / `PARAM_RANGES`）
+2. 在多个历史时段运行回测
+3. 使用 `analyze_returns` 分析结果（夏普、回撤、胜率、alpha 等）
+4. 生成**数据驱动**的参数调整方案，并记录每次调整的依据
+5. 每次调参后执行代码审查
+6. 循环迭代，直到满足你的所有要求（或达到最大迭代次数）
+7. 将每一步决策记录到结构化审计日志（JSONL + Markdown）
+
+### 快速上手
+
+```bash
+# 使用内置模板策略和默认要求
+python agent/optimizer.py
+
+# 使用自定义策略和自定义目标
+python agent/optimizer.py \
+    --strategy my_strategy.py \
+    --min-sharpe 1.0 \
+    --max-drawdown 0.20 \
+    --max-iterations 15 \
+    --periods "2022-01-01:2022-12-31" "2023-01-01:2023-12-31" "2024-01-01:2024-12-31" \
+    --output-strategy my_strategy_optimized.py
+```
+
+### Agent 相关文件
+
+- **[`CLAUDE.md`](CLAUDE.md)** — Claude Code 可识别的 AI Agent 配置文件，包含完整的自优化工作流、参数调整规则、审计日志格式和代码审查要求
+- **[`agent/optimizer.py`](agent/optimizer.py)** — 自优化循环编排器
+- **[`agent/audit_log.py`](agent/audit_log.py)** — 结构化审计日志（JSONL + Markdown）
+- **[`agent/strategy_template.py`](agent/strategy_template.py)** — 参数化策略模板
+- **[Tutorial 10: AI Agent 自动化策略优化](tutorials/10_agent_optimization.md)** — 完整使用教程
+
+### 审计日志
+
+每次优化会话在 `audit_log/` 目录下生成两个文件：
+
+```
+audit_log/
+├── session_<时间戳>.jsonl   # 机器可读，支持 jq 查询
+└── session_<时间戳>.md      # 人类可读 Markdown 报告
+```
+
+每次参数调整都记录了：触发调整的具体指标数值、预期效果和代码审查结果。
+用户可以追溯每一个决策的数据依据。
+
+---
+
 ## 许可证
 
 MIT
