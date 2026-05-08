@@ -18,7 +18,8 @@
 8. [缓存 API](#8-缓存-api)
 9. [日志 API](#9-日志-api)
 10. [辅助工具 API](#10-辅助工具-api)
-11. [AI Agent 自动化工作流](#11-ai-agent-自动化工作流)
+11. [选股策略 API](#11-选股策略-api)
+12. [AI Agent 自动化工作流](#12-ai-agent-自动化工作流)
 
 ---
 
@@ -564,7 +565,7 @@ print(info['price'], info['pe'])
 
 ## 4. 回测与模拟盘引擎
 
-### 4.1 `run_strategy(initialize_func, start_date, end_date, starting_cash=100000, benchmark='000300.XSHG', handle_data=None, securities=None, report_dir='reports', use_local=False, max_memory_mb=1024)`
+### 4.1 `run_strategy(initialize_func, start_date, end_date, starting_cash=100000, benchmark='000300.XSHG', handle_data=None, securities=None, report_dir='reports', use_local=False, max_memory_mb=1024, selection_func=None, selection_rebalance='monthly:1')`
 
 一站式回测 + 报告生成。
 
@@ -582,16 +583,18 @@ print(info['price'], info['pe'])
 | `report_dir` | `str` | 否 | 报告输出目录 |
 | `use_local` | `bool` | 否 | 使用本地 CSV 数据，默认 False |
 | `max_memory_mb` | `int` | 否 | 内存限制（MB），默认 1024（1GB） |
+| `selection_func` | `callable` | 否 | 选股函数，返回股票代码列表 |
+| `selection_rebalance` | `str` | 否 | 选股频率，`"monthly:N"` / `"weekly:N"` / `"daily"` |
 
-**返回：** `dict` 回测结果，包含 `context`, `trade_log`, `recorded_values`
+**返回：** 回测结果 `dict`，包含 `context`, `trade_log`, `recorded_values`
 
 **`max_memory_mb` 说明：** 回测引擎会在内存允许的情况下构建快速查找字典缓存（O(1)）。如果估计内存超过此限制，会自动回退到紧凑的 DataFrame 切片模式（O(log n)），结果完全一致但略慢。你可以通过 `estimate_memory_mb(securities, rows_per_sec)` 提前估算内存需求。
 
-### 4.2 `run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency='daily', benchmark='000300.XSHG', securities=None, use_local=False, max_memory_mb=1024)`
+### 4.2 `run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency='daily', benchmark='000300.XSHG', securities=None, use_local=False, max_memory_mb=1024, selection_func=None, selection_rebalance='monthly:1')`
 
 运行回测（不生成报告）。
 
-**参数：** 与 `run_strategy` 类似，额外支持 `frequency`（`'daily'` 或 `'minute'`）。
+**参数：** 与 `run_strategy` 类似，额外支持 `frequency`（`'daily'` 或 `'minute'`）、`selection_func`（选股函数）、`selection_rebalance`（选股频率）。
 
 **返回：**
 
@@ -715,6 +718,42 @@ record(price=current_price, ma5=ma5, signal='BUY')
 #### `run_monthly(func, day_of_month=1, time='09:30')`
 
 每月定时执行。`day_of_month`：1-31。
+
+#### `run_selection(func, rebalance='monthly:1')`
+
+注册选股函数，按周期执行并自动更新 `context.universe`。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `func` | `callable` | 选股函数，签名 `func(context) -> list[str]` |
+| `rebalance` | `str` | 调度频率，见下表 |
+
+**Rebalance 格式：**
+
+| 值 | 含义 | 示例 |
+|---|---|---|
+| `"monthly:N"` | 每月第 N 天（1-31） | `"monthly:1"`（1号）、`"monthly:15"`（15号） |
+| `"weekly:N"` | 周几（0=周一, 4=周五） | `"weekly:0"`（周一）、`"weekly:4"`（周五） |
+| `"daily"` | 每个交易日 | `"daily"` |
+
+**使用方式：**
+
+```python
+def my_selection(context):
+    candidates = filter_st_stocks(context.universe)
+    return TopNSelector(factor='pe', top_n=5).rank(candidates, context)
+
+def initialize(context):
+    run_selection(my_selection, rebalance='monthly:1')
+```
+
+**选股策略编写模式：**
+
+1. **普通函数**（最简单）：编写一个函数，返回股票代码列表
+2. **StockSelector 子类**（适合复杂逻辑）：继承 `StockSelector`，实现 `filter()` 和 `rank()` 方法
+3. **通过 `run_strategy` 参数**：`run_strategy(..., selection_func=my_selection, selection_rebalance='weekly:0')`
 
 ### 4.8 生命周期回调
 
@@ -961,11 +1000,175 @@ log.error("数据获取失败")
 
 ---
 
-## 11. AI Agent 自动化工作流
+## 11. 选股策略 API
+
+选股策略允许你定义周期性的股票筛选逻辑，框架会在指定的调度频率（每周/每月）自动执行选股并更新 `context.universe`。
+
+### 11.1 编写选股策略
+
+**模式一：普通函数（最简单）**
+
+编写一个函数，接收 `context`，返回股票代码列表：
+
+```python
+def my_selection(context):
+    """返回当期要交易的股票列表。"""
+    # 1. 筛选：剔除 ST 股
+    candidates = filter_st_stocks(["601390", "600519", "000858"])
+    # 2. 打分：按 PE 排序，选最低的 5 只
+    df = fetch_factor_data(candidates, fields=["pe"])
+    df = df.dropna(subset=["pe"]).sort_values("pe", ascending=True)
+    return df.head(5).index.tolist()
+```
+
+**模式二：StockSelector 子类（适合复杂逻辑）**
+
+继承 `StockSelector` 基类，实现 `filter()` 和 `rank()` 两个方法：
+
+```python
+class MySelector(StockSelector):
+    def __init__(self, top_n=5, max_pe=50):
+        self.top_n = top_n
+        self.max_pe = max_pe
+
+    def filter(self, candidates, context):
+        """初选：剔除不合格股票"""
+        filtered = filter_st_stocks(candidates)       # 剔除 ST
+        filtered = filter_paused_stocks(filtered, context)  # 剔除停牌
+        return filter_high_pe_stocks(filtered, max_pe=self.max_pe)  # 剔除高 PE
+
+    def rank(self, securities, context):
+        """打分排序：选出最优组合"""
+        return TopNSelector(factor="pe", top_n=self.top_n).rank(securities, context)
+```
+
+**模式三：内置选择器（最快捷）**
+
+直接使用 `TopNSelector` 或 `MultiFactorSelector`：
+
+```python
+# 单因子：选 PE 最低的 5 只
+sel = TopNSelector(factor="pe", top_n=5, ascending=True)
+
+# 多因子：加权综合评分
+sel = MultiFactorSelector(
+    factors={"pe": -0.4, "pb": -0.2, "pct_change": 0.4},
+    top_n=5,
+)
+```
+
+### 11.2 注册与调用
+
+**方式一：在 `initialize` 中调用 `run_selection`**
+
+```python
+def initialize(context):
+    run_selection(my_selection, rebalance="monthly:1")  # 每月1号执行
+    run_daily(trade, time="every_bar")
+```
+
+**方式二：通过 `run_strategy` 参数传入**
+
+```python
+result = run_strategy(
+    initialize_func=initialize,
+    selection_func=my_selection,
+    selection_rebalance="weekly:0",  # 每周一执行
+)
+```
+
+### 11.3 `run_selection(func, rebalance='monthly:1')`
+
+注册选股函数到回测引擎。
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `func` | `callable` | 选股函数，签名 `func(context) -> list[str]` |
+| `rebalance` | `str` | 调度频率（见下表） |
+
+**Rebalance 格式：**
+
+| 值 | 含义 | 示例 |
+|---|---|---|
+| `"monthly:N"` | 每月第 N 天（1-31） | `"monthly:1"`（1号） |
+| `"weekly:N"` | 周几（0=周一, 4=周五） | `"weekly:0"`（周一） |
+| `"daily"` | 每个交易日 | `"daily"` |
+
+### 11.4 工具函数
+
+#### `StockSelector`
+
+选股基类，子类需实现 `filter()` 和 `rank()` 方法。
+
+#### `filter_st_stocks(securities)`
+
+剔除 ST / *ST 股票。
+
+**返回：** 非 ST 股票列表
+
+#### `filter_paused_stocks(securities, context)`
+
+剔除停牌股票（成交量为 0）。
+
+**参数：** `context` 可选，回测模式下用于获取当前交易日
+
+**返回：** 活跃交易股票列表
+
+#### `filter_low_price_stocks(securities, min_price=2.0)`
+
+剔除低于最低价格的股票。
+
+#### `filter_high_pe_stocks(securities, max_pe=100.0)`
+
+剔除高于最高 PE 的股票。
+
+#### `fetch_factor_data(securities, fields=None)`
+
+获取多维度因子数据。
+
+**可用字段：**
+
+| 字段 | 说明 | 来源 |
+|------|------|------|
+| `price` | 最新价 | 行情快照 |
+| `pct_change` | 涨跌幅 | 行情快照 |
+| `total_value` | 总市值 | 行情快照 |
+| `pe` | 市盈率（动态） | 行情快照 |
+| `pb` | 市净率 | 行情快照 |
+| `turnover` | 换手率 | 行情快照 |
+| `ma5` | 5日均价 | 预加载日线 |
+| `ma10` | 10日均价 | 预加载日线 |
+| `ma20` | 20日均价 | 预加载日线 |
+| `rsi14` | 14日 RSI | 预加载日线 |
+
+**返回：** `DataFrame`，索引为股票代码
+
+#### `TopNSelector(factor='pe', top_n=5, ascending=True)`
+
+按单因子排序，选出 Top-N。
+
+| 参数 | 说明 |
+|------|------|
+| `factor` | 因子名称（`fetch_factor_data` 中的字段名） |
+| `top_n` | 选取数量 |
+| `ascending` | `True` 表示从小到大（如低 PE） |
+
+#### `MultiFactorSelector(factors, top_n=5)`
+
+按多因子加权综合评分排序。
+
+| 参数 | 说明 |
+|------|------|
+| `factors` | `dict`，因子名 -> 权重（正权重=越大越好，负权重=越小越好） |
+| `top_n` | 选取数量 |
+
+---
+
+## 12. AI Agent 自动化工作流
 
 `eqlib` 的 API 被设计为可与 Claude Code（AI 编码智能体）配合使用，实现从回测到优化到模拟盘的全自动工作流。以下是 Claude Code 如何调用 `eqlib` API 完成自动化策略优化。
 
-### 11.1 AI Agent 如何调用 eqlib API
+### 12.1 AI Agent 如何调用 eqlib API
 
 Claude Code 作为主驱，通过以下步骤完成自动化：
 
@@ -978,7 +1181,7 @@ Claude Code 作为主驱，通过以下步骤完成自动化：
 | 数据查询 | 获取股票数据辅助诊断 | `get_price()`, `attribute_history()` |
 | 模拟盘 | 编写并启动模拟盘脚本 | `run_paper_trade()` |
 
-### 11.2 策略参数化约定
+### 12.2 策略参数化约定
 
 Claude Code 通过策略文件中的 `PARAMS` 和 `PARAM_RANGES` 字典识别可调参数：
 
@@ -998,7 +1201,7 @@ PARAM_RANGES = {
 
 Claude Code 使用 Edit 工具直接修改策略文件中的 `PARAMS` 块，然后重新运行回测验证。
 
-### 11.3 用户如何触发 AI 优化
+### 12.3 用户如何触发 AI 优化
 
 无需运行任何命令 —— 直接在 Claude Code 对话中提出需求：
 
@@ -1011,7 +1214,7 @@ Claude Code 使用 Edit 工具直接修改策略文件中的 `PARAMS` 块，然�
 
 Claude Code 会自动完成：回测运行 → 结果分析 → 参数调整 → 代码审查 → 再回测 → 审计报告。
 
-### 11.4 代码审查子 Agent
+### 12.4 代码审查子 Agent
 
 每次参数变更后，Claude Code 会调用专门的代码审查子 Agent 验证：
 
@@ -1020,7 +1223,7 @@ Claude Code 会自动完成：回测运行 → 结果分析 → 参数调整 →
 3. **参数使用检查**：修改的参数是否在策略代码中通过 `PARAMS[key]` 引用
 4. **前视偏差检查**：修改是否引入了使用未来数据的逻辑
 
-### 11.5 审计日志
+### 12.5 审计日志
 
 所有决策记录在 `audit_log/` 目录下：
 
@@ -1037,7 +1240,7 @@ audit_log/
 - 调参诊断依据和数据证据
 - 代码审查结果
 
-### 11.6 AI Agent 模拟盘自动化
+### 12.6 AI Agent 模拟盘自动化
 
 除了回测优化，Claude Code 也可以自动化模拟盘流程：
 
@@ -1104,6 +1307,11 @@ from eqlib import (
     portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
     # === 分析 ===
     analyze_returns, brinson_attribution, fama_french_analysis,
+    # === 选股策略 ===
+    StockSelector, TopNSelector, MultiFactorSelector,
+    filter_st_stocks, filter_paused_stocks,
+    filter_low_price_stocks, filter_high_pe_stocks,
+    fetch_factor_data, run_selection,
     # === 缓存 ===
     set_cache_dir, set_local_data_dir, fetch_cached, estimate_memory_mb,
     save_stock_local, load_stock_local, has_local_data,

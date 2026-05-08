@@ -127,6 +127,33 @@ def run_monthly(func, day_of_month: int = 1, time="09:30"):
     st.get_session()._scheduled_funcs.append(("monthly", day_of_month, time, func))
 
 
+def run_selection(func, rebalance: str = "monthly:1"):
+    """Register a stock selection function to run periodically.
+
+    The selection function should return a list of security codes that will
+    automatically update ``context.universe``.
+
+    Parameters:
+        func: callable taking (context) and returning a list of security codes
+        rebalance: schedule string, e.g. "monthly:1" (1st of month),
+            "weekly:0" (Monday), or "daily"
+
+    Example::
+
+        def my_selection(context):
+            # Return top 10 stocks by PE ratio
+            from eqlib.selection import TopNSelector
+            sel = TopNSelector(factor='pe', top_n=10, ascending=True)
+            return sel.rank(context.universe, context)
+
+        run_selection(my_selection, rebalance='monthly:1')
+    """
+    sess = st.get_session()
+    # Store selection config on the session for the engine to pick up
+    object.__setattr__(sess, '_selection_func', func)
+    object.__setattr__(sess, '_selection_rebalance', rebalance)
+
+
 def _should_run_schedule(sched, day) -> bool:
     """Check if a scheduled function should run on the given date."""
     t = sched[0]
@@ -136,6 +163,30 @@ def _should_run_schedule(sched, day) -> bool:
         return day.weekday() == sched[1]
     if t == "monthly":
         return day.day == sched[1]
+    return False
+
+
+def _should_run_selection(rebalance: str, day) -> bool:
+    """Check if stock selection should run on the given date.
+
+    Parameters:
+        rebalance: schedule string, e.g. "monthly:1", "weekly:0", "daily"
+        day: datetime.date to check
+    """
+    if not rebalance:
+        return False
+    if rebalance == "daily":
+        return True
+    if ":" in rebalance:
+        kind, val = rebalance.split(":", 1)
+        try:
+            n = int(val)
+        except ValueError:
+            return False
+        if kind == "monthly":
+            return day.day == n
+        if kind == "weekly":
+            return day.weekday() == n
     return False
 
 
@@ -418,7 +469,8 @@ def _round_lot(amount) -> int:
 def run_backtest(initialize_func, start_date, end_date,
                  starting_cash=100000.0, frequency: str = "daily",
                  benchmark: str = "000300.XSHG", securities=None,
-                 use_local: bool = False, max_memory_mb: int = 1024):
+                 use_local: bool = False, max_memory_mb: int = 1024,
+                 selection_func=None, selection_rebalance: str = "monthly:1"):
     """Main backtest runner.
 
     Parameters:
@@ -431,6 +483,13 @@ def run_backtest(initialize_func, start_date, end_date,
         securities: list of stock codes to preload data for
         use_local: if True, load data from local CSV files first.
         max_memory_mb: memory limit in MB for in-memory dict caches.
+        selection_func: optional callable taking (context) and returning
+            a list of selected security codes.  Runs periodically on
+            rebalance days (see selection_rebalance).
+        selection_rebalance: when to run selection_func.  Format:
+            - "monthly:N" — Nth day of month (1-31), default "monthly:1"
+            - "weekly:N" — Nth weekday (0=Mon, 4=Fri), default "weekly:0"
+            - "daily" — every trading day
 
     Returns:
         dict with keys: context, trade_log, recorded_values, benchmark, session
@@ -483,6 +542,15 @@ def run_backtest(initialize_func, start_date, end_date,
 
     initialize_func(context)
 
+    # Pick up selection config from session (set via run_selection in initialize)
+    # Parameter takes precedence over session-level config
+    if selection_func is None:
+        selection_func = getattr(session, '_selection_func', None)
+    if selection_rebalance == "monthly:1":
+        sess_rebalance = getattr(session, '_selection_rebalance', None)
+        if sess_rebalance is not None:
+            selection_rebalance = sess_rebalance
+
     log.info(f"Backtest started: {start_date} to {end_date}, "
              f"{len(trading_days)} trading days, cash={starting_cash:,.0f}")
 
@@ -504,6 +572,17 @@ def run_backtest(initialize_func, start_date, end_date,
         context.portfolio._sync_total_value(open_prices)
 
         data = _LazyData(context)
+
+        # ── Stock selection: run on rebalance days (item 22) ──────────────
+        if selection_func is not None:
+            if _should_run_selection(selection_rebalance, day):
+                try:
+                    selected = selection_func(context)
+                    if selected:
+                        context.universe = selected
+                        log.info(f"Stock selection ({day}): {len(selected)} securities")
+                except Exception as e:
+                    log.warn(f"Stock selection failed on {day}: {e}")
 
         # ── Before-trading-start callbacks ─────────────────────────────────
         for func in session._before_trading_start_funcs:

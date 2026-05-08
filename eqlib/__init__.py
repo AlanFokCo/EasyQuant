@@ -37,6 +37,7 @@ from eqlib.engine import (
     run_daily,
     run_weekly,
     run_monthly,
+    run_selection,
     set_handle_data,
     record,
     run_paper_trade,
@@ -119,6 +120,18 @@ from eqlib.attribution import (
     fama_french_analysis,
 )
 
+# Stock selection
+from eqlib.selection import (
+    StockSelector,
+    TopNSelector,
+    MultiFactorSelector,
+    filter_st_stocks,
+    filter_paused_stocks,
+    filter_low_price_stocks,
+    filter_high_pe_stocks,
+    fetch_factor_data,
+)
+
 # Utilities: indicators, statistics, money management
 from eqlib import utils
 
@@ -131,7 +144,7 @@ from eqlib.portfolio import StrategyConfig, run_portfolio_backtest
 
 __all__ = [
     # Lifecycle
-    "run_backtest", "run_daily", "run_weekly", "run_monthly",
+    "run_backtest", "run_daily", "run_weekly", "run_monthly", "run_selection",
     "set_handle_data", "record", "run_paper_trade",
     # Config
     "set_benchmark", "set_option", "set_order_cost", "set_slippage", "OrderCost",
@@ -177,6 +190,11 @@ __all__ = [
     "portfolio_optimizer", "Bound", "MinVariance", "MaxSharpe", "RiskParity",
     # Attribution analysis
     "analyze_returns", "brinson_attribution", "fama_french_analysis",
+    # Stock selection
+    "StockSelector", "TopNSelector", "MultiFactorSelector",
+    "filter_st_stocks", "filter_paused_stocks",
+    "filter_low_price_stocks", "filter_high_pe_stocks",
+    "fetch_factor_data",
     # Data cache
     "set_cache_dir", "fetch_cached", "estimate_memory_mb",
     # Local CSV data store
@@ -194,7 +212,8 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
                   starting_cash=100000.0, benchmark="000300.XSHG",
                   handle_data=None, securities=None,
                   report_dir="reports", use_local: bool = False,
-                  max_memory_mb: int = 1024):
+                  max_memory_mb: int = 1024,
+                  selection_func=None, selection_rebalance: str = "monthly:1"):
     """
     High-level strategy runner. Runs backtest and generates all reports.
 
@@ -214,6 +233,13 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
         max_memory_mb: memory limit in MB for in-memory dict caches.
                        Default 1024 (1 GB). Results are identical
                        regardless of whether dict caches are used.
+        selection_func: optional callable taking (context) and returning
+            a list of selected security codes.  Runs periodically on
+            rebalance days to update context.universe.
+        selection_rebalance: when to run selection_func.  Format:
+            - "monthly:N" — Nth day of month (1-31), default "monthly:1"
+            - "weekly:N" — Nth weekday (0=Mon, 4=Fri), default "weekly:0"
+            - "daily" — every trading day
 
     Returns:
         Backtest result dict
@@ -240,6 +266,8 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
         starting_cash=starting_cash, benchmark=benchmark,
         securities=securities, use_local=use_local,
         max_memory_mb=max_memory_mb,
+        selection_func=selection_func,
+        selection_rebalance=selection_rebalance,
     )
 
     if result is None:

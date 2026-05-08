@@ -17,6 +17,7 @@ This project provides the `eqlib` Python package — the core library that imple
 - **Portfolio optimization** — minimum variance, maximum Sharpe, risk parity
 - **Paper trading** — run strategies live with real-time market data
 - **PTrade/QMT adapter** — export EasyQuant strategies to PTrade/QMT platform with minimal changes
+- **Stock selection** — periodic portfolio rebalancing with factor-based screening (ST/PB/PE/momentum filters, Top-N, multi-factor scoring)
 - **Utility library** — technical indicators (MA, MACD, RSI, KDJ, Bollinger, ATR), statistical tools, position sizing (Kelly, ATR-based, fixed fractional)
 - **Reports** — chart (PNG), Markdown, and JSON output
 
@@ -109,6 +110,7 @@ See the [`examples/`](examples/) directory for complete scripts:
 | 19 | `19_local_data_backtest.py` | Local data mode (download once, backtest offline) |
 | 20 | `20_sr_strategy/` | Support & Resistance portfolio strategy (real-world case) |
 | 21 | `21_combined_strategy/` | **All-Weather Alpha** — comprehensive combined strategy (multi-factor + sector rotation + RSI/MACD/Bollinger + ATR) |
+| 22 | `22_stock_selection_strategy.py` | **Stock Selection** — periodic rebalancing with factor-based screening (ST/PE/momentum filters, TopNSelector, MultiFactorSelector) |
 
 ---
 
@@ -174,6 +176,91 @@ audit_log/
 ```
 
 Every parameter change is logged with: the specific metric values that triggered it, the expected effect, and the code review result. Users can trace every decision back to data.
+
+---
+
+## Stock Selection
+
+EasyQuant supports periodic portfolio rebalancing through a stock selection interface. Instead of hardcoding your stock pool, you define a selection function that runs weekly, monthly, or at any custom frequency.
+
+### Quick start
+
+```python
+from eqlib import *
+
+def my_selection(context):
+    """Return the stocks you want to trade this period."""
+    # Filter ST, then pick top 5 by lowest PE
+    candidates = filter_st_stocks(["601390", "600519", "000858", "600036"])
+    df = fetch_factor_data(candidates, fields=["pe"])
+    df = df.dropna(subset=["pe"]).sort_values("pe", ascending=True)
+    return df.head(5).index.tolist()
+
+def initialize(context):
+    context.universe = ["601390"]  # initial universe
+    run_selection(my_selection, rebalance="monthly:1")  # run on 1st of month
+    run_daily(trade, time="every_bar")
+
+def trade(context):
+    selected = context.universe
+    # ... sell stocks not in selected, buy selected stocks ...
+```
+
+### Rebalance frequencies
+
+| Value | Meaning | Example |
+|-------|---------|---------|
+| `"monthly:N"` | Nth day of month (1-31) | `"monthly:1"` (1st), `"monthly:15"` (15th) |
+| `"weekly:N"` | Nth weekday (0=Mon, 4=Fri) | `"weekly:0"` (Monday), `"weekly:4"` (Friday) |
+| `"daily"` | Every trading day | `"daily"` |
+
+### Three ways to define selection
+
+**1. Plain function** (simplest):
+
+```python
+def simple_selection(context):
+    candidates = filter_st_stocks(CANDIDATE_POOL)
+    return TopNSelector(factor="pe", top_n=5).rank(candidates, context)
+```
+
+**2. StockSelector subclass** (complex logic):
+
+```python
+class MySelector(StockSelector):
+    def filter(self, candidates, context):
+        candidates = filter_st_stocks(candidates)
+        return filter_high_pe_stocks(candidates, max_pe=50)
+    def rank(self, securities, context):
+        return MultiFactorSelector(
+            factors={"pe": -0.4, "pb": -0.3, "pct_change": 0.3},
+            top_n=5
+        ).rank(securities, context)
+```
+
+**3. Via `run_strategy` parameter**:
+
+```python
+result = run_strategy(
+    initialize_func=initialize,
+    selection_func=my_selection,
+    selection_rebalance="weekly:0",
+)
+```
+
+### Available filters and selectors
+
+| API | Description |
+|-----|-------------|
+| `filter_st_stocks(securities)` | Remove ST / *ST stocks |
+| `filter_paused_stocks(securities, context)` | Remove paused/suspended stocks |
+| `filter_low_price_stocks(securities, min_price)` | Remove stocks below price threshold |
+| `filter_high_pe_stocks(securities, max_pe)` | Remove stocks with PE above threshold |
+| `fetch_factor_data(securities, fields)` | Get multi-dimensional data (PE/PB/momentum/MA/RSI) |
+| `TopNSelector(factor, top_n, ascending)` | Rank by single factor |
+| `MultiFactorSelector(factors, top_n)` | Rank by weighted composite score |
+
+See [`examples/22_stock_selection_strategy.py`](examples/22_stock_selection_strategy.py) for a complete example.
 
 ---
 

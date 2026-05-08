@@ -45,6 +45,7 @@ class BacktestSession:
         '_options', '_scheduled_funcs', '_recorded_values', '_trade_log',
         '_handle_data_func', '_before_trading_start_funcs', '_after_trading_end_funcs',
         '_pending_orders', '_t1_locked_amounts', '_slippage_model',
+        '_selection_func', '_selection_rebalance', '_preloaded',
     )
 
     def __init__(self):
@@ -70,6 +71,11 @@ class BacktestSession:
         self._t1_locked_amounts: dict = {}
         # Slippage model (None = no slippage)
         self._slippage_model = None
+        # Stock selection (set via run_selection or parameter)
+        self._selection_func = None
+        self._selection_rebalance = None
+        # Preloaded data (set by engine)
+        self._preloaded = None
 
 
 # ── Thread-local session management ───────────────────────────────────────────
