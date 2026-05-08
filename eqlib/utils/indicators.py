@@ -52,8 +52,15 @@ def smma(series: pd.Series, period: int, weight: float = 1.0) -> pd.Series:
         weight: weighting factor (default 1.0)
     """
     result = series.rolling(period).mean()
-    for i in range(period, len(series)):
-        result.iloc[i] = (result.iloc[i - 1] * (period - weight) + series.iloc[i] * weight) / period
+    if len(series) <= period:
+        return result
+
+    alpha = weight / period
+    seeded = pd.concat([
+        pd.Series([result.iloc[period - 1]], index=[series.index[period - 1]]),
+        series.iloc[period:],
+    ])
+    result.iloc[period - 1:] = seeded.ewm(alpha=alpha, adjust=False).mean().values
     return result
 
 

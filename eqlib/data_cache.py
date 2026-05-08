@@ -342,17 +342,8 @@ class PreloadedData:
                     close_frames[sec] = df["close"]
                     self._close_dict[sec] = dict(zip(df.index, df["close"]))
 
-                bar_dict = {}
-                for idx, row in df.iterrows():
-                    bar_dict[idx] = {
-                        "open": row.get("open", 0),
-                        "high": row.get("high", 0),
-                        "low": row.get("low", 0),
-                        "close": row.get("close", 0),
-                        "volume": row.get("volume", 0),
-                        "money": row.get("money", 0),
-                    }
-                self._bar_cache[sec] = bar_dict
+                fields = ["open", "high", "low", "close", "volume", "money"]
+                self._bar_cache[sec] = df.reindex(columns=fields, fill_value=0).to_dict("index")
 
             if close_frames:
                 self._close_matrix = pd.DataFrame(close_frames)

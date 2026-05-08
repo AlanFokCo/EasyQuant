@@ -16,6 +16,8 @@ from eqlib.data_cache import _slice_by_date
 _cache: dict = {}
 _spot_cache: Optional[pd.DataFrame] = None
 _spot_fetch_time: float = 0
+_LOOKBACK_DAYS_FACTOR = 2
+_LOOKBACK_EXTRA_DAYS = 60
 
 
 def _invalidate_spot_cache(max_age_seconds=60):
@@ -68,6 +70,13 @@ def _to_numeric(df: pd.DataFrame, cols: list[str]):
     for col in cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+
+def _compute_lookback(count: int, end_date):
+    """Compute fallback lookback start date with a warmup buffer."""
+    return end_date - datetime.timedelta(
+        days=count * _LOOKBACK_DAYS_FACTOR + _LOOKBACK_EXTRA_DAYS
+    )
 
 
 def _rename_cols(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
@@ -193,7 +202,8 @@ def get_price(security, start_date=None, end_date=None, frequency: str = "daily"
     if count is not None and start_date is None:
         end_date = end_date or datetime.datetime.now()
         lookback = end_date if isinstance(end_date, datetime.date) else end_date.date()
-        start_date = datetime.datetime.combine(lookback, datetime.time()) - datetime.timedelta(days=count * 2 + 60)
+        start_date = datetime.datetime.combine(lookback, datetime.time())
+        start_date = _compute_lookback(count, start_date)
 
     if end_date is None:
         end_date = datetime.datetime.now()
@@ -215,7 +225,7 @@ def history(count: int, unit: str = "1d", field: str = "close",
         security = _context.universe
 
     end_date = _context.current_dt
-    start_date = end_date - datetime.timedelta(days=count * 2 + 60)
+    start_date = _compute_lookback(count, end_date)
 
     df_data = get_price(security, start_date=start_date, end_date=end_date)
     if isinstance(df_data, dict):
@@ -254,7 +264,7 @@ def attribute_history(security, count: int, unit: str = "1d",
 
     # Fallback: fetch from disk/network
     end_date = _context.current_dt
-    start_date = end_date - datetime.timedelta(days=count * 2 + 60)
+    start_date = _compute_lookback(count, end_date)
 
     adjust_map = {"pre": "qfq", "post": "hfq", None: ""}
     df_data = fetch_stock_data(security, start_date, end_date, adjust=adjust_map.get(fq, "qfq"))
@@ -412,6 +422,17 @@ def _iter_days(start, end):
         current += datetime.timedelta(days=1)
 
 
+@lru_cache(maxsize=64)
+def _get_trading_days_range(start, end) -> tuple[datetime.date, ...]:
+    """Return trading days between start and end using local holiday fallback."""
+    start_date = pd.Timestamp(start).date()
+    end_date = pd.Timestamp(end).date()
+    return tuple(
+        d for d in _iter_days(start_date, end_date)
+        if d.weekday() < 5 and not _is_ashare_holiday(d)
+    )
+
+
 # ============================================================
 # Market scanning / screening
 # ============================================================
@@ -460,18 +481,20 @@ def _filter_spot(rename_map: dict, filters: dict) -> pd.DataFrame:
     num_cols = [c for c in set(rename_map.values()) if c not in ("code", "name")]
     _to_numeric(df, num_cols)
 
+    mask = pd.Series(True, index=df.index)
     for col, constraint in filters.items():
         if col not in df.columns:
             continue
         if isinstance(constraint, tuple):
             lo, hi = constraint
             if lo is not None:
-                df = df[df[col] >= lo]
+                mask &= df[col] >= lo
             if hi is not None:
-                df = df[df[col] <= hi]
+                mask &= df[col] <= hi
         else:
-            df = df[df[col] >= constraint]
+            mask &= df[col] >= constraint
 
+    df = df[mask]
     return df.reset_index(drop=True)
 
 
