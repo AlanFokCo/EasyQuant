@@ -36,6 +36,7 @@ def rolling_beta(series: pd.Series, benchmark: pd.Series,
 def rolling_sharpe(returns: pd.Series, window: int,
                    risk_free: float = 0.0, annualize: int = 252) -> pd.Series:
     """Rolling annualized Sharpe ratio."""
+    # mean * annualize = annualized return (daily mean scaled to yearly)
     mean = returns.rolling(window).mean() * annualize
     std = returns.rolling(window).std() * np.sqrt(annualize)
     return (mean - risk_free) / std.replace(0, np.nan)
@@ -131,12 +132,19 @@ def downside_deviation(returns: pd.Series, target: float = 0.0,
                        annualize: int = 252) -> float:
     """Downside deviation (semi-standard deviation).
 
-    Only considers returns below the target.
+    Computes ``sqrt(mean(min(r - target, 0)^2)) * sqrt(annualize)``, the
+    square root of the mean squared deviation below the target return.
+
+    Parameters:
+        returns: series of periodic (e.g. daily) returns
+        target: minimum acceptable return per period (default 0.0).
+            For the Sortino ratio, pass the risk-free rate expressed in the
+            same frequency as ``returns`` (e.g. ``0.03 / 252`` for daily).
+        annualize: number of periods per year for annualization (default 252)
     """
-    downside = returns[returns < target]
-    if len(downside) == 0:
-        return 0.0
-    return sqrt(np.mean(downside ** 2)) * sqrt(annualize)
+    downside_sq = (returns - target)[returns - target < 0] ** 2
+    downside_dev = (downside_sq.mean() ** 0.5) * sqrt(annualize) if len(downside_sq) > 0 else 0.0
+    return downside_dev
 
 
 def value_at_risk(returns: pd.Series, confidence: float = 0.05,
@@ -194,31 +202,27 @@ def max_drawdown(equity: pd.Series):
 # ============================================================
 
 def consecutive_wins(returns: pd.Series) -> pd.Series:
-    """Count consecutive winning days up to each point."""
-    sign = np.sign(returns)
-    streak = pd.Series(0, index=returns.index)
-    count = 0
-    for i in range(len(returns)):
-        if sign.iloc[i] > 0:
-            count += 1
-        else:
-            count = 0
-        streak.iloc[i] = count
-    return streak
+    """Count consecutive winning days up to each point.
+
+    Uses a vectorized implementation: group returns into contiguous win/non-win
+    blocks and compute the cumulative count within each block.
+    """
+    is_win = (returns > 0).astype(int)
+    # New group starts whenever the win flag changes
+    group = (is_win != is_win.shift(1)).cumsum()
+    return is_win.groupby(group).cumsum()
 
 
 def consecutive_losses(returns: pd.Series) -> pd.Series:
-    """Count consecutive losing days up to each point."""
-    sign = np.sign(returns)
-    streak = pd.Series(0, index=returns.index)
-    count = 0
-    for i in range(len(returns)):
-        if sign.iloc[i] < 0:
-            count += 1
-        else:
-            count = 0
-        streak.iloc[i] = count
-    return streak
+    """Count consecutive losing days up to each point.
+
+    Uses a vectorized implementation: group returns into contiguous loss/non-loss
+    blocks and compute the cumulative count within each block.
+    """
+    is_loss = (returns < 0).astype(int)
+    # New group starts whenever the loss flag changes
+    group = (is_loss != is_loss.shift(1)).cumsum()
+    return is_loss.groupby(group).cumsum()
 
 
 # ============================================================

@@ -25,7 +25,11 @@ class Logger:
 
     @staticmethod
     def warn(msg, *args):
+        """Log a warning.  Alias: ``warning``."""
         _logger.warning(msg, *args)
+
+    # Python stdlib-compatible alias for warn
+    warning = warn
 
     @staticmethod
     def error(msg, *args):

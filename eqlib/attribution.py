@@ -12,9 +12,10 @@ Provides:
 import datetime
 import numpy as np
 import pandas as pd
+from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
 
 
-def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
+def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_DAYS_PER_YEAR):
     """Calculate comprehensive risk and return metrics from a backtest result.
 
     Parameters:
@@ -80,9 +81,10 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
     sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor) if std > 0 else 0.0
 
     # Sortino ratio
-    downside = daily_ret[daily_ret < 0]
-    downside_std = downside.std(ddof=1) * np.sqrt(ann_factor) if len(downside) >= 2 else 0.0
-    sortino = (ann_return - risk_free_rate) / downside_std if downside_std > 0 else 0.0
+    downside = daily_ret[daily_ret < daily_rf]
+    downside_std = downside.std(ddof=1) if len(downside) >= 2 else 0.0
+    sortino = ((daily_ret.mean() - daily_rf) / downside_std * np.sqrt(ann_factor)
+               if downside_std > 0 else 0.0)
 
     # Max drawdown
     rolling_max = values.cummax()
@@ -108,7 +110,11 @@ def analyze_returns(result, risk_free_rate=0.03, trading_days=252):
         t["price"] * t["amount"]
         for t in trades if t.get("type") == "BUY"
     )
-    annual_turnover = (total_buy_value / avg_portfolio_value / years
+    total_sell_value = sum(
+        t["price"] * t["amount"]
+        for t in trades if t.get("type") == "SELL"
+    )
+    annual_turnover = (min(total_buy_value, total_sell_value) / avg_portfolio_value / years
                        if avg_portfolio_value > 0 and years > 0 else 0.0)
     total_commission = sum(t.get("commission", 0.0) for t in trades)
     net_return = total_return - total_commission / initial
@@ -197,7 +203,13 @@ def _calc_trade_win_rate(trades):
 
 
 def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
-    """Calculate alpha, beta, and information ratio vs benchmark."""
+    """Calculate alpha, beta, and information ratio vs benchmark.
+
+    Requires at least 10 overlapping trading days between the strategy and the
+    benchmark return series.  When fewer data points are available this function
+    returns ``(0.0, 1.0, 0.0)`` as safe defaults — callers should not interpret
+    these as meaningful estimates.
+    """
     try:
         from eqlib.data import fetch_stock_data
 
@@ -227,10 +239,11 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         alpha_daily = strat.mean() - beta * bench.mean()
         alpha_annual = alpha_daily * ann_factor
 
-        residual = strat - beta * bench
-        residual_std = residual.std(ddof=1)
-        info_ratio = (alpha_daily / residual_std * np.sqrt(ann_factor)
-                      if residual_std > 0 else 0.0)
+        active = strat - bench
+        active_mean = active.mean()
+        active_std = active.std(ddof=1)
+        info_ratio = (active_mean / active_std * np.sqrt(ann_factor)
+                      if active_std > 0 else 0.0)
 
         return alpha_annual, beta, info_ratio
     except Exception:
@@ -288,11 +301,18 @@ def brinson_attribution(result, sector_data=None, benchmark_returns=None):
         remaining = pos.total_value if pos else 0.0
         sec_returns[sec] = (sell_proceeds + remaining) / buy_cost - 1.0
 
-    # Portfolio weights by open-position market value
-    weights = {
-        sec: pos.total_value / total_value
-        for sec, pos in positions.items()
-    }
+    # Portfolio weights by total buy cost (proxy for average allocation over
+    # the backtest period, including positions that were fully closed before
+    # end-of-period — these would be missing from terminal positions alone).
+    total_buy_cost = sum(buy_cost_by_sec.values())
+    if total_buy_cost > 0:
+        weights = {sec: cost / total_buy_cost for sec, cost in buy_cost_by_sec.items()}
+    else:
+        # Fall back to terminal open-position market value
+        weights = {
+            sec: pos.total_value / total_value
+            for sec, pos in positions.items()
+        }
 
     # ── Benchmark return (item 14) ────────────────────────────────────────
     # Use caller-supplied benchmark_returns if available, otherwise fall back
@@ -331,12 +351,17 @@ def brinson_attribution(result, sector_data=None, benchmark_returns=None):
 
 
 def fama_french_analysis(result, factors=None):
-    """Simplified Fama-French style factor analysis.
+    """Simplified factor analysis (not a full Fama-French 3-factor model).
 
     Decomposes strategy returns into:
-    - Market factor (beta)
-    - Momentum factor (lag-5 autocorrelation)
-    - Alpha (residual)
+    - Market factor (beta vs benchmark)
+    - Momentum proxy (lag-5 return autocorrelation, not a true UMD factor)
+    - Alpha (residual vs market)
+
+    Note: This function does **not** implement the true Fama-French 3-factor
+    model (Fama & French, 1993), which requires SMB and HML factor data.
+    The ``momentum_correlation`` field is a return autocorrelation, not a
+    genuine momentum factor exposure.
 
     Parameters:
         result: dict from run_backtest

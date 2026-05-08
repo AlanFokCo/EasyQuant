@@ -738,9 +738,10 @@ def on_bar(ContextInfo):
     now = _context.current_dt
     today = now.date()
 
-    # Check for new trading day
+    # Check for new trading day: run before_trading_start and daily functions
+    # on the first bar of each day.  The _last_trade_day flag is updated AFTER
+    # both blocks so that the daily functions check still sees the old value.
     if today != _last_trade_day:
-        _last_trade_day = today
         # Run before_trading_start
         for func in _before_start_funcs:
             try:
@@ -748,13 +749,14 @@ def on_bar(ContextInfo):
             except Exception as e:
                 print(f'[PTrade Adapter] before_trading_start() error: {e}')
 
-    # Run daily functions (on first bar of each day)
-    if today != _last_trade_day:
+        # Run daily functions (on first bar of each day)
         for _, func in _daily_funcs:
             try:
                 func(_context)
             except Exception as e:
                 print(f'[PTrade Adapter] run_daily() error: {e}')
+
+        _last_trade_day = today
 
     # Run weekly functions
     current_week = now.isocalendar()[:2]

@@ -56,10 +56,16 @@ class VolumeSlippage(SlippageModel):
     When ``daily_volume`` is 0 or unknown, falls back to no slippage.
 
     Parameters:
-        impact: price impact coefficient (default 0.1)
+        impact: price impact coefficient (default 0.05). This value is
+            calibrated for A-share markets with open-price passive execution.
+            Typical range: 0.01–0.05 for large/mid-cap A-shares, 0.05–0.1 for
+            small-cap stocks with lower liquidity.  For reference, an order
+            representing 10% of daily volume with ``impact=0.05`` results in
+            0.5% slippage.  Adjust based on the target universe's average
+            daily turnover (Almgren & Chriss, 2001).
     """
 
-    def __init__(self, impact: float = 0.1):
+    def __init__(self, impact: float = 0.05):
         self.impact = impact
 
     def get_execution_price(self, price: float, amount: int, is_buy: bool,

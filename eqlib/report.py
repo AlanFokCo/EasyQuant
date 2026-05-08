@@ -12,6 +12,7 @@ plt.rcParams["font.sans-serif"] = ["PingFang HK", "Heiti TC", "Arial Unicode MS"
 plt.rcParams["axes.unicode_minus"] = False
 
 from eqlib.data import fetch_stock_data, get_price
+from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
 import pandas as pd
 import numpy as np
 
@@ -175,6 +176,8 @@ def generate_chart(result, out_path):
     ) if isinstance(recorded, dict) else recorded
     pf_records = [r for r in pf_entries if "total_value" in r]
     if not pf_records:
+        from eqlib.logger import log as _log
+        _log.warning("generate_chart: no portfolio value data found in recorded_values")
         plt.close()
         return
 
@@ -589,7 +592,7 @@ def _compute_atr(high, low, close, period=14):
     tr2 = (high - prev_close).abs()
     tr3 = (low - prev_close).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(period, min_periods=1).mean()
+    atr = tr.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
     return atr.iloc[-1] if not atr.empty else None
 
 
@@ -624,19 +627,22 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
     n_days = len(returns)
     total_ret = final / initial - 1
     years = n_days / 252
+    ann_ret = 0.0
     if years > 0:
         ann_ret = (1 + total_ret) ** (1 / years) - 1
         metrics["ann_ret"] = f"{ann_ret:.2%}"
         metrics["ann_ret_pct"] = f"{ann_ret:+.2f}%"
 
-    rf_daily = 0.03 / 252
+    rf_daily = RISK_FREE_RATE / TRADING_DAYS_PER_YEAR
     if ret_series.std() > 0:
         sharpe = (ret_series.mean() - rf_daily) / ret_series.std() * (252 ** 0.5)
         metrics["sharpe"] = f"{sharpe:.2f}"
 
-    downside = ret_series[ret_series < 0]
-    if len(downside) > 0 and downside.std() > 0:
-        sortino = (ret_series.mean() - rf_daily) / downside.std() * (252 ** 0.5)
+    downside_returns = ret_series - rf_daily
+    downside_sq = downside_returns[downside_returns < 0] ** 2
+    downside_dev = (downside_sq.mean() ** 0.5) * (252 ** 0.5) if len(downside_sq) > 0 else 0
+    if downside_dev > 0:
+        sortino = (ret_series.mean() * 252 - 0.03) / downside_dev
         metrics["sortino"] = f"{sortino:.2f}"
 
     peak = values[0]
@@ -651,12 +657,10 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
     metrics["max_dd_pct"] = f"{-max_dd:.2f}%"
 
     if trade_log:
-        buys = [t for t in trade_log if t["type"] == "BUY"]
-        sells = [t for t in trade_log if t["type"] == "SELL"]
-        n_pairs = min(len(buys), len(sells))
-        wins = sum(1 for i in range(n_pairs) if sells[i]["price"] > buys[i]["price"])
+        from eqlib.attribution import _calc_trade_win_rate
+        win_rate_val, n_pairs = _calc_trade_win_rate(trade_log)
         if n_pairs > 0:
-            metrics["win_rate"] = f"{wins / n_pairs:.0%}"
+            metrics["win_rate"] = f"{win_rate_val:.0%}"
 
     if benchmark_data and len(benchmark_data) > 0:
         last_bm = benchmark_data[-1]["value"]
@@ -679,8 +683,10 @@ def _calc_metrics(recorded, trade_log, initial, final, benchmark_data):
                 if bm_var > 0:
                     beta_val = cov / bm_var
                     metrics["beta"] = f"{beta_val:.3f}"
-                    alpha_ann = ann_ret - (0.03 + beta_val * (bm_ret / years - 0.03)) if years > 0 else 0
-                    metrics["alpha"] = f"{alpha_ann:.2%}"
+                    if years > 0:
+                        bm_ann_ret = (1 + bm_ret) ** (1 / years) - 1
+                        alpha_ann = ann_ret - (RISK_FREE_RATE + beta_val * (bm_ann_ret - RISK_FREE_RATE))
+                        metrics["alpha"] = f"{alpha_ann:.2%}"
 
     return metrics
 
@@ -1517,6 +1523,7 @@ def generate_report_md(result, out_path):
         lines.append("|---|----------|----------|-----------|-----------|------------|-----|")
 
         trade_pairs: dict = {}  # sec -> list of buys
+        trade_num = 0
         for t in trade_log:
             sec = t["security"]
             if sec not in trade_pairs:
@@ -1529,8 +1536,9 @@ def generate_report_md(result, out_path):
                 sell_val = t["price"] * t["amount"] - t.get("commission", 0)
                 trade_pnl = sell_val - buy_val
                 pnl_str = f"+{trade_pnl:,.0f}" if trade_pnl >= 0 else f"{trade_pnl:,.0f}"
+                trade_num += 1
                 lines.append(
-                    f"| {len(lines)} | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
+                    f"| {trade_num} | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
                     f"| {t['date']} | {t['price']:.3f} | {pnl_str} |"
                 )
 

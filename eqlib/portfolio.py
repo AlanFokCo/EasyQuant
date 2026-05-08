@@ -212,8 +212,21 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
     return result
 
 
-def _parse_date(d):
-    """Convert date string or date object."""
+def _parse_date(d) -> datetime.date:
+    """Convert a date string or date object to ``datetime.date``.
+
+    Parameters:
+        d: a ``datetime.date``, ``datetime.datetime``, or ``'YYYY-MM-DD'``
+            string.  ``None`` is not accepted — pass an explicit date.
+
+    Returns:
+        ``datetime.date`` object.
+
+    Raises:
+        ValueError: if ``d`` is ``None``.
+    """
+    if d is None:
+        raise ValueError("start_date and end_date cannot be None in StrategyConfig")
     if isinstance(d, str):
         return datetime.datetime.strptime(d, "%Y-%m-%d").date()
     return d

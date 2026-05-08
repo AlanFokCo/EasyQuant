@@ -36,7 +36,8 @@ class OrderCost:
         commission = max(value * self.open_commission, self.min_commission)
         return tax + commission
 
-    def calc_close_cost(self, price, amount, is_today=False, is_etf=False):
+    def calc_close_cost(self, price, amount, is_today=False, is_etf=False,
+                        trade_date=None):
         """Calculate total closing cost (stamp duty + commission).
 
         Parameters:
@@ -44,10 +45,23 @@ class OrderCost:
             amount: number of shares sold
             is_today: True for intraday close (uses close_today_commission)
             is_etf: True for ETF sells — stamp duty is waived for ETFs
+            trade_date: the trade date (datetime.date or None). When provided,
+                applies the date-dependent A-share stamp duty rate:
+                0.05% (万五) for trades on or after 2023-08-28 (MoF Announcement
+                2023 No. 33), and 0.1% (千一) for earlier dates.  When None,
+                falls back to the configured ``close_tax`` rate.
         """
         value = price * amount
-        # ETFs are exempt from stamp duty (close_tax only applies to stocks)
-        tax = 0.0 if is_etf else value * self.close_tax
+        # Determine effective stamp duty rate
+        if is_etf:
+            tax = 0.0
+        elif trade_date is not None:
+            _cutoff = datetime.date(2023, 8, 28)
+            _date = trade_date if isinstance(trade_date, datetime.date) else trade_date.date()
+            effective_tax_rate = 0.0005 if _date >= _cutoff else 0.001
+            tax = value * effective_tax_rate
+        else:
+            tax = value * self.close_tax
         comm_rate = self.close_today_commission if is_today else self.close_commission
         commission = max(value * comm_rate, self.min_commission)
         return tax + commission

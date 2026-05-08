@@ -11,6 +11,7 @@ Provides:
 import os
 import hashlib
 import datetime
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,19 @@ _LOCAL_DATA_DIR = os.environ.get("EQLIB_LOCAL_DATA_DIR", None)
 
 # Default memory limit for preload (1 GB in MB)
 _DEFAULT_MAX_MEMORY_MB = 1024
+
+# Per-file locks to ensure thread-safe read-merge-write in _save_to_disk
+_file_locks: dict = {}
+_file_locks_lock = threading.Lock()
+
+
+def _get_file_lock(path: Path) -> threading.Lock:
+    """Return (creating if needed) the threading.Lock for a given cache file."""
+    key = str(path)
+    with _file_locks_lock:
+        if key not in _file_locks:
+            _file_locks[key] = threading.Lock()
+        return _file_locks[key]
 
 
 def _slice_by_date(df: pd.DataFrame, start, end) -> pd.DataFrame:
@@ -91,17 +105,22 @@ def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
     When the cache file already exists the new data is merged with the stored
     frame (union of dates, new values overwrite old ones) so the file always
     holds the most complete history available.
+
+    Thread-safe: a per-file lock prevents concurrent read-merge-write races
+    from corrupting the cache file.
     """
+    from eqlib.logger import log as _log
     try:
         path = _cache_path(security, adjust)
-        if path.exists():
-            existing = pd.read_parquet(path)
-            if not existing.empty:
-                df = pd.concat([existing, df])
-                df = df[~df.index.duplicated(keep='last')].sort_index()
-        df.to_parquet(path, engine="pyarrow" if _has_pyarrow() else "fastparquet")
-    except Exception:
-        pass
+        with _get_file_lock(path):
+            if path.exists():
+                existing = pd.read_parquet(path)
+                if not existing.empty:
+                    df = pd.concat([existing, df])
+                    df = df[~df.index.duplicated(keep='last')].sort_index()
+            df.to_parquet(path, engine="pyarrow" if _has_pyarrow() else "fastparquet")
+    except Exception as e:
+        _log.warning(f"Failed to save cache for {security}: {e}")
 
 
 @lru_cache(maxsize=None)
@@ -391,17 +410,23 @@ class PreloadedData:
         return self._close_matrix[security].dropna()
 
     def get_bar(self, date, security) -> Optional[dict]:
-        """Get full OHLCV bar for a given date and security."""
+        """Get full OHLCV bar for a given date and security.
+
+        Returns a copy of the cached bar dict so that callers cannot mutate
+        the shared cache.
+        """
         # Fast path: dict cache
         if self._bar_cache:
             sec_dict = self._bar_cache.get(security)
             if sec_dict is not None:
                 bar = sec_dict.get(date)
                 if bar is not None:
-                    return bar
+                    return dict(bar)
                 try:
                     ts = pd.Timestamp(date)
-                    return sec_dict.get(ts)
+                    bar = sec_dict.get(ts)
+                    if bar is not None:
+                        return dict(bar)
                 except Exception:
                     pass
 
