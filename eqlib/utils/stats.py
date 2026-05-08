@@ -142,8 +142,8 @@ def downside_deviation(returns: pd.Series, target: float = 0.0,
             same frequency as ``returns`` (e.g. ``0.03 / 252`` for daily).
         annualize: number of periods per year for annualization (default 252)
     """
-    downside_dev = ((returns - target)[returns - target < 0] ** 2)
-    downside_dev = (downside_dev.mean() ** 0.5) * sqrt(annualize) if len(downside_dev) > 0 else 0.0
+    downside_sq = (returns - target)[returns - target < 0] ** 2
+    downside_dev = (downside_sq.mean() ** 0.5) * sqrt(annualize) if len(downside_sq) > 0 else 0.0
     return downside_dev
 
 

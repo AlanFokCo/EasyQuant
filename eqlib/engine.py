@@ -712,9 +712,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                 _fill_pending_orders(session, today, exec_prices=live_prices)
                 prev_day = today
 
-            prices = {sec: spot_cache.get(sec, spot_cache.get(
-                          sec.replace(".XSHG", "").replace(".XSHE", ""),
-                          pos.avg_cost))
+            prices = {sec: _resolve_live_price(spot_cache, sec, pos.avg_cost)
                       for sec, pos in context.portfolio.positions.items()}
             for sched in session._scheduled_funcs:
                 if _should_run_schedule(sched, today):
@@ -743,6 +741,20 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                                   key=lambda x: x["date"]),
         "session": session,
     }
+
+
+def _resolve_live_price(spot_cache: dict, security: str, default: float) -> float:
+    """Look up a live spot price from spot_cache for a security.
+
+    akshare returns bare codes (e.g. "601390").  Securities in the portfolio
+    may carry exchange suffixes (e.g. "601390.XSHG").  This helper tries
+    both forms and falls back to ``default`` if neither is found.
+    """
+    price = spot_cache.get(security)
+    if price is None:
+        bare = security.replace(".XSHG", "").replace(".XSHE", "")
+        price = spot_cache.get(bare)
+    return price if price is not None else default
 
 
 def _fetch_live_prices(cache: dict, max_age: int = 30) -> dict:
