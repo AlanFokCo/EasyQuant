@@ -51,14 +51,13 @@ class OrderCost:
                 2023 No. 33), and 0.1% (千一) for earlier dates.  When None,
                 falls back to the configured ``close_tax`` rate.
         """
-        import datetime as _dt
         value = price * amount
         # Determine effective stamp duty rate
         if is_etf:
             tax = 0.0
         elif trade_date is not None:
-            _cutoff = _dt.date(2023, 8, 28)
-            _date = trade_date if isinstance(trade_date, _dt.date) else trade_date.date()
+            _cutoff = datetime.date(2023, 8, 28)
+            _date = trade_date if isinstance(trade_date, datetime.date) else trade_date.date()
             effective_tax_rate = 0.0005 if _date >= _cutoff else 0.001
             tax = value * effective_tax_rate
         else:
