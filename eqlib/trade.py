@@ -17,6 +17,13 @@ def _get_pending_price(security):
     Used only for basic sanity checks (e.g., computing approximate shares from
     a value order).  The actual execution price is determined by the engine at
     fill time using tomorrow's open.
+
+    .. note::
+        This function uses a late import from ``eqlib.engine`` to avoid a
+        circular import: ``engine`` imports ``data`` which imports ``_state``,
+        while ``trade`` would otherwise need ``engine`` at module level.  The
+        late import is intentional and safe — it runs only when a strategy
+        callback is active (i.e. after ``engine`` is fully loaded).
     """
     sess = st.get_session()
     ctx = sess._context
@@ -30,11 +37,6 @@ def _get_pending_price(security):
     if price is not None:
         return price
     return _get_preloaded().get_close(day, security)
-
-
-def _round_lot(amount) -> int:
-    """Round down to nearest 100 shares (A-share lot size)."""
-    return int(amount // 100) * 100
 
 
 def _buffer_order(action: str, **kwargs) -> str:
@@ -78,6 +80,15 @@ def order_target(security, amount, style=None):
         amount: target number of shares (0 = close entire position)
         style: order style (reserved)
 
+    .. note::
+        The target delta is computed at *queue time* from the current position.
+        If multiple orders for the same security are queued in a single callback
+        (e.g., ``order('X', 100)`` followed by ``order_target('X', 200)``), the
+        target delta will not account for the earlier queued order, and the final
+        filled position may differ from the intended target.  To avoid this,
+        avoid mixing ``order`` and ``order_target`` calls for the same security
+        within a single callback execution.
+
     Returns:
         Pending order ID string, or None.
     """
@@ -113,6 +124,13 @@ def order_target_value(security, value, style=None):
         security: stock code
         value: target position value in CNY (0 = close entire position)
         style: order style (reserved)
+
+    .. note::
+        The target delta is computed at *fill time* from the current position
+        at tomorrow's open price.  However, the share count is derived from
+        today's buffered target value, so mixing ``order_value`` and
+        ``order_target_value`` calls for the same security in a single callback
+        may produce unexpected results.
 
     Returns:
         Pending order ID string, or None.

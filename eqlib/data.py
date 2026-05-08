@@ -235,11 +235,12 @@ def attribute_history(security, count: int, unit: str = "1d",
                       skip_paused: bool = True, fq: str = "pre"):
     """Get historical attribute data for a single security."""
     from eqlib._state import _context
-    from eqlib.engine import _preloaded
+    from eqlib.engine import _get_preloaded
 
     # Fast path: slice from preloaded in-memory data
-    if _preloaded.panel is not None:
-        sec_df = _preloaded.panel.get(security)
+    preloaded = _get_preloaded()
+    if preloaded is not None and preloaded.panel is not None:
+        sec_df = preloaded.panel.get(security)
         if sec_df is not None and not sec_df.empty:
             available = [f for f in fields if f in sec_df.columns]
             if not available:
