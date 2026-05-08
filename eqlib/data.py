@@ -72,7 +72,7 @@ def _to_numeric(df: pd.DataFrame, cols: list[str]):
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
 
-def _compute_lookback(count: int, end_date):
+def _compute_lookback(count: int, end_date: datetime.datetime) -> datetime.datetime:
     """Compute fallback lookback start date with a warmup buffer."""
     return end_date - datetime.timedelta(
         days=count * _LOOKBACK_DAYS_FACTOR + _LOOKBACK_EXTRA_DAYS
@@ -423,7 +423,10 @@ def _iter_days(start, end):
 
 
 @lru_cache(maxsize=64)
-def _get_trading_days_range(start, end) -> tuple[datetime.date, ...]:
+def _get_trading_days_range(
+    start: datetime.date | datetime.datetime | pd.Timestamp,
+    end: datetime.date | datetime.datetime | pd.Timestamp,
+) -> tuple[datetime.date, ...]:
     """Return trading days between start and end using local holiday fallback."""
     start_date = pd.Timestamp(start).date()
     end_date = pd.Timestamp(end).date()
