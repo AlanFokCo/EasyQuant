@@ -66,7 +66,7 @@ SMA(t) = (C(t) + C(t-1) + ... + C(t-n+1)) / n
 smma14 = utils.smma(close, 14, weight=1.0)
 ```
 通常使用默认 `weight=1.0` 即可；只有在需要自定义平滑强度时才需要显式修改。
-默认值 `1.0` 即 Wilder 标准平滑权重。
+该默认值对应 Wilder 标准平滑权重。
 
 **计算原理：**
 ```
@@ -101,7 +101,7 @@ TP = (H + L + C) / 3          # 典型价格
 window=None:  VWAP = Σ(TP * Volume) / Σ(Volume)   （累计）
 window=N:     VWAP = rolling_sum(TP*Volume, N) / rolling_sum(Volume, N)
 ```
-`window=None` 的累计 VWAP 在任何频率都可计算，但更适合同一交易会话内的分钟级序列；日线或跨会话分析通常应传入 `window` 使用滚动 VWAP。
+累计 VWAP（`window=None`）在任何频率都可计算，更适合同一交易会话内的分钟级序列。日线或跨会话分析通常应传入 `window` 使用滚动 VWAP。
 
 ---
 
