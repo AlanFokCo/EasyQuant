@@ -46,18 +46,33 @@ EMA(t) = α * C(t) + (1 - α) * EMA(t-1)
 ```
 EMA 给予近期价格更高权重，反应更灵敏。初始值取 SMA。
 
-#### `sma(series, period, weight)` — 平滑移动平均
+#### `sma(series, period)` — 简单移动平均（`ma` 的别名）
 
 **用法：**
 ```python
-sma14 = utils.sma(close, 14, weight=1.0)
+sma14 = utils.sma(close, 14)
 ```
 
 **计算原理：**
 ```
-SMA(t) = (SMA(t-1) * (n - w) + C(t) * w) / n
+SMA(t) = (C(t) + C(t-1) + ... + C(t-n+1)) / n
 ```
-初始 `n` 根取 SMA，之后用加权平滑递推。
+与 `ma` 完全一致，都是滚动算术平均。
+
+#### `smma(series, period, weight=1.0)` — 平滑移动平均（Wilder MA，`weight` 控制平滑强度）
+
+**用法：**
+```python
+smma14 = utils.smma(close, 14)
+```
+通常使用默认 `weight=1.0` 即可；只有在需要自定义平滑强度时才需要显式修改。
+该默认值对应 Wilder 标准平滑权重。
+
+**计算原理：**
+```
+SMMA(t) = (SMMA(t-1) * (n - w) + C(t) * w) / n
+```
+先用前 `n` 根初始化，再按递推公式平滑更新。ADX/RSI 等 Wilder 风格指标更适合用 `smma`。
 
 #### `wma(series, period)` — 加权移动平均
 
@@ -72,19 +87,21 @@ WMA(t) = Σ [C(t-i) * (i+1)] / Σ (i+1),  i = 0..n-1
 ```
 线性权重：最近一根 K 线权重最大（n），最远的最小（1）。
 
-#### `vwap(high, low, close, volume)` — 成交量加权平均价
+#### `vwap(high, low, close, volume, window=None)` — 成交量加权平均价
 
 **用法：**
 ```python
-vwap = utils.vwap(high, low, close, volume)
+vwap = utils.vwap(high, low, close, volume)           # 累计 VWAP
+vwap20 = utils.vwap(high, low, close, volume, 20)     # 20 日滚动 VWAP
 ```
 
 **计算原理：**
 ```
 TP = (H + L + C) / 3          # 典型价格
-VWAP = Σ(TP * Volume) / Σ(Volume)
+window=None:  VWAP = Σ(TP * Volume) / Σ(Volume)   （累计）
+window=N:     VWAP = rolling_sum(TP*Volume, N) / rolling_sum(Volume, N)
 ```
-反映成交量的加权平均价格，常用于判断日内趋势。
+累计 VWAP（`window=None`）在任何频率都可计算，更适合同一交易会话内的分钟级序列。日线或跨会话分析通常应传入 `window` 使用滚动 VWAP，因为不分会话的累计结果会持续跨日累加。
 
 ---
 
@@ -305,11 +322,11 @@ pdi, mdi, adx, adxr = utils.adx(high, low, close, period=14)
 +DM(t) = max(H(t) - H(t-1), 0)   且 +DM > -DM
 -DM(t) = max(L(t-1) - L(t), 0)   且 -DM > +DM
 
-+DI = 100 * SMA(+DM) / ATR
--DI = 100 * SMA(-DM) / ATR
++DI = 100 * WilderSmooth(+DM) / ATR
+-DI = 100 * WilderSmooth(-DM) / ATR
 
 DX   = |+DI - -DI| / (+DI + -DI) * 100
-ADX  = EMA(DX, period)
+ADX  = WilderSmooth(DX, period)
 ADXR = (ADX(t) + ADX(t-period)) / 2
 ```
 

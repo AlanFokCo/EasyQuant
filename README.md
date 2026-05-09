@@ -81,6 +81,8 @@ result = run_strategy(
 )
 ```
 
+> Execution model: orders created by `order*` APIs are queued in the current callback and filled at the **next trading day open** to avoid look-ahead bias.
+
 ---
 
 ## Examples

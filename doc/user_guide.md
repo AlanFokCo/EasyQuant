@@ -116,6 +116,7 @@ result = run_strategy(
 ```
 
 运行后会输出：
+- `reports/backtest_YYYYMMDD_HHMMSS.html` — 交互式 HTML 报告
 - `reports/backtest_YYYYMMDD_HHMMSS.png` — 价格与交易标记图
 - `reports/backtest_YYYYMMDD_HHMMSS.md` — 回测摘要报告
 - `reports/backtest_YYYYMMDD_HHMMSS.json` — 结构化数据
@@ -258,6 +259,8 @@ def market_open(context):
 ---
 
 ## 6. 交易 API：买入与卖出
+
+> 重要：`order` / `order_value` / `order_target` / `order_target_value` 在回测中是**先入队**，统一按**下一交易日开盘价**成交（不是当日立即成交）。
 
 ### 6.1 `order(security, amount)`
 
