@@ -147,7 +147,7 @@ def market_open(context):
 | `amount` | `int` | 是 | 股数，正数=买入，负数=卖出 |
 | `style` | — | 否 | 订单类型（保留参数，暂不支持限价） |
 
-**返回：** `str` 挂单 ID（如 `PENDING_ORDER_601390`），失败返回 `None`
+**返回：** `str` 挂单 ID（如 `PENDING_ORDER_601390`，目标单场景可能为 `PENDING_ORDER_TARGET_601390`），失败返回 `None`
 
 **说明：** 买入自动取整到 100 的整数倍（A 股最小交易单位）。资金不足时自动按最大可买数量执行。
 
@@ -274,7 +274,12 @@ df = get_price('601390', count=30)
 | `security` | `str` | 否 | 股票代码，默认使用 `context.universe` |
 | `df` | `bool` | 否 | `True` 返回 DataFrame，`False` 返回 dict |
 
-**返回：** 单标的时返回 `Series`（`df=False`）或 `DataFrame`（`df=True`）；多标的时返回 `dict[str, Series]`（`df=False`）或 `DataFrame`（`df=True`）
+**返回：**
+
+- 单标的 + `df=False`：`Series`
+- 单标的 + `df=True`：`DataFrame`
+- 多标的 + `df=False`：`dict[str, Series]`
+- 多标的 + `df=True`：`DataFrame`
 
 ```python
 def market_open(context):

@@ -65,6 +65,7 @@ SMA(t) = (C(t) + C(t-1) + ... + C(t-n+1)) / n
 ```python
 smma14 = utils.smma(close, 14, weight=1.0)
 ```
+通常使用默认 `weight=1.0` 即可；只有在需要自定义平滑强度时才需要显式修改。
 
 **计算原理：**
 ```
@@ -99,7 +100,7 @@ TP = (H + L + C) / 3          # 典型价格
 window=None:  VWAP = Σ(TP * Volume) / Σ(Volume)   （累计）
 window=N:     VWAP = rolling_sum(TP*Volume, N) / rolling_sum(Volume, N)
 ```
-`window=None` 适合单日内序列；日线多周期分析建议传入 `window` 使用滚动 VWAP。
+`window=None` 适合同一交易会话内的分钟级序列；日线或跨会话分析建议传入 `window` 使用滚动 VWAP。
 
 ---
 
