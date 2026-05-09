@@ -59,7 +59,7 @@ SMA(t) = (C(t) + C(t-1) + ... + C(t-n+1)) / n
 ```
 与 `ma` 完全一致，都是滚动算术平均。
 
-#### `smma(series, period, weight=1.0)` — 平滑移动平均（Wilder MA）
+#### `smma(series, period, weight=1.0)` — 平滑移动平均（Wilder MA，`weight` 控制平滑强度）
 
 **用法：**
 ```python
