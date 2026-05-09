@@ -89,7 +89,7 @@ pos = context.portfolio.positions.get('601390')
 | `closeable_amount` | `float` | 今日可卖数量（T+1 限制） | 框架自动维护 |
 | `avg_cost` | `float` | 持仓均价 | 框架自动计算 |
 | `total_value` | `float` | 持仓市值 = amount * 当前价 | 框架自动计算 |
-| `price` | `float` | 当前价（等同于 avg_cost） | 只读 |
+| `price` | `float` | 当前价（`current_price` 的别名） | 只读 |
 
 **使用方式：**
 
@@ -133,6 +133,8 @@ def market_open(context):
 
 用于在策略中下单买卖。
 
+> 回测执行语义：`order*` 系列 API 只负责在当前回调中提交请求，订单会在**下一交易日开盘价**统一撮合成交，以避免前视偏差。
+
 ### 2.1 `order(security, amount, style=None)`
 
 按股数下单买卖。
@@ -145,7 +147,7 @@ def market_open(context):
 | `amount` | `int` | 是 | 股数，正数=买入，负数=卖出 |
 | `style` | — | 否 | 订单类型（保留参数，暂不支持限价） |
 
-**返回：** `str` 订单 ID，如 `'BUY_601390_1000'`，失败返回 `None`
+**返回：** `str` 挂单 ID（如 `PENDING_ORDER_601390`），失败返回 `None`
 
 **说明：** 买入自动取整到 100 的整数倍（A 股最小交易单位）。资金不足时自动按最大可买数量执行。
 
@@ -166,7 +168,7 @@ order('601390', -500)    # 卖出 500 股
 | `value` | `float` | 是 | 金额，正数=买入，负数=卖出 |
 | `style` | — | 否 | 订单类型 |
 
-**返回：** `str` 订单 ID，失败返回 `None`
+**返回：** `str` 挂单 ID，失败返回 `None`
 
 ```python
 order_value('601390', 50000)    # 买入 5 万元
@@ -185,7 +187,7 @@ order_value('601390', -30000)   # 卖出 3 万元
 | `amount` | `int` | 是 | 目标持仓股数，0 = 清仓 |
 | `style` | — | 否 | 订单类型 |
 
-**返回：** `str` 订单 ID，失败返回 `None`
+**返回：** `str` 挂单 ID，失败返回 `None`
 
 ```python
 order_target('601390', 5000)   # 调到 5000 股
@@ -204,7 +206,7 @@ order_target('601390', 0)      # 清仓
 | `value` | `float` | 是 | 目标市值，0 = 清仓 |
 | `style` | — | 否 | 订单类型 |
 
-**返回：** `str` 订单 ID，失败返回 `None`
+**返回：** `str` 挂单 ID，失败返回 `None`
 
 ```python
 order_target_value('601390', 100000)   # 持仓市值调到 10 万
@@ -241,7 +243,7 @@ order_target_value('601390', 0)        # 清仓
 | `security` | `str` 或 `list` | 是 | 股票代码，可传多只 |
 | `start_date` | `str` / `date` | 否 | 开始日期，如 `'2024-01-01'` |
 | `end_date` | `str` / `date` | 否 | 结束日期 |
-| `frequency` | `str` | 否 | `'daily'` 或 `'1m'`（分钟线） |
+| `frequency` | `str` | 否 | 当前仅支持 `'daily'`（分钟线请使用 `fetch_minute_data` / `get_price_minute`） |
 | `fields` | `list` | 否 | 指定返回字段，如 `['close', 'volume']` |
 | `count` | `int` | 否 | 返回最近 N 根 bar |
 
@@ -272,7 +274,7 @@ df = get_price('601390', count=30)
 | `security` | `str` | 否 | 股票代码，默认使用 `context.universe` |
 | `df` | `bool` | 否 | `True` 返回 DataFrame，`False` 返回 dict |
 
-**返回：** `dict[str, Series]` 或 `DataFrame`
+**返回：** 单标的时返回 `Series`（`df=False`）或 `DataFrame`（`df=True`）；多标的时返回 `dict[str, Series]`（`df=False`）或 `DataFrame`（`df=True`）
 
 ```python
 def market_open(context):
@@ -574,8 +576,8 @@ print(info['price'], info['pe'])
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `initialize_func` | `callable` | 是 | 用户 `initialize(context)` 函数 |
-| `start_date` | `str` / `date` | 是 | 回测开始日期 |
-| `end_date` | `str` / `date` | 是 | 回测结束日期 |
+| `start_date` | `str` / `date` | 否 | 回测开始日期（默认：今天往前 365 天） |
+| `end_date` | `str` / `date` | 否 | 回测结束日期（默认：今天） |
 | `starting_cash` | `float` | 否 | 初始资金，默认 100,000 |
 | `benchmark` | `str` | 否 | 基准代码，默认 `'000300.XSHG'` |
 | `handle_data` | `callable` | 否 | `handle_data(context, data)` 函数 |

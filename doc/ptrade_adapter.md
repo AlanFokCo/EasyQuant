@@ -395,6 +395,7 @@ def init(ContextInfo):
 
 - QMT 回测模式中，`cancel`、`can_cancel_order`、`do_order` 等函数无实际意义
 - QMT 模拟运行模式下，交易函数无效（需实盘或回测模式）
+- EasyQuant 本地回测为“当日信号、次日开盘成交”；QMT 以平台成交规则为准（通常为当下委托撮合）
 
 ### 7.4 股票池
 
