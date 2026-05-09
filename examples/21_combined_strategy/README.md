@@ -35,6 +35,8 @@ python examples/21_combined_strategy/run_backtest.py
 python examples/21_combined_strategy/run_paper_trade.py
 ```
 
+Backtest note: `order*` calls are queued and filled at the next trading day open; paper trading uses real-time prices.
+
 ## Tutorial
 
 Full step-by-step explanation with formulas and justifications:
