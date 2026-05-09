@@ -147,7 +147,8 @@ def market_open(context):
 | `amount` | `int` | 是 | 股数，正数=买入，负数=卖出 |
 | `style` | — | 否 | 订单类型（保留参数，暂不支持限价） |
 
-**返回：** `str` 挂单 ID（统一格式 `PENDING_<ACTION>_<SECURITY>`，其中 `<ACTION>` 为 `ORDER` / `ORDER_VALUE` / `ORDER_TARGET` / `ORDER_TARGET_VALUE`），例如 `PENDING_ORDER_601390`、`PENDING_ORDER_TARGET_601390`；失败返回 `None`
+**返回：** `str` 挂单 ID，失败返回 `None`  
+格式：`PENDING_<ACTION>_<SECURITY>`，其中 `<ACTION>` 为 `ORDER` / `ORDER_VALUE` / `ORDER_TARGET` / `ORDER_TARGET_VALUE`（如 `PENDING_ORDER_601390`）
 
 **说明：** 买入自动取整到 100 的整数倍（A 股最小交易单位）。资金不足时自动按最大可买数量执行。
 
@@ -249,7 +250,7 @@ order_target_value('601390', 0)        # 清仓
 
 **返回：** `DataFrame`（单只股票）或 `dict[str, DataFrame]`（多只股票）
 
-> `frequency` 参数当前为兼容保留项，建议省略或显式传 `'daily'`；传入其他值不会切换到分钟线。分钟线请见 **3.7 节**（`fetch_minute_data` / `get_price_minute`）。
+> `frequency` 参数当前为兼容保留项，建议省略或显式传 `'daily'`；传入其他值不会切换到分钟线。分钟线请见下文“3.7 分钟线数据”（`fetch_minute_data` / `get_price_minute`）。
 
 ```python
 # 单只股票
