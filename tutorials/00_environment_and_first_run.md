@@ -48,7 +48,7 @@ python examples/03_run_backtest.py
 
 用浏览器打开其中的 **`.html` 文件`**，从上到下浏览：指标卡片 → 图表 → 成交与持仓。各字段含义见 [**报告与指标详解**](../doc/reports_and_metrics.md)。
 
-与 **`reports/`** 中已保存的示例导出如何对照，见 **[`reports/README.md`](../reports/README.md)**（推荐与 [`tutorials/assets/example_report_19_localdata.png`](assets/example_report_19_localdata.png) 及 Tutorial 03 配图一起阅读）。
+与 **`reports/`** 中已保存的示例导出如何对照，见 **[`reports/README.md`](../reports/README.md)**（推荐与 [`tutorials/assets/example_report_html_19_localdata.png`](assets/example_report_html_19_localdata.png) 及 Tutorial 03 配图一起阅读）。
 
 ---
 

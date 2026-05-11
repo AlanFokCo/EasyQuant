@@ -2,7 +2,7 @@
 
 > 配合 [用户手册 — 回测报告与图表解读](user_guide.md) 阅读。生成报告的推荐入口是 **`run_strategy`**（一次得到 PNG、HTML、MD、JSON）。
 >
-> **仓库内真实输出样例：** 见根目录 [`reports/README.md`](../reports/README.md)（与 [`examples/`](../examples/Examples.md) 各脚本对应）；教程中的截图与之一致，见 [`tutorials/assets/example_report_19_localdata.png`](../tutorials/assets/example_report_19_localdata.png)。
+> **仓库内真实输出样例：** 见根目录 [`reports/README.md`](../reports/README.md)（与 [`examples/`](../examples/Examples.md) 各脚本对应）；教程中的截图与之一致，见 [`tutorials/assets/example_report_html_19_localdata.png`](../tutorials/assets/example_report_html_19_localdata.png)。
 
 ---
 
@@ -39,7 +39,7 @@ result = run_strategy(
 
 打开 `.html` 文件后，你看到的页面大致分为以下区块（以下为 [Example 22 选股策略](../examples/22_stock_selection_strategy.py) 的回测截图）：
 
-![选股策略 HTML 报告截图](../tutorials/assets/example_report_stock_selection.png)
+![选股策略 HTML 报告截图](../tutorials/assets/example_report_html_stock_selection.png)
 
 页头（标题 + 盈亏金额）→ 核心指标卡片 → 详细指标行 → K 线图 → 累计收益率 → 回撤 → 每日盈亏 → 成交/持仓标签页。
 
@@ -110,7 +110,7 @@ result = run_strategy(
 
 ### 2.8 对照走读示例（`reports/…19_localdata` + HTML）
 
-下面用一次真实导出（与 [`reports/README.md`](../reports/README.md) 推荐组 **`backtest_*_19_localdata`** 对应，标的 **000768**，区间 **2024-01-01～2024-12-31**）说明：**打开 HTML 时，各块数字在说什么**。运行 `python examples/19_local_data_backtest.py` 后，在 `reports/` 下打开**最新** `*_19_localdata.html`，对照下表阅读（下列数值为该次运行的快照，与教程配图 [`../tutorials/assets/example_report_19_localdata.png`](../tutorials/assets/example_report_19_localdata.png) 同源）。
+下面用一次真实导出（与 [`reports/README.md`](../reports/README.md) 推荐组 **`backtest_*_19_localdata`** 对应，标的 **000768**，区间 **2024-01-01～2024-12-31**）说明：**打开 HTML 时，各块数字在说什么**。运行 `python examples/19_local_data_backtest.py` 后，在 `reports/` 下打开**最新** `*_19_localdata.html`，对照下表阅读（下列数值为该次运行的快照，与教程配图 [`../tutorials/assets/example_report_html_19_localdata.png`](../tutorials/assets/example_report_html_19_localdata.png) 同源）。
 
 > **说明：**本示例策略在该区间**亏损**，用来读报告很合适——夏普为负、卡玛为负、回撤大，都是「风险指标在说话」。
 
@@ -212,7 +212,7 @@ JSON 顶层字段随版本可能扩展，以生成文件为准；核心通常包
 
 ### 盈利策略：MACD 趋势 + 成交量确认（+103.48%）
 
-![MACD+成交量](../tutorials/assets/example_report_macd_volume.png)
+![MACD+成交量 HTML 报告](../tutorials/assets/example_report_html_macd_volume.png)
 
 - **夏普比率**：高 → 风险调整后收益好
 - **交易次数**：16 笔 → 不算太频繁
@@ -221,7 +221,7 @@ JSON 顶层字段随版本可能扩展，以生成文件为准；核心通常包
 
 ### 震荡市表现好：布林带均值回归（+57.77%）
 
-![布林带](../tutorials/assets/example_report_bollinger.png)
+![布林带 HTML 报告](../tutorials/assets/example_report_html_bollinger.png)
 
 - **交易次数**：8 笔 → 低频策略
 - **回撤**：控制得当
@@ -229,7 +229,7 @@ JSON 顶层字段随版本可能扩展，以生成文件为准；核心通常包
 
 ### 组合策略：多因子选股（+5.19%）
 
-![多因子](../tutorials/assets/example_report_multifactor.png)
+![多因子 HTML 报告](../tutorials/assets/example_report_html_multifactor.png)
 
 - **交易次数**：135 笔 → 高频换手
 - **换手率高**：佣金成本需关注
@@ -237,7 +237,7 @@ JSON 顶层字段随版本可能扩展，以生成文件为准；核心通常包
 
 ### 亏损策略：动量组合（-25.69%）
 
-![组合回测](../tutorials/assets/example_report_portfolio.png)
+![组合回测 HTML 报告](../tutorials/assets/example_report_html_portfolio.png)
 
 - **夏普比率**：负值
 - **最大回撤**：-33.10%

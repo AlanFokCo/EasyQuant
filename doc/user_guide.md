@@ -735,7 +735,7 @@ e |     [SELL]    [BUY]                                  |
 
 页面自上而下分为以下层次（以 [Example 22 选股策略](../examples/22_stock_selection_strategy.py) 为例）：
 
-![选股策略 HTML 报告](../tutorials/assets/example_report_stock_selection.png)
+![选股策略 HTML 报告](../tutorials/assets/example_report_html_stock_selection.png)
 
 #### 10.2.1 页头摘要
 
