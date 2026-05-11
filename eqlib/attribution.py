@@ -31,9 +31,19 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
             win_rate_daily: daily win rate (fraction of profitable days),
             win_rate_trade: round-trip trade win rate (matched buy/sell pairs),
             trade_count: number of completed round-trip trades,
+            win_count, loss_count: separate win/loss trade counts,
+            profit_loss_ratio: avg winning trade P&L / avg losing trade P&L,
             annual_turnover: total traded value / avg portfolio value / years,
             total_commission: sum of all commissions paid,
-            net_return: total return after deducting all commissions.
+            net_return: same as total_return; cash path in the engine already
+                pays commissions, so portfolio value is net of fees. The
+                ``total_commission`` field sums fees for reporting only.
+            excess_return: strategy total return minus benchmark total return,
+            benchmark_return: benchmark total return over the same period,
+            excess_return_max_drawdown: max drawdown of daily excess returns,
+            excess_return_sharpe: Sharpe ratio of daily excess returns,
+            daily_excess_return: annualized mean daily excess return,
+            benchmark_volatility: annualized benchmark volatility.
     """
     ctx = result["context"]
     trades = result["trade_log"]
@@ -101,7 +111,10 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     win_rate_daily = float((daily_ret > 0).sum()) / n_days
 
     # ── Trade-level win rate (item 12) ────────────────────────────────────
-    win_rate_trade, trade_count = _calc_trade_win_rate(trades)
+    win_rate_trade, trade_count, win_count, loss_count = _calc_trade_win_rate(trades)
+
+    # ── Profit/Loss ratio ─────────────────────────────────────────────────
+    profit_loss_ratio, _, _ = _calc_profit_loss_ratio(trades)
 
     # ── Turnover & commission metrics (item 13) ───────────────────────────
     years = n_days / ann_factor if ann_factor > 0 else 1.0
@@ -117,13 +130,27 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     annual_turnover = (min(total_buy_value, total_sell_value) / avg_portfolio_value / years
                        if avg_portfolio_value > 0 and years > 0 else 0.0)
     total_commission = sum(t.get("commission", 0.0) for t in trades)
-    net_return = total_return - total_commission / initial
+    # total_return is from mark-to-market portfolio value; buys/sells already
+    # reduced cash by commissions in the engine — do not subtract fees again.
+    net_return = total_return
 
     # Benchmark comparison
     benchmark_name = result.get("benchmark", "000300.XSHG")
-    alpha, beta, info_ratio = _calc_alpha_beta(
+    alpha, beta, info_ratio, bench_daily_ret, bench_total_ret, bench_ann_vol = _calc_alpha_beta(
         daily_ret, benchmark_name, risk_free_rate, ann_factor
     )
+
+    # Excess return metrics
+    if bench_daily_ret is not None:
+        excess_total, excess_max_dd, excess_sharpe, daily_excess_ret = _calc_excess_metrics(
+            daily_ret, bench_daily_ret, risk_free_rate, ann_factor
+        )
+    else:
+        excess_total = total_return - bench_total_ret if bench_total_ret is not None else 0.0
+        excess_max_dd = 0.0
+        excess_sharpe = 0.0
+        daily_excess_ret = 0.0
+        bench_total_ret = 0.0
 
     return {
         "total_return": total_return,
@@ -142,11 +169,21 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         "win_rate_daily": win_rate_daily,
         "win_rate_trade": win_rate_trade,
         "trade_count": trade_count,
+        "win_count": win_count,
+        "loss_count": loss_count,
+        "profit_loss_ratio": profit_loss_ratio,
         "annual_turnover": annual_turnover,
         "total_commission": total_commission,
         "net_return": net_return,
         "trading_days": n_days,
         "num_trades": len(trades),
+        # Excess return metrics
+        "excess_return": excess_total,
+        "benchmark_return": bench_total_ret,
+        "excess_return_max_drawdown": excess_max_dd,
+        "excess_return_sharpe": excess_sharpe,
+        "daily_excess_return": daily_excess_ret,
+        "benchmark_volatility": bench_ann_vol,
     }
 
 
@@ -158,12 +195,13 @@ def _calc_trade_win_rate(trades):
     sell price exceeds the average buy cost of the matched shares.
 
     Returns:
-        tuple: (win_rate, completed_trade_count)
+        tuple: (win_rate, completed_trade_count, win_count, loss_count)
     """
     from collections import deque
 
     buy_queues: dict = {}    # security -> deque of (price, amount) lots
     wins = 0
+    losses = 0
     total = 0
 
     for trade in trades:
@@ -197,19 +235,111 @@ def _calc_trade_win_rate(trades):
                 total += 1
                 if price > avg_buy:
                     wins += 1
+                else:
+                    losses += 1
 
     win_rate = wins / total if total > 0 else 0.0
-    return win_rate, total
+    return win_rate, total, wins, losses
+
+
+def _calc_profit_loss_ratio(trades):
+    """Compute avg win / avg loss from FIFO-matched trade pairs.
+
+    For each completed round-trip, compute the total P&L in yuan
+    (sell_proceeds - buy_cost).  Then separate wins and losses,
+    compute their averages, and return the ratio.
+
+    Returns:
+        tuple: (profit_loss_ratio, win_count, loss_count)
+               profit_loss_ratio = avg_win / abs(avg_loss), or 0.0 if no losses.
+    """
+    from collections import deque
+
+    buy_queues: dict = {}
+    win_pnls = []
+    loss_pnls = []
+
+    for trade in trades:
+        sec = trade["security"]
+        t_type = trade.get("type")
+        price = trade["price"]
+        amount = trade["amount"]
+
+        if t_type == "BUY":
+            buy_queues.setdefault(sec, deque()).append((price, amount))
+
+        elif t_type == "SELL":
+            remaining = amount
+            q = buy_queues.get(sec, deque())
+            total_buy_cost = 0.0
+            total_matched = 0
+
+            while remaining > 0 and q:
+                buy_price, buy_amt = q[0]
+                matched = min(buy_amt, remaining)
+                total_buy_cost += buy_price * matched
+                total_matched += matched
+                remaining -= matched
+                if matched == buy_amt:
+                    q.popleft()
+                else:
+                    q[0] = (buy_price, buy_amt - matched)
+
+            if total_matched > 0:
+                avg_buy = total_buy_cost / total_matched
+                pnl = (price - avg_buy) * total_matched
+                if pnl > 0:
+                    win_pnls.append(pnl)
+                else:
+                    loss_pnls.append(pnl)
+
+    win_count = len(win_pnls)
+    loss_count = len(loss_pnls)
+
+    if win_count == 0 or loss_count == 0:
+        return 0.0, win_count, loss_count
+
+    avg_win = sum(win_pnls) / win_count
+    avg_loss = sum(loss_pnls) / loss_count
+    plr = avg_win / abs(avg_loss) if avg_loss != 0 else 0.0
+    return plr, win_count, loss_count
+
+
+def _calc_excess_metrics(strategy_daily_ret, benchmark_daily_ret, risk_free_rate, ann_factor):
+    """Compute excess return metrics.
+
+    Returns:
+        tuple: (excess_return, excess_return_max_drawdown, excess_return_sharpe, daily_excess_return)
+    """
+    excess = strategy_daily_ret - benchmark_daily_ret
+    excess_total = float((1 + excess).prod() - 1)
+    excess_daily_mean = float(excess.mean()) * ann_factor
+
+    # Excess Sharpe
+    daily_rf = risk_free_rate / ann_factor
+    exc_std = excess.std()
+    excess_sharpe = (excess.mean() - daily_rf) / exc_std * np.sqrt(ann_factor) if exc_std > 0 else 0.0
+
+    # Excess return max drawdown
+    excess_cum = (1 + excess).cumprod()
+    excess_rolling_max = excess_cum.cummax()
+    excess_dd = ((excess_cum - excess_rolling_max) / excess_rolling_max).min()
+
+    return excess_total, float(excess_dd), excess_sharpe, excess_daily_mean
 
 
 def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
-    """Calculate alpha, beta, and information ratio vs benchmark.
+    """Calculate alpha, beta, information ratio vs benchmark, plus benchmark series.
 
     Requires at least 10 overlapping trading days between the strategy and the
     benchmark return series.  When fewer data points are available this function
-    returns ``(0.0, 1.0, 0.0)`` as safe defaults — callers should not interpret
-    these as meaningful estimates.
+    returns ``(0.0, 1.0, 0.0, None, 0.0, 0.0)`` as safe defaults.
+
+    Returns:
+        tuple: (alpha_annual, beta, info_ratio, benchmark_daily_ret,
+                benchmark_total_return, benchmark_annual_volatility)
     """
+    default = (0.0, 1.0, 0.0, None, 0.0, 0.0)
     try:
         from eqlib.data import fetch_stock_data
 
@@ -218,7 +348,7 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
 
         bench_df = fetch_stock_data(benchmark_code, start, end)
         if bench_df.empty or "close" not in bench_df.columns:
-            return 0.0, 1.0, 0.0
+            return default
 
         bench_ret = bench_df["close"].pct_change().dropna()
         bench_ret = bench_ret.reindex(strategy_returns.index).fillna(0)
@@ -228,12 +358,12 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         bench = bench_ret.loc[common].values
 
         if len(strat) < 10:
-            return 0.0, 1.0, 0.0
+            return default
 
         cov_matrix = np.cov(strat, bench, ddof=1)
         bench_var = cov_matrix[1, 1]
         if bench_var < 1e-15:
-            return 0.0, 1.0, 0.0
+            return default
 
         beta = cov_matrix[0, 1] / bench_var
         alpha_daily = strat.mean() - beta * bench.mean()
@@ -245,9 +375,14 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         info_ratio = (active_mean / active_std * np.sqrt(ann_factor)
                       if active_std > 0 else 0.0)
 
-        return alpha_annual, beta, info_ratio
+        # Benchmark total and annualized volatility
+        bench_daily_ret = pd.Series(bench, index=common)
+        bench_total_ret = float((1 + bench_daily_ret).prod() - 1)
+        bench_ann_vol = float(bench_daily_ret.std() * np.sqrt(ann_factor))
+
+        return alpha_annual, beta, info_ratio, bench_daily_ret, bench_total_ret, bench_ann_vol
     except Exception:
-        return 0.0, 1.0, 0.0
+        return default
 
 
 def brinson_attribution(result, sector_data=None, benchmark_returns=None):
@@ -393,7 +528,7 @@ def fama_french_analysis(result, factors=None):
         return None
 
     benchmark = result.get("benchmark", "000300.XSHG")
-    alpha_annual, beta, _ = _calc_alpha_beta(strat_ret, benchmark, 0.03, 252)
+    alpha_annual, beta, _, _, _, _ = _calc_alpha_beta(strat_ret, benchmark, 0.03, 252)
 
     arr = strat_ret.values
     if len(arr) > 10:

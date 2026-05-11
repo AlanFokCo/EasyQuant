@@ -72,50 +72,48 @@ from eqlib import utils
 # ============================================================
 
 STOCK_POOL = [
-    "601398",  # ICBC 工商银行          (Banking)
-    "600519",  # Kweichow Moutai 贵州茅台 (Liquor)
-    "002594",  # BYD 比亚迪             (New Energy / EV)
-    "601857",  # PetroChina 中国石油     (Oil & Gas)
-    "601088",  # China Shenhua 中国神华  (Coal / Energy)
-    "601390",  # China Railway 中国中铁  (Infrastructure)
-    "600276",  # Hengrui Pharma 恒瑞医药 (Healthcare)
-    "000333",  # Midea 美的集团          (Appliances)
-    "600916",  # China Gold 中国黄金     (Gold / Commodities)
-    "000858",  # Wuliangye 五粮液        (Liquor)
-    "601318",  # Ping An 中国平安        (Insurance)
-    "600887",  # Yili 伊利股份           (Consumer Staples)
+    "601390",  # China Railway 中国中铁
+    "600036",  # China Merchants Bank 招商银行
+    "159819",  # ETF fund
+    "518880",  # Gold ETF 黄金ETF
+    "601088",  # China Shenhua 中国神华
+    "601857",  # PetroChina 中国石油
+    "002594",  # BYD 比亚迪
+    "000768",  # AVIC Jonhon 中航光电
+    "600536",  # China National Software 中国软件
+    "601111",  # Air China 中国国航
+    "601179",  # China XD Electric 中国西电
+    "516090",  # ETF fund
 ]
 
 # Map each stock to its sector (for sector-rotation bonus)
 SECTOR_MAP = {
-    "601398": "Banking",
-    "600519": "Liquor",
-    "002594": "NewEnergy",
-    "601857": "OilGas",
-    "601088": "Coal",
     "601390": "Infrastructure",
-    "600276": "Healthcare",
-    "000333": "Appliances",
-    "600916": "Gold",
-    "000858": "Liquor",
-    "601318": "Insurance",
-    "600887": "Consumer",
+    "600036": "Banking",
+    "159819": "ETF",
+    "518880": "Gold",
+    "601088": "Coal",
+    "601857": "OilGas",
+    "002594": "NewEnergy",
+    "000768": "Technology",
+    "600536": "Technology",
+    "601111": "Infrastructure",
+    "601179": "Energy",
+    "516090": "ETF",
 }
 
 # For sector-rotation scoring we use the most liquid / representative
 # stock from each sector to gauge sector momentum.
 SECTOR_REPRESENTATIVES = {
-    "Banking":       "601398",
-    "Liquor":        "600519",
-    "NewEnergy":     "002594",
-    "OilGas":        "601857",
-    "Coal":          "601088",
     "Infrastructure":"601390",
-    "Healthcare":    "600276",
-    "Appliances":    "000333",
-    "Gold":          "600916",
-    "Insurance":     "601318",
-    "Consumer":      "600887",
+    "Banking":       "600036",
+    "Gold":          "518880",
+    "Coal":          "601088",
+    "OilGas":        "601857",
+    "NewEnergy":     "002594",
+    "Technology":    "600536",
+    "Energy":        "601179",
+    "ETF":           "516090",
 }
 
 
@@ -124,38 +122,38 @@ SECTOR_REPRESENTATIVES = {
 # ============================================================
 
 # --- Stock selection (weekly rebalance) ---
-g.top_n                 = 5      # Hold top-N stocks at any time
-g.momentum_period       = 20     # Momentum lookback (trading days)
-g.reversal_period       = 5      # Short-term reversal lookback
-g.vol_short             = 5      # Volume ratio: short window
-g.vol_long              = 20     # Volume ratio: long window
-g.sector_lookback       = 10     # Sector momentum lookback (days)
+TOP_N                   = 5      # Hold top-N stocks at any time
+MOMENTUM_PERIOD         = 20     # Momentum lookback (trading days)
+REVERSAL_PERIOD         = 5      # Short-term reversal lookback
+VOL_SHORT               = 5      # Volume ratio: short window
+VOL_LONG                = 20     # Volume ratio: long window
+SECTOR_LOOKBACK         = 10     # Sector momentum lookback (days)
 
 # Factor weights (must sum to 1.0)
-g.w_momentum  = 0.35
-g.w_volume    = 0.30
-g.w_reversal  = 0.15
-g.w_volatility = 0.20
+W_MOMENTUM  = 0.35
+W_VOLUME    = 0.30
+W_REVERSAL  = 0.15
+W_VOLATILITY = 0.20
 
 # --- Technical indicators ---
-g.rsi_period     = 14
-g.rsi_oversold   = 35    # More selective than the default 30
-g.rsi_overbought = 65    # More selective than the default 70
-g.boll_period    = 20    # Bollinger Band period
-g.boll_std       = 2.0   # Bollinger Band standard-deviation multiplier
-g.macd_fast      = 12
-g.macd_slow      = 26
-g.macd_signal    = 9
-g.atr_period     = 14
-g.atr_multiplier = 2.5   # ATR trailing-stop multiplier
-g.donchian_period = 20   # Donchian Channel period
-g.sr_lookback    = 60    # Support/resistance lookback (days)
-g.sr_tolerance   = 0.025 # ±2.5 % tolerance to "near" a S/R level
+RSI_PERIOD     = 14
+RSI_OVERSOLD   = 35    # More selective than the default 30
+RSI_OVERBOUGHT = 65    # More selective than the default 70
+BOLL_PERIOD    = 20    # Bollinger Band period
+BOLL_STD       = 2.0   # Bollinger Band standard-deviation multiplier
+MACD_FAST      = 12
+MACD_SLOW      = 26
+MACD_SIGNAL    = 9
+ATR_PERIOD     = 14
+ATR_MULTIPLIER = 2.5   # ATR trailing-stop multiplier
+DONCHIAN_PERIOD = 20   # Donchian Channel period
+SR_LOOKBACK    = 60    # Support/resistance lookback (days)
+SR_TOLERANCE   = 0.025 # ±2.5 % tolerance to "near" a S/R level
 
 # --- Risk / position ---
-g.max_single_pct    = 0.20   # Max 20 % of total value per stock
-g.hard_stop_pct     = 0.08   # Hard stop: sell if loss > 8 % of avg cost
-g.vol_confirm_ratio = 1.2    # Volume must be ≥ 1.2× 20-day avg to confirm buy
+MAX_SINGLE_PCT    = 0.20   # Max 20 % of total value per stock
+HARD_STOP_PCT     = 0.08   # Hard stop: sell if loss > 8 % of avg cost
+VOL_CONFIRM_RATIO = 1.2    # Volume must be ≥ 1.2× 20-day avg to confirm buy
 
 # --- Derived state (populated at runtime) ---
 # g.selected_stocks     : list[str]  — top-N from weekly scoring
@@ -218,9 +216,9 @@ def _compute_factors(code):
                  Low-volatility stocks are preferred (lower drawdown risk).
                  We negate so that lower volatility → higher factor value.
     """
-    bars_needed = g.momentum_period + 10
+    bars_needed = MOMENTUM_PERIOD + 10
     hist = attribute_history(code, bars_needed, "1d", ["close", "volume"])
-    if hist is None or hist.empty or len(hist) < g.momentum_period:
+    if hist is None or hist.empty or len(hist) < MOMENTUM_PERIOD:
         return None
 
     close = hist["close"]
@@ -232,22 +230,22 @@ def _compute_factors(code):
         return None
 
     # Factor 1 — Momentum (20-day)
-    past_price = close.iloc[-g.momentum_period]
+    past_price = close.iloc[-MOMENTUM_PERIOD]
     if past_price <= 0:
         return None
     momentum = (price / past_price) - 1.0
 
     # Factor 2 — Volume ratio (5d / 20d)
-    vol_short_avg = vol.tail(g.vol_short).mean()
-    vol_long_avg  = vol.tail(g.vol_long).mean()
+    vol_short_avg = vol.tail(VOL_SHORT).mean()
+    vol_long_avg  = vol.tail(VOL_LONG).mean()
     volume_ratio  = vol_short_avg / vol_long_avg if vol_long_avg > 0 else 1.0
 
     # Factor 3 — Short-term reversal correction (negative 5-day return)
-    past5 = close.iloc[-g.reversal_period] if len(close) >= g.reversal_period else price
+    past5 = close.iloc[-REVERSAL_PERIOD] if len(close) >= REVERSAL_PERIOD else price
     reversal = -((price / past5) - 1.0) if past5 > 0 else 0.0
 
     # Factor 4 — Negative volatility (lower std → higher factor)
-    daily_rets = close.pct_change().dropna().tail(g.momentum_period)
+    daily_rets = close.pct_change().dropna().tail(MOMENTUM_PERIOD)
     neg_vol = -daily_rets.std() if len(daily_rets) >= 5 else 0.0
 
     return (momentum, volume_ratio, reversal, neg_vol)
@@ -263,11 +261,11 @@ def _score_sector_momentum():
     """
     raw = {}
     for sector, rep_code in SECTOR_REPRESENTATIVES.items():
-        hist = attribute_history(rep_code, g.sector_lookback + 5, "1d", ["close"])
-        if hist is None or hist.empty or len(hist) < g.sector_lookback:
+        hist = attribute_history(rep_code, SECTOR_LOOKBACK + 5, "1d", ["close"])
+        if hist is None or hist.empty or len(hist) < SECTOR_LOOKBACK:
             continue
         close = hist["close"]
-        ret = (close.iloc[-1] / close.iloc[-g.sector_lookback]) - 1.0
+        ret = (close.iloc[-1] / close.iloc[-SECTOR_LOOKBACK]) - 1.0
         raw[sector] = ret
 
     return _zscore_normalize(raw)
@@ -293,7 +291,7 @@ def rank_stocks_weekly(context):
 
     if not raw_data:
         log.warning("No stocks passed factor computation; skipping rebalance.")
-        return getattr(g, "selected_stocks", STOCK_POOL[:g.top_n])
+        return getattr(g, "selected_stocks", STOCK_POOL[:TOP_N])
 
     # --- Step 2: Normalise each factor ---
     z_mom  = _zscore_normalize({c: v[0] for c, v in raw_data.items()})
@@ -305,10 +303,10 @@ def rank_stocks_weekly(context):
     scores = {}
     for code in raw_data:
         scores[code] = (
-            g.w_momentum   * z_mom.get(code, 0.0) +
-            g.w_volume     * z_vol.get(code, 0.0) +
-            g.w_reversal   * z_rev.get(code, 0.0) +
-            g.w_volatility * z_nvol.get(code, 0.0)
+            W_MOMENTUM   * z_mom.get(code, 0.0) +
+            W_VOLUME     * z_vol.get(code, 0.0) +
+            W_REVERSAL   * z_rev.get(code, 0.0) +
+            W_VOLATILITY * z_nvol.get(code, 0.0)
         )
 
     # --- Step 4: Sector-rotation bonus ---
@@ -323,10 +321,10 @@ def rank_stocks_weekly(context):
 
     log.info("=== Weekly factor scores ===")
     for i, (code, score) in enumerate(ranked):
-        tag = " ← SELECTED" if i < g.top_n else ""
+        tag = " ← SELECTED" if i < TOP_N else ""
         log.info("  %2d. %s  score=%.4f%s" % (i + 1, code, score, tag))
 
-    top_codes = [code for code, _ in ranked[:g.top_n]]
+    top_codes = [code for code, _ in ranked[:TOP_N]]
     return top_codes
 
 
@@ -336,6 +334,9 @@ def rank_stocks_weekly(context):
 
 def _compute_indicators(code):
     """Calculate all technical indicators needed for entry/exit decisions.
+
+    Uses precomputed indicators from PreloadedData if available (fast path),
+    otherwise falls back to on-the-fly computation.
 
     Indicators computed
     -------------------
@@ -353,11 +354,76 @@ def _compute_indicators(code):
 
     Returns dict with all indicators, or None if data are insufficient.
     """
-    bars_needed = max(g.sr_lookback, g.macd_slow + g.macd_signal,
-                      g.boll_period, g.atr_period, g.donchian_period) + 30
+    from eqlib.engine import _get_preloaded
+
+    preloaded = _get_preloaded()
+    bars_needed = max(SR_LOOKBACK, MACD_SLOW + MACD_SIGNAL,
+                      BOLL_PERIOD, ATR_PERIOD, DONCHIAN_PERIOD) + 30
+
+    # Try fast path: precomputed indicators from PreloadedData
+    if preloaded is not None and preloaded._indicators:
+        ind_df = preloaded.get_indicators(code, bars_needed, _context_if_available())
+        if ind_df is not None and not ind_df.empty and len(ind_df) >= SR_LOOKBACK:
+            # Still need OHLCV for S/R levels and volume ratio
+            hist = attribute_history(code, bars_needed, "1d",
+                                     ["open", "high", "low", "close", "volume"])
+            if hist is None or hist.empty or len(hist) < SR_LOOKBACK:
+                return None
+
+            close  = hist["close"]
+            high   = hist["high"]
+            low    = hist["low"]
+            volume = hist["volume"]
+            price  = close.iloc[-1]
+
+            # --- Support / Resistance (not precomputed) ---
+            sr = utils.support_resistance_levels(
+                high, low, close,
+                lookback=SR_LOOKBACK,
+                tolerance=SR_TOLERANCE,
+            )
+            nearest_support    = sr.get("nearest_support")
+            nearest_resistance = sr.get("nearest_resistance")
+
+            # --- Volume ratio ---
+            avg_vol_20  = volume.tail(VOL_LONG).mean()
+            current_vol = volume.iloc[-1]
+            vol_ratio   = current_vol / avg_vol_20 if avg_vol_20 > 0 else 1.0
+
+            # Read precomputed indicator values
+            last = ind_df.iloc[-1]
+            dif_val = last["macd_dif"]
+            dea_val = last["macd_dea"]
+            if len(ind_df) >= 2:
+                prev = ind_df.iloc[-2]
+                macd_golden = (dif_val > dea_val and prev["macd_dif"] <= prev["macd_dea"])
+                macd_death  = (dif_val < dea_val and prev["macd_dif"] >= prev["macd_dea"])
+            else:
+                macd_golden = False
+                macd_death = False
+
+            return {
+                "price":             price,
+                "rsi":               last["rsi"],
+                "bb_upper":          last["bb_upper"],
+                "bb_mid":            last["bb_mid"],
+                "bb_lower":          last["bb_lower"],
+                "macd_golden":       macd_golden,
+                "macd_death":        macd_death,
+                "dif":               dif_val,
+                "dea":               dea_val,
+                "atr":               last["atr"],
+                "dc_upper":          last["dc_upper"],
+                "dc_lower":          last["dc_lower"],
+                "nearest_support":   nearest_support,
+                "nearest_resistance":nearest_resistance,
+                "vol_ratio":         vol_ratio,
+            }
+
+    # Fallback: full on-the-fly computation
     hist = attribute_history(code, bars_needed, "1d",
                              ["open", "high", "low", "close", "volume"])
-    if hist is None or hist.empty or len(hist) < g.sr_lookback:
+    if hist is None or hist.empty or len(hist) < SR_LOOKBACK:
         return None
 
     close  = hist["close"]
@@ -367,43 +433,43 @@ def _compute_indicators(code):
     price  = close.iloc[-1]
 
     # --- RSI ---
-    rsi_series = utils.rsi(close, period=g.rsi_period)
+    rsi_series = utils.rsi(close, period=RSI_PERIOD)
     current_rsi = rsi_series.iloc[-1]
 
     # --- Bollinger Bands ---
     bb_upper, bb_mid, bb_lower = utils.boll(close,
-                                             period=g.boll_period,
-                                             num_std=g.boll_std)
+                                             period=BOLL_PERIOD,
+                                             num_std=BOLL_STD)
 
     # --- MACD ---
     dif, dea, _ = utils.macd(close,
-                              fast=g.macd_fast,
-                              slow=g.macd_slow,
-                              signal=g.macd_signal)
+                              fast=MACD_FAST,
+                              slow=MACD_SLOW,
+                              signal=MACD_SIGNAL)
     macd_golden = (dif.iloc[-1] > dea.iloc[-1] and
                    dif.iloc[-2] <= dea.iloc[-2])
     macd_death  = (dif.iloc[-1] < dea.iloc[-1] and
                    dif.iloc[-2] >= dea.iloc[-2])
 
     # --- ATR ---
-    atr_series   = utils.atr(high, low, close, g.atr_period)
+    atr_series   = utils.atr(high, low, close, ATR_PERIOD)
     current_atr  = atr_series.iloc[-1]
 
     # --- Donchian Channel ---
     dc_upper, _dc_mid, dc_lower = utils.donchian(high, low, close,
-                                                  period=g.donchian_period)
+                                                  period=DONCHIAN_PERIOD)
 
     # --- Support / Resistance ---
     sr = utils.support_resistance_levels(
         high, low, close,
-        lookback=g.sr_lookback,
-        tolerance=g.sr_tolerance,
+        lookback=SR_LOOKBACK,
+        tolerance=SR_TOLERANCE,
     )
     nearest_support    = sr.get("nearest_support")
     nearest_resistance = sr.get("nearest_resistance")
 
     # --- Volume ratio ---
-    avg_vol_20  = volume.tail(g.vol_long).mean()
+    avg_vol_20  = volume.tail(VOL_LONG).mean()
     current_vol = volume.iloc[-1]
     vol_ratio   = current_vol / avg_vol_20 if avg_vol_20 > 0 else 1.0
 
@@ -424,6 +490,17 @@ def _compute_indicators(code):
         "nearest_resistance":nearest_resistance,
         "vol_ratio":         vol_ratio,
     }
+
+
+def _context_if_available():
+    """Return current_dt from context or None if not available."""
+    try:
+        from eqlib._state import _context
+        if _context is not None:
+            return _context.current_dt
+    except Exception:
+        pass
+    return None
 
 
 # ============================================================
@@ -463,9 +540,9 @@ def _check_sell(context, code, ind):
     # 1. Hard stop-loss
     if avg_cost > 0:
         loss_pct = (price - avg_cost) / avg_cost
-        if loss_pct < -g.hard_stop_pct:
+        if loss_pct < -HARD_STOP_PCT:
             return True, "Hard stop-loss: loss=%.1f%% (> %.0f%%)" % (
-                loss_pct * 100, g.hard_stop_pct * 100)
+                loss_pct * 100, HARD_STOP_PCT * 100)
 
     # 2. ATR trailing stop
     prev_high = g.highest_since_buy.get(code)
@@ -473,13 +550,13 @@ def _check_sell(context, code, ind):
         g.highest_since_buy[code] = price
         prev_high = price
 
-    trailing_stop = prev_high - g.atr_multiplier * ind["atr"]
+    trailing_stop = prev_high - ATR_MULTIPLIER * ind["atr"]
     if price < trailing_stop:
         return True, "ATR trailing stop: price=%.4f < stop=%.4f" % (
             price, trailing_stop)
 
     # 3. Bollinger upper + overbought
-    if (price >= ind["bb_upper"] and ind["rsi"] >= g.rsi_overbought):
+    if (price >= ind["bb_upper"] and ind["rsi"] >= RSI_OVERBOUGHT):
         return True, "Bollinger upper+overbought: price=%.4f, RSI=%.1f" % (
             price, ind["rsi"])
 
@@ -496,7 +573,7 @@ def _check_sell(context, code, ind):
     # 6. Near resistance + overbought
     if ind["nearest_resistance"] is not None:
         dist = (ind["nearest_resistance"] - price) / price
-        if 0 <= dist < g.sr_tolerance and ind["rsi"] >= g.rsi_overbought:
+        if 0 <= dist < SR_TOLERANCE and ind["rsi"] >= RSI_OVERBOUGHT:
             return True, (
                 "Near resistance+overbought: R=%.4f (%.1f%% away), RSI=%.1f"
                 % (ind["nearest_resistance"], dist * 100, ind["rsi"])
@@ -547,13 +624,13 @@ def _check_buy(context, code, ind):
 
     # B. Position-count limit
     held = sum(1 for p in context.portfolio.positions.values() if p.amount > 0)
-    max_positions = max(1, int(1.0 / g.max_single_pct))
+    max_positions = max(1, int(1.0 / MAX_SINGLE_PCT))
     if held >= max_positions:
         return False, ""
 
     # C. Oversold / reversal signal
     oversold_signal = (
-        ind["rsi"] <= g.rsi_oversold
+        ind["rsi"] <= RSI_OVERSOLD
         or ind["price"] <= ind["bb_lower"]
         or ind["price"] <= ind["dc_lower"]
     )
@@ -564,14 +641,14 @@ def _check_buy(context, code, ind):
     near_support = False
     if ind["nearest_support"] is not None:
         dist = (ind["price"] - ind["nearest_support"]) / ind["price"]
-        near_support = 0 <= dist < g.sr_tolerance
+        near_support = 0 <= dist < SR_TOLERANCE
 
     confirmation = ind["macd_golden"] or near_support
     if not confirmation:
         return False, ""
 
     # E. Volume confirmation
-    if ind["vol_ratio"] < g.vol_confirm_ratio:
+    if ind["vol_ratio"] < VOL_CONFIRM_RATIO:
         return False, ""
 
     reason = (
@@ -591,7 +668,7 @@ def _check_buy(context, code, ind):
 # 8. Lifecycle callbacks
 # ============================================================
 
-def _before_market_open(context):
+def _before_market_open(context, data=None):
     """Pre-market preparation (registered via before_trading_start).
 
     Logs current portfolio state and warns about any ST stocks that
@@ -617,7 +694,7 @@ def _before_market_open(context):
         pass
 
 
-def _after_market_close(context):
+def _after_market_close(context, data=None):
     """Post-close portfolio snapshot (registered via after_trading_end)."""
     portfolio = context.portfolio
     pnl     = portfolio.total_value - portfolio.starting_cash
@@ -700,7 +777,7 @@ def daily_trading(context):
     if buy_candidates:
         total_value = context.portfolio.total_value
         per_stock_value = min(
-            total_value * g.max_single_pct,
+            total_value * MAX_SINGLE_PCT,
             context.portfolio.available_cash / len(buy_candidates),
         )
         for code, reason in buy_candidates:
@@ -741,7 +818,7 @@ def initialize(context):
     context.universe = STOCK_POOL
 
     # Runtime state
-    g.selected_stocks   = STOCK_POOL[:g.top_n]  # bootstrap with first N
+    g.selected_stocks   = STOCK_POOL[:TOP_N]  # bootstrap with first N
     g.highest_since_buy = {}                      # {code: float|None}
 
     # Register lifecycle callbacks (Example 08 pattern)
@@ -758,8 +835,8 @@ def initialize(context):
     log.info("=" * 60)
     log.info("All-Weather Alpha Combined Strategy — Initialized")
     log.info("  Stock pool  : %d stocks across 8 sectors" % n)
-    log.info("  Top-N       : %d positions max" % g.top_n)
-    log.info("  Max per pos : %.0f%%" % (g.max_single_pct * 100))
-    log.info("  Hard stop   : -%.0f%%" % (g.hard_stop_pct * 100))
-    log.info("  ATR mult    : %.1f×" % g.atr_multiplier)
+    log.info("  Top-N       : %d positions max" % TOP_N)
+    log.info("  Max per pos : %.0f%%" % (MAX_SINGLE_PCT * 100))
+    log.info("  Hard stop   : -%.0f%%" % (HARD_STOP_PCT * 100))
+    log.info("  ATR mult    : %.1f×" % ATR_MULTIPLIER)
     log.info("=" * 60)

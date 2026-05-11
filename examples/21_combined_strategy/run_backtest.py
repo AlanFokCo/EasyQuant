@@ -30,9 +30,9 @@ Output:
 import os
 import sys
 
-# Add project root to path so eqlib and combined_strategy can be found
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.insert(0, _here)
 
 from combined_strategy import initialize, STOCK_POOL
 from eqlib import run_strategy, analyze_returns
@@ -41,13 +41,12 @@ from eqlib import run_strategy, analyze_returns
 # Backtest configuration
 # ============================================================
 
-START_DATE    = "2022-01-01"
+START_DATE    = "2021-10-01"  # earlier start for data warmup (need ~60 bars before first trade)
 END_DATE      = "2024-12-31"
 STARTING_CASH = 500_000      # ¥500,000 initial capital
 BENCHMARK     = "000300.XSHG"
-REPORT_DIR    = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "../../reports"
-)
+_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPORT_DIR    = os.path.join(_root, "reports")
 
 
 if __name__ == "__main__":
@@ -62,6 +61,8 @@ if __name__ == "__main__":
         print("              %s" % code)
     print()
 
+    os.makedirs(REPORT_DIR, exist_ok=True)
+
     result = run_strategy(
         initialize_func=initialize,
         start_date=START_DATE,
@@ -70,6 +71,7 @@ if __name__ == "__main__":
         benchmark=BENCHMARK,
         securities=STOCK_POOL,
         report_dir=REPORT_DIR,
+        use_local=True,
     )
 
     if result is None:

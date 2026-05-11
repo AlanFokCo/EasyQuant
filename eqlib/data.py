@@ -2,7 +2,7 @@
 
 import datetime
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union
 
 import akshare as ak
 import pandas as pd
@@ -93,8 +93,12 @@ def _rename_cols(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
 # ============================================================
 
 def _is_etf(code: str) -> bool:
-    """Check if a code is an ETF (51xxxx, 15xxxx, 16xxxx, 18xxxx)."""
-    return code.startswith(("51", "15", "16", "18"))
+    """Heuristic: exchange-traded fund codes (incl. 588 STAR board ETFs).
+
+    Used for stamp-duty exemption on sell. New product codes appear over time;
+    treat unknown codes as non-ETF (conservative on tax).
+    """
+    return code.startswith(("51", "15", "16", "18")) or code.startswith("588")
 
 
 def _is_index(code: str) -> bool:
@@ -247,8 +251,27 @@ def attribute_history(security, count: int, unit: str = "1d",
     from eqlib._state import _context
     from eqlib.engine import _get_preloaded
 
-    # Fast path: slice from preloaded in-memory data
+    # Fast path: use prebuilt Series dicts from PreloadedData
     preloaded = _get_preloaded()
+    if preloaded is not None and preloaded._field_series:
+        sec_data = preloaded._field_series.get(security)
+        if sec_data is not None:
+            available = [f for f in fields if f in sec_data]
+            if not available:
+                return pd.DataFrame()
+            current = _context.current_dt
+            if current is not None:
+                ts = pd.Timestamp(current)
+                result = pd.DataFrame(
+                    {f: sec_data[f].loc[:ts] for f in available}
+                )
+            else:
+                result = pd.DataFrame(
+                    {f: sec_data[f] for f in available}
+                )
+            return result.tail(count)
+
+    # Fallback: slice from preloaded panel (legacy path)
     if preloaded is not None and preloaded.panel is not None:
         sec_df = preloaded.panel.get(security)
         if sec_df is not None and not sec_df.empty:
@@ -424,9 +447,9 @@ def _iter_days(start, end):
 
 @lru_cache(maxsize=64)
 def _get_trading_days_range(
-    start: datetime.date | datetime.datetime | pd.Timestamp,
-    end: datetime.date | datetime.datetime | pd.Timestamp,
-) -> tuple[datetime.date, ...]:
+    start: Union[datetime.date, datetime.datetime, pd.Timestamp],
+    end: Union[datetime.date, datetime.datetime, pd.Timestamp],
+) -> tuple:
     """Return trading days between start and end using local holiday fallback."""
     start_date = pd.Timestamp(start).date()
     end_date = pd.Timestamp(end).date()

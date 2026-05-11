@@ -9,6 +9,7 @@ Usage:
     python examples/14_bollinger_strategy.py
 """
 
+import os
 from eqlib import *
 from eqlib import utils
 
@@ -17,10 +18,10 @@ from eqlib import utils
 # Strategy parameters
 # ============================================================
 
-g.security = "601390"       # ICBC
-g.period = 20               # Bollinger Band period
-g.std_dev = 2.0             # Standard deviation multiplier
-g.stop_loss_pct = 0.08      # Stop loss at 8% below entry
+SECURITY = "601088"       # China Shenhua 中国神华
+PERIOD = 20               # Bollinger Band period
+STD_DEV = 2.0             # Standard deviation multiplier
+STOP_LOSS_PCT = 0.08      # Stop loss at 8% below entry
 
 
 # ============================================================
@@ -39,34 +40,34 @@ def initialize(context):
         min_commission=5,
     ))
 
-    context.universe = [g.security]
+    context.universe = [SECURITY]
     run_daily(market_open, time="every_bar")
 
     log.info("Bollinger Band init: %s, period=%d, std=%.1f" % (
-        g.security, g.period, g.std_dev))
+        SECURITY, PERIOD, STD_DEV))
 
 
 def market_open(context):
     """Daily trading logic: mean reversion on Bollinger Bands."""
-    security = g.security
+    security = SECURITY
 
     # Fetch price history (need enough bars for Bollinger calculation)
-    bars_needed = g.period + 10
+    bars_needed = PERIOD + 10
     close_data = attribute_history(security, bars_needed, "1d", ["close"])
-    if close_data.empty or len(close_data) < g.period:
+    if close_data.empty or len(close_data) < PERIOD:
         return
 
     close_prices = close_data["close"]
     current_price = close_prices.iloc[-1]
 
     # Calculate Bollinger Bands
-    upper, mid, lower = utils.boll(close_prices, period=g.period, num_std=g.std_dev)
+    upper, mid, lower = utils.boll(close_prices, period=PERIOD, num_std=STD_DEV)
 
     # === Stop-loss check ===
     if security in context.portfolio.positions:
         position = context.portfolio.positions[security]
         loss_pct = (current_price - position.avg_cost) / position.avg_cost
-        if loss_pct < -g.stop_loss_pct:
+        if loss_pct < -STOP_LOSS_PCT:
             order_target(security, 0)
             log.info("Stop-loss SELL: %s @ %.3f, loss=%.1f%%" % (
                 security, current_price, loss_pct * 100))
@@ -105,12 +106,15 @@ if __name__ == "__main__":
     print("Bollinger Band Mean Reversion Strategy")
     print("=" * 60)
 
+    os.makedirs("reports", exist_ok=True)
+
     result = run_strategy(
         initialize_func=initialize,
         start_date="2024-01-01",
         end_date="2025-01-01",
         starting_cash=100000,
         benchmark="000300.XSHG",
-        securities=["601390"],
+        securities=["601088"],
         report_dir="reports",
+        use_local=True,
     )

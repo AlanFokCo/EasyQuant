@@ -43,26 +43,26 @@ from eqlib import utils
 # Strategy parameters
 # ============================================================
 
-g.stock_pool = [
+STOCK_POOL = [
     "601390",  # China Railway 中国中铁
-    "600916",  # China Gold 中国黄金
+    "518880",  # Gold ETF 黄金ETF
     "002594",  # BYD 比亚迪
     "601088",  # China Shenhua 中国神华
     "601857",  # PetroChina 中国石油
     "600536",  # China Soft 中国软件
-    "601398",  # ICBC 工商银行
-    "518880",  # Gold ETF 黄金ETF
+    "601111",  # Air China 中国国航
+    "000630",  # Tongling Nonferrous 铜陵有色
 ]
-g.sr_lookback = 80                   # Support/resistance lookback (days)
-g.sr_tolerance = 0.02                # Tolerance near S/R level (2%)
-g.rsi_period = 14                    # RSI period
-g.rsi_oversold = 30                  # RSI oversold threshold
-g.rsi_overbought = 70                # RSI overbought threshold
-g.atr_period = 14                    # ATR period
-g.atr_stop_multiplier = 2.5          # Trailing stop: highest - N * ATR
-g.donchian_period = 20               # Donchian channel period
-g.volume_ratio_period = 20           # Volume confirmation period
-g.max_single_pct = 0.25              # Max position per stock (% of total)
+SR_LOOKBACK = 80                   # Support/resistance lookback (days)
+SR_TOLERANCE = 0.02                # Tolerance near S/R level (2%)
+RSI_PERIOD = 14                    # RSI period
+RSI_OVERSOLD = 30                  # RSI oversold threshold
+RSI_OVERBOUGHT = 70                # RSI overbought threshold
+ATR_PERIOD = 14                    # ATR period
+ATR_STOP_MULTIPLIER = 2.5          # Trailing stop: highest - N * ATR
+DONCHIAN_PERIOD = 20               # Donchian channel period
+VOLUME_RATIO_PERIOD = 20           # Volume confirmation period
+MAX_SINGLE_PCT = 0.25              # Max position per stock (% of total)
 
 
 # ============================================================
@@ -71,21 +71,6 @@ g.max_single_pct = 0.25              # Max position per stock (% of total)
 
 def initialize(context):
     """Strategy initialization."""
-    g.stock_pool = [
-        "601390", "600916", "002594", "601088",
-        "601857", "600536", "601398", "518880",
-    ]
-    g.sr_lookback = 80
-    g.sr_tolerance = 0.02
-    g.rsi_period = 14
-    g.rsi_oversold = 30
-    g.rsi_overbought = 70
-    g.atr_period = 14
-    g.atr_stop_multiplier = 2.5
-    g.donchian_period = 20
-    g.volume_ratio_period = 20
-    g.max_single_pct = 0.25            # Max 25% per stock
-
     set_benchmark("000001.XSHG")
     set_order_cost(OrderCost(
         open_tax=0,
@@ -96,16 +81,16 @@ def initialize(context):
         min_commission=5,
     ))
 
-    context.universe = g.stock_pool
+    context.universe = STOCK_POOL
     run_daily(market_open, time="every_bar")
 
     # Per-stock state
     g.highest_since_buy = {}           # {security: highest_price}
     g.indicators = {}                  # {security: {rsi, atr, ...}}
 
-    n = len(g.stock_pool)
+    n = len(STOCK_POOL)
     log.info("S/R Portfolio init: %d stocks, lookback=%d, max_single=%.0f%%" % (
-        n, g.sr_lookback, g.max_single_pct * 100))
+        n, SR_LOOKBACK, MAX_SINGLE_PCT * 100))
 
 
 def _analyze_stock(security, bars_needed):
@@ -117,7 +102,7 @@ def _analyze_stock(security, bars_needed):
     """
     hist = attribute_history(security, bars_needed, "1d",
                              ["open", "high", "low", "close", "volume"])
-    if hist.empty or len(hist) < g.sr_lookback:
+    if hist.empty or len(hist) < SR_LOOKBACK:
         return None
 
     close_prices = hist["close"]
@@ -129,11 +114,11 @@ def _analyze_stock(security, bars_needed):
     # Support & Resistance
     sr = utils.support_resistance_levels(
         high_prices, low_prices, close_prices,
-        lookback=g.sr_lookback, tolerance=g.sr_tolerance,
+        lookback=SR_LOOKBACK, tolerance=SR_TOLERANCE,
     )
 
     # RSI
-    rsi_values = utils.rsi(close_prices, period=g.rsi_period)
+    rsi_values = utils.rsi(close_prices, period=RSI_PERIOD)
     current_rsi = rsi_values.iloc[-1]
 
     # MACD
@@ -144,15 +129,15 @@ def _analyze_stock(security, bars_needed):
                          dif.iloc[-2] <= dea.iloc[-2])
 
     # ATR
-    atr_values = utils.atr(high_prices, low_prices, close_prices, g.atr_period)
+    atr_values = utils.atr(high_prices, low_prices, close_prices, ATR_PERIOD)
     current_atr = atr_values.iloc[-1]
 
     # Donchian Channel
     dc_upper, dc_mid, dc_lower = utils.donchian(
-        high_prices, low_prices, close_prices, period=g.donchian_period)
+        high_prices, low_prices, close_prices, period=DONCHIAN_PERIOD)
 
     # Volume ratio
-    avg_vol = volumes.tail(g.volume_ratio_period).mean()
+    avg_vol = volumes.tail(VOLUME_RATIO_PERIOD).mean()
     current_vol = volumes.iloc[-1]
     vol_ratio = current_vol / avg_vol if avg_vol > 0 else 1.0
 
@@ -185,15 +170,15 @@ def _should_sell(context, security, ind):
         prev_high = ind["price"]
 
     # ATR trailing stop
-    trailing_stop = prev_high - g.atr_stop_multiplier * ind["atr"]
+    trailing_stop = prev_high - ATR_STOP_MULTIPLIER * ind["atr"]
     if ind["price"] < trailing_stop:
         return True, "ATR trailing stop: %.4f < %.4f" % (ind["price"], trailing_stop)
 
     # Resistance + overbought / MACD death cross
     if ind["nearest_resistance"] is not None:
         dist_to_res = (ind["nearest_resistance"] - ind["price"]) / ind["price"]
-        near_resistance = dist_to_res < g.sr_tolerance
-        if near_resistance and (ind["rsi"] > g.rsi_overbought or ind["macd_death_cross"]):
+        near_resistance = dist_to_res < SR_TOLERANCE
+        if near_resistance and (ind["rsi"] > RSI_OVERBOUGHT or ind["macd_death_cross"]):
             return True, "Resistance: R=%.4f (%.1f%% away), RSI=%.1f" % (
                 ind["nearest_resistance"], dist_to_res * 100, ind["rsi"])
 
@@ -213,20 +198,20 @@ def _should_buy(context, security, ind):
 
     # Position limit: max N stocks
     held = sum(1 for _, p in context.portfolio.positions.items() if p.amount > 0)
-    max_stocks = max(1, int(1.0 / g.max_single_pct))
+    max_stocks = max(1, int(1.0 / MAX_SINGLE_PCT))
     if held >= max_stocks:
         return False, ""
 
     # Support + oversold / MACD golden cross
     if ind["nearest_support"] is not None:
         dist_to_sup = (ind["price"] - ind["nearest_support"]) / ind["price"]
-        near_support = dist_to_sup < g.sr_tolerance
-        if near_support and (ind["rsi"] < g.rsi_oversold or ind["macd_golden_cross"]):
+        near_support = dist_to_sup < SR_TOLERANCE
+        if near_support and (ind["rsi"] < RSI_OVERSOLD or ind["macd_golden_cross"]):
             return True, "Support: S=%.4f (%.1f%% away), RSI=%.1f, vol=%.1f" % (
                 ind["nearest_support"], dist_to_sup * 100, ind["rsi"], ind["vol_ratio"])
 
     # Donchian lower band
-    if ind["price"] <= ind["dc_lower"] and ind["rsi"] < g.rsi_overbought:
+    if ind["price"] <= ind["dc_lower"] and ind["rsi"] < RSI_OVERBOUGHT:
         return True, "Donchian lower: %.4f <= %.4f" % (ind["price"], ind["dc_lower"])
 
     return False, ""
@@ -234,12 +219,12 @@ def _should_buy(context, security, ind):
 
 def market_open(context):
     """Daily trading logic: process all stocks in the pool."""
-    bars_needed = max(g.sr_lookback, g.atr_period, g.donchian_period,
-                      g.volume_ratio_period) + 30
+    bars_needed = max(SR_LOOKBACK, ATR_PERIOD, DONCHIAN_PERIOD,
+                      VOLUME_RATIO_PERIOD) + 30
 
     # --- Phase 1: Analyze all stocks ---
     signals = {}
-    for sec in g.stock_pool:
+    for sec in STOCK_POOL:
         ind = _analyze_stock(sec, bars_needed)
         if ind is not None:
             signals[sec] = ind
@@ -266,12 +251,12 @@ def market_open(context):
 
     if buy_candidates:
         held_count = sum(1 for s, p in context.portfolio.positions.items() if p.amount > 0)
-        remaining_slots = max(1, int(1.0 / g.max_single_pct)) - held_count
+        remaining_slots = max(1, int(1.0 / MAX_SINGLE_PCT)) - held_count
         if remaining_slots <= 0:
             remaining_slots = 1
 
         per_stock_value = min(
-            context.portfolio.available_cash * g.max_single_pct,
+            context.portfolio.available_cash * MAX_SINGLE_PCT,
             context.portfolio.available_cash / remaining_slots,
         )
 

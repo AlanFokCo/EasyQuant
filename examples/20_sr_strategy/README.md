@@ -65,6 +65,8 @@ python examples/20_sr_strategy/run_backtest.py
 
 Backtest note: `order*` calls are queued first and filled at the next trading day open in local backtests.
 
+New reports (timestamped PNG/HTML/MD/JSON) are written under the repository root `reports/` directory.
+
 Requires local data files in `data/` directory. If you don't have them:
 ```bash
 # Download data first (example 19)

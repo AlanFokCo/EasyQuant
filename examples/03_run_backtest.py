@@ -71,6 +71,10 @@ def market_open(context):
 # ============================================================
 
 if __name__ == "__main__":
+    import os
+
+    os.makedirs("reports", exist_ok=True)
+
     result = run_strategy(
         initialize_func=initialize,
         start_date="2024-01-01",
@@ -78,6 +82,8 @@ if __name__ == "__main__":
         starting_cash=100000,
         benchmark="000300.XSHG",
         report_dir="reports",
+        securities=["601390"],
+        use_local=True,
     )
 
     if result is not None:

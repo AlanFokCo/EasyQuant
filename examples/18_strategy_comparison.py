@@ -22,7 +22,7 @@ from eqlib import utils
 # Common parameters
 # ============================================================
 
-SECURITY = "601390"
+SECURITY = "002594"
 START_DATE = "2024-01-01"
 END_DATE = "2025-01-01"
 STARTING_CASH = 100000
@@ -43,6 +43,7 @@ def bh_init(context):
     ))
     context.universe = [SECURITY]
     g.done = False
+    run_daily(bh_handle, time="every_bar")
 
 
 def bh_handle(context):
@@ -50,6 +51,7 @@ def bh_handle(context):
         order_value(g.sec, context.portfolio.available_cash)
         log.info("Buy&Hold: BUY %s" % g.sec)
         g.done = True
+    record(total_value=context.portfolio.total_value)
 
 
 # ============================================================
@@ -176,19 +178,16 @@ def boll_handle(context):
             order_target(g.sec, 0)
             log.info("Boll: SELL %s @ %.3f" % (g.sec, price))
 
-    record(price=price, upper=upper[-1], lower=lower[-1])
+    record(price=price, upper=upper.iloc[-1], lower=lower.iloc[-1])
 
 
 # ============================================================
 # Runner and comparison
 # ============================================================
 
-def run_strategy_quiet(init_func, label, handle_data=None):
+def run_strategy_quiet(init_func, label):
     """Run a strategy and return its result metrics."""
-    from eqlib.engine import run_backtest, set_handle_data
-
-    if handle_data is not None:
-        set_handle_data(handle_data)
+    from eqlib.engine import run_backtest
 
     result = run_backtest(
         init_func,
@@ -197,6 +196,7 @@ def run_strategy_quiet(init_func, label, handle_data=None):
         starting_cash=STARTING_CASH,
         benchmark=BENCHMARK,
         securities=[SECURITY],
+        use_local=True,
     )
 
     if result is None:
@@ -204,6 +204,16 @@ def run_strategy_quiet(init_func, label, handle_data=None):
 
     ctx = result["context"]
     metrics = analyze_returns(result, risk_free_rate=0.03)
+    if not metrics:
+        return {
+            "label": label,
+            "final_value": ctx.portfolio.total_value,
+            "pnl_pct": (ctx.portfolio.total_value - STARTING_CASH) / STARTING_CASH * 100,
+            "sharpe": 0.0,
+            "max_dd": 0.0,
+            "trades": len(result["trade_log"]),
+            "win_rate": 0.0,
+        }
     trades = len(result["trade_log"])
     pnl_pct = (ctx.portfolio.total_value - STARTING_CASH) / STARTING_CASH * 100
 
@@ -233,16 +243,16 @@ if __name__ == "__main__":
     print()
 
     strategies = [
-        ("Buy & Hold",     bh_init,   bh_handle),
-        ("MA Crossover",   ma_init,   ma_handle),
-        ("RSI Mean Revert", rsi_init,  rsi_handle),
-        ("Bollinger Band", boll_init,  boll_handle),
+        ("Buy & Hold",      bh_init),
+        ("MA Crossover",    ma_init),
+        ("RSI Mean Revert", rsi_init),
+        ("Bollinger Band",  boll_init),
     ]
 
     results = []
-    for label, init_fn, handle_fn in strategies:
+    for label, init_fn in strategies:
         print("Running: %s ..." % label)
-        r = run_strategy_quiet(init_fn, label, handle_fn)
+        r = run_strategy_quiet(init_fn, label)
         if r:
             results.append(r)
             print("  -> P&L: %+.2f%%, Sharpe: %.2f, MaxDD: %.1f%%" % (
@@ -258,7 +268,7 @@ if __name__ == "__main__":
     # Sort by Sharpe, highest first
     results.sort(key=lambda r: r["sharpe"], reverse=True)
     for r in results:
-        print("%-18s %12,.2f %+10.2f %10.2f %10.1f %8d %10.1f" % (
+        print("%-18s %12.2f %+10.2f %10.2f %10.1f %8d %10.1f" % (
             r["label"], r["final_value"], r["pnl_pct"],
             r["sharpe"], r["max_dd"], r["trades"], r["win_rate"]))
     print("=" * 78)

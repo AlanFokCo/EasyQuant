@@ -125,6 +125,7 @@ if __name__ == "__main__":
         end_date="2024-12-31",
         starting_cash=100000,
         securities=securities,
+        use_local=True,
     )
 
     if result is not None:

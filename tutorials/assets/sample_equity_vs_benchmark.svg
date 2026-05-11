@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 280" font-family="system-ui,sans-serif">
+  <rect width="100%" height="100%" fill="#fafafa"/>
+  <text x="360" y="28" text-anchor="middle" font-size="14" fill="#262626">¥J-„6Êò¿:þ^žÞK	</text>
+  <line x1="50" y1="220" x2="670" y2="220" stroke="#d9d9d9" stroke-width="1"/>
+  <line x1="50" y1="220" x2="50" y2="50" stroke="#d9d9d9" stroke-width="1"/>
+  <text x="24" y="140" font-size="11" fill="#595959" transform="rotate(-90 24 140)">/¡6Ê %</text>
+  <text x="360" y="268" text-anchor="middle" font-size="11" fill="#595959">¤å</text>
+  <!-- strategy line -->
+  <polyline fill="none" stroke="#1890ff" stroke-width="2.5"
+    points="50,200 120,175 200,120 280,95 360,88 440,70 520,55 600,48 670,42"/>
+  <!-- benchmark dashed -->
+  <polyline fill="none" stroke="#8c8c8c" stroke-width="2" stroke-dasharray="8 5"
+    points="50,198 150,185 250,160 350,145 450,130 550,118 670,105"/>
+  <rect x="480" y="48" width="200" height="56" fill="#fff" stroke="#e8e8e8" rx="4"/>
+  <line x1="492" y1="68" x2="512" y2="68" stroke="#1890ff" stroke-width="3"/>
+  <text x="520" y="72" font-size="11" fill="#262626">Ve</text>
+  <line x1="492" y1="88" x2="512" y2="88" stroke="#8c8c8c" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="520" y="92" font-size="11" fill="#262626">úÆ</text>
+</svg>

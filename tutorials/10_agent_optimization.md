@@ -2,6 +2,8 @@
 
 > 使用 Claude Code（AI 编码智能体）对 EasyQuant 策略进行全自动参数优化。Claude Code 本身驱动整个流程 —— 运行回测、分析结果、修改策略文件、调用代码审查子 Agent —— 而不是依赖独立的 Python 脚本。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **约定全文：** 仓库根目录 [`CLAUDE.md`](../CLAUDE.md)
+
 ---
 
 ## 目录

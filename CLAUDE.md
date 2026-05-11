@@ -44,6 +44,7 @@ EasyQuant/
 ├── eqlib/                         ← Core library (do not modify during optimization)
 │   ├── engine.py                  ← Backtest engine
 │   ├── attribution.py             ← analyze_returns, brinson_attribution, etc.
+│   ├── stock_query.py             ← Fluent query API (query, valuation, get_fundamentals)
 │   └── ...
 ├── agent/                         ← AI agent support utilities
 │   ├── optimizer.py               ← Reference utility (rule-based param search, NOT the driver)

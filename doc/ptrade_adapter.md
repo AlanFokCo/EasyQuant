@@ -49,7 +49,7 @@ EasyQuant 的 PTrade 适配器是一个兼容层（compatibility layer），让�
 python examples/13_ptrade_export.py
 ```
 
-生成 `ptrade_strategy.py` 文件，复制到 QMT 策略编辑器即可运行。
+生成 `examples/ptrade_strategy_generated.py`（默认由 `examples/03_run_backtest.py` 生成样例），复制到 QMT 策略编辑器即可运行。
 
 ### 2.2 手动方式：三步迁移
 
@@ -327,9 +327,9 @@ def handlebar(ContextInfo):
 适用于已有完整的 EasyQuant 策略文件。
 
 ```bash
-# 编辑导出脚本，填入你的策略代码
+# 可在 13_ptrade_export.py 中修改 strategy_file / output_file
 python examples/13_ptrade_export.py
-# 输出 ptrade_strategy.py → 复制到 QMT
+# 输出 examples/ptrade_strategy_generated.py → 复制到 QMT
 ```
 
 ---

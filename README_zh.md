@@ -4,7 +4,7 @@
 
 本项目提供 `eqlib` Python 包——核心库，包含事件驱动回测引擎、数据 API 和分析工具。
 
-[English](README.md) · [新手教程](tutorials/) · [用户手册](doc/user_guide.md) · [API 参考](doc/api_reference.md) · [示例](examples/)
+[English](README.md) · [新手教程](tutorials/) · [**文档中心**](doc/README.md) · [用户手册](doc/user_guide.md) · [API 速查](doc/api_index.md) · [API 参考](doc/api_reference.md) · [示例](examples/Examples.md)
 
 ---
 
@@ -30,13 +30,16 @@ pip install akshare pandas numpy matplotlib scipy
 pip install pyarrow
 ```
 
-或从源码安装：
+或从源码安装（任选其一，需在仓库根目录执行）：
 
 ```bash
 git clone https://github.com/AlanFokCo/EasyQuant.git
 cd EasyQuant
-pip install -e .
+pip install .
+# 开发时可选用 editable：pip install -e .
 ```
+
+安装后可在任意目录 `import eqlib`。运行 `examples/` 下的脚本前，请在仓库根目录执行 `pip install .`（或 `pip install -e .`）。
 
 ---
 
@@ -66,6 +69,7 @@ result = run_strategy(
     end_date='2024-12-31',
     starting_cash=100000,
     securities=['601390'],
+    use_local=True,
 )
 ```
 
@@ -73,7 +77,7 @@ result = run_strategy(
 
 ## 示例
 
-参见 [`examples/`](examples/) 目录中的完整脚本：
+参见 [`examples/Examples.md`](examples/Examples.md) 索引；脚本位于 [`examples/`](examples/)：
 
 | # | 文件 | 说明 |
 |---|------|------|
@@ -82,7 +86,7 @@ result = run_strategy(
 | 03 | `03_run_backtest.py` | 运行完整回测 |
 | 04 | `04_stock_screener.py` | 选股扫描 |
 | 05 | `05_paper_trade.py` | 模拟盘交易 |
-| 06 | `06_advanced_api.py` | 高级数据 API |
+| 06 | `06_advanced_api.py` | 调度说明、组合优化、归因与因子分析 |
 | 07 | `07_market_data.py` | 市场数据：财务、指数、分钟线、Tick |
 | 08 | `08_lifecycle_callbacks.py` | 生命周期回调 |
 | 09 | `09_attribution_analysis.py` | 归因分析 |
@@ -98,6 +102,9 @@ result = run_strategy(
 | 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） |
 | 20 | `20_sr_strategy/` | 支撑阻力位组合策略（完整实盘案例） |
 | 21 | `21_combined_strategy/` | **全天候 Alpha** — 综合策略（多因子+行业轮动+RSI/MACD/布林带+ATR止损） |
+| 22 | `22_stock_selection_strategy.py` | 定期选股调仓（run_selection / 因子筛选） |
+| 23 | `23_small_cap_query_example.py` | 小市值 query/valuation 链式筛选示例 |
+| 24 | `24_quick_report_test.py` | 快速验证报告输出（PNG/HTML/MD/JSON） |
 
 ---
 

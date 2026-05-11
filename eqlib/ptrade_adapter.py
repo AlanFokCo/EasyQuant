@@ -10,7 +10,7 @@ Usage in QMT strategy editor:
 
     def market_open(context):
         close_data = attribute_history(g.security, 5, '1d', ['close'])
-        MA5 = close_data['close'].mean()
+        MA5 = close_data['close'].iloc[-1]  # current bar close
         current_price = close_data['close'][-1]
         if current_price > 1.01 * MA5:
             order_value(g.security, context.portfolio.available_cash)
@@ -959,7 +959,7 @@ def market_open(context):
 
     # Simple MA crossover
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
     current = hist['close'].iloc[-1]
 
     if current > ma5 and current > ma20:

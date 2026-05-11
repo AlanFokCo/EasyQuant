@@ -28,7 +28,7 @@ techniques covered in the EasyQuant tutorials and examples.
 ## Quick Start
 
 ```bash
-# Backtest (takes ~60 s)
+# Backtest (takes ~60 s); reports go to ../../reports/ under the repo root
 python examples/21_combined_strategy/run_backtest.py
 
 # Paper trade (runs until Ctrl+C)

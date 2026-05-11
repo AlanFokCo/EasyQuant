@@ -4,17 +4,24 @@
 
 ## 快速开始
 
-在项目根目录执行：
+在仓库根目录安装 `eqlib`（如未安装）：
+
+```bash
+pip install -e .
+# 或开发模式：pip install -e ".[dev]"
+```
+
+运行示例：
 
 ```bash
 python examples/<file>.py
 ```
 
-安装依赖（如未安装）：
+`examples/21_combined_strategy/`、`examples/20_sr_strategy/` 下的脚本仅将**当前脚本所在目录**加入 `sys.path`，用于 `import combined_strategy` / `import sr_strategy`；**不**修改用于导入 `eqlib` 的路径。
 
-```bash
-pip install -e ".[dev]"
-```
+依赖：`akshare`、`pandas`、`numpy`、`matplotlib`、`scipy`（见项目 `pyproject.toml`）。多数回测示例使用 `use_local=True`：首次会下载并写入 `data/`，之后优先读本地 CSV。
+
+**文档：** 安装排错、报告解读、API 速查见仓库 [`doc/README.md`](../doc/README.md)。**`reports/` 下示例报告与示例脚本的对应表**见 [`reports/README.md`](../reports/README.md)。
 
 ---
 
@@ -63,7 +70,276 @@ python examples/05_paper_trade.py --strategy examples/02_write_strategy --cash 2
 
 ### 19 本地数据管理
 
+### 19 本地数据管理
+
+见 [`examples/19_local_data_backtest.py`](19_local_data_backtest.py)。
+
+## 06_advanced_api.py — 高级 API：调度、组合优化、归因分析
+
+演示 eqlib 高级功能：
+
+- **策略调度** — `run_weekly` 按周调仓、`run_monthly` 按月调仓（说明与用法）
+- **组合优化** — 最小方差、最大夏普、风险平价三种优化方式
+- **归因分析** — 风险收益指标、Brinson 归因分解、Fama-French 因子分析
+
+**涉及 API：** `portfolio_optimizer`、`MinVariance`、`MaxSharpe`、`RiskParity`、`analyze_returns`、`brinson_attribution`、`fama_french_analysis`
+
+**运行方式：**
 ```bash
+python examples/06_advanced_api.py
+```
+
+---
+
+## 07_market_data.py — 扩展数据 API
+
+演示高级数据获取能力：
+
+- 财务摘要与财务报表
+- 按财务指标（P/E、P/B）筛选股票
+- 指数成分股与权重
+- 行业板块及其成分股
+- 分钟级 K 线数据（1分钟、5分钟、15分钟）
+- 当日分笔成交 Tick 数据
+
+**涉及 API：** `get_financial_abstract`、`get_financial_screen`、`get_index_stocks`、`get_industry_list`、`get_industry_stocks`、`fetch_minute_data`、`get_price_minute`、`get_tick_data`
+
+**运行方式：**
+```bash
+python examples/07_market_data.py
+```
+
+---
+
+## 08_lifecycle_callbacks.py — 生命周期回调与股票池管理
+
+演示如何使用生命周期钩子和动态股票池管理：
+
+- `before_trading_start` — 每个交易日开盘前回调（如 ST 股检测）
+- `after_trading_end` — 收盘后组合统计
+- `set_universe` / `get_universe` — 动态设置和获取股票池
+- `get_trade_days` — 交易日历查询
+- `run_monthly` — 每月调仓
+
+**涉及 API：** `before_trading_start`、`after_trading_end`、`set_universe`、`get_universe`、`get_trade_days`、`run_monthly`、`get_extras`
+
+**运行方式：**
+```bash
+python examples/08_lifecycle_callbacks.py
+```
+
+---
+
+## 09_attribution_analysis.py — 绩效归因分析
+
+多股票动量策略 + 完整的回测后分析：
+
+- **绩效指标** — 夏普比率、索提诺比率、最大回撤、Calmar 比率、Alpha、Beta、日胜率
+- **Brinson 归因** — 配置效应、选股效应、交互效应
+- **因子分析** — 市场 Beta、Alpha、动量相关性、残差波动率
+- **报告生成** — 图表、Markdown 报告、JSON 数据
+
+**涉及 API：** `analyze_returns`、`brinson_attribution`、`fama_french_analysis`、`generate_chart`、`generate_report_md`、`generate_report_json`
+
+**运行方式：**
+```bash
+python examples/09_attribution_analysis.py
+```
+
+---
+
+## 10_index_concept.py — 指数与概念策略
+
+从指数成分股构建策略股票池，探索概念/主题板块：
+
+- 获取指数成分股及权重
+- 概念板块及其成分股查询
+- 运行基于动量的指数策略，每周调仓
+
+**涉及 API：** `get_index_stocks`、`get_index_weights`、`get_concept_list`、`get_concept_stocks`、`get_industry`
+
+**运行方式：**
+```bash
+python examples/10_index_concept.py
+```
+
+---
+
+## 11_utils_library.py — 工具库：技术指标 / 统计 / 资金管理 / 支撑阻力位
+
+全面演示 `eqlib.utils` 中的计算工具：
+
+- **技术指标** — 均线（MA/EMA/SMA/WMA）、MACD、RSI、KDJ、布林带、ATR、CCI、威廉指标、ROC、OBV、ADX、金叉/死叉检测
+- **统计分析** — 滚动夏普比率、滚动 Beta、Z-Score、百分位排名、线性回归、最大回撤、VaR/CVaR、CAGR
+- **资金管理** — Kelly Criterion、固定比例风险仓位、ATR 仓位管理、波动率目标、马丁格尔/反马丁格尔、风险平价权重
+- **支撑阻力位** — 五种枢轴点（Classic/Fibonacci/Woodie/Camarilla/DeMark）、摆动高低点聚类、斐波那契回撤、唐奇安通道、成交量分布（POC/VAH/VAL）、整数心理价位、ATR 追踪止损、缺口检测
+
+**涉及 API：** `utils.ma`、`utils.ema`、`utils.macd`、`utils.rsi`、`utils.kdj`、`utils.boll`、`utils.atr`、`utils.adx`、`utils.rolling_sharpe`、`utils.value_at_risk`、`utils.max_drawdown`、`utils.cagr`、`utils.kelly_criterion`、`utils.atr_position_size`、`utils.fixed_fraction_size`、`utils.risk_parity_weights`、`utils.pivot_classic`、`utils.support_resistance_levels`、`utils.fibonacci_retracement`、`utils.donchian`、`utils.volume_profile_support_resistance`、`utils.trailing_stop`、`utils.gap_up_down`
+
+**运行方式：**
+```bash
+python examples/11_utils_library.py
+```
+
+---
+
+## 12_portfolio_backtest.py — 组合回测模式
+
+使用 `StrategyConfig` 和 `run_portfolio_backtest` 进行多股票组合回测：
+
+- 定义初始资金、股票池、每只股票的仓位比例
+- 策略函数遍历 `context.universe`，从股票池中选择标的交易
+- 自动生成包含每只股票操作明细、整体盈亏、与大盘对比的综合报告
+- 通过 `report_suffix` 参数区分不同版本或参数的回测结果
+
+**涉及 API：** `StrategyConfig`、`run_portfolio_backtest`、`context.universe`、`order_value`、`order_target`
+
+**运行方式：**
+```bash
+python examples/12_portfolio_backtest.py
+```
+
+---
+
+## 13_ptrade_export.py — 导出 PTrade/QMT 策略
+
+将 EasyQuant 策略一键转换为 PTrade/QMT 平台可运行的格式：
+
+- 以 `examples/03_run_backtest.py` 为样例策略读入并包装为 QMT 入口
+- 自动生成 `init()` / `handlebar()` 入口函数
+- 透明转换股票代码格式（`601390` → `601390.SH`）
+- 兼容 EasyQuant 的全部 API：`attribute_history`、`order_value`、`run_daily` 等
+- 提供 `start()` / `on_bar()` 生命周期桥接
+
+**涉及 API：** `start`、`on_bar`、`export_ptrade_script`、`QMT_TEMPLATE`
+
+**运行方式：**
+```bash
+# 生成 QMT 策略文件（输出到 examples/ptrade_strategy_generated.py）
+python examples/13_ptrade_export.py
+
+# 将生成的脚本复制到 QMT 编辑器即可运行（需自行填写资金账号）
+```
+
+---
+
+## 14_bollinger_strategy.py — 布林带均值回归策略
+
+演示经典的布林带均值回归策略：
+
+- 价格触及下轨买入，触及上轨卖出
+- 内置止损机制（亏损超过设定比例强制平仓）
+- 适合震荡市中的高抛低吸操作
+
+**涉及 API：** `utils.boll`、`order_value`、`order_target`、`set_order_cost`
+
+**运行方式：**
+```bash
+python examples/14_bollinger_strategy.py
+```
+
+---
+
+## 15_macd_volume_strategy.py — MACD 趋势跟踪 + 成交量确认
+
+演示结合 MACD 和成交量的趋势跟踪策略：
+
+- MACD 金叉/死叉判断趋势方向
+- 成交量放大确认信号有效性
+- ATR 追踪止损，根据波动率动态调整止损位
+
+**涉及 API：** `utils.macd`、`utils.atr`、`order_value`、`order_target`
+
+**运行方式：**
+```bash
+python examples/15_macd_volume_strategy.py
+```
+
+---
+
+## 16_multi_factor_strategy.py — 多因子选股 + 每周轮动
+
+演示多因子量化选股策略：
+
+- 动量因子：过去 20 天收益率
+- 成交量因子：短期成交量与长期均值的比值
+- 价格过滤：排除低价股和高价股
+- 每周一调仓，等权配置排名前 N 的股票
+
+**涉及 API：** `run_weekly`、`attribute_history`、`context.universe`、`order_value`
+
+**运行方式：**
+```bash
+python examples/16_multi_factor_strategy.py
+```
+
+---
+
+## 17_grid_trading_strategy.py — 网格交易策略
+
+演示适用于震荡市的网格交易策略：
+
+- 设定价格区间并划分为 N 个网格级别
+- 价格下跌到网格级别时买入一批
+- 价格上涨到网格级别时卖出一批
+- 从价格的上下波动中获利
+
+适合低波动、区间震荡的股票（如银行股）。
+
+**涉及 API：** `order_value`、`order`、`attribute_history`
+
+**运行方式：**
+```bash
+python examples/17_grid_trading_strategy.py
+```
+
+---
+
+## 18_strategy_comparison.py — 多策略对比
+
+在同一只股票和同一时间段内，横向对比多种策略的表现：
+
+- 买入持有（基准）
+- 均线交叉（趋势跟踪）
+- RSI 均值回归（反向交易）
+- 布林带（均值回归）
+
+输出格式化的对比表格，按夏普比率排序，便于客观评估哪种方法更有效。
+
+**涉及 API：** `run_backtest`、`analyze_returns`、`record`
+
+**运行方式：**
+```bash
+python examples/18_strategy_comparison.py
+```
+
+---
+
+## 19_local_data_backtest.py — 本地数据回测模式
+
+演示 `use_local` 参数的用法：
+
+- 首次运行：从网络下载数据，保存到本地 CSV
+- 后续运行：从本地 CSV 加载数据，无需网络
+- 手动管理：列出、下载、删除本地数据文件
+
+适合以下场景：
+- 离线回测（无网络环境）
+- 节省重复下载的时间
+- 管理自己的历史数据版本
+- 批量预下载数据
+
+**涉及 API：** `use_local`、`has_local_data`、`list_local_stocks`、`save_stock_local`、`clear_all_local_data`
+
+**运行方式：**
+```bash
+# 首次运行 — 下载数据并回测
+python examples/19_local_data_backtest.py
+
+# 再次运行 — 使用本地数据（无网络请求）
+python examples/19_local_data_backtest.py
+
+# 查看本地数据列表
 python examples/19_local_data_backtest.py --list
 python examples/19_local_data_backtest.py --download-all
 ```
@@ -71,7 +347,50 @@ python examples/19_local_data_backtest.py --download-all
 ### 21 综合策略模拟盘
 
 ```bash
+# 回测（约 60 秒）
+python examples/21_combined_strategy/run_backtest.py
+
+# 模拟盘（持续运行，按 Ctrl+C 停止）
+python examples/21_combined_strategy/run_paper_trade.py
 python examples/21_combined_strategy/run_paper_trade.py --cash 500000 --interval 60
+```
+
+**配套教程：** [Tutorial 09: 全天候 Alpha 综合策略](../tutorials/09_combined_strategy.md)
+
+---
+
+## 20_sr_strategy/ — 支撑阻力位组合策略（完整实盘案例）
+
+一个真实的多股票组合策略实战案例：基于支撑阻力位、RSI、MACD、ATR 和唐奇安通道，
+在 8 只不同行业的 A 股中进行交易。
+
+策略逻辑：
+- **买入**：价格接近支撑位 + RSI 超卖 或 MACD 金叉
+- **卖出**：价格接近阻力位 + RSI 超买 或 MACD 死叉
+- **止损**：ATR 追踪止损
+- **仓位**：每只股票最多 25% 资金，等权配置
+
+回测结果（2020-01-01 至 2026-03-30）：
+- 初始资金：1,000,000
+- 最终价值：2,371,889.70
+- 总收益率：+137.19%
+- 交易次数：226 笔
+
+本目录包含完整的策略代码、回测脚本和预生成的报告文件（PNG、HTML、Markdown、JSON），
+用户可以查看报告了解策略表现，也可以直接运行回测验证。
+
+**涉及 API：** `utils.support_resistance_levels`、`utils.rsi`、`utils.macd`、`utils.atr`、`utils.donchian`、`order_value`、`order_target`、`record`
+
+**运行方式：**
+```bash
+# 查看预生成的报告
+# 打开 examples/20_sr_strategy/sr_backtest.html（浏览器）
+
+# 运行回测（需要 data/ 目录中的本地数据；报告写入仓库根目录 reports/）
+python examples/20_sr_strategy/run_backtest.py
+
+# 模拟盘（持续运行，按 Ctrl+C 停止）
+python examples/20_sr_strategy/run_paper_trade.py
 ```
 
 ---
@@ -86,8 +405,121 @@ python examples/21_combined_strategy/run_paper_trade.py --cash 500000 --interval
 
 ---
 
+## 22_stock_selection_strategy.py — 定期选股调仓（因子筛选）
+
+演示如何使用 `run_selection` 实现定期投资组合调仓：
+
+- **ST 过滤** — 自动剔除 ST/\*ST 股票
+- **PB 过滤** — 排除市净率过高的股票
+- **动量过滤** — 排除近期涨幅过大的股票
+- **多因子打分** — PE/PB/动量加权综合评分
+- **Top-N 选股** — 选取排名前 N 的股票等权配置
+
+支持三种选股方式：普通函数、StockSelector 子类、`run_strategy` 参数。
+
+**调仓频率：** `monthly:N`（每月第 N 天）、`weekly:N`（每周第 N 个交易日）、`daily`
+
+**涉及 API：** `run_selection`、`filter_st_stocks`、`filter_paused_stocks`、`TopNSelector`、`MultiFactorSelector`、`fetch_factor_data`
+
+**运行方式：**
+```bash
+python examples/22_stock_selection_strategy.py
+```
+
+---
+
+## 23_small_cap_query_example.py — 小市值选股（query API）
+
+演示 `query()` / `valuation` / `get_fundamentals()` 链式筛选 API：
+
+- 主程序先用 query 拉取一篮子代码，并作为 `securities=` 预加载 OHLCV（与回测成交一致）
+- 策略内优先使用该篮子；否则回退到 query + 行情快照筛选
+- 可选过滤停牌；定期调仓，等权配置
+
+**涉及 API：** `query`、`valuation`、`get_fundamentals`、`filter_paused_stocks`、`order_value`、`order_target_value`
+
+**运行方式：**
+```bash
+python examples/23_small_cap_query_example.py
+```
+
+---
+
+## 24_quick_report_test.py — 快速回测验证报告格式
+
+快速运行一个简单回测，验证所有报告输出格式是否正常生成：
+
+- PNG 图表（matplotlib）
+- HTML 报告（TradingView lightweight-charts）
+- Markdown 报告
+- JSON 数据
+
+适合在修改报告代码后快速验证输出是否正常。
+
+**涉及 API：** `run_backtest`、`generate_chart`、`generate_html_report`、`generate_report_md`、`generate_report_json`、`analyze_returns`
+
+**运行方式：**
+```bash
+python examples/24_quick_report_test.py
+```
+
+---
+
+## 速查表
+
+| # | 文件 | 主题 | 运行时间 |
+|---|------|------|---------|
+| 01 | `01_fetch_data.py` | 数据获取基础 | ~10s |
+| 02 | `02_write_strategy.py` | 策略编写（模块，不直接运行） | N/A |
+| 03 | `03_run_backtest.py` | 完整回测 + 报告生成 | ~15s |
+| 04 | `04_stock_screener.py` | 市场扫描选股 | ~30s |
+| 05 | `05_paper_trade.py` | 实时模拟盘 | 持续运行，按 Ctrl+C 停止 |
+| 06 | `06_advanced_api.py` | 调度说明、组合优化、归因与因子分析 | ~30s |
+| 07 | `07_market_data.py` | 扩展数据 API | ~30s |
+| 08 | `08_lifecycle_callbacks.py` | 生命周期回调 + 股票池 | ~15s |
+| 09 | `09_attribution_analysis.py` | 绩效归因 | ~15s |
+| 10 | `10_index_concept.py` | 指数与概念策略 | ~30s |
+| 11 | `11_utils_library.py` | 工具库：技术指标 / 统计 / 资金管理 / 支撑阻力位 | ~5s |
+| 12 | `12_portfolio_backtest.py` | 组合回测模式（StrategyConfig） | ~15s |
+| 13 | `13_ptrade_export.py` | 导出 PTrade/QMT 策略 | ~1s |
+| 14 | `14_bollinger_strategy.py` | 布林带均值回归策略 | ~15s |
+| 15 | `15_macd_volume_strategy.py` | MACD 趋势跟踪 + 成交量确认 | ~15s |
+| 16 | `16_multi_factor_strategy.py` | 多因子选股 + 每周轮动 | ~30s |
+| 17 | `17_grid_trading_strategy.py` | 网格交易策略 | ~15s |
+| 18 | `18_strategy_comparison.py` | 多策略横向对比（同股同时段） | ~30s |
+| 19 | `19_local_data_backtest.py` | 本地数据回测模式（下载一次，离线回测） | ~15s |
+| 20 | `20_sr_strategy/` | 支撑阻力位组合策略（完整实盘案例） | ~30s |
+| 21 | `21_combined_strategy/` | 全天候 Alpha 综合策略（多因子+行业轮动+RSI/MACD/布林+ATR） | ~60s |
+| 22 | `22_stock_selection_strategy.py` | 定期选股调仓（因子筛选：ST/PB/动量过滤+多因子打分） | ~30s |
+| 23 | `23_small_cap_query_example.py` | 小市值选股（query/valuation 链式筛选 API） | ~15s |
+| 24 | `24_quick_report_test.py` | 快速回测验证报告格式（PNG/HTML/MD/JSON） | ~10s |
+
+---
+
 ## 相关文档
 
 - `examples/20_sr_strategy/README.md`
 - `examples/21_combined_strategy/README.md`
 - `tutorials/09_combined_strategy.md`
+
+## 安装与注意事项
+
+安装依赖：
+```bash
+pip install akshare pandas numpy matplotlib scipy
+pip install pyarrow   # 可选，磁盘缓存更快
+pip install .         # 在仓库根目录：安装 eqlib（推荐）
+```
+## 相关文档
+
+- `examples/20_sr_strategy/README.md`
+- `examples/21_combined_strategy/README.md`
+- `tutorials/09_combined_strategy.md`
+
+## 注意事项
+
+- 示例 04、07 等需连接行情/财务接口，首次运行需网络；部分接口在交易时段数据更完整。
+- 示例 05、21 的模拟盘持续运行，按 Ctrl+C 停止。
+- 生成型回测报告默认写入仓库根目录的 `reports/`（已在 `.gitignore` 中忽略）。
+- 示例 13 会生成 `examples/ptrade_strategy_generated.py`（可加入 `.gitignore` 或自行删除）。
+- 多数回测示例带 `use_local=True`：配合 `examples/19_local_data_backtest.py` 预下载后，可显著减少重复请求。

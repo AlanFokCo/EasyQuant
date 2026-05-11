@@ -18,18 +18,20 @@ from eqlib import *
 # ============================================================
 
 CANDIDATE_POOL = [
-    "601390",  # ICBC (banking)
-    "600519",  # Kweichow Moutai (liquor)
-    "000858",  # Wuliangye (liquor)
-    "600036",  # China Merchants Bank (banking)
-    "000001",  # Ping An Bank (banking)
-    "601318",  # Ping An Insurance (insurance)
-    "600276",  # Hengrui Pharma (pharma)
-    "000333",  # Midea Group (appliances)
-    "600887",  # Yili Industrial (dairy)
-    "000651",  # Gree Electric (appliances)
-    "601166",  # Industrial Bank (banking)
-    "002714",  # Muyuan Foods (agriculture)
+    "601390",  # China Railway 中国中铁
+    "600036",  # China Merchants Bank 招商银行
+    "000630",  # Tongling Nonferrous 铜陵有色
+    "518880",  # Gold ETF 黄金ETF
+    "601088",  # China Shenhua 中国神华
+    "601857",  # PetroChina 中国石油
+    "002594",  # BYD 比亚迪
+    "000768",  # AVIC Jonhon 中航光电
+    "600536",  # China National Software 中国软件
+    "601111",  # Air China 中国国航
+    "601179",  # China XD Electric 中国西电
+    "516090",  # ETF fund
+    "600118",  # China Spacesat 中国卫星
+    "159819",  # ETF fund
 ]
 TOP_N = 5
 REBALANCE = "monthly:1"
@@ -216,6 +218,8 @@ def trade(context):
 # ============================================================
 
 if __name__ == "__main__":
+    import os
+
     print("=" * 60)
     print("Stock Selection Strategy Interface Demo")
     print("=" * 60)
@@ -223,6 +227,8 @@ if __name__ == "__main__":
     print("Top picks per rebalance: %d" % TOP_N)
     print("Rebalance frequency: %s" % REBALANCE)
     print()
+
+    os.makedirs("reports", exist_ok=True)
 
     result = run_strategy(
         initialize_func=initialize,
@@ -232,6 +238,7 @@ if __name__ == "__main__":
         benchmark="000300.XSHG",
         securities=CANDIDATE_POOL,
         report_dir="reports",
+        use_local=True,
     )
 
     if result is not None:

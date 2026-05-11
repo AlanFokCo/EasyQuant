@@ -4,7 +4,7 @@ A quantitative strategy and backtesting tool for the **China A-share market**.
 
 This project provides the `eqlib` Python package — the core library that implements the event-driven backtesting engine, data APIs, and analysis tools.
 
-[中文文档](README_zh.md) · [新手教程](tutorials/) · [用户手册](doc/user_guide.md) · [API 参考](doc/api_reference.md) · [示例](examples/)
+[中文文档](README_zh.md) · [新手教程](tutorials/) · [**Documentation hub**](doc/README.md) · [User guide](doc/user_guide.md) · [API index](doc/api_index.md) · [API reference](doc/api_reference.md) · [Examples](examples/Examples.md)
 
 ---
 
@@ -42,13 +42,16 @@ pip install akshare pandas numpy matplotlib scipy
 pip install pyarrow
 ```
 
-Or install from source:
+Or install from the repository root (either form works):
 
 ```bash
 git clone https://github.com/AlanFokCo/EasyQuant.git
 cd EasyQuant
-pip install -e .
+pip install .
+# optional editable install: pip install -e .
 ```
+
+After `pip install .`, you can `import eqlib` from any working directory. Run `pip install .` (or `pip install -e .`) from the repository root before executing scripts under `examples/`.
 
 ---
 
@@ -78,6 +81,7 @@ result = run_strategy(
     end_date='2024-12-31',
     starting_cash=100000,
     securities=['601390'],
+    use_local=True,
 )
 ```
 
@@ -87,7 +91,7 @@ result = run_strategy(
 
 ## Examples
 
-See the [`examples/`](examples/) directory for complete scripts:
+See [`examples/Examples.md`](examples/Examples.md) for a full index. Scripts live under [`examples/`](examples/).
 
 | # | File | Description |
 |---|------|-------------|
@@ -96,7 +100,7 @@ See the [`examples/`](examples/) directory for complete scripts:
 | 03 | `03_run_backtest.py` | Run a full backtest |
 | 04 | `04_stock_screener.py` | Stock screening |
 | 05 | `05_paper_trade.py` | Paper trading |
-| 06 | `06_advanced_api.py` | Advanced data APIs |
+| 06 | `06_advanced_api.py` | Scheduling, portfolio optimization, attribution |
 | 07 | `07_market_data.py` | Market data: financials, index, minute, tick |
 | 08 | `08_lifecycle_callbacks.py` | Lifecycle callbacks |
 | 09 | `09_attribution_analysis.py` | Attribution analysis |
@@ -112,7 +116,9 @@ See the [`examples/`](examples/) directory for complete scripts:
 | 19 | `19_local_data_backtest.py` | Local data mode (download once, backtest offline) |
 | 20 | `20_sr_strategy/` | Support & Resistance portfolio strategy (real-world case) |
 | 21 | `21_combined_strategy/` | **All-Weather Alpha** — comprehensive combined strategy (multi-factor + sector rotation + RSI/MACD/Bollinger + ATR) |
-| 22 | `22_stock_selection_strategy.py` | **Stock Selection** — periodic rebalancing with factor-based screening (ST/PE/momentum filters, TopNSelector, MultiFactorSelector) |
+| 22 | `22_stock_selection_strategy.py` | **Stock Selection** — periodic rebalancing with factor-based screening |
+| 23 | `23_small_cap_query_example.py` | Small-cap screening with chainable query/valuation API |
+| 24 | `24_quick_report_test.py` | Quick backtest verifying all report formats (PNG/HTML/MD/JSON) |
 
 ---
 
@@ -263,6 +269,15 @@ result = run_strategy(
 | `MultiFactorSelector(factors, top_n)` | Rank by weighted composite score |
 
 See [`examples/22_stock_selection_strategy.py`](examples/22_stock_selection_strategy.py) for a complete example.
+
+---
+
+## Directories
+
+| Directory | Purpose |
+|-----------|---------|
+| `data/` | Local CSV cache for daily OHLCV data. Created automatically when `use_local=True` or `save_stock_local()` is called. Re-download from network if deleted. |
+| `reports/` | Output directory for backtest reports (PNG charts, HTML, Markdown, JSON). Created automatically by `run_strategy()` and `generate_chart()`. |
 
 ---
 

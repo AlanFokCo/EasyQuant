@@ -43,9 +43,9 @@ Usage:
 import os
 import sys
 
-# Add project root and this directory to path so eqlib and sr_strategy can be found
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.insert(0, _here)
 
 from sr_strategy import initialize
 from eqlib import *
@@ -56,9 +56,6 @@ STOCK_POOL = [
 ]
 
 if __name__ == "__main__":
-    import os
-    import datetime
-
     print("=" * 60)
     print("Portfolio Support & Resistance Strategy Backtest")
     print("=" * 60)
@@ -70,6 +67,10 @@ if __name__ == "__main__":
     print("Local data: Yes (load from CSV)")
     print()
 
+    _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _report_dir = os.path.join(_root, "reports")
+    os.makedirs(_report_dir, exist_ok=True)
+
     result = run_strategy(
         initialize_func=initialize,
         start_date="2020-01-01",
@@ -78,7 +79,7 @@ if __name__ == "__main__":
         benchmark="000001.XSHG",
         securities=STOCK_POOL,
         use_local=True,
-        report_dir=os.path.dirname(os.path.abspath(__file__)),
+        report_dir=_report_dir,
     )
 
     if result is None:
