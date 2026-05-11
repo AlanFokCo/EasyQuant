@@ -19,7 +19,37 @@ This project provides the `eqlib` Python package — the core library that imple
 - **PTrade/QMT adapter** — export EasyQuant strategies to PTrade/QMT platform with minimal changes
 - **Stock selection** — periodic portfolio rebalancing with factor-based screening (ST/PB/PE/momentum filters, Top-N, multi-factor scoring)
 - **Utility library** — technical indicators (MA, MACD, RSI, KDJ, Bollinger, ATR), statistical tools, position sizing (Kelly, ATR-based, fixed fractional)
-- **Reports** — chart (PNG), Markdown, and JSON output
+- **Reports** — interactive HTML, chart (PNG), Markdown, and JSON output with 20+ risk/return metrics
+- **Direct stock query** — fluent chainable API (`query` / `valuation` / `get_fundamentals`) for fundamental screening
+
+---
+
+## Report Preview
+
+`run_strategy` generates an **interactive HTML report** (open in any browser) plus PNG, Markdown, and JSON. Below are snapshots from real backtest runs — same layout, different results.
+
+### Profitable strategies
+
+| **MACD Trend + Volume** (600536) | **Bollinger Mean Reversion** (601088) | **Support/Resistance** (8-stock pool) |
+|:---:|:---:|:---:|
+| **+103.48%** · 16 trades | **+57.77%** · 8 trades | **+119.97%** · 171 trades |
+| [![MACD+Volume](tutorials/assets/example_report_macd_volume.png)](tutorials/assets/example_report_macd_volume.png) | [![Bollinger](tutorials/assets/example_report_bollinger.png)](tutorials/assets/example_report_bollinger.png) | [![S/R](tutorials/assets/example_report_sr_strategy.png)](tutorials/assets/example_report_sr_strategy.png) |
+
+| **Grid Trading** (601857) | **Multi-Factor** (10 stocks) | **Stock Selection** (14 stocks) |
+|:---:|:---:|:---:|
+| **+30.25%** · 10 trades | **+5.19%** · 135 trades | **+16.96%** · 5 holdings |
+| [![Grid](tutorials/assets/example_report_grid.png)](tutorials/assets/example_report_grid.png) | [![Multi-Factor](tutorials/assets/example_report_multifactor.png)](tutorials/assets/example_report_multifactor.png) | [![Stock Selection](tutorials/assets/example_report_stock_selection.png)](tutorials/assets/example_report_stock_selection.png) |
+
+### Losing strategies (for learning)
+
+| **Momentum Portfolio** (5 stocks) | **Local Data** (000768) |
+|:---:|:---:|
+| **−25.69%** · 52 trades | **−33.28%** · 16 trades |
+| [![Portfolio](tutorials/assets/example_report_portfolio.png)](tutorials/assets/example_report_portfolio.png) | [![Local Data](tutorials/assets/example_report_19_localdata.png)](tutorials/assets/example_report_19_localdata.png) |
+
+> **How to read reports:** each HTML page has a header summary → metric cards (Sharpe, max drawdown, alpha, etc.) → K-line chart → cumulative returns vs benchmark → drawdown curve → daily P&L → trade/position tabs. See [**Report & Metrics Guide**](doc/reports_and_metrics.md) for a field-by-field walkthrough.
+
+---
 
 ---
 
@@ -86,6 +116,8 @@ result = run_strategy(
 ```
 
 > Execution model: orders created by `order*` APIs are queued in the current callback and filled at the **next trading day open** to avoid look-ahead bias.
+>
+> **Output:** after running, find 4 files in `reports/` — `.png` chart, `.html` interactive report, `.md` summary, `.json` data. Open the `.html` in your browser. See the report preview section above for what they look like.
 
 ---
 
