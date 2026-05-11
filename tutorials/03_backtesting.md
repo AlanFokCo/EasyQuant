@@ -73,9 +73,9 @@
 
 真实回测会在仓库根目录的 **`reports/`** 下写出四套文件（`.html` / `.png` / `.md` / `.json`）。文件名带时间戳；带后缀的（如 `_19_localdata`）通常对应示例脚本里的 `report_suffix` 或脚本说明。
 
-**推荐阅读：** 仓库内 [`reports/README.md`](../reports/README.md) 列出了与示例脚本对应的对照表。下面 PNG 与其中 **`backtest_20260511_234245_19_localdata.png`** 为同一次运行（示例 [`19_local_data_backtest.py`](../examples/19_local_data_backtest.py)）；副本放在 `tutorials/assets/` 便于在网页里直接显示，**你本地学习时请同时用浏览器打开同名的 `.html`** 对照 [报告与指标详解](../doc/reports_and_metrics.md)。
+**推荐阅读：** 仓库内 [`reports/README.md`](../reports/README.md) 列出了与示例脚本对应的对照表。下面 HTML 截图与其中 **`backtest_20260511_234245_19_localdata.html`** 为同一次运行（示例 [`19_local_data_backtest.py`](../examples/19_local_data_backtest.py)）；副本放在 `tutorials/assets/` 便于在网页里直接显示，**你本地学习时请同时用浏览器打开同名的 `.html`** 对照 [报告与指标详解](../doc/reports_and_metrics.md)。
 
-![示例：本地数据回测报告图（19_local_data）](assets/example_report_19_localdata.png)
+![示例：本地数据回测 HTML 报告（19_local_data）](assets/example_report_html_19_localdata.png)
 
 **同一组结果还可打开：**
 
@@ -84,7 +84,7 @@
 
 抽象「策略 vs 基准」折线示意见仍保留：`assets/sample_equity_vs_benchmark.svg`。
 
-**对照 HTML 页眉与指标卡片读数：**打开上节同名 `.html` 后，按 [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md) **第 2.8 节**逐条对照（与下 PNG 同源示例）；若图区空白，多为 CDN 被拦，见 [FAQ](../doc/FAQ.md#faq-html-blank)。
+**对照 HTML 页眉与指标卡片读数：**打开上节同名 `.html` 后，按 [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md) **第 2.8 节**逐条对照（与上 HTML 截图同源示例）；若图区空白，多为 CDN 被拦，见 [FAQ](../doc/FAQ.md#faq-html-blank)。
 
 ---
 
@@ -94,37 +94,37 @@
 
 ### 布林带均值回归（Example 14，股票 601088 中国神华）
 
-![布林带策略报告图](assets/example_report_bollinger.png)
+![布林带策略 HTML 报告](assets/example_report_html_bollinger.png)
 
 > 结果：**+57.77%**，交易 8 笔。布林带策略在震荡市表现优异——价格触及下轨买入、上轨卖出，天然的低买高卖逻辑。
 
 ### MACD 趋势 + 成交量确认（Example 15，股票 600536 中国软件）
 
-![MACD+成交量报告图](assets/example_report_macd_volume.png)
+![MACD+成交量 HTML 报告](assets/example_report_html_macd_volume.png)
 
 > 结果：**+103.48%**，交易 16 笔。科技股波动大，MACD 金叉配合放量确认，能较好地捕捉趋势启动点。
 
 ### 网格交易（Example 17，股票 601857 中国石油）
 
-![网格交易报告图](assets/example_report_grid.png)
+![网格交易 HTML 报告](assets/example_report_html_grid.png)
 
 > 结果：**+30.25%**，交易 10 笔。网格适合低波动、有明确价格区间的股票——在区间内反复"低吸高抛"。
 
 ### 多因子选股（Example 16，10 只股票池）
 
-![多因子选股报告图](assets/example_report_multifactor.png)
+![多因子选股 HTML 报告](assets/example_report_html_multifactor.png)
 
 > 结果：**+5.19%**，交易 135 笔。多因子模型每周从 10 只股票中选出动量/成交量/波动率综合得分最高的 3 只，高频换手。
 
 ### 选股策略界面（Example 22，14 只股票池）
 
-![选股策略报告图](assets/example_report_stock_selection.png)
+![选股策略 HTML 报告](assets/example_report_html_stock_selection.png)
 
 > 结果：**+16.96%**，持有 5 只股票。基于 PE 低估值选股 + 月度调频，买入后持有至期末。Brinson 归因显示配置效应 +2.84%、选股效应 +2.84%。
 
 ### 组合回测（Example 12，5 只股票等权）
 
-![组合回测报告图](assets/example_report_portfolio.png)
+![组合回测 HTML 报告](assets/example_report_html_portfolio.png)
 
 > 结果：**-25.69%**，交易 52 笔。动量策略在本期内表现不佳，说明"追涨杀跌"在某些市场环境中会反复亏损。
 

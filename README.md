@@ -34,11 +34,13 @@ This project provides the `eqlib` Python package — the core library that imple
 |:---:|:---:|:---:|
 | **+103.48%** · 16 trades | **+57.77%** · 8 trades | **+119.97%** · 171 trades |
 | [![MACD+Volume](tutorials/assets/example_report_macd_volume.png)](tutorials/assets/example_report_macd_volume.png) | [![Bollinger](tutorials/assets/example_report_bollinger.png)](tutorials/assets/example_report_bollinger.png) | [![S/R](tutorials/assets/example_report_sr_strategy.png)](tutorials/assets/example_report_sr_strategy.png) |
+| HTML report: [![HTML](tutorials/assets/example_report_html_macd_volume.png)](tutorials/assets/example_report_html_macd_volume.png) | HTML report: [![HTML](tutorials/assets/example_report_html_bollinger.png)](tutorials/assets/example_report_html_bollinger.png) | HTML report: [![HTML](tutorials/assets/example_report_html_sr_strategy.png)](tutorials/assets/example_report_html_sr_strategy.png) |
 
 | **Grid Trading** (601857) | **Multi-Factor** (10 stocks) | **Stock Selection** (14 stocks) |
 |:---:|:---:|:---:|
 | **+30.25%** · 10 trades | **+5.19%** · 135 trades | **+16.96%** · 5 holdings |
 | [![Grid](tutorials/assets/example_report_grid.png)](tutorials/assets/example_report_grid.png) | [![Multi-Factor](tutorials/assets/example_report_multifactor.png)](tutorials/assets/example_report_multifactor.png) | [![Stock Selection](tutorials/assets/example_report_stock_selection.png)](tutorials/assets/example_report_stock_selection.png) |
+| HTML report: [![HTML](tutorials/assets/example_report_html_grid.png)](tutorials/assets/example_report_html_grid.png) | HTML report: [![HTML](tutorials/assets/example_report_html_multifactor.png)](tutorials/assets/example_report_html_multifactor.png) | HTML report: [![HTML](tutorials/assets/example_report_html_stock_selection.png)](tutorials/assets/example_report_html_stock_selection.png) |
 
 ### Losing strategies (for learning)
 
@@ -46,6 +48,7 @@ This project provides the `eqlib` Python package — the core library that imple
 |:---:|:---:|
 | **−25.69%** · 52 trades | **−33.28%** · 16 trades |
 | [![Portfolio](tutorials/assets/example_report_portfolio.png)](tutorials/assets/example_report_portfolio.png) | [![Local Data](tutorials/assets/example_report_19_localdata.png)](tutorials/assets/example_report_19_localdata.png) |
+| HTML report: [![HTML](tutorials/assets/example_report_html_portfolio.png)](tutorials/assets/example_report_html_portfolio.png) | HTML report: [![HTML](tutorials/assets/example_report_html_19_localdata.png)](tutorials/assets/example_report_html_19_localdata.png) |
 
 > **How to read reports:** each HTML page has a header summary → metric cards (Sharpe, max drawdown, alpha, etc.) → K-line chart → cumulative returns vs benchmark → drawdown curve → daily P&L → trade/position tabs. See [**Report & Metrics Guide**](doc/reports_and_metrics.md) for a field-by-field walkthrough.
 
@@ -67,9 +70,9 @@ This project provides the `eqlib` Python package — the core library that imple
 ## Installation
 
 ```bash
-pip install akshare pandas numpy matplotlib scipy
+pip install akshare pandas numpy matplotlib scipy -i https://pypi.tuna.tsinghua.edu.cn/simple
 # optional: faster disk cache
-pip install pyarrow
+pip install pyarrow -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 Or install from the repository root (either form works):
@@ -77,8 +80,8 @@ Or install from the repository root (either form works):
 ```bash
 git clone https://github.com/AlanFokCo/EasyQuant.git
 cd EasyQuant
-pip install .
-# optional editable install: pip install -e .
+pip install . -i https://pypi.tuna.tsinghua.edu.cn/simple
+# optional editable install: pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 After `pip install .`, you can `import eqlib` from any working directory. Run `pip install .` (or `pip install -e .`) from the repository root before executing scripts under `examples/`.
