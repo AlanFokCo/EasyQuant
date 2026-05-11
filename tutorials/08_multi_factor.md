@@ -2,6 +2,8 @@
 
 > 多因子选股是机构量化基金最常用的方法之一。它不依赖单一指标，而是从价格、财务、情绪等多个维度综合评分，系统性地找出"性价比最高"的股票。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **选股 API：** [`doc/api_reference.md`](../doc/api_reference.md) 第 3.14 节链式选股、`MultiFactorSelector` 第 11 章
+
 ---
 
 ## 目录
@@ -306,23 +308,23 @@ from eqlib import *
 from eqlib import utils
 import statistics
 
-# ========== 策略参数 ==========
-g.stock_pool = [
+# ========== 策略参数（模块级常量，引擎不会清除） ==========
+STOCK_POOL = [
     '601390', '600519', '000858', '600036', '000001',
     '601318', '000333', '600887', '000651', '600276',
 ]
-g.top_n          = 3     # 每次持有排名前 3 的股票
-g.lookback_long  = 20    # 中期动量回看期
-g.lookback_short = 5     # 短期反转回看期
-g.position_pct   = 0.33  # 每只股票最多 33% 仓位
+TOP_N          = 3     # 每次持有排名前 3 的股票
+LOOKBACK_LONG  = 20    # 中期动量回看期
+LOOKBACK_SHORT = 5     # 短期反转回看期
+POSITION_PCT   = 0.33  # 每只股票最多 33% 仓位
 
 
 # ========== 因子函数 ==========
 
 def compute_factors(code):
     """计算单只股票的三因子原始值，失败返回 None。"""
-    hist = attribute_history(code, g.lookback_long + 10, '1d', ['close', 'volume'])
-    if hist.empty or len(hist) < g.lookback_long:
+    hist = attribute_history(code, LOOKBACK_LONG + 10, '1d', ['close', 'volume'])
+    if hist.empty or len(hist) < LOOKBACK_LONG:
         return None
 
     close = hist['close']
@@ -333,9 +335,9 @@ def compute_factors(code):
     if price < 3.0 or price > 500.0:
         return None
 
-    momentum  = (close.iloc[-1] / close.iloc[-g.lookback_long]) - 1
+    momentum  = (close.iloc[-1] / close.iloc[-LOOKBACK_LONG]) - 1
     vol_ratio = vol.tail(5).mean() / vol.tail(20).mean()
-    reversal  = -((close.iloc[-1] / close.iloc[-g.lookback_short]) - 1)
+    reversal  = -((close.iloc[-1] / close.iloc[-LOOKBACK_SHORT]) - 1)
 
     return (momentum, vol_ratio, reversal)
 
@@ -354,7 +356,7 @@ def rank_stocks(context):
     """
     对股票池内所有股票打分排名，返回 [(code, score)] 从高到低排序。
     """
-    raw = {code: compute_factors(code) for code in g.stock_pool}
+    raw = {code: compute_factors(code) for code in STOCK_POOL}
     raw = {k: v for k, v in raw.items() if v is not None}
 
     if not raw:
@@ -387,10 +389,10 @@ def initialize(context):
         open_commission=0.0003, close_commission=0.0003,
         min_commission=5,
     ))
-    context.universe = g.stock_pool
+    context.universe = STOCK_POOL
     run_weekly(rebalance, day_of_week=0, time='every_bar')
     log.info('多因子策略初始化: 股票池=%d, 持仓Top%d' % (
-        len(g.stock_pool), g.top_n))
+        len(STOCK_POOL), TOP_N))
 
 
 def rebalance(context):
@@ -400,21 +402,21 @@ def rebalance(context):
         log.warn('无有效评分，跳过调仓')
         return
 
-    top_stocks = [code for code, _ in ranked[:g.top_n]]
+    top_stocks = [code for code, _ in ranked[:TOP_N]]
 
     # 打印当前评分
     log.info('本周评分排名:')
-    for i, (code, score) in enumerate(ranked[:g.top_n]):
+    for i, (code, score) in enumerate(ranked[:TOP_N]):
         log.info('  %d. %s  score=%.3f' % (i + 1, code, score))
 
     # 卖出不在 Top N 的持仓
     for sec in list(context.portfolio.positions.keys()):
         if sec not in top_stocks:
             order_target(sec, 0)
-            log.info('卖出 %s（未入选本周 Top%d）' % (sec, g.top_n))
+            log.info('卖出 %s（未入选本周 Top%d）' % (sec, TOP_N))
 
     # 等权买入 Top N
-    weight = 1.0 / g.top_n
+    weight = 1.0 / TOP_N
     for sec in top_stocks:
         target_value = context.portfolio.total_value * weight
         order_target_value(sec, target_value)
@@ -428,7 +430,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=300000,
         benchmark='000300.XSHG',
-        securities=g.stock_pool,
+        securities=STOCK_POOL,
         report_dir='reports',
     )
 ```

@@ -101,6 +101,71 @@ def vwap(high, low, close, volume, window: int = None) -> pd.Series:
 # MACD
 # ============================================================
 
+def compute_all_indicators(close: pd.Series, high: pd.Series, low: pd.Series,
+                           volume: pd.Series,
+                           rsi_period=14, boll_period=20, boll_std=2.0,
+                           macd_fast=12, macd_slow=26, macd_signal=9,
+                           atr_period=14, donchian_period=20):
+    """Compute all standard indicators at once on a full price series.
+
+    Returns a DataFrame with one column per indicator value (all aligned to
+    the same index as the input series).  This is much faster than calling
+    each indicator function separately because pandas can reuse intermediate
+    rolling/ewm windows internally.
+
+    Columns: rsi, bb_upper, bb_mid, bb_lower, macd_dif, macd_dea, macd_hist,
+             atr, dc_upper, dc_mid, dc_lower
+    """
+    # RSI
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = (-delta).where(delta < 0, 0.0)
+    avg_gain = gain.ewm(alpha=1 / rsi_period, min_periods=rsi_period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / rsi_period, min_periods=rsi_period, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi_vals = 100 - (100 / (1 + rs))
+
+    # Bollinger Bands
+    bb_mid = close.rolling(boll_period).mean()
+    bb_std = close.rolling(boll_period).std()
+    bb_upper = bb_mid + boll_std * bb_std
+    bb_lower = bb_mid - boll_std * bb_std
+
+    # MACD
+    fast_ema = close.ewm(span=macd_fast, adjust=False).mean()
+    slow_ema = close.ewm(span=macd_slow, adjust=False).mean()
+    macd_dif = fast_ema - slow_ema
+    macd_dea = macd_dif.ewm(span=macd_signal, adjust=False).mean()
+    macd_hist = 2 * (macd_dif - macd_dea)
+
+    # ATR
+    prev_close = close.shift(1)
+    tr1 = high - low
+    tr2 = (high - prev_close).abs()
+    tr3 = (low - prev_close).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr_vals = tr.ewm(alpha=1 / atr_period, min_periods=atr_period, adjust=False).mean()
+
+    # Donchian Channel
+    dc_upper = high.rolling(donchian_period).max()
+    dc_lower = low.rolling(donchian_period).min()
+    dc_mid = (dc_upper + dc_lower) / 2
+
+    return pd.DataFrame({
+        "rsi": rsi_vals,
+        "bb_upper": bb_upper,
+        "bb_mid": bb_mid,
+        "bb_lower": bb_lower,
+        "macd_dif": macd_dif,
+        "macd_dea": macd_dea,
+        "macd_hist": macd_hist,
+        "atr": atr_vals,
+        "dc_upper": dc_upper,
+        "dc_mid": dc_mid,
+        "dc_lower": dc_lower,
+    })
+
+
 def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
     """Moving Average Convergence Divergence.
 

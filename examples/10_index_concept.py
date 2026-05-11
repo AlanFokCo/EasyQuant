@@ -114,11 +114,20 @@ if __name__ == "__main__":
     # Run backtest
     import datetime
 
+    idx = get_index_stocks("000300")
+    preload = (
+        idx["code"].head(10).tolist()
+        if not idx.empty
+        else ["601390", "600519", "000001", "600036", "000858"]
+    )
+
     result = run_backtest(
         initialize_func=initialize,
         start_date=datetime.date(2023, 1, 1),
         end_date=datetime.date(2024, 6, 30),
         starting_cash=100000,
+        securities=preload,
+        use_local=True,
     )
 
     if result is not None:

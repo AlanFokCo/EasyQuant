@@ -498,6 +498,12 @@ def run_backtest(initialize_func, start_date, end_date,
 
     from eqlib.objects import OrderCost
 
+    # ── Normalize date strings to date objects ─────────────────────────────
+    if isinstance(start_date, str):
+        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+    if isinstance(end_date, str):
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+
     # ── Create a fresh BacktestSession for this run ────────────────────────
     session = BacktestSession()
     _set_session(session)
@@ -633,6 +639,28 @@ def run_backtest(initialize_func, start_date, end_date,
 
     log.info(f"Backtest finished: final_value={context.portfolio.total_value:,.2f}")
 
+    # ── Fetch benchmark OHLCV for reporting ────────────────────────────────
+    benchmark_values = []
+    try:
+        from eqlib.data import fetch_stock_data
+        bench_df = fetch_stock_data(session._benchmark, start_date, end_date)
+        if bench_df.empty:
+            # Fallback to local data if network fetch fails
+            try:
+                from eqlib.data_cache import load_stock_local
+                bench_df = load_stock_local(session._benchmark,
+                                            start_date.strftime("%Y-%m-%d")[:10],
+                                            end_date.strftime("%Y-%m-%d")[:10], "qfq")
+            except Exception:
+                bench_df = None
+        if bench_df is not None and not bench_df.empty and "close" in bench_df.columns:
+            benchmark_values = [
+                {"date": str(d.date()) if hasattr(d, 'date') else str(d), "value": float(row["close"])}
+                for d, row in bench_df.iterrows()
+            ]
+    except Exception:
+        pass
+
     result = {
         "context": context,
         "trade_log": session._trade_log,
@@ -640,8 +668,18 @@ def run_backtest(initialize_func, start_date, end_date,
             session._recorded_values.values(), key=lambda x: x["date"]
         ),
         "benchmark": session._benchmark,
+        "benchmark_values": benchmark_values,
         "session": session,
+        "ohlcv_data": {},
     }
+
+    # Export preloaded OHLCV data for report generation
+    if preloaded.panel is not None and not preloaded.panel.empty:
+        for sec in securities:
+            if sec in preloaded.panel.columns.get_level_values(0).unique():
+                sec_df = preloaded.panel[sec]
+                if not sec_df.empty:
+                    result["ohlcv_data"][sec] = sec_df
 
     _clear_session()
     return result

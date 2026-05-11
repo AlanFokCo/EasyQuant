@@ -19,9 +19,9 @@ import argparse
 import os
 import sys
 
-# Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.insert(0, _here)
 
 from combined_strategy import initialize
 from eqlib import run_paper_trade, log

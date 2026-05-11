@@ -20,6 +20,10 @@
    - 9.3 组合回测模式
    - 9.4 基准对比说明
 10. [回测报告与图表解读](#10-回测报告与图表解读)
+    - 10.1 图表（PNG）
+    - 10.2 交互式 HTML 报告
+    - 10.3 Markdown 报告
+    - 10.4 JSON 报告
 11. [风险与归因分析](#11-风险与归因分析)
 12. [模拟盘交易](#12-模拟盘交易)
 13. [使用 Claude Code AI Agent 自动化策略优化](#13-使用-claude-code-ai-agent-自动化策略优化)
@@ -46,12 +50,17 @@
 
 ## 2. 安装
 
-```bash
-# 核心依赖
-pip install akshare pandas numpy matplotlib scipy
+**环境要求：Python 3.10 及以上**（见仓库 `pyproject.toml` 中 `requires-python`）。若使用 3.9 及以下，`pip install .` 会直接被拒绝。
 
-# 可选：更好的缓存性能
-pip install pyarrow
+```bash
+# 推荐：在克隆的仓库根目录安装 eqlib（含全部依赖）
+cd EasyQuant
+pip install .
+# 开发时可选用：pip install -e .
+
+# 若仅想手动装依赖、再从源码路径导入（不推荐），可：
+# pip install akshare pandas numpy matplotlib scipy
+# pip install pyarrow   # 可选，更好的磁盘缓存性能
 ```
 
 确认安装成功：
@@ -60,6 +69,8 @@ pip install pyarrow
 from eqlib import *
 print("eqlib OK")
 ```
+
+更多排错见 [**常见问题 FAQ**](FAQ.md) 与 [**文档中心**](README.md)。
 
 ---
 
@@ -115,11 +126,13 @@ result = run_strategy(
 )
 ```
 
-运行后会输出：
-- `reports/backtest_YYYYMMDD_HHMMSS.html` — 交互式 HTML 报告
+运行后会输出（时间戳每次不同）：
 - `reports/backtest_YYYYMMDD_HHMMSS.png` — 价格与交易标记图
+- `reports/backtest_YYYYMMDD_HHMMSS.html` — **交互式报告**（浏览器直接打开）
 - `reports/backtest_YYYYMMDD_HHMMSS.md` — 回测摘要报告
 - `reports/backtest_YYYYMMDD_HHMMSS.json` — 结构化数据
+
+HTML 各区块与指标含义见 [**报告与指标详解**](reports_and_metrics.md)。
 
 ---
 
@@ -716,7 +729,79 @@ e |     [SELL]    [BUY]                                  |
 3. **持仓区域**：绿色阴影区域越短，说明交易越频繁；区域越长，说明持仓越久
 4. **资产曲线**：右轴的组合价值曲线持续向上说明策略盈利，向下说明亏损
 
-### 10.2 Markdown 报告
+### 10.2 交互式 HTML 报告
+
+文件：`reports/backtest_YYYYMMDD_HHMMSS.html`，用浏览器打开即可（无需启动服务器）。
+
+页面自上而下分为以下层次（以 [Example 22 选股策略](../examples/22_stock_selection_strategy.py) 为例）：
+
+![选股策略 HTML 报告](../tutorials/assets/example_report_stock_selection.png)
+
+#### 10.2.1 页头摘要
+
+显示回测标的、时间区间、初始资金、最终资产的盈亏金额与百分比。**一眼判断策略盈亏**。
+
+#### 10.2.2 核心指标卡片
+
+一排关键数据卡片，通常包括：
+
+| 卡片 | 含义 | 好值 |
+|------|------|------|
+| **年化收益** | 折算为一年的复利年化 | > 10% |
+| **超额收益** | 策略收益 − 基准收益 | 正数 |
+| **夏普比率** | 每单位风险换取的超额收益 | > 1 |
+| **最大回撤** | 从峰值到谷底的最大跌幅 | < 15% |
+| **胜率（交易）** | 完整买卖回合中盈利的比例 | > 50% |
+| **卡玛比率** | 年化收益 / \|最大回撤\| | > 1 |
+
+#### 10.2.3 详细指标行
+
+更丰富的风险指标行，点击可看释义：
+
+| 指标 | 含义 |
+|------|------|
+| **年化波动率** | 收益的标准差（年化），越低越稳定 |
+| **索提诺比率** | 只看下行风险的风险调整收益，比夏普更保守 |
+| **Alpha** | 市场无法解释的超额收益（CAPM 意义下） |
+| **Beta** | 相对大盘的敏感度，1 = 同步 |
+| **信息比率** | 主动收益 / 跟踪误差 |
+| **日胜率** | 盈利交易日占比（注意与交易胜率含义不同） |
+| **盈亏比** | 平均盈利 / 平均亏损，> 1.5 为佳 |
+
+#### 10.2.4 K 线与技术指标图
+
+策略的价格走势图：
+- **主图**：价格线 + 均线 + 买卖点标记（绿色 BUY，红色 SELL）
+- **成交量**：下方柱状图
+- **绿色阴影**：持仓期间
+
+**读法**：买卖点是否合理？买入在低位、卖出在高位为佳。
+
+#### 10.2.5 累计收益率
+
+策略累计收益曲线 vs 基准指数。**核心对比：策略线是否在基准线上方**。
+
+#### 10.2.6 回撤曲线
+
+显示组合从历史新高的回落深度。**最深处即最大回撤发生期间**。
+
+#### 10.2.7 每日盈亏/收益率
+
+柱状图展示每个交易日的盈亏。关注：是否有连续亏损日？亏损是否集中？
+
+#### 10.2.8 标签页
+
+- **成交 Tab**：每笔买卖的时间、价格、数量、佣金
+- **持仓 Tab**：回测结束时的持仓状态
+- **数据源说明**等辅助信息
+
+**完整阅读流程：** 页头（赚钱了吗）→ 指标卡片（夏普/回撤合格吗）→ 累计收益图（跑赢基准吗）→ 回撤曲线（最差情况能接受吗）→ 成交表（每笔合理吗）。
+
+**多策略对比**：打开不同策略的 HTML 报告，观察相同结构下的数值差异。亏损策略（如 `*_19_localdata.html`）是很好的学习材料——夏普为负、回撤大、胜率低，所有指标都在"说话"。
+
+各字段的严格定义、`analyze_returns` 字典键对照见 [**报告与指标详解**](reports_and_metrics.md)。**仓库内真实报告索引**见 [`reports/README.md`](../reports/README.md)。
+
+### 10.3 Markdown 报告
 
 文件：`reports/backtest_YYYYMMDD_HHMMSS.md`
 
@@ -752,7 +837,7 @@ e |     [SELL]    [BUY]                                  |
 3. **Positions**：回测结束时的持仓状态
 4. **Buy/Sell 数量差**：如果 Buy 比 Sell 多 1 个，说明最后还持有仓位
 
-### 10.3 JSON 报告
+### 10.4 JSON 报告
 
 文件：`reports/backtest_YYYYMMDD_HHMMSS.json`
 
@@ -794,7 +879,10 @@ metrics = analyze_returns(result, risk_free_rate=0.03)
 | `alpha` | 超额收益（年化） | 正数为跑赢基准 |
 | `beta` | 市场敏感度 | 1 表示与大盘同步，> 1 波动更大 |
 | `information_ratio` | 信息比率 | > 0.5 为好 |
-| `win_rate` | 日胜率 | > 0.5 为好 |
+| `win_rate_daily` | 日胜率（盈利交易日占比） | > 0.5 为好 |
+| `win_rate_trade` | 配对交易胜率（完整买卖回合） | 与 `win_rate_daily` 含义不同，勿混用 |
+
+完整字段列表与解读见 [**reports_and_metrics.md — 第 4 节**](reports_and_metrics.md#4-analyze_returns-指标字典)。
 
 ### 11.2 `brinson_attribution`：归因分析
 
@@ -1001,6 +1089,8 @@ Claude Code 会：
 ---
 
 ## 14. 常见问题
+
+更完整的排错与场景说明见 [**FAQ.md**](FAQ.md)。
 
 ### Q: 如何设置手续费？
 

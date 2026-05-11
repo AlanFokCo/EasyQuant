@@ -23,8 +23,6 @@ Note: The paper trader runs indefinitely until stopped with Ctrl+C.
 import argparse
 import importlib.util
 import os
-import sys
-
 from eqlib import *
 
 

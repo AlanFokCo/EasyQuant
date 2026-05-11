@@ -2,6 +2,8 @@
 
 > A 股市场有一个显著特点：资金不会同时追捧所有板块，而是在不同行业之间"轮流炒作"。理解和利用这一规律，可以构建超越大盘的行业轮动策略。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **API：** [`doc/api_index.md`](../doc/api_index.md)（行业/指数相关）
+
 ---
 
 ## 目录
@@ -183,10 +185,10 @@ for ind in industries:
 ### 参数说明
 
 ```python
-g.industry_pool = [...]    # 候选行业列表
-g.top_n         = 3        # 每次持有 Top N 个行业
-g.lookback      = 20       # 动量计算回看期（交易日）
-g.rebalance_day = 0        # 调仓日：0=周一
+INDUSTRY_POOL = [...]    # 候选行业列表
+TOP_N         = 3        # 每次持有 Top N 个行业
+LOOKBACK      = 20       # 动量计算回看期（交易日）
+REBALANCE_DAY = 0        # 调仓日：0=周一
 ```
 
 ---
@@ -196,11 +198,11 @@ g.rebalance_day = 0        # 调仓日：0=周一
 ```python
 from eqlib import *
 
-# ========== 策略参数 ==========
+# ========== 策略参数（模块级常量，引擎不会清除） ==========
 # 候选行业（每个行业选最大市值的代表股票）
-g.industry_pool = ['银行', '白酒', '新能源', '医药', '家电', '保险']
-g.top_n         = 2        # 持有排名前 2 的行业
-g.lookback      = 20       # 近 20 个交易日的收益率
+INDUSTRY_POOL = ['银行', '白酒', '新能源', '医药', '家电', '保险']
+TOP_N         = 2        # 持有排名前 2 的行业
+LOOKBACK      = 20       # 近 20 个交易日的收益率
 
 
 def get_industry_representative(industry_name):
@@ -218,14 +220,14 @@ def score_industries(context):
     按收益率从高到低排序。
     """
     scored = []
-    for ind in g.industry_pool:
+    for ind in INDUSTRY_POOL:
         code = get_industry_representative(ind)
         if code is None:
             continue
-        hist = attribute_history(code, g.lookback + 5, '1d', ['close'])
-        if hist.empty or len(hist) < g.lookback:
+        hist = attribute_history(code, LOOKBACK + 5, '1d', ['close'])
+        if hist.empty or len(hist) < LOOKBACK:
             continue
-        ret = (hist['close'].iloc[-1] / hist['close'].iloc[-g.lookback]) - 1
+        ret = (hist['close'].iloc[-1] / hist['close'].iloc[-LOOKBACK]) - 1
         scored.append((ind, code, ret))
         log.info('行业评分: %-8s %s ret=%.2f%%' % (ind, code, ret * 100))
 
@@ -243,7 +245,7 @@ def initialize(context):
     # 每周一调仓
     run_weekly(rebalance, day_of_week=0, time='every_bar')
     log.info('行业轮动策略初始化: 行业=%d, 持有Top%d' % (
-        len(g.industry_pool), g.top_n))
+        len(INDUSTRY_POOL), TOP_N))
 
 
 def rebalance(context):
@@ -255,17 +257,17 @@ def rebalance(context):
         return
 
     # 2. 选出 Top N 行业的代表股票
-    top_stocks = [code for _, code, _ in scored[:g.top_n]]
+    top_stocks = [code for _, code, _ in scored[:TOP_N]]
     log.info('本周持仓目标: %s' % str(top_stocks))
 
     # 3. 卖出不在 Top N 的持仓
     for sec in list(context.portfolio.positions.keys()):
         if sec not in top_stocks:
             order_target(sec, 0)
-            log.info('清仓 %s（不在本周 Top%d）' % (sec, g.top_n))
+            log.info('清仓 %s（不在本周 Top%d）' % (sec, TOP_N))
 
     # 4. 等权买入 Top N 的代表股票
-    weight = 1.0 / g.top_n
+    weight = 1.0 / TOP_N
     for sec in top_stocks:
         target_value = context.portfolio.total_value * weight
         order_target_value(sec, target_value)
@@ -290,8 +292,8 @@ if __name__ == '__main__':
 当行业数据接口不稳定，或者希望使用确定的历史数据回测时，可以用固定股票池代替动态行业查询：
 
 ```python
-# 每个行业选 1-2 只代表性股票
-g.industry_stocks = {
+# 每个行业选 1-2 只代表性股票（模块级常量，引擎不会清除）
+INDUSTRY_STOCKS = {
     '银行':   '601390',   # 工商银行
     '白酒':   '600519',   # 贵州茅台
     '新能源': '300750',   # 宁德时代
@@ -304,11 +306,11 @@ g.industry_stocks = {
 def score_industries_fixed(context):
     """使用固定股票池评分行业动量。"""
     scored = []
-    for ind, code in g.industry_stocks.items():
-        hist = attribute_history(code, g.lookback + 5, '1d', ['close'])
-        if hist.empty or len(hist) < g.lookback:
+    for ind, code in INDUSTRY_STOCKS.items():
+        hist = attribute_history(code, LOOKBACK + 5, '1d', ['close'])
+        if hist.empty or len(hist) < LOOKBACK:
             continue
-        ret = (hist['close'].iloc[-1] / hist['close'].iloc[-g.lookback]) - 1
+        ret = (hist['close'].iloc[-1] / hist['close'].iloc[-LOOKBACK]) - 1
         scored.append((ind, code, ret))
     scored.sort(key=lambda x: x[2], reverse=True)
     return scored
@@ -446,10 +448,11 @@ print('预计年化手续费: %.0f 元 (%.2f%%)' % (
 ```python
 from eqlib import *
 
-g.index_code = '000300'   # 沪深 300
-g.top_n      = 5          # 持有 Top 5
-g.lookback   = 20
-g.max_stocks = 30         # 从成分股中取前 30 只作为候选（避免数据量过大）
+# 模块级常量（引擎不会清除）
+INDEX_CODE = '000300'   # 沪深 300
+TOP_N      = 5          # 持有 Top 5
+LOOKBACK   = 20
+MAX_STOCKS = 30         # 从成分股中取前 30 只作为候选（避免数据量过大）
 
 
 def initialize(context):
@@ -461,9 +464,9 @@ def initialize(context):
     ))
 
     # 构建候选股票池：沪深 300 前 30 大成分股
-    index_df = get_index_stocks(g.index_code)
+    index_df = get_index_stocks(INDEX_CODE)
     if not index_df.empty:
-        context.universe = index_df['code'].head(g.max_stocks).tolist()
+        context.universe = index_df['code'].head(MAX_STOCKS).tolist()
         log.info('候选池: %d 只成分股' % len(context.universe))
 
     run_weekly(rebalance, day_of_week=0, time='every_bar')
@@ -477,10 +480,10 @@ def rebalance(context):
     # 计算所有候选股的近期收益
     scores = {}
     for code in universe:
-        hist = attribute_history(code, g.lookback + 5, '1d', ['close'])
-        if hist.empty or len(hist) < g.lookback:
+        hist = attribute_history(code, LOOKBACK + 5, '1d', ['close'])
+        if hist.empty or len(hist) < LOOKBACK:
             continue
-        ret = (hist['close'].iloc[-1] / hist['close'].iloc[-g.lookback]) - 1
+        ret = (hist['close'].iloc[-1] / hist['close'].iloc[-LOOKBACK]) - 1
         scores[code] = ret
 
     if not scores:
@@ -488,7 +491,7 @@ def rebalance(context):
 
     # 选出 Top N
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    top_stocks = [code for code, _ in ranked[:g.top_n]]
+    top_stocks = [code for code, _ in ranked[:TOP_N]]
     log.info('本周目标: %s' % str(top_stocks))
 
     # 卖出离场股票
@@ -497,7 +500,7 @@ def rebalance(context):
             order_target(sec, 0)
 
     # 等权买入 Top N
-    weight = 1.0 / g.top_n
+    weight = 1.0 / TOP_N
     for sec in top_stocks:
         order_target_value(sec, context.portfolio.total_value * weight)
 
@@ -530,6 +533,6 @@ if __name__ == '__main__':
 ### 练习
 
 1. 将调仓频率从每周改为每月（`run_monthly`），对比换手率和收益的变化
-2. 修改 `g.top_n = 3`，观察持有更多行业时的分散效果
+2. 修改 `TOP_N = 3`，观察持有更多行业时的分散效果
 3. 加入估值过滤（PE < 50），观察是否能提升风险调整后的收益
 4. 在固定股票池中，将行业代表股从市值最大改为你自己选择的股票，对比结果

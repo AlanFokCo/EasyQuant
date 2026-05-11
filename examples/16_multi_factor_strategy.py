@@ -12,6 +12,7 @@ Usage:
     python examples/16_multi_factor_strategy.py
 """
 
+import os
 from eqlib import *
 
 
@@ -19,23 +20,23 @@ from eqlib import *
 # Strategy parameters
 # ============================================================
 
-g.stock_pool = [
+STOCK_POOL = [
     # A diversified set of A-share stocks for testing
-    "601390",  # ICBC (banking)
-    "600519",  # Kweichow Moutai (liquor)
-    "000858",  # Wuliangye (liquor)
-    "600036",  # China Merchants Bank (banking)
-    "000001",  # Ping An Bank (banking)
-    "601318",  # Ping An Insurance (insurance)
-    "600276",  # Hengrui Pharma (pharma)
-    "000333",  # Midea Group (appliances)
-    "600887",  # Yili Industrial (dairy)
-    "000651",  # Gree Electric (appliances)
+    "601390",  # China Railway 中国中铁
+    "600036",  # China Merchants Bank 招商银行
+    "000630",  # Tongling Nonferrous 铜陵有色
+    "518880",  # Gold ETF 黄金ETF
+    "601088",  # China Shenhua 中国神华
+    "601857",  # PetroChina 中国石油
+    "002594",  # BYD 比亚迪
+    "000768",  # AVIC Jonhon Optronic 中航光电
+    "600536",  # China National Software 中国软件
+    "601111",  # Air China 中国国航
 ]
-g.top_n = 3                     # Pick top 3 stocks each week
-g.lookback = 20                 # Momentum lookback period (days)
-g.min_price = 3.0               # Minimum stock price (avoid penny stocks)
-g.max_price = 200.0             # Maximum stock price
+TOP_N = 3                     # Pick top 3 stocks each week
+LOOKBACK = 20                 # Momentum lookback period (days)
+MIN_PRICE = 3.0               # Minimum stock price (avoid penny stocks)
+MAX_PRICE = 200.0             # Maximum stock price
 
 
 # ============================================================
@@ -54,12 +55,12 @@ def initialize(context):
         min_commission=5,
     ))
 
-    context.universe = g.stock_pool
+    context.universe = STOCK_POOL
     # Rebalance every Monday
     run_weekly(rebalance, day_of_week=0, time="every_bar")
 
     log.info("Multi-factor init: pool=%d stocks, pick top %d" % (
-        len(g.stock_pool), g.top_n))
+        len(STOCK_POOL), TOP_N))
 
 
 def score_stocks(context):
@@ -69,10 +70,10 @@ def score_stocks(context):
     """
     scores = {}
 
-    for sec in g.stock_pool:
-        hist = attribute_history(sec, g.lookback + 10, "1d",
+    for sec in STOCK_POOL:
+        hist = attribute_history(sec, LOOKBACK + 10, "1d",
                                  ["close", "volume"])
-        if hist.empty or len(hist) < g.lookback:
+        if hist.empty or len(hist) < LOOKBACK:
             continue
 
         close_prices = hist["close"]
@@ -80,11 +81,11 @@ def score_stocks(context):
         current_price = close_prices.iloc[-1]
 
         # --- Price filter ---
-        if current_price < g.min_price or current_price > g.max_price:
+        if current_price < MIN_PRICE or current_price > MAX_PRICE:
             continue
 
         # --- Momentum factor (20-day return) ---
-        past_price = close_prices.iloc[-g.lookback]
+        past_price = close_prices.iloc[-LOOKBACK]
         if past_price <= 0:
             continue
         momentum = (current_price - past_price) / past_price
@@ -112,9 +113,9 @@ def rebalance(context):
         log.info("No stocks pass screening this week")
         return
 
-    top_stocks = [sec for sec, score in ranked[:g.top_n]]
+    top_stocks = [sec for sec, score in ranked[:TOP_N]]
 
-    log.info("Weekly rebalance: top %d = %s" % (g.top_n, top_stocks))
+    log.info("Weekly rebalance: top %d = %s" % (TOP_N, top_stocks))
 
     # === Sell stocks not in top N ===
     for sec in list(context.portfolio.positions.keys()):
@@ -157,10 +158,12 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Multi-Factor Stock Selection Strategy")
     print("=" * 60)
-    print("Stock pool: %d stocks" % len(g.stock_pool))
-    print("Top picks per week: %d" % g.top_n)
-    print("Momentum lookback: %d days" % g.lookback)
+    print("Stock pool: %d stocks" % len(STOCK_POOL))
+    print("Top picks per week: %d" % TOP_N)
+    print("Momentum lookback: %d days" % LOOKBACK)
     print()
+
+    os.makedirs("reports", exist_ok=True)
 
     result = run_strategy(
         initialize_func=initialize,
@@ -168,6 +171,7 @@ if __name__ == "__main__":
         end_date="2025-01-01",
         starting_cash=200000,
         benchmark="000300.XSHG",
-        securities=g.stock_pool,
+        securities=STOCK_POOL,
         report_dir="reports",
+        use_local=True,
     )

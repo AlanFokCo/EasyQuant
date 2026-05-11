@@ -2,6 +2,8 @@
 
 > 从零开始，用 EasyQuant 编写并运行你的第一个量化交易策略。
 
+**环境：** 请先完成 [Tutorial 00](00_environment_and_first_run.md)（Python 3.10+、`pip install .`）。
+
 ---
 
 ## 目录
@@ -18,11 +20,17 @@
 
 ## 1. 准备工作
 
-### 1.1 安装依赖
+### 1.1 安装 eqlib
+
+**要求：Python 3.10 及以上。** 在仓库根目录执行：
 
 ```bash
-pip install akshare pandas numpy matplotlib scipy
+cd EasyQuant
+pip install .
+# 或：pip install -e .
 ```
+
+若仅安装 `akshare` 等依赖而未执行 `pip install .`，`import eqlib` 会失败。更详细的说明与排错见 [Tutorial 00](00_environment_and_first_run.md) 与 [FAQ](../doc/FAQ.md)。
 
 ### 1.2 验证安装
 
@@ -204,7 +212,7 @@ Data:   reports/backtest_20260503_143000.json
 ### 查看报告
 
 - **图表**（PNG）：价格曲线 + 买卖点标注
-- **HTML 报告**：完整的回测结果，可在浏览器中查看
+- **HTML 报告**：交互式完整结果；**如何阅读各区块**见 [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md)
 - **Markdown 报告**：文字摘要
 - **JSON 数据**：结构化数据，可进一步分析
 
@@ -214,19 +222,32 @@ Data:   reports/backtest_20260503_143000.json
 
 ### 5.1 `g` 全局对象
 
-`g` 是跨交易日的持久化存储。你可以把它理解为一个"全局配置"：
+`g` 是跨交易日的持久化存储。**注意：回测引擎会在调用 `initialize` 之前清空 `g` 的所有属性**，所以不能在模块顶层给 `g` 赋值作为配置参数。
+
+**正确用法：**
 
 ```python
-g.security = '601390'      # 股票代码
-g.ma_period = 20           # 均线周期
-g.hold_days = 0            # 持仓天数
-g.max_loss_pct = 0.08      # 最大亏损比例
+# 模块级常量 — 配置参数（不会被引擎清除）
+SECURITY = '601390'
+MA_PERIOD = 20
 
-# 在策略中随时读写
+# g — 运行时状态（在 initialize 中初始化，跨交易日保持）
+def initialize(context):
+    g.hold_days = 0       # 在 initialize 中初始化
+    g.max_loss_pct = 0.08
+
 def market_open(context):
     g.hold_days += 1
     if g.hold_days > 30:
-        order_target(g.security, 0)  # 超过 30 天就卖出
+        order_target(SECURITY, 0)  # 使用模块常量
+```
+
+**错误用法（模块顶层赋值会被引擎清除）：**
+
+```python
+# ❌ 错误！这些值会在 initialize 之前被清除
+g.security = '601390'
+g.ma_period = 20
 ```
 
 ### 5.2 `context` 上下文对象

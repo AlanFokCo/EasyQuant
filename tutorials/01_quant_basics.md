@@ -2,6 +2,8 @@
 
 > 从零开始理解量化交易，了解策略开发的基本思路和注意事项。
 
+**运行代码前：**请先完成 [Tutorial 00：环境与第一次运行](00_environment_and_first_run.md)（Python 3.10+、`pip install .`、验证 `import eqlib`）。
+
 ---
 
 ## 目录
@@ -39,7 +41,7 @@ Python 是量化交易领域最主流的语言，原因在于：
 ### 1.3 EasyQuant 的定位
 
 EasyQuant（`eqlib`）是一个面向 **中国 A 股市场** 的轻量级量化策略框架，它提供：
-- 一套简单直观的策略 API（类似聚宽/JoinQuant 的风格）
+- 一套简单直观的策略 API（事件驱动模式）
 - 免费的 A 股数据源（akshare）
 - 完整的回测、报告生成、模拟盘功能
 - 可以导出到 PTrade/QMT 平台进行实盘

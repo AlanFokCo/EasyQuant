@@ -9,6 +9,7 @@ Usage:
     python examples/15_macd_volume_strategy.py
 """
 
+import os
 from eqlib import *
 from eqlib import utils
 
@@ -17,13 +18,13 @@ from eqlib import utils
 # Strategy parameters
 # ============================================================
 
-g.security = "600519"           # Kweichow Moutai
-g.macd_fast = 12
-g.macd_slow = 26
-g.macd_signal = 9
-g.volume_ratio = 1.5            # Volume must be 1.5x the 20-day average
-g.atr_period = 14
-g.atr_multiplier = 2.5          # Trailing stop = highest - 2.5 * ATR
+SECURITY = "600536"           # China National Software 中国软件
+MACD_FAST = 12
+MACD_SLOW = 26
+MACD_SIGNAL = 9
+VOLUME_RATIO = 1.0            # Volume must be 1.0x the 20-day average
+ATR_PERIOD = 14
+ATR_MULTIPLIER = 2.5          # Trailing stop = highest - 2.5 * ATR
 
 
 # ============================================================
@@ -42,19 +43,19 @@ def initialize(context):
         min_commission=5,
     ))
 
-    context.universe = [g.security]
+    context.universe = [SECURITY]
     run_daily(market_open, time="every_bar")
 
     log.info("MACD+Volume init: %s, MACD(%d,%d,%d)" % (
-        g.security, g.macd_fast, g.macd_slow, g.macd_signal))
+        SECURITY, MACD_FAST, MACD_SLOW, MACD_SIGNAL))
 
 
 def market_open(context):
     """Daily trading logic: MACD + volume + ATR trailing stop."""
-    security = g.security
+    security = SECURITY
 
     # Need enough history for MACD (slow period + signal period) + ATR + volume
-    bars_needed = max(g.macd_slow + g.macd_signal, g.atr_period) + 20
+    bars_needed = max(MACD_SLOW + MACD_SIGNAL, ATR_PERIOD) + 20
     hist = attribute_history(security, bars_needed, "1d",
                              ["open", "high", "low", "close", "volume"])
     if hist.empty or len(hist) < bars_needed - 10:
@@ -68,8 +69,8 @@ def market_open(context):
 
     # === Calculate MACD ===
     dif, dea, macd_hist = utils.macd(
-        close_prices, fast=g.macd_fast,
-        slow=g.macd_slow, signal=g.macd_signal,
+        close_prices, fast=MACD_FAST,
+        slow=MACD_SLOW, signal=MACD_SIGNAL,
     )
 
     # MACD golden cross detection
@@ -81,10 +82,10 @@ def market_open(context):
     # === Volume confirmation ===
     avg_vol_20 = volumes.tail(20).mean()
     current_vol = volumes.iloc[-1]
-    volume_confirmed = current_vol > avg_vol_20 * g.volume_ratio
+    volume_confirmed = current_vol > avg_vol_20 * VOLUME_RATIO
 
     # === ATR trailing stop ===
-    atr_values = utils.atr(high_prices, low_prices, close_prices, g.atr_period)
+    atr_values = utils.atr(high_prices, low_prices, close_prices, ATR_PERIOD)
     current_atr = atr_values.iloc[-1]
 
     if security in context.portfolio.positions:
@@ -92,7 +93,7 @@ def market_open(context):
 
         # Update trailing stop (highest price since entry minus ATR buffer)
         highest = high_prices.tail(20).max()
-        trailing_stop = highest - g.atr_multiplier * current_atr
+        trailing_stop = highest - ATR_MULTIPLIER * current_atr
 
         if current_price < trailing_stop:
             order_target(security, 0)
@@ -134,12 +135,15 @@ if __name__ == "__main__":
     print("MACD Trend Following + Volume Confirmation Strategy")
     print("=" * 60)
 
+    os.makedirs("reports", exist_ok=True)
+
     result = run_strategy(
         initialize_func=initialize,
         start_date="2024-01-01",
         end_date="2025-01-01",
         starting_cash=100000,
         benchmark="000300.XSHG",
-        securities=["600519"],
+        securities=["600536"],
         report_dir="reports",
+        use_local=True,
     )

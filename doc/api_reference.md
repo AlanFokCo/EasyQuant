@@ -3,6 +3,8 @@
 > 本文档描述 `eqlib` 核心库的全部 API。`eqlib` 是 EasyQuant 项目的 Python 包，提供策略编写、数据拉取、回测执行、模拟盘和风险分析等能力。
 >
 > **注意：本工具仅支持中国 A 股市场。**
+>
+> **速查入口：** [文档中心 README](README.md) · [API 速查索引](api_index.md) · [报告与指标解读](reports_and_metrics.md) · [常见问题 FAQ](FAQ.md)
 
 ---
 
@@ -12,7 +14,7 @@
 2. [交易 API](#2-交易-api)
 3. [数据 API](#3-数据-api)
 4. [回测与模拟盘引擎](#4-回测与模拟盘引擎)
-5. [配置 API](#5-配置-api)
+5. [配置 API](#5-配置-api)（含滑点、会话）
 6. [报告与分析 API](#6-报告与分析-api)
 7. [组合优化 API](#7-组合优化-api)
 8. [缓存 API](#8-缓存-api)
@@ -523,9 +525,84 @@ print(info['price'], info['pe'])
 
 **返回：** `DataFrame`（指标为行名）
 
-#### `get_fundamentals(code, date=None)`
+### 3.14 链式选股 API
 
-获取基本面数据（`get_financial_abstract` 的别名）。
+#### `query(*fields)`
+
+创建链式查询对象，支持 `.filter()`、`.order_by()`、`.limit()` 方法。
+
+**可用字段（通过 `valuation` 命名空间）：**
+
+| 字段 | 说明 | 单位 |
+|------|------|------|
+| `valuation.code` | 股票代码 | — |
+| `valuation.market_cap` | 流通市值 | 亿元 |
+| `valuation.total_value` | 总市值 | 亿元 |
+| `valuation.float_value` | 流通市值 | 亿元 |
+| `valuation.pe` | 市盈率（动态） | — |
+| `valuation.pb` | 市净率 | — |
+| `valuation.turnover` | 换手率 | % |
+| `valuation.price` | 最新价 | 元 |
+| `valuation.pct_change` | 涨跌幅 | % |
+
+**链式方法：**
+
+| 方法 | 说明 |
+|------|------|
+| `.filter(*conditions)` | 添加过滤条件（AND 连接） |
+| `.order_by(*clauses)` | 添加排序（`.asc()` / `.desc()`） |
+| `.limit(n)` | 限制返回行数 |
+
+**字段比较运算符：** `==`, `!=`, `>`, `>=`, `<`, `<=`, `.between(low, high)`, `.in_(values)`
+
+```python
+q = (
+    query(
+        valuation.code,
+        valuation.market_cap,
+        valuation.pe,
+    )
+    .filter(
+        valuation.market_cap.between(20, 30),
+        valuation.pe > 0,
+    )
+    .order_by(
+        valuation.market_cap.asc(),
+    )
+    .limit(5)
+)
+df = get_fundamentals(q)
+```
+
+#### `get_fundamentals(query_or_code, date=None)`
+
+获取基本面数据。
+
+**双签名：**
+- 传入 `Query` 对象：执行链式查询，返回筛选后的 `DataFrame`
+- 传入股票代码字符串：返回财务摘要 `DataFrame`（原有行为）
+
+```python
+# 链式查询用法
+df = get_fundamentals(q)
+
+# 单只股票用法（向后兼容）
+df = get_fundamentals('601390')
+```
+
+#### `get_current_data_object()`
+
+获取带属性访问的实时行情快照。
+
+**返回：** `dict[str, _StockDataObj]`，每个对象具有 `.paused`、`.price`、`.pe` 等属性。
+
+```python
+data = get_current_data_object()
+stock = data['601390']
+print(stock.price, stock.paused, stock.pe)
+```
+
+**Limitation (V1)：** 市值/PE/PB 等估值数据来自 akshare 的实时快照，非历史数据。在回测中，这些数据反映当前时刻的值，而非回测日的历史值。
 
 ### 3.11 额外字段
 
@@ -823,6 +900,43 @@ set_order_cost(OrderCost(
 
 ```python
 set_option('use_real_price', True)
+```
+
+### 5.4 `set_slippage(model)`
+
+在回测成交时按模型调整执行价，使结果更接近真实冲击成本。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `model` | `SlippageModel` | 滑点模型实例 |
+
+**内置模型：**
+
+| 类 | 说明 |
+|------|------|
+| `SlippageModel` | 基类；不对价格做调整 |
+| `FixedSlippage(pct=0.001)` | 固定比例：买入 `price * (1 + pct)`，卖出 `price * (1 - pct)` |
+| `VolumeSlippage(impact=0.05)` | 与「委托股数 / 当日成交量」成比例；当日成交量未知时不调整 |
+
+```python
+from eqlib import set_slippage, FixedSlippage, VolumeSlippage
+
+set_slippage(FixedSlippage(0.0005))
+# 或：set_slippage(VolumeSlippage(impact=0.05))
+```
+
+### 5.5 `BacktestSession` 与 `get_session()`（进阶）
+
+`BacktestSession` 封装单次回测的可变状态（上下文、`g`、成交记录、调度表等）。`run_backtest` 内部会创建并注册会话，**普通策略不必使用**。
+
+若你在**多线程**中并行跑多组回测，可为每线程使用独立会话，避免共享全局状态冲突：
+
+```python
+from eqlib import BacktestSession, get_session
+
+# 典型用法见 eqlib._state 与引擎实现；进阶用户再查阅源码。
 ```
 
 ---
@@ -1285,7 +1399,8 @@ from eqlib import (
     run_daily, run_weekly, run_monthly,
     set_handle_data, record, run_paper_trade,
     # === 配置 ===
-    set_benchmark, set_option, set_order_cost, OrderCost,
+    set_benchmark, set_option, set_order_cost, set_slippage,
+    OrderCost, SlippageModel, FixedSlippage, VolumeSlippage,
     # === 交易 ===
     order, order_target, order_value, order_target_value,
     # === 数据 ===
@@ -1302,6 +1417,8 @@ from eqlib import (
     get_current_data, get_security_info, get_trade_days,
     get_fundamentals, get_financial_abstract, get_money_flow,
     get_billboard_list, get_valuation, get_index_weights, get_extras,
+    # === 链式选股 ===
+    query, valuation, get_current_data_object,
     # === 股票池 ===
     set_universe, get_universe,
     # === 生命周期回调 ===
@@ -1326,5 +1443,6 @@ from eqlib import (
     set_cache_dir, set_local_data_dir, fetch_cached, estimate_memory_mb,
     save_stock_local, load_stock_local, has_local_data,
     list_local_stocks, remove_local_data, clear_all_local_data,
+    BacktestSession, get_session,
 )
 ```

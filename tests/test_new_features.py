@@ -196,16 +196,20 @@ class TestTradeWinRate:
     def test_all_wins(self):
         from eqlib.attribution import _calc_trade_win_rate
         trades = self._make_trades([10.0, 11.0], [12.0, 13.0])
-        win_rate, count = _calc_trade_win_rate(trades)
+        win_rate, count, wins, losses = _calc_trade_win_rate(trades)
         assert count == 2
         assert win_rate == 1.0
+        assert wins == 2
+        assert losses == 0
 
     def test_all_losses(self):
         from eqlib.attribution import _calc_trade_win_rate
         trades = self._make_trades([12.0, 13.0], [10.0, 11.0])
-        win_rate, count = _calc_trade_win_rate(trades)
+        win_rate, count, wins, losses = _calc_trade_win_rate(trades)
         assert count == 2
         assert win_rate == 0.0
+        assert wins == 0
+        assert losses == 2
 
     def test_mixed(self):
         from eqlib.attribution import _calc_trade_win_rate
@@ -216,15 +220,19 @@ class TestTradeWinRate:
             {"type": "SELL", "security": "601390", "price": 12.0, "amount": 100, "commission": 5},
             {"type": "SELL", "security": "601390", "price": 9.0, "amount": 100, "commission": 5},
         ]
-        win_rate, count = _calc_trade_win_rate(trades)
+        win_rate, count, wins, losses = _calc_trade_win_rate(trades)
         assert count == 2
         assert win_rate == 0.5
+        assert wins == 1
+        assert losses == 1
 
     def test_no_trades(self):
         from eqlib.attribution import _calc_trade_win_rate
-        win_rate, count = _calc_trade_win_rate([])
+        win_rate, count, wins, losses = _calc_trade_win_rate([])
         assert win_rate == 0.0
         assert count == 0
+        assert wins == 0
+        assert losses == 0
 
 
 # ============================================================

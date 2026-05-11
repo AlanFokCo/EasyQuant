@@ -2,6 +2,8 @@
 
 > 均值回归是最经典的量化策略思想之一。本教程从 RSI 指标原理出发，系统讲解如何设计、回测和改进一个 RSI 均值回归策略。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **示例：** [`examples/14_bollinger_strategy.py`](../examples/14_bollinger_strategy.py) 等（见 [`Examples.md`](../examples/Examples.md)）
+
 ---
 
 ## 目录
@@ -108,9 +110,9 @@ print("最新 RSI:", rsi14.iloc[-1])   # 例如: 28.3（超卖区域）
 ### 参数设计
 
 ```python
-g.rsi_period     = 14    # RSI 计算周期（标准为 14 日）
-g.rsi_oversold   = 30    # 超卖阈值（买入触发）
-g.rsi_overbought = 70    # 超买阈值（卖出触发）
+RSI_PERIOD     = 14    # RSI 计算周期（标准为 14 日）
+RSI_OVERSOLD   = 30    # 超卖阈值（买入触发）
+RSI_OVERBOUGHT = 70    # 超买阈值（卖出触发）
 ```
 
 ---
@@ -121,12 +123,12 @@ g.rsi_overbought = 70    # 超买阈值（卖出触发）
 from eqlib import *
 from eqlib import utils
 
-# ========== 策略参数 ==========
-g.security       = '601390'   # 操作标的：工商银行
-g.rsi_period     = 14         # RSI 计算周期
-g.rsi_oversold   = 30         # 超卖阈值
-g.rsi_overbought = 70         # 超买阈值
-g.bars_needed    = 40         # 需要获取的历史 bar 数量（RSI 需要足够的预热数据）
+# ========== 策略参数（模块级常量，引擎不会清除） ==========
+SECURITY       = '601390'   # 操作标的：工商银行
+RSI_PERIOD     = 14         # RSI 计算周期
+RSI_OVERSOLD   = 30         # 超卖阈值
+RSI_OVERBOUGHT = 70         # 超买阈值
+BARS_NEEDED    = 40         # 需要获取的历史 bar 数量（RSI 需要足够的预热数据）
 
 
 def initialize(context):
@@ -140,26 +142,26 @@ def initialize(context):
     ))
     run_daily(market_open, time='every_bar')
     log.info('RSI 均值回归策略初始化: %s, RSI%d, 超卖=%d, 超买=%d' % (
-        g.security, g.rsi_period, g.rsi_oversold, g.rsi_overbought))
+        SECURITY, RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT))
 
 
 def market_open(context):
-    security = g.security
+    security = SECURITY
 
     # 1. 获取历史数据
-    hist = attribute_history(security, g.bars_needed, '1d', ['close'])
-    if hist.empty or len(hist) < g.rsi_period + 10:
+    hist = attribute_history(security, BARS_NEEDED, '1d', ['close'])
+    if hist.empty or len(hist) < RSI_PERIOD + 10:
         return
 
     close_prices = hist['close']
     current_price = close_prices.iloc[-1]
 
     # 2. 计算 RSI
-    rsi_series = utils.rsi(close_prices, g.rsi_period)
+    rsi_series = utils.rsi(close_prices, RSI_PERIOD)
     current_rsi = rsi_series.iloc[-1]
 
     # 3. 超卖区：RSI 低于阈值 → 买入
-    if current_rsi < g.rsi_oversold:
+    if current_rsi < RSI_OVERSOLD:
         if security not in context.portfolio.positions or \
            context.portfolio.positions[security].amount == 0:
             order_value(security, context.portfolio.available_cash)
@@ -167,7 +169,7 @@ def market_open(context):
                 security, current_price, current_rsi))
 
     # 4. 超买区：RSI 高于阈值 → 卖出
-    elif current_rsi > g.rsi_overbought:
+    elif current_rsi > RSI_OVERBOUGHT:
         if security in context.portfolio.positions and \
            context.portfolio.positions[security].amount > 0:
             order_target(security, 0)
@@ -204,7 +206,7 @@ if __name__ == '__main__':
 
 ```python
 def market_open(context):
-    security = g.security
+    security = SECURITY
 
     # === 止损优先（在信号判断之前执行）===
     if security in context.portfolio.positions:
@@ -274,12 +276,13 @@ if current_rsi < g.rsi_oversold and current_vol < avg_vol * 0.8:
 from eqlib import *
 from eqlib import utils
 
-g.security       = '601390'
-g.rsi_period     = 14
-g.rsi_oversold   = 30
-g.rsi_overbought = 70
-g.stop_loss_pct  = 0.08    # 8% 止损
-g.bars_needed    = 40
+# 模块级常量（引擎不会清除）
+SECURITY       = '601390'
+RSI_PERIOD     = 14
+RSI_OVERSOLD   = 30
+RSI_OVERBOUGHT = 70
+STOP_LOSS_PCT  = 0.08    # 8% 止损
+BARS_NEEDED    = 40
 
 
 def initialize(context):
@@ -293,16 +296,16 @@ def initialize(context):
 
 
 def market_open(context):
-    security = g.security
-    hist = attribute_history(security, g.bars_needed, '1d', ['close', 'volume'])
-    if hist.empty or len(hist) < g.rsi_period + 10:
+    security = SECURITY
+    hist = attribute_history(security, BARS_NEEDED, '1d', ['close', 'volume'])
+    if hist.empty or len(hist) < RSI_PERIOD + 10:
         return
 
     close_prices = hist['close']
     volumes = hist['volume']
     current_price = close_prices.iloc[-1]
 
-    rsi_series = utils.rsi(close_prices, g.rsi_period)
+    rsi_series = utils.rsi(close_prices, RSI_PERIOD)
     current_rsi = rsi_series.iloc[-1]
     prev_rsi    = rsi_series.iloc[-2]
 
@@ -322,7 +325,7 @@ def market_open(context):
         pos = context.portfolio.positions[security]
         if pos.amount > 0:
             loss_pct = (current_price - pos.avg_cost) / pos.avg_cost
-            if loss_pct < -g.stop_loss_pct:
+            if loss_pct < -STOP_LOSS_PCT:
                 order_target(security, 0)
                 log.info('止损 %s @ %.3f，亏损 %.1f%%' % (
                     security, current_price, loss_pct * 100))
@@ -333,7 +336,7 @@ def market_open(context):
     in_position = security in context.portfolio.positions and \
                   context.portfolio.positions[security].amount > 0
 
-    if (current_rsi < g.rsi_oversold and
+    if (current_rsi < RSI_OVERSOLD and
             current_rsi > prev_rsi and        # RSI 开始回升
             market_bullish and
             current_vol < avg_vol * 1.2 and   # 非放量下跌
@@ -344,7 +347,7 @@ def market_open(context):
         record(price=current_price, rsi=current_rsi, signal='BUY')
 
     # --- 卖出：超买 ---
-    elif current_rsi > g.rsi_overbought and in_position:
+    elif current_rsi > RSI_OVERBOUGHT and in_position:
         order_target(security, 0)
         log.info('卖出 %s @ %.3f，RSI=%.1f（超买）' % (
             security, current_price, current_rsi))

@@ -145,6 +145,7 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
         benchmark=config.benchmark,
         securities=config.securities,
         frequency=config.frequency,
+        use_local=True,
     )
 
     if result is None:

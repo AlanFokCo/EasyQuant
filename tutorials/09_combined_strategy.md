@@ -4,6 +4,8 @@
 > 我们会逐步讲解每个组件的设计原理、数学公式和代码实现，
 > 并提供完整的回测和模拟盘代码，可直接运行。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **可运行代码：** [`examples/21_combined_strategy/`](../examples/21_combined_strategy/)（该目录脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 安装方式无关）
+
 ---
 
 ## 目录
@@ -470,10 +472,10 @@ STOCK_POOL     = [...]   # 12 只股票
 SECTOR_MAP     = {...}   # 股票→行业映射
 SECTOR_REPRES. = {...}   # 行业代表股（用于行业动量计算）
 
-# 参数配置（按需修改）
-g.top_n          = 5
-g.rsi_oversold   = 35
-g.atr_multiplier = 2.5
+# 参数配置（按需修改，使用模块级常量）
+TOP_N          = 5
+RSI_OVERSOLD   = 35
+ATR_MULTIPLIER = 2.5
 ...
 
 # 核心函数
@@ -484,8 +486,8 @@ rank_stocks_weekly(context)             # 每周选股排名
 _compute_indicators(code)              # 计算技术指标
 _check_sell(context, code, ind)        # 离场逻辑
 _check_buy(context, code, ind)         # 入场逻辑
-_before_market_open(context)           # 生命周期：开盘前
-_after_market_close(context)           # 生命周期：收盘后
+_before_market_open(context, data=None)    # 生命周期：开盘前
+_after_market_close(context, data=None)    # 生命周期：收盘后
 weekly_rebalance(context)              # 每周一调仓
 daily_trading(context)                 # 每日信号处理
 
@@ -496,20 +498,20 @@ initialize(context)                    # 策略入口（必须有）
 
 | 参数 | 默认值 | 含义 |
 |------|--------|------|
-| `g.top_n` | 5 | 每周选股数量 |
-| `g.w_momentum` | 0.35 | 动量因子权重 |
-| `g.w_volume` | 0.30 | 成交量因子权重 |
-| `g.w_reversal` | 0.15 | 反转修正权重 |
-| `g.w_volatility` | 0.20 | 低波动率权重 |
-| `g.rsi_oversold` | 35 | RSI 超卖阈值 |
-| `g.rsi_overbought` | 65 | RSI 超买阈值 |
-| `g.boll_period` | 20 | 布林带周期 |
-| `g.atr_multiplier` | 2.5 | ATR 追踪止损倍数 |
-| `g.sr_lookback` | 60 | 支撑阻力回看期（天） |
-| `g.sr_tolerance` | 0.025 | 支撑阻力容差（2.5%） |
-| `g.max_single_pct` | 0.20 | 单股最大仓位（20%） |
-| `g.hard_stop_pct` | 0.08 | 硬止损阈值（8%） |
-| `g.vol_confirm_ratio` | 1.2 | 成交量确认倍数 |
+| `TOP_N` | 5 | 每周选股数量 |
+| `W_MOMENTUM` | 0.35 | 动量因子权重 |
+| `W_VOLUME` | 0.30 | 成交量因子权重 |
+| `W_REVERSAL` | 0.15 | 反转修正权重 |
+| `W_VOLATILITY` | 0.20 | 低波动率权重 |
+| `RSI_OVERSOLD` | 35 | RSI 超卖阈值 |
+| `RSI_OVERBOUGHT` | 65 | RSI 超买阈值 |
+| `BOLL_PERIOD` | 20 | 布林带周期 |
+| `ATR_MULTIPLIER` | 2.5 | ATR 追踪止损倍数 |
+| `SR_LOOKBACK` | 60 | 支撑阻力回看期（天） |
+| `SR_TOLERANCE` | 0.025 | 支撑阻力容差（2.5%） |
+| `MAX_SINGLE_PCT` | 0.20 | 单股最大仓位（20%） |
+| `HARD_STOP_PCT` | 0.08 | 硬止损阈值（8%） |
+| `VOL_CONFIRM_RATIO` | 1.2 | 成交量确认倍数 |
 
 ---
 
@@ -685,7 +687,7 @@ def _get_factor_weights():
 
 **4. 月度再平衡财务因子**
 
-每月加入 PE/PB 财务因子（参考 Tutorial 08 §5），但仅作为辅助参考：
+每月加入 PE/PB 财务因子（参考 Tutorial 08 第 5 节），但仅作为辅助参考：
 
 ```python
 def _compute_pe_factor(code):

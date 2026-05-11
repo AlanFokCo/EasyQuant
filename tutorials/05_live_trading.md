@@ -2,6 +2,8 @@
 
 > 回测通过后，用实时行情验证策略，再导出到 PTrade/QMT 进行实盘部署。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **PTrade 导出：** [`doc/ptrade_adapter.md`](../doc/ptrade_adapter.md)
+
 ---
 
 ## 目录
@@ -117,30 +119,19 @@ run_paper_trade(
 python examples/13_ptrade_export.py
 ```
 
-这会生成 `ptrade_strategy.py` 文件。
+这会生成 `examples/ptrade_strategy_generated.py`（默认以 `examples/03_run_backtest.py` 为样例策略）。
 
 ### 3.2 自定义策略导出
 
-修改 `examples/13_ptrade_export.py` 中的 `STRATEGY_CODE` 变量，替换为你自己的策略：
+在 `examples/13_ptrade_export.py` 的 `if __name__ == '__main__':` 中，把 `export_ptrade_script(strategy_file=...)` 的 `strategy_file` 改成你自己的策略 `.py` 路径（需包含 `initialize(context)`）。也可直接调用：
 
 ```python
-# 在 examples/13_ptrade_export.py 中
-STRATEGY_CODE = '''
-# 你的策略代码（去掉 from eqlib import * 这一行）
+from eqlib.ptrade_adapter import export_ptrade_script
 
-g.security = '601390'
-g.fast_period = 5
-g.slow_period = 20
-
-def initialize(context):
-    set_benchmark('000300.XSHG')
-    set_account('YOUR_ACCOUNT_ID')
-    run_daily(market_open, time='every_bar')
-
-def market_open(context):
-    # ... 你的策略逻辑 ...
-    pass
-'''
+export_ptrade_script(
+    strategy_file="/path/to/my_strategy.py",
+    output_file="/path/to/ptrade_strategy_generated.py",
+)
 ```
 
 ### 3.3 手动迁移步骤

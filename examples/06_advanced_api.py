@@ -113,6 +113,8 @@ def demo_attribution():
         end_date=datetime.date(2024, 12, 31),
         starting_cash=100000,
         benchmark="000300.XSHG",
+        securities=["601390"],
+        use_local=True,
     )
 
     if result is None:

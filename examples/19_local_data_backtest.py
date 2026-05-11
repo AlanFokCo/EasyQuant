@@ -25,6 +25,8 @@ Usage:
     python examples/19_local_data_backtest.py --download-all
 """
 
+import os
+import sys
 from eqlib import *
 
 
@@ -32,9 +34,9 @@ from eqlib import *
 # Strategy parameters
 # ============================================================
 
-g.security = "601390"
-g.fast_period = 5
-g.slow_period = 20
+SECURITY = "000768"
+FAST_PERIOD = 5
+SLOW_PERIOD = 20
 
 
 # ============================================================
@@ -42,6 +44,9 @@ g.slow_period = 20
 # ============================================================
 
 def initialize(context):
+    g.security = SECURITY
+    g.fast_period = FAST_PERIOD
+    g.slow_period = SLOW_PERIOD
     set_benchmark("000300.XSHG")
     set_order_cost(OrderCost(
         open_tax=0, close_tax=0.001,
@@ -59,7 +64,7 @@ def market_open(context):
 
     price = hist["close"].iloc[-1]
     ma_fast = hist["close"].tail(g.fast_period).mean()
-    ma_slow = hist["close"].mean()
+    ma_slow = hist["close"].tail(g.slow_period).mean()
 
     if price > ma_fast > ma_slow:
         if g.security not in context.portfolio.positions:
@@ -82,8 +87,8 @@ def demo_local_data_info():
     print("\n--- Local Data Management Demo ---\n")
 
     # Check if we have local data
-    has_data = has_local_data(g.security)
-    print("Has local data for %s: %s" % (g.security, has_data))
+    has_data = has_local_data(SECURITY)
+    print("Has local data for %s: %s" % (SECURITY, has_data))
 
     # List all local stocks
     local_stocks = list_local_stocks()
@@ -101,7 +106,7 @@ def demo_local_data_info():
 
 def demo_download_all():
     """Pre-download data for a batch of stocks."""
-    stocks = ["601390", "600519", "000858", "600036", "000001"]
+    stocks = [SECURITY, "600519", "000858", "600036", "000001"]
     print("\nDownloading data for %d stocks..." % len(stocks))
 
     for sec in stocks:
@@ -120,8 +125,6 @@ def demo_download_all():
 # ============================================================
 
 if __name__ == "__main__":
-    import sys
-
     if "--list" in sys.argv:
         demo_local_data_info()
         sys.exit(0)
@@ -140,13 +143,15 @@ if __name__ == "__main__":
     print("                download and save if not.")
     print()
 
+    os.makedirs("reports", exist_ok=True)
+
     result = run_strategy(
         initialize,
         start_date="2024-01-01",
         end_date="2024-12-31",
         starting_cash=100000,
         benchmark="000300.XSHG",
-        securities=["601390"],
+        securities=[SECURITY],
         report_dir="reports",
         use_local=True,  # <-- Enable local data mode
     )

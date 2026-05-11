@@ -74,7 +74,7 @@ from eqlib.data import (
     # P0: Market snapshot, security info, trading calendar
     get_current_data, get_security_info, get_trade_days,
     # P1: Fundamentals, money flow, valuation, extras
-    get_fundamentals, get_money_flow, get_billboard_list,
+    get_money_flow, get_billboard_list,
     get_valuation, get_index_weights, get_extras,
     # Universe management
     set_universe, get_universe,
@@ -130,6 +130,11 @@ from eqlib.selection import (
     filter_low_price_stocks,
     filter_high_pe_stocks,
     fetch_factor_data,
+)
+
+# Stock query API (fluent chainable screening)
+from eqlib.stock_query import (
+    query, valuation, get_fundamentals, get_current_data_object,
 )
 
 # Utilities: indicators, statistics, money management
@@ -205,6 +210,8 @@ __all__ = [
     "utils",
     # Portfolio backtest
     "StrategyConfig", "run_portfolio_backtest",
+    # Stock query API
+    "query", "valuation", "get_current_data_object",
 ]
 
 

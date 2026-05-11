@@ -41,7 +41,8 @@ data/
 # Backtest / strategy output
 backtest_results/
 strategy_results/
-reports/
+reports/*
+!reports/README.md
 *.log
 
 # Local config (may contain API keys, secrets)
@@ -61,6 +62,9 @@ htmlcov/
 .coverage
 .coverage.*
 coverage.xml
+
+# Example-generated QMT script (regenerate with examples/13_ptrade_export.py)
+examples/ptrade_strategy_generated.py
 
 # Testing
 .pytest_cache/

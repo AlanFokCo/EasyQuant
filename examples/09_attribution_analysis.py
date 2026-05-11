@@ -62,9 +62,12 @@ def weekly_rebalance(context):
 
 if __name__ == "__main__":
     import datetime
+    import os
 
     # Run backtest with preloaded data
     securities = ["601390", "000001", "600519", "600036", "000858"]
+
+    os.makedirs("reports", exist_ok=True)
 
     result = run_backtest(
         initialize_func=initialize,
@@ -73,6 +76,7 @@ if __name__ == "__main__":
         starting_cash=100000,
         benchmark="000300.XSHG",
         securities=securities,
+        use_local=True,
     )
 
     if result is None:
@@ -141,8 +145,6 @@ if __name__ == "__main__":
     print("Generating Reports")
     print(f"{'=' * 60}")
 
-    import os
-    os.makedirs("reports", exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     generate_chart(result, f"reports/analysis_{timestamp}.png")

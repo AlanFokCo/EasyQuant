@@ -7,6 +7,7 @@ Demonstrates the high-level portfolio backtest mode:
 - Use report_suffix to distinguish versions
 """
 
+import os
 from eqlib import *
 
 
@@ -30,7 +31,7 @@ def momentum_strategy(context):
         current_price = hist["close"].iloc[-1]
 
         # Uptrend: buy if no position
-        if current_price > ma20 * 1.02:
+        if current_price > ma20 * 1.005:
             if sec not in context.portfolio.positions or \
                context.portfolio.positions[sec].amount == 0:
                 # Use config.position_pct or position_amount
@@ -41,7 +42,7 @@ def momentum_strategy(context):
                     log.info("BUY %s @ %.3f (price > MA20)" % (sec, current_price))
 
         # Downtrend: sell if holding
-        elif current_price < ma20 * 0.98:
+        elif current_price < ma20 * 0.995:
             if sec in context.portfolio.positions and \
                context.portfolio.positions[sec].amount > 0:
                 order_target(sec, 0)
@@ -53,23 +54,25 @@ def momentum_strategy(context):
 # ============================================================
 
 if __name__ == "__main__":
+    os.makedirs("reports", exist_ok=True)
+
     # Method 1: Using StrategyConfig (recommended)
     # This is the cleanest way to define a portfolio backtest
 
     config = StrategyConfig(
         starting_cash=200000,              # 20万初始资金
         securities=[
-            "601390",  # 工商银行
-            "600519",  # 贵州茅台
-            "000858",  # 五粮液
+            "601390",  # 中国中铁
+            "000630",  # 铜陵有色
+            "518880",  # 黄金ETF
             "600036",  # 招商银行
-            "000001",  # 平安银行
+            "000768",  # 中航光电
         ],
         benchmark="000300.XSHG",           # 沪深300 对比
         position_pct=0.33,                 # 每只股票最多用 33% 可用资金
         start_date="2024-01-01",
         end_date="2024-12-31",
-        report_suffix="momentum_v1",        # 报告文件后缀，用于区分版本
+        report_suffix="momentum_v2",        # 报告文件后缀，用于区分版本
     )
 
     result = run_portfolio_backtest(

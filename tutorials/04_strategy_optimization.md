@@ -2,6 +2,8 @@
 
 > 在回测验证的基础上，改进策略参数、丰富策略逻辑、构建组合策略。
 
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **文档：** [`doc/README.md`](../doc/README.md)
+
 ---
 
 ## 目录

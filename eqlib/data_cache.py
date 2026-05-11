@@ -233,6 +233,12 @@ class PreloadedData:
         self._securities: list = []
         self._dates: pd.DatetimeIndex = pd.DatetimeIndex([])
         self._use_panel_fallback: bool = False  # True when dicts were skipped
+        # Pre-built {security: {field: pd.Series}} for fast attribute_history
+        self._field_series: dict = {}
+        # Precomputed indicators: {security: pd.DataFrame} with columns:
+        # rsi, bb_upper, bb_mid, bb_lower, macd_dif, macd_dea, macd_hist,
+        # atr, dc_upper, dc_mid, dc_lower
+        self._indicators: dict = {}
 
     def load(
         self,
@@ -362,6 +368,91 @@ class PreloadedData:
         self._securities = sorted(frames.keys())
         self._dates = self.panel.index
 
+        # Build {security: {field: pd.Series}} for fast attribute_history
+        fields = ["open", "high", "low", "close", "volume", "money",
+                   "pct_change", "price_change", "turnover"]
+        for sec, df in frames.items():
+            self._field_series[sec] = {}
+            for f in fields:
+                if f in df.columns:
+                    self._field_series[sec][f] = df[f]
+
+        # Precompute all technical indicators once per stock
+        self._compute_indicators(frames)
+
+    def _compute_indicators(self, frames: dict):
+        """Precompute technical indicators for all securities at once.
+
+        Called automatically at the end of load().  Computes RSI, MACD,
+        Bollinger Bands, ATR, and Donchian Channel for each stock's full
+        price history in a single pass, storing the results in
+        ``self._indicators[security]`` as a DataFrame.
+        """
+        from eqlib.utils.indicators import compute_all_indicators
+
+        for sec, df in frames.items():
+            if not all(f in df.columns for f in ["close", "high", "low"]):
+                continue
+            try:
+                ind_df = compute_all_indicators(
+                    close=df["close"], high=df["high"], low=df["low"],
+                    volume=df.get("volume", pd.Series()),
+                )
+                self._indicators[sec] = ind_df
+            except Exception:
+                pass
+
+    def get_indicators(self, security, count, current_dt):
+        """Get precomputed indicators for a security up to current_dt.
+
+        Returns a DataFrame with indicator columns, limited to *count* rows
+        ending at or before *current_dt*.  If precomputed indicators are not
+        available, returns None.
+        """
+        ind_df = self._indicators.get(security)
+        if ind_df is None:
+            return None
+
+        if current_dt is not None:
+            ts = pd.Timestamp(current_dt)
+            result = ind_df.loc[:ts]
+        else:
+            result = ind_df
+
+        return result.tail(count)
+
+    def get_history(self, security, count, fields, current_dt):
+        """Fast attribute_history from preloaded data.
+
+        Returns a DataFrame with the requested fields and up to *count* rows
+        ending at or before *current_dt*.  Uses pre-built Series dicts to avoid
+        repeated DataFrame slicing.
+
+        Parameters:
+            security: stock code
+            count: number of bars to return
+            fields: list of field names
+            current_dt: datetime (may be None, in which case no date filter)
+        """
+        sec_data = self._field_series.get(security)
+        if sec_data is None:
+            return None
+
+        available = [f for f in fields if f in sec_data]
+        if not available:
+            return pd.DataFrame()
+
+        if current_dt is not None:
+            ts = pd.Timestamp(current_dt)
+            result = pd.DataFrame(
+                {f: sec_data[f].loc[:ts] for f in available}
+            )
+        else:
+            result = pd.DataFrame(
+                {f: sec_data[f] for f in available}
+            )
+        return result.tail(count)
+
     def get_close(self, date, security) -> Optional[float]:
         """Get closing price for a given date and security."""
         # Fast path: dict cache
@@ -462,6 +553,8 @@ class PreloadedData:
         self._securities = []
         self._dates = pd.DatetimeIndex([])
         self._use_panel_fallback = False
+        self._field_series = {}
+        self._indicators = {}
 
 
 # ============================================================

@@ -12,6 +12,7 @@ Usage:
     python examples/17_grid_trading_strategy.py
 """
 
+import os
 from eqlib import *
 
 
@@ -19,10 +20,10 @@ from eqlib import *
 # Strategy parameters
 # ============================================================
 
-g.security = "601390"           # ICBC (stable bank stock)
-g.grid_levels = 10              # Number of grid lines
-g.grid_range_pct = 0.15         # Grid range: +/- 15% from center price
-g.trade_value = 10000           # Each trade: 10,000 yuan
+SECURITY = "601857"           # PetroChina 中国石油
+GRID_LEVELS = 10              # Number of grid lines
+GRID_RANGE_PCT = 0.15         # Grid range: +/- 15% from center price
+TRADE_VALUE = 10000           # Each trade: 10,000 yuan
 
 
 # ============================================================
@@ -41,7 +42,7 @@ def initialize(context):
         min_commission=5,
     ))
 
-    context.universe = [g.security]
+    context.universe = [SECURITY]
     run_daily(market_open, time="every_bar")
 
     # Grid state
@@ -52,16 +53,16 @@ def initialize(context):
     g.trade_count = 0
 
     log.info("Grid Trading init: %s, levels=%d, range=+/%.0f%%" % (
-        g.security, g.grid_levels, g.grid_range_pct * 100))
+        SECURITY, GRID_LEVELS, GRID_RANGE_PCT * 100))
 
 
 def build_grid(center_price):
     """Build grid price levels."""
-    lower = center_price * (1 - g.grid_range_pct)
-    upper = center_price * (1 + g.grid_range_pct)
-    step = (upper - lower) / g.grid_levels
+    lower = center_price * (1 - GRID_RANGE_PCT)
+    upper = center_price * (1 + GRID_RANGE_PCT)
+    step = (upper - lower) / GRID_LEVELS
 
-    g.grid_prices = [lower + step * i for i in range(g.grid_levels + 1)]
+    g.grid_prices = [lower + step * i for i in range(GRID_LEVELS + 1)]
 
     # Pre-fill: assume we buy at the initial price level
     init_idx = _find_level(center_price)
@@ -87,7 +88,7 @@ def _find_level(price):
 
 def market_open(context):
     """Daily trading logic."""
-    security = g.security
+    security = SECURITY
 
     hist = attribute_history(security, 5, "1d", ["close"])
     if hist.empty:
@@ -99,7 +100,7 @@ def market_open(context):
     if not g.grid_initialized:
         build_grid(price)
         # Initial position: buy at center price
-        order_value(security, g.trade_value * 5)
+        order_value(security, TRADE_VALUE * 5)
         g.grid_initialized = True
         log.info("Initial position: BUY %s @ %.3f" % (security, price))
         return
@@ -108,7 +109,7 @@ def market_open(context):
 
     # Price dropped to a new lower grid level -> BUY one batch
     if grid_idx < g.last_grid_idx:
-        order_value(security, g.trade_value)
+        order_value(security, TRADE_VALUE)
         g.grid_holding[grid_idx] = True
         g.trade_count += 1
         log.info("Grid BUY level %d: %s @ %.3f" % (grid_idx, security, price))
@@ -136,11 +137,13 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Grid Trading Strategy")
     print("=" * 60)
-    print("Stock: %s" % g.security)
-    print("Grid levels: %d" % g.grid_levels)
-    print("Range: +/-%.0f%%" % (g.grid_range_pct * 100))
-    print("Trade size: %.0f yuan/grid" % g.trade_value)
+    print("Stock: %s" % SECURITY)
+    print("Grid levels: %d" % GRID_LEVELS)
+    print("Range: +/-%.0f%%" % (GRID_RANGE_PCT * 100))
+    print("Trade size: %.0f yuan/grid" % TRADE_VALUE)
     print()
+
+    os.makedirs("reports", exist_ok=True)
 
     result = run_strategy(
         initialize_func=initialize,
@@ -148,6 +151,7 @@ if __name__ == "__main__":
         end_date="2025-01-01",
         starting_cash=100000,
         benchmark="000300.XSHG",
-        securities=["601390"],
+        securities=["601857"],
         report_dir="reports",
+        use_local=True,
     )
