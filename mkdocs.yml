@@ -42,6 +42,8 @@ plugins:
   - git-revision-date-localized:
       enable_creation_date: true
       fallback_to_build_date: true
+      # Avoid parallel path bugs (e.g. symlink edge cases) in CI; serial is fast enough here.
+      enable_parallel_processing: false
 markdown_extensions:
   - admonition
   - attr_list
