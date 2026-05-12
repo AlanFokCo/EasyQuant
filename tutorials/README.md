@@ -1,5 +1,5 @@
 <div align="center">
-<a href="https://github.com/AlanFokCo/EasyQuant"><img src="../assets/logo.svg" width="200" alt="EasyQuant"/></a>
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="../assets/logo.svg" width="240" alt="EasyQuant"/></a>
 </div>
 
 # Tutorials

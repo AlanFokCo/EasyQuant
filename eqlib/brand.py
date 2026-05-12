@@ -10,7 +10,7 @@ TAGLINE_EN = "A-share backtest"
 def html_header_brand_lockup() -> str:
     """Inline SVG + name for HTML report header (GitHub link, unique gradient IDs)."""
     svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64" '
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="4 4 56 56" '
         'aria-hidden="true" focusable="false">'
         "<defs>"
         '<linearGradient id="eqHdrBg" x1="12%" y1="88%" x2="88%" y2="12%">'
@@ -43,7 +43,7 @@ def html_header_brand_lockup() -> str:
 def html_footer_brand_chip() -> str:
     """Small lockup for HTML report footer."""
     svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 64 64" '
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="4 4 56 56" '
         'aria-hidden="true" focusable="false">'
         "<defs>"
         '<linearGradient id="eqFtBg" x1="12%" y1="88%" x2="88%" y2="12%">'

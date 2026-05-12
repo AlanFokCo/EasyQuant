@@ -1,4 +1,4 @@
-<p align="center"><a href="https://github.com/AlanFokCo/EasyQuant"><img src="../assets/logo.svg" width="160" alt="EasyQuant"/></a></p>
+<p align="center"><a href="https://github.com/AlanFokCo/EasyQuant"><img src="../assets/logo.svg" width="240" alt="EasyQuant"/></a></p>
 
 # Examples（示例总览）
 
