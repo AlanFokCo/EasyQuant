@@ -47,6 +47,8 @@ def _buffer_order(action: str, **kwargs) -> str:
         return None
     req = {"action": action, "security": kwargs.pop("security"), **kwargs}
     sess._pending_orders.append(req)
+    log.debug("order buffered: action=%s security=%s queue_size=%s",
+              action, req["security"], len(sess._pending_orders))
     return f"PENDING_{action}_{req['security']}"
 
 
@@ -65,8 +67,9 @@ def order(security, amount, style=None):
     """
     if amount == 0:
         return None
-    log.info(f"order queued: {'+' if amount > 0 else ''}{amount} {security} "
-             f"(fills at next open)")
+    log.action("Queue order", security,
+               amount=f"{'+' if amount > 0 else ''}{int(amount)}",
+               fill="next_open")
     return _buffer_order("ORDER", security=security, amount=int(amount))
 
 
@@ -92,7 +95,8 @@ def order_target(security, amount, style=None):
     Returns:
         Pending order ID string, or None.
     """
-    log.info(f"order_target queued: {security} → {amount} shares (fills at next open)")
+    log.action("Queue target-shares", security,
+               target_shares=int(amount), fill="next_open")
     return _buffer_order("ORDER_TARGET", security=security, target_amount=int(amount))
 
 
@@ -111,7 +115,8 @@ def order_value(security, value, style=None):
     """
     if value == 0:
         return None
-    log.info(f"order_value queued: {security} {value:+.0f} CNY (fills at next open)")
+    log.action("Queue order-value", security,
+               value_cny=f"{float(value):+.0f}", fill="next_open")
     return _buffer_order("ORDER_VALUE", security=security, value=float(value))
 
 
@@ -135,6 +140,6 @@ def order_target_value(security, value, style=None):
     Returns:
         Pending order ID string, or None.
     """
-    log.info(f"order_target_value queued: {security} → {value:.0f} CNY (fills at next open)")
+    log.action("Queue target-value", security,
+               target_cny=f"{float(value):.0f}", fill="next_open")
     return _buffer_order("ORDER_TARGET_VALUE", security=security, target_value=float(value))
-
