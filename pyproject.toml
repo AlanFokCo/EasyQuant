@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eqlib"
-version = "0.1.0"
-description = "Event-driven quantitative trading framework for local backtesting"
+version = "0.1.1"
+description = "Event-driven quantitative trading framework for China A-share backtesting and research"
 readme = "README.md"
-license = {text = "MIT"}
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 authors = [
     {name = "AlanFokCo", email = "alanfok2868@gmail.com"},
 ]

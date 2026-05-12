@@ -26,14 +26,14 @@ ENV/
 *.swo
 *~
 
-# AI / editor orchestration (local only; not shipped to end users)
+# AI / editor orchestration (local only)
 .claude/
 CLAUDE.md
 
 # Jupyter Notebook
 .ipynb_checkpoints/
 
-# Data directories (downloaded / generated data)
+# Data directories (downloaded / generated)
 data/
 *.csv
 *.h5
@@ -50,12 +50,12 @@ reports/*
 !reports/README.md
 *.log
 
-# Local config (may contain API keys, secrets)
+# Local config / secrets
 .env
 .env.local
 *.local.json
 
-# OS
+# OS junk
 .DS_Store
 Thumbs.db
 
@@ -68,8 +68,18 @@ htmlcov/
 .coverage.*
 coverage.xml
 
-# Example-generated QMT script (regenerate with examples/13_ptrade_export.py)
+# Generated QMT/PTrade script (regenerate with examples/13_ptrade_export.py)
 examples/ptrade_strategy_generated.py
+ptrade_strategy.py
+
+# Node.js (leftover from docs tooling)
+node_modules/
+package.json
+package-lock.json
 
 # Testing
 .pytest_cache/
+
+# Screenshot tooling (internal use only)
+screenshot_reports.py
+tools/
