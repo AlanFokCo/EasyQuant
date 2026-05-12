@@ -24,6 +24,27 @@
 
 ---
 
+## 新手 15 分钟验证清单
+
+```bash
+cd EasyQuant
+pip install .
+python -c "from eqlib import *; print('eqlib OK')"
+python examples/03_run_backtest.py
+```
+
+然后在 `reports/` 打开最新 `.html` 文件，确认：收益曲线、回撤曲线、交易记录都能显示。
+
+若要做额外自检：
+
+```bash
+python examples/01_fetch_data.py
+pip install -e ".[dev]"
+python -m pytest tests/
+```
+
+---
+
 ## 快速命令
 
 ```bash
