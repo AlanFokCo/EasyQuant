@@ -1,3 +1,8 @@
+<p align="center">
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="200" alt="EasyQuant"/></a><br/>
+<strong>EasyQuant</strong> - China A-share quantitative backtesting
+</p>
+
 # EasyQuant Documentation
 
 EasyQuant is an event-driven quantitative backtesting and strategy development framework for the China A-share market, built around the core package [`eqlib`](https://github.com/AlanFokCo/EasyQuant/tree/main/eqlib).

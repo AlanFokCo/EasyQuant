@@ -70,6 +70,16 @@ def test_import_reporting():
     assert callable(generate_report_json)
 
 
+def test_brand_assets_packaged():
+    from importlib.resources import files
+
+    from eqlib.brand import BRAND_NAME, html_header_brand_lockup
+
+    assert BRAND_NAME == "EasyQuant"
+    assert "svg" in html_header_brand_lockup().lower()
+    assert files("eqlib").joinpath("static/logo-icon.png").is_file()
+
+
 def test_import_optimizer():
     from eqlib import portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity
     assert callable(portfolio_optimizer)

@@ -41,9 +41,12 @@ Key capabilities available to the agent:
 ```
 EasyQuant/
 ├── CLAUDE.md                      ← This file (AI agent configuration)
+├── assets/                        ← Brand: logo.svg, logo-icon.svg, PNG exports
 ├── eqlib/                         ← Core library (do not modify during optimization)
 │   ├── engine.py                  ← Backtest engine
 │   ├── attribution.py             ← analyze_returns, brinson_attribution, etc.
+│   ├── brand.py                   ← HTML/matplotlib branding helpers
+│   ├── static/logo-icon.png       ← Packaged icon for matplotlib reports
 │   ├── stock_query.py             ← Fluent query API (query, valuation, get_fundamentals)
 │   └── ...
 ├── agent/                         ← AI agent support utilities

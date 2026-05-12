@@ -13,6 +13,12 @@ plt.rcParams["axes.unicode_minus"] = False
 
 from eqlib.data import fetch_stock_data, get_price
 from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
+from eqlib.brand import (
+    BRAND_NAME,
+    apply_matplotlib_brand,
+    html_footer_brand_chip,
+    html_header_brand_lockup,
+)
 import pandas as pd
 import numpy as np
 
@@ -23,6 +29,21 @@ def _to_tv_date(date_val):
         return date_val.strftime("%Y-%m-%d")
     if isinstance(date_val, datetime.date):
         return date_val.strftime("%Y-%m-%d")
+    if isinstance(date_val, pd.Timestamp):
+        return date_val.strftime("%Y-%m-%d")
+    if hasattr(date_val, "dtype") and getattr(date_val, "dtype", None) is not None:
+        try:
+            ts = pd.Timestamp(date_val)
+            if not pd.isna(ts):
+                return ts.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    try:
+        ts = pd.Timestamp(date_val)
+        if not pd.isna(ts):
+            return ts.strftime("%Y-%m-%d")
+    except Exception:
+        pass
     return str(date_val)[:10]
 
 
@@ -120,6 +141,125 @@ def _build_daily_pnl(recorded, initial):
         prev_val = val
 
     return pnl_bars, ret_bars
+
+
+def _build_drawdown_from_cumulative_pct(cum_points):
+    """From cumulative total return % series [{time, value}, ...], build drawdown % from running peak.
+
+    Same definition as strategy drawdown: current cumulative % minus max cumulative % seen so far.
+    """
+    if not cum_points:
+        return []
+    out = []
+    peak = cum_points[0]["value"]
+    for d in cum_points:
+        v = d["value"]
+        if v > peak:
+            peak = v
+        out.append({"time": d["time"], "value": round(v - peak, 3)})
+    return out
+
+
+def _align_index_close_to_times(target_time_strings: list, price_df: pd.DataFrame) -> list:
+    """Build cumulative index return (%) series aligned to strategy chart ``time`` keys.
+
+    Uses the last available index close on or before each target date (forward-filled
+    after union reindex), then expresses returns vs the close on the **first** target
+    date. This avoids empty series when the first portfolio bar has no exact index row
+    in the sliced frame (calendar edge / timezone) or when the slice starts on a
+    non-trading day.
+    """
+    if not target_time_strings or price_df is None or price_df.empty:
+        return []
+    if "close" not in price_df.columns:
+        return []
+    s = price_df["close"].astype(float).copy()
+    if not isinstance(s.index, pd.DatetimeIndex):
+        s.index = pd.to_datetime(s.index, errors="coerce")
+    s = s.sort_index()
+    s = s[~s.index.duplicated(keep="last")]
+    s = s.dropna(how="all")
+    if s.empty:
+        return []
+    try:
+        target_ix = pd.DatetimeIndex([pd.Timestamp(t) for t in target_time_strings])
+    except Exception:
+        return []
+    union_ix = s.index.union(target_ix).sort_values()
+    s_ff = s.reindex(union_ix).sort_index().ffill()
+    at_targets = s_ff.reindex(target_ix)
+    if at_targets.isna().any():
+        at_targets = at_targets.bfill().ffill()
+    if at_targets.isna().all():
+        return []
+    base = float(at_targets.iloc[0])
+    if base <= 0 or np.isnan(base):
+        return []
+    out = []
+    for i, t in enumerate(target_time_strings):
+        pr = float(at_targets.iloc[i])
+        if np.isnan(pr):
+            continue
+        out.append({"time": t, "value": round((pr / base - 1.0) * 100.0, 3)})
+    return out
+
+
+def attach_chart_dual_indices(result: dict) -> None:
+    """Fetch CSI300 + SSE index closes during backtest and attach aligned cumulative % series.
+
+    Populates ``result['chart_index_hs300']`` and ``result['chart_index_sse']`` as
+    lists of ``{{"time": "YYYY-MM-DD", "value": float}}`` matching portfolio record
+    dates (same length/order as strategy cumulative return chart). Used by
+    ``generate_html_report`` so charts render without a second fragile fetch.
+
+    Safe no-op if ``context`` / ``recorded_values`` missing or fetch fails.
+    """
+    ctx = result.get("context")
+    if ctx is None:
+        return
+    recorded = result.get("recorded_values")
+    if not recorded:
+        result["chart_index_hs300"] = []
+        result["chart_index_sse"] = []
+        return
+    initial = getattr(ctx.portfolio, "starting_cash", 0) or 0
+    cum_pts = _build_return_series(recorded, initial)
+    if not cum_pts:
+        result["chart_index_hs300"] = []
+        result["chart_index_sse"] = []
+        return
+    target_times = [p["time"] for p in cum_pts]
+    first_d = datetime.datetime.strptime(target_times[0], "%Y-%m-%d").date()
+    last_d = datetime.datetime.strptime(target_times[-1], "%Y-%m-%d").date()
+    pad = datetime.timedelta(days=400)
+    ctx_start = getattr(ctx, "start_date", first_d)
+    ctx_end = getattr(ctx, "end_date", last_d)
+    fetch_start = min(first_d, ctx_start) - pad
+    fetch_end = max(last_d, ctx_end)
+    try:
+        hs_df = fetch_stock_data("000300.XSHG", fetch_start, fetch_end)
+        sse_df = fetch_stock_data("000001.XSHG", fetch_start, fetch_end)
+    except Exception as exc:
+        from eqlib.logger import log
+        log.warn("attach_chart_dual_indices: index fetch failed: %s", exc)
+        result["chart_index_hs300"] = []
+        result["chart_index_sse"] = []
+        return
+    hs_line = _align_index_close_to_times(target_times, hs_df)
+    sse_line = _align_index_close_to_times(target_times, sse_df)
+    has_raw = (hs_df is not None and not hs_df.empty) or (sse_df is not None and not sse_df.empty)
+    if (not hs_line or not sse_line) and has_raw:
+        from eqlib.logger import log
+        log.warn(
+            "attach_chart_dual_indices: aligned series empty "
+            "(hs_pts=%s, sse_pts=%s, hs_rows=%s, sse_rows=%s, strategy_pts=%s)",
+            len(hs_line), len(sse_line),
+            len(hs_df) if hs_df is not None else 0,
+            len(sse_df) if sse_df is not None else 0,
+            len(target_times),
+        )
+    result["chart_index_hs300"] = hs_line
+    result["chart_index_sse"] = sse_line
 
 
 def _fetch_index_returns(index_symbol, start, end, recorded):
@@ -226,7 +366,7 @@ def generate_chart(result, out_path):
         gridspec_kw={"height_ratios": [3, 1]},
         sharex=True,
     )
-    fig.subplots_adjust(hspace=0.08, left=0.08, right=0.96, top=0.94, bottom=0.08)
+    fig.subplots_adjust(hspace=0.08, left=0.08, right=0.96, top=0.82, bottom=0.08)
 
     # Strategy return
     strat_dates_np = pf_dates.to_numpy()
@@ -293,7 +433,8 @@ def generate_chart(result, out_path):
     ax_dd.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax_dd.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1, len(pf_dates) // 12)))
 
-    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    apply_matplotlib_brand(fig)
+    plt.savefig(out_path, dpi=150, bbox_inches="tight", pad_inches=0.2)
     plt.close()
     print(f"Chart saved: {out_path}")
 
@@ -417,10 +558,16 @@ def generate_html_report(result, out_path):
     pnl_bar_data, daily_returns_data = _build_daily_pnl(recorded, initial)
 
     # ============================================================
-    # Benchmark returns (uses the configured benchmark from result)
+    # Benchmark cumulative returns: 沪深300 + 上证指数（图表双线）；
+    # bench_data 为 set_benchmark 配置的指数，用于 _calc_metrics 等
     # ============================================================
     bench_data = _fetch_benchmark_returns(benchmark, start, end, recorded)
-    sse_data = _fetch_index_returns("sh000001", start, end, recorded)
+    ret_hs300 = result.get("chart_index_hs300") if isinstance(result.get("chart_index_hs300"), list) else None
+    if not ret_hs300:
+        ret_hs300 = _fetch_index_returns("sh000300", start, end, recorded)
+    ret_sse = result.get("chart_index_sse") if isinstance(result.get("chart_index_sse"), list) else None
+    if not ret_sse:
+        ret_sse = _fetch_index_returns("sh000001", start, end, recorded)
 
     # ============================================================
     # Drawdown series
@@ -433,6 +580,9 @@ def generate_html_report(result, out_path):
                 peak = d["value"]
             dd = round(d["value"] - peak, 3)
             drawdown_data.append({"time": d["time"], "value": dd})
+
+    dd_hs300 = _build_drawdown_from_cumulative_pct(ret_hs300)
+    dd_sse = _build_drawdown_from_cumulative_pct(ret_sse)
 
     # ============================================================
     # Performance metrics
@@ -556,6 +706,8 @@ def generate_html_report(result, out_path):
     pnl_badge_class = "pos" if pnl >= 0 else "neg"
 
     html = _HTML_TEMPLATE.format(
+        html_brand_lockup=html_header_brand_lockup(),
+        html_footer_brand=html_footer_brand_chip(),
         symbol=symbol,
         start_date=str(start),
         end_date=str(end),
@@ -576,8 +728,10 @@ def generate_html_report(result, out_path):
         support_json=json.dumps(support_data),
         resistance_json=json.dumps(resistance_data),
         cum_return_json=json.dumps(cum_return_data),
-        csi300_json=json.dumps(bench_data),
-        sse_json=json.dumps(sse_data),
+        ret_hs300_json=json.dumps(ret_hs300),
+        ret_sse_json=json.dumps(ret_sse),
+        dd_hs300_json=json.dumps(dd_hs300),
+        dd_sse_json=json.dumps(dd_sse),
         drawdown_json=json.dumps(drawdown_data),
         pnl_bar_json=json.dumps(pnl_bar_data),
         daily_returns_json=json.dumps(daily_returns_data),
@@ -695,7 +849,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>回测报告 · {symbol}</title>
+<title>EasyQuant | 回测报告 · {symbol}</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 if (typeof LightweightCharts === 'undefined') {{
@@ -725,8 +879,27 @@ if (typeof LightweightCharts === 'undefined') {{
   }}
   .header-inner {{
     max-width: 98vw; margin: 0 auto; padding: 0 16px;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
   }}
+  .eq-brand {{
+    display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    text-decoration: none; color: inherit;
+  }}
+  .eq-brand:hover {{ opacity: 0.88; }}
+  .eq-brand svg {{ display: block; flex-shrink: 0; }}
+  .eq-brand-text {{ display: flex; flex-direction: column; line-height: 1.15; }}
+  .eq-brand-name {{
+    font-size: 15px; font-weight: 700; color: #0c1222; letter-spacing: -0.04em;
+  }}
+  .eq-brand-tag {{
+    font-size: 9px; font-weight: 500; color: #64748b; letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }}
+  .header-main {{ flex: 1; min-width: 0; }}
+  .eq-footer-brand {{
+    display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  }}
+  .eq-footer-name {{ font-weight: 600; color: #595959; }}
   h1 {{ font-size: 16px; font-weight: 600; color: var(--text); }}
   h1 .sym {{ color: var(--primary); }}
   .header-meta {{ font-size: 11px; color: var(--text-dim); margin-top: 2px; }}
@@ -991,7 +1164,8 @@ if (typeof LightweightCharts === 'undefined') {{
 <!-- ==================== HEADER ==================== -->
 <div class="header">
   <div class="header-inner">
-    <div>
+    {html_brand_lockup}
+    <div class="header-main">
       <h1>回测报告 &middot; <span class="sym">{symbol}</span></h1>
       <div class="header-meta">
         回测区间 {start_date} &rarr; {end_date}&nbsp;&nbsp;&middot;&nbsp;&nbsp;
@@ -1168,12 +1342,14 @@ if (typeof LightweightCharts === 'undefined') {{
       </div>
     </div>
     <div class="chart-body">
-      <div class="desc">策略与{benchmark_name}在相同区间的累计收益率（%）横向对比，直观评估策略 Alpha 来源。</div>
+      <div class="desc">策略累计收益（%）与<strong>沪深300</strong>、<strong>上证综指</strong>在同一回测区间、同一交易日对齐后的累计涨跌幅对比；指标卡片区「{benchmark_name} 收益」仍为 <code>set_benchmark</code> 配置的指数口径。</div>
     </div>
     <div id="returns"></div>
     <div class="legend" style="padding: 8px 16px;">
       <span><span class="ln" style="background:#f5222d"></span>策略</span>
-      <span><span class="ln" style="background:#1890ff"></span>{benchmark_name}</span>
+      <span><span class="ln" style="background:#1890ff"></span>沪深300</span>
+      <span><span class="ln" style="background:#fa8c16"></span>上证指数</span>
+      <span><span class="ln" style="background:#722ed1"></span>超额(相对沪深300)</span>
     </div>
   </div>
 
@@ -1183,7 +1359,7 @@ if (typeof LightweightCharts === 'undefined') {{
       <h2>回撤曲线</h2>
     </div>
     <div class="chart-body">
-      <div class="desc">策略净值相较历史峰值的累计回撤（%）。红色区域越深代表风险越大。</div>
+      <div class="desc">绿色区域为<strong>策略</strong>净值相对自身历史峰值的回撤（%）；<strong>蓝线</strong>为沪深300、<strong>橙线</strong>为上证综指各自相对其区间峰值的回撤，便于对照大盘调整时的策略风险。</div>
     </div>
     <div id="drawdown"></div>
   </div>
@@ -1292,7 +1468,8 @@ if (typeof LightweightCharts === 'undefined') {{
 </div>
 
 <div class="footer">
-  EasyQuant &middot; eqlib &nbsp;|&nbsp;
+  {html_footer_brand}
+  &nbsp;&middot;&nbsp; eqlib &nbsp;|&nbsp;
   行情数据：<a href="https://akshare.akfamily.xyz/" target="_blank" rel="noopener noreferrer">AKShare</a>（东方财富）&nbsp;|&nbsp;
   本报告仅供研究参考，不构成任何投资建议。
 </div>
@@ -1670,7 +1847,7 @@ if (typeof LightweightCharts === 'undefined') {{
     volS.setData({volume_json});
     kChart.timeScale().fitContent();
 
-    /* Cumulative returns — strategy + benchmark lines */
+    /* Cumulative returns — strategy + 沪深300 + 上证指数 */
     const rEl = document.getElementById('returns');
     const rChart = LightweightCharts.createChart(rEl, {{ ...cmn, width: rEl.clientWidth, height: 300 }});
     const stratLine = rChart.addLineSeries({{
@@ -1678,26 +1855,31 @@ if (typeof LightweightCharts === 'undefined') {{
       crosshairMarkerVisible: true, title: '策略',
     }});
     stratLine.setData({cum_return_json});
-    const benchLine = rChart.addLineSeries({{
+    const hs300Line = rChart.addLineSeries({{
       color: '#1890ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
-      crosshairMarkerVisible: true, title: '{benchmark_name}',
+      crosshairMarkerVisible: true, title: '沪深300',
     }});
-    benchLine.setData({csi300_json});
+    hs300Line.setData({ret_hs300_json});
+    const sseLine = rChart.addLineSeries({{
+      color: '#fa8c16', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, lastValueVisible: true,
+      crosshairMarkerVisible: true, title: '上证指数',
+    }});
+    sseLine.setData({ret_sse_json});
 
-    /* Excess return line (computed client-side) */
+    /* Excess return vs 沪深300 (same convention as broad-market active return) */
     const excessLine = rChart.addLineSeries({{
       color: '#722ed1', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
-      crosshairMarkerVisible: false, title: '超额收益',
+      crosshairMarkerVisible: false, title: '超额(相对沪深300)',
     }});
     var excessReturnData = [];
-    if ({cum_return_json}.length > 0 && {csi300_json}.length > 0) {{
+    if ({cum_return_json}.length > 0 && {ret_hs300_json}.length > 0) {{
       var cumArr = {cum_return_json};
-      var benchArr = {csi300_json};
-      var benchMap = {{}};
-      benchArr.forEach(function(d) {{ benchMap[d.time] = d.value; }});
+      var hsArr = {ret_hs300_json};
+      var hsMap = {{}};
+      hsArr.forEach(function(d) {{ hsMap[d.time] = d.value; }});
       cumArr.forEach(function(d) {{
-        if (benchMap.hasOwnProperty(d.time)) {{
-          excessReturnData.push({{ time: d.time, value: +(d.value - benchMap[d.time]).toFixed(3) }});
+        if (hsMap.hasOwnProperty(d.time)) {{
+          excessReturnData.push({{ time: d.time, value: +(d.value - hsMap[d.time]).toFixed(3) }});
         }}
       }});
     }}
@@ -1705,29 +1887,28 @@ if (typeof LightweightCharts === 'undefined') {{
 
     rChart.timeScale().fitContent();
 
-    /* Toggle return series visibility */
-    var returnSeriesVisible = {{ strat: true, bench: true, excess: false }};
+    var retVis = {{ strat: true, hs300: true, sse: true, excess: false }};
     window.toggleReturnSeries = function(mode, el) {{
-      // Update tab active state
       var tabs = document.querySelectorAll('#retTabs .chart-tab');
       tabs.forEach(function(t) {{ t.classList.remove('active'); }});
       if (el) el.classList.add('active');
 
       if (mode === 'all') {{
-        returnSeriesVisible = {{ strat: true, bench: true, excess: false }};
+        retVis = {{ strat: true, hs300: true, sse: true, excess: false }};
       }} else if (mode === 'excess') {{
-        returnSeriesVisible = {{ strat: true, bench: false, excess: true }};
+        retVis = {{ strat: true, hs300: false, sse: false, excess: true }};
       }} else if (mode === 'strategy') {{
-        returnSeriesVisible = {{ strat: true, bench: false, excess: false }};
+        retVis = {{ strat: true, hs300: false, sse: false, excess: false }};
       }} else if (mode === 'benchmark') {{
-        returnSeriesVisible = {{ strat: false, bench: true, excess: false }};
+        retVis = {{ strat: false, hs300: true, sse: true, excess: false }};
       }}
-      stratLine.applyOptions({{ visible: returnSeriesVisible.strat }});
-      benchLine.applyOptions({{ visible: returnSeriesVisible.bench }});
-      excessLine.applyOptions({{ visible: returnSeriesVisible.excess }});
+      stratLine.applyOptions({{ visible: retVis.strat }});
+      hs300Line.applyOptions({{ visible: retVis.hs300 }});
+      sseLine.applyOptions({{ visible: retVis.sse }});
+      excessLine.applyOptions({{ visible: retVis.excess }});
     }};
 
-    /* Drawdown */
+    /* Drawdown — strategy area + HS300 + SSE lines */
     const ddEl = document.getElementById('drawdown');
     const ddChart = LightweightCharts.createChart(ddEl, {{
       ...cmn, width: ddEl.clientWidth, height: 160,
@@ -1738,12 +1919,19 @@ if (typeof LightweightCharts === 'undefined') {{
       lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
     }});
     ddSeries.setData({drawdown_json});
-    // Add zero line via a line series
     var ddZeroData = {drawdown_json}.length > 0 ? [{{ time: {drawdown_json}[0].time, value: 0 }}, {{ time: {drawdown_json}[{drawdown_json}.length - 1].time, value: 0 }}] : [];
     var ddZeroLine = ddChart.addLineSeries({{
       color: '#d9d9d9', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
     }});
     ddZeroLine.setData(ddZeroData);
+    const ddHs300 = ddChart.addLineSeries({{
+      color: '#1890ff', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    }});
+    ddHs300.setData({dd_hs300_json});
+    const ddSse = ddChart.addLineSeries({{
+      color: '#fa8c16', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    }});
+    ddSse.setData({dd_sse_json});
     ddChart.timeScale().fitContent();
 
     /* Daily P&L */
@@ -1909,6 +2097,8 @@ def generate_report_md(result, out_path):
     # Header
     # ============================================================
     lines.append(f"# Backtest Report")
+    lines.append("")
+    lines.append(f"*Generated by {BRAND_NAME} (eqlib).*")
     lines.append("")
     lines.append(f"| | |")
     lines.append(f"|---|---|")
