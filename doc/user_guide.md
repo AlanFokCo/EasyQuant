@@ -496,7 +496,7 @@ from eqlib import (
     run_backtest
 )
 
-set_local_data_dir('data')  # 建议使用绝对路径，便于多项目复用
+set_local_data_dir('/home/user/eqlib_data')  # 建议使用绝对路径，便于多项目复用
 
 # 先预下载策略股票 + 基准
 for sec in ['601390', '600519', '000300.XSHG']:

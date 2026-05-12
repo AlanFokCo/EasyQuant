@@ -1096,7 +1096,7 @@ from eqlib import (
     run_strategy
 )
 
-set_local_data_dir('data')
+set_local_data_dir('/home/user/eqlib_data')  # 建议使用绝对路径，便于多项目复用
 targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
 
 for sec in targets:
