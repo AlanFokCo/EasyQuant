@@ -5,13 +5,33 @@ repo_name: AlanFokCo/EasyQuant
 docs_dir: docs
 theme:
   name: material
-  language: zh
+  language: en
   features:
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.expand
-    - navigation.sections
+    - navigation.indexes
     - navigation.top
     - toc.follow
+    - search.highlight
     - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light/dark mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+extra_css:
+  - assets/stylesheets/extra.css
 plugins:
   - search:
       lang:
@@ -31,38 +51,49 @@ markdown_extensions:
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
           case: lower
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
   - pymdownx.superfences
 nav:
   - Home: index.md
-  - Getting Started:
-      - Installation & Setup: doc/user_guide.md
-      - Your First Strategy: tutorials/02_first_strategy.md
-  - User Manual:
-      - Overview: doc/README.md
-      - User Guide: doc/user_guide.md
-      - Reports & Metrics: doc/reports_and_metrics.md
-      - PTrade/QMT Adapter: doc/ptrade_adapter.md
-      - FAQ: doc/FAQ.md
-  - API Reference:
-      - Index: doc/api_index.md
-      - Full Reference: doc/api_reference.md
-      - Utilities: doc/utils_reference.md
-  - Tutorials:
-      - Tutorial Guide: tutorials/README.md
-      - 00 Environment & First Run: tutorials/00_environment_and_first_run.md
-      - 01 Quant Basics: tutorials/01_quant_basics.md
-      - 02 First Strategy: tutorials/02_first_strategy.md
-      - 03 Backtesting Intro: tutorials/03_backtesting.md
-      - 04 Strategy Optimization: tutorials/04_strategy_optimization.md
-      - 05 Live Trading: tutorials/05_live_trading.md
-      - 06 RSI Mean Reversion: tutorials/06_rsi_mean_reversion.md
-      - 07 Sector Rotation: tutorials/07_sector_rotation.md
-      - 08 Multi-Factor: tutorials/08_multi_factor.md
-      - 09 Combined Strategy: tutorials/09_combined_strategy.md
-      - 10 Agent Optimization: tutorials/10_agent_optimization.md
-  - Examples:
-      - Example Index: examples/Examples.md
-      - Browse Code: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
+
+  - Getting Started (快速入门):
+      - Introduction (项目简介): doc/README.md
+      - Installation (安装配置): doc/user_guide.md
+      - Quick Start Guide (快速开始): tutorials/00_environment_and_first_run.md
+
+  - User Manual (用户手册):
+      - Overview (概览): doc/user_guide.md
+      - Reports & Metrics (报告与指标): doc/reports_and_metrics.md
+      - PTrade/QMT Adapter (实盘适配): doc/ptrade_adapter.md
+      - FAQ (常见问题): doc/FAQ.md
+
+  - API Reference (API 参考):
+      - Index (索引): doc/api_index.md
+      - Complete API (完整 API): doc/api_reference.md
+      - Utilities (工具库): doc/utils_reference.md
+
+  - Tutorials (分步教程):
+      - Tutorial Overview (教程导读): tutorials/README.md
+      - "00 - Environment Setup (环境配置)": tutorials/00_environment_and_first_run.md
+      - "01 - Quant Basics (量化基础)": tutorials/01_quant_basics.md
+      - "02 - First Strategy (首个策略)": tutorials/02_first_strategy.md
+      - "03 - Backtesting (回测入门)": tutorials/03_backtesting.md
+      - "04 - Strategy Optimization (策略优化)": tutorials/04_strategy_optimization.md
+      - "05 - Live Trading (实盘交易)": tutorials/05_live_trading.md
+      - "06 - RSI Mean Reversion (RSI 均值回归)": tutorials/06_rsi_mean_reversion.md
+      - "07 - Sector Rotation (行业轮动)": tutorials/07_sector_rotation.md
+      - "08 - Multi-Factor (多因子)": tutorials/08_multi_factor.md
+      - "09 - Combined Strategy (组合策略)": tutorials/09_combined_strategy.md
+      - "10 - Agent Optimization (Agent 优化)": tutorials/10_agent_optimization.md
+
+  - Examples (示例代码):
+      - Example Index (示例索引): examples/Examples.md
+      - Browse on GitHub (GitHub 浏览): https://github.com/AlanFokCo/EasyQuant/tree/main/examples
+
+  - GitHub Repository: https://github.com/AlanFokCo/EasyQuant
+
