@@ -56,7 +56,12 @@ tutorials/
    python examples/03_run_backtest.py
    ```
 3. 打开 `reports/*.html` 看指标卡片、回撤曲线、交易记录。
-4. 做最小功能验证（可选）：
+4. 需要离线快验时，先跑本地数据示例（可选）：
+   ```bash
+   python examples/19_local_data_backtest.py --download-all
+   python examples/19_local_data_backtest.py
+   ```
+5. 做最小功能验证（可选）：
    ```bash
    python examples/01_fetch_data.py
    pip install -e ".[dev]"
