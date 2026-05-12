@@ -44,7 +44,7 @@ EasyQuant is an event-driven quantitative backtesting and strategy development f
 
 ## Additional Resources
 
-- <a href="https://github.com/AlanFokCo/EasyQuant/blob/main/README_zh.md">中文 README</a>
-- <a href="https://github.com/AlanFokCo/EasyQuant">GitHub Repository</a>
-- <a href="doc/api_index.md">API Reference (API 参考)</a>
-- <a href="doc/reports_and_metrics.md">Reports &amp; Metrics (报告与指标)</a>
+- [中文 README](https://github.com/AlanFokCo/EasyQuant/blob/main/README_zh.md)
+- [GitHub Repository](https://github.com/AlanFokCo/EasyQuant)
+- [API Reference (API 参考)](doc/api_index.md)
+- [Reports & Metrics (报告与指标)](doc/reports_and_metrics.md)

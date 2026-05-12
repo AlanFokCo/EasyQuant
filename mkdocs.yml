@@ -5,7 +5,7 @@ repo_name: AlanFokCo/EasyQuant
 docs_dir: docs
 theme:
   name: material
-  language: en
+  language: zh
   features:
     - navigation.tabs
     - navigation.tabs.sticky
@@ -67,7 +67,7 @@ nav:
       - Quick Start Guide (快速开始): tutorials/00_environment_and_first_run.md
 
   - User Manual (用户手册):
-      - Overview (概览): doc/user_guide.md
+      - Overview (概览): doc/README.md
       - Reports & Metrics (报告与指标): doc/reports_and_metrics.md
       - PTrade/QMT Adapter (实盘适配): doc/ptrade_adapter.md
       - FAQ (常见问题): doc/FAQ.md
