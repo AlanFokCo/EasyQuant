@@ -1,5 +1,5 @@
 <p align="center">
-<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="200" alt="EasyQuant"/></a><br/>
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="240" alt="EasyQuant"/></a><br/>
 <strong>EasyQuant</strong> - China A-share quantitative backtesting
 </p>
 

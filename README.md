@@ -1,5 +1,5 @@
 <div align="center">
-<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="220" alt="EasyQuant logo"/></a>
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="250" alt="EasyQuant logo"/></a>
 <p><strong>EasyQuant</strong> - A quantitative strategy and backtesting tool for the <strong>China A-share market</strong>.</p>
 <p><code>eqlib</code> is the core library: event-driven backtesting engine, data APIs, and analysis tools.</p>
 <p>

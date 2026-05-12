@@ -1,5 +1,5 @@
 <div align="center">
-<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="220" alt="EasyQuant logo"/></a>
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="250" alt="EasyQuant logo"/></a>
 <p><strong>EasyQuant</strong> - 面向 <strong>中国 A 股市场</strong> 的量化策略与回测工具。</p>
 <p>核心 Python 包为 <code>eqlib</code>：事件驱动回测引擎、数据 API 与分析工具。</p>
 <p>

@@ -30,7 +30,7 @@ def _squircle(ax, x, y, w, h, r, face, edge=None, lw=0):
 
 
 def draw_horizontal_logo(path: Path, width_px: int = 640) -> None:
-    vb_w, vb_h = 280, 64
+    vb_w, vb_h = 184, 64
     dpi = 100
     fig_w = width_px / dpi
     fig_h = fig_w * (vb_h / vb_w)
@@ -41,7 +41,7 @@ def draw_horizontal_logo(path: Path, width_px: int = 640) -> None:
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
 
-    ix, iy, iw, ih, ir = 4, 6, 52, 52, 16
+    ix, iy, iw, ih, ir = 2, 6, 52, 52, 16
     _squircle(ax, ix, iy, iw, ih, ir, TILE_DARK, TILE_DARK_EDGE, 0.35)
 
     t = np.linspace(0, 1, 120)
@@ -52,7 +52,7 @@ def draw_horizontal_logo(path: Path, width_px: int = 640) -> None:
     ax.add_patch(Circle((ix + 43, iy + 14), 1.75, color="#f8fafc", zorder=4))
 
     ax.text(
-        66, 40, "EasyQuant",
+        58, 40, "EasyQuant",
         fontsize=13.8, fontweight="600", color="#0c1222", va="center", ha="left",
         family="sans-serif",
     )
@@ -65,8 +65,8 @@ def draw_icon(path: Path, size_px: int = 512) -> None:
     dpi = 100
     s = size_px / dpi
     fig, ax = plt.subplots(1, 1, figsize=(s, s), dpi=dpi)
-    ax.set_xlim(0, 64)
-    ax.set_ylim(0, 64)
+    ax.set_xlim(4, 60)
+    ax.set_ylim(4, 60)
     ax.axis("off")
     ax.set_aspect("equal")
     fig.patch.set_facecolor("white")
@@ -85,7 +85,7 @@ def draw_icon(path: Path, size_px: int = 512) -> None:
 
 
 def draw_mono(path: Path, width_px: int = 640) -> None:
-    vb_w, vb_h = 280, 64
+    vb_w, vb_h = 184, 64
     dpi = 100
     fig_w = width_px / dpi
     fig_h = fig_w * (vb_h / vb_w)
@@ -96,7 +96,7 @@ def draw_mono(path: Path, width_px: int = 640) -> None:
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
 
-    ix, iy = 4, 6
+    ix, iy = 2, 6
     _squircle(ax, ix, iy, 52, 52, 16, TILE_DARK)
 
     t = np.linspace(0, 1, 120)
@@ -105,7 +105,7 @@ def draw_mono(path: Path, width_px: int = 640) -> None:
     ax.plot(x, y, color="#f1f5f9", lw=2.05, solid_capstyle="round", zorder=2)
     ax.add_patch(Circle((ix + 43, iy + 14), 1.75, color="#f1f5f9", zorder=3))
 
-    ax.text(66, 40, "EasyQuant", fontsize=13.8, fontweight="600", color="#0c1222", va="center")
+    ax.text(58, 40, "EasyQuant", fontsize=13.8, fontweight="600", color="#0c1222", va="center")
 
     fig.savefig(path, bbox_inches="tight", pad_inches=0.02, facecolor="white")
     plt.close(fig)
