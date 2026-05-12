@@ -26,6 +26,10 @@ ENV/
 *.swo
 *~
 
+# AI / editor orchestration (local only; not shipped to end users)
+.claude/
+CLAUDE.md
+
 # Jupyter Notebook
 .ipynb_checkpoints/
 

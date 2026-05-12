@@ -191,56 +191,25 @@ See [`examples/Examples.md`](examples/Examples.md) for a full index. Scripts liv
 
 ## Documentation
 
-- [**Tutorials**](tutorials/) — beginner guide: from zero to live trading, plus AI agent optimization
+- [**Tutorials**](tutorials/) — beginner guide: from zero to live trading, plus parameter tuning (Tutorial 10)
 - [**User Guide**](doc/user_guide.md) — tutorial: writing strategies, running backtests, reading reports
 - [**API Reference**](doc/api_reference.md) — full API: structures, parameters, usage
 - [**Utils Reference**](doc/utils_reference.md) — calculation tools: indicators, statistics, money management, support/resistance
 - [**PTrade/QMT Adapter**](doc/ptrade_adapter.md) — export EasyQuant strategies to PTrade/QMT platform
-- [**CLAUDE.md**](CLAUDE.md) — AI agent configuration: self-optimization workflow, audit log format, code review rules
-
 ---
 
-## AI Agent — Autonomous Strategy Optimization
+## Strategy parameter tuning & audit trail
 
-EasyQuant includes a built-in **AI agent workflow** orchestrated by **Claude Code**. The AI agent (Claude Code itself) reads strategy files, runs backtests via `eqlib` APIs, analyzes results, edits strategy files directly, spawns a code-review sub-agent, and logs every decision — all without running a standalone optimization script.
+EasyQuant ships with **`PARAMS` / `PARAM_RANGES`** conventions, a reference **`agent/optimizer.py`** rule-based search, and **`agent/audit_log.py`** for JSONL + Markdown logs. You can drive the loop from your own scripts, notebooks, or CI—`eqlib` APIs stay the single source of truth.
 
-### How it works
+### Where to read more
 
-1. You tell Claude Code your requirements (e.g. "Sharpe > 1.0, max drawdown < 20%")
-2. Claude Code reads `CLAUDE.md` and your strategy file
-3. It runs backtests using `eqlib` APIs, then analyzes the results
-4. Diagnoses issues and proposes data-driven parameter adjustments
-5. Edits the strategy file directly via the Edit tool
-6. Spawns a specialized code-review sub-agent to verify changes
-7. Repeats until all requirements are met
-8. Logs every decision to a structured audit trail (JSONL + Markdown)
+- **[`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md)** — parameterization, `optimizer.py`, audit logs, review checklist (Chinese)
+- **[`agent/optimizer.py`](agent/optimizer.py)** — optional CLI rule search for baselines and benchmarks
+- **[`agent/audit_log.py`](agent/audit_log.py)** — structured logging helpers
+- **[`agent/strategy_template.py`](agent/strategy_template.py)** — copy-paste parameterized template
 
-For the full workflow details, see [`CLAUDE.md`](CLAUDE.md) and [`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md).
-
-### Quick start
-
-Just tell Claude Code what you want:
-
-```
-Optimize agent/strategy_template.py, requiring Sharpe > 1.0,
-max drawdown < 20%, validated across 2021, 2022, and 2023.
-```
-
-Claude Code handles the rest — no command to run.
-
-### Reference utility
-
-The [`agent/optimizer.py`](agent/optimizer.py) script provides a standalone rule-based parameter search for comparison with the AI-driven approach. It can be run independently but is **not** the primary optimization driver.
-
-### Agent files
-
-- **[`CLAUDE.md`](CLAUDE.md)** — AI agent configuration: full self-optimization workflow, parameter rules, audit log format, code review
-- **[`agent/audit_log.py`](agent/audit_log.py)** — Structured audit logging (JSONL + Markdown)
-- **[`agent/strategy_template.py`](agent/strategy_template.py)** — Parameterized strategy template
-- **[`agent/optimizer.py`](agent/optimizer.py)** — Reference rule-based optimizer (optional, for comparison)
-- **[`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md)** — Tutorial (Chinese)
-
-### Audit log
+### Audit log layout
 
 Every optimization session writes two files to `audit_log/`:
 

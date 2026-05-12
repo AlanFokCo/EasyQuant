@@ -27,7 +27,7 @@
     - 10.4 JSON 报告
 11. [风险与归因分析](#11-风险与归因分析)
 12. [模拟盘交易](#12-模拟盘交易)
-13. [使用 Claude Code AI Agent 自动化策略优化](#13-使用-claude-code-ai-agent-自动化策略优化)
+13. [参数优化、审计与参考脚本](#13-参数优化审计与参考脚本)
 14. [常见问题](#14-常见问题)
 
 ---
@@ -1035,58 +1035,44 @@ result = run_paper_trade(
 
 ---
 
-## 13. 使用 Claude Code AI Agent 自动化策略优化
+## 13. 参数优化、审计与参考脚本
 
-EasyQuant 的整个工作流（回测 → 分析 → 调参 → 代码审查 → 再回测）可以由 **Claude Code** 全自动驱动。你只需要提出需求，Claude Code 会完成所有后续工作。
+若要对策略做**可复现**的参数搜索与记录，推荐采用以下仓库内约定与工具（均不绑定特定 IDE 或商业 AI）：
 
-### 13.1 工作原理
+| 组件 | 说明 |
+|------|------|
+| `PARAMS` / `PARAM_RANGES` | 模块级字典：`PARAMS` 为当前参数，`PARAM_RANGES` 为搜索边界；`initialize` 必须从 `PARAMS` 读取 |
+| [`agent/strategy_template.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/strategy_template.py) | 参数化策略模板 |
+| [`agent/optimizer.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/optimizer.py) | 规则基参数搜索，可在命令行独立运行，作基线对比 |
+| [`agent/audit_log.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/audit_log.py) | 将迭代摘要写入 `audit_log/`（JSONL + Markdown） |
 
-```
-你提出需求
-     ↓
-Claude Code 读取策略文件（PARAMS / PARAM_RANGES）
-     ↓
-运行基线回测（调用 eqlib 的 run_backtest + analyze_returns）
-     ↓
-分析结果，诊断问题（夏普不足？回撤过大？胜率低？）
-     ↓
-提出参数调整方案 + 数据依据
-     ↓
-直接编辑策略文件中的 PARAMS（Edit 工具）
-     ↓
-调用代码审查子 Agent 验证修改
-     ↓
-运行新回测验证效果
-     ↓
-循环直到满足要求 → 生成审计报告
-```
-
-Claude Code 使用 `agent/audit_log.py` 记录每一步决策到 `audit_log/` 目录，生成 JSONL（机器可读）和 Markdown（人类可读）两种格式的审计日志。
-
-### 13.2 快速上手：告诉 Claude Code 你的需求
-
-直接在对话中描述你的要求即可，无需运行任何命令：
+### 13.1 推荐工作流
 
 ```
-帮我优化 agent/strategy_template.py：
-- 夏普比率 > 1.0
-- 最大回撤 < 20%
-- 在 2021、2022、2023 三个年度分别验证
+基线回测（run_backtest / run_strategy）
+    ↓
+analyze_returns(result) 等指标
+    ↓
+若不达标：在 PARAM_RANGES 内调整 PARAMS（或扩展策略逻辑）
+    ↓
+（可选）人工核对：参数是否在代码中通过 PARAMS 读取、是否引入前视等
+    ↓
+再回测；需要可追溯时调用 audit_log 写入会话记录
 ```
 
-Claude Code 会：
-1. 读取策略文件的 `PARAMS` 和 `PARAM_RANGES`
-2. 运行基线回测，记录初始指标
-3. 分析失败指标，诊断根因
-4. 修改 PARAMS 并直接编辑策略文件
-5. 调用代码审查子 Agent 验证
-6. 运行新回测验证效果
-7. 重复直到满足要求
-8. 将完整过程记录到审计日志
+### 13.2 运行 optimizer.py（示例）
 
-### 13.3 参数化策略的要求
+```bash
+python agent/optimizer.py \
+  --strategy agent/strategy_template.py \
+  --min-sharpe 1.0 \
+  --max-drawdown 0.20 \
+  --periods "2022-01-01:2022-12-31" "2023-01-01:2023-12-31"
+```
 
-要让 Claude Code 自动调参，策略文件必须定义 `PARAMS` 和 `PARAM_RANGES` 两个模块级字典：
+### 13.3 参数化策略要求
+
+策略须定义 `PARAMS` 与 `PARAM_RANGES`，并在 `initialize` 中从 `PARAMS` 赋值给 `g.*` 等，例如：
 
 ```python
 PARAMS = {
@@ -1098,15 +1084,13 @@ PARAMS = {
 }
 
 PARAM_RANGES = {
-    'fast_period':      (2,   15,   1),    # (min, max, step)
+    'fast_period':      (2,   15,   1),
     'slow_period':      (10,  60,   5),
     'stop_loss_pct':    (0.03, 0.15, 0.01),
     'position_pct':     (0.3,  1.0,  0.1),
     'vol_confirm_mul':  (1.0,  3.0,  0.25),
 }
 ```
-
-`initialize` 函数必须从 `PARAMS` 读取所有可调参数：
 
 ```python
 def initialize(context):
@@ -1115,67 +1099,21 @@ def initialize(context):
     g.stop_loss_pct  = PARAMS['stop_loss_pct']
     g.position_pct   = PARAMS['position_pct']
     g.vol_confirm_mul = PARAMS['vol_confirm_mul']
-    # ...
 ```
 
-完整模板参考 `agent/strategy_template.py`。
+完整说明见 **[Tutorial 10：策略参数优化与审计](../tutorials/10_agent_optimization.md)**。
 
-### 13.4 超出参数范围的优化
+### 13.4 审计日志目录
 
-当参数调整达到极限但仍有指标不达标时，Claude Code 可以直接修改策略逻辑：
-
-```
-当前参数已经优化到极限了。分析审计日志，找出瓶颈，
-建议并实施策略逻辑改进（例如添加 RSI 过滤或大盘择时）。
-```
-
-Claude Code 会：
-1. 读取审计日志找出当前瓶颈
-2. 诊断是否需要修改策略结构
-3. 直接编辑策略文件添加新逻辑（例如添加 `rsi_oversold` / `rsi_overbought` 参数和 RSI 过滤逻辑）
-4. 更新 `PARAMS` 和 `PARAM_RANGES`
-5. 重新运行回测验证效果
-
-### 13.5 审计日志
-
-每次优化会话在 `audit_log/` 目录下生成两个文件：
+使用 `audit_log.py` 时，会话产物示例：
 
 ```
 audit_log/
-├── session_<时间戳>.jsonl   # 机器可读，支持 jq 查询
-└── session_<时间戳>.md      # 人类可读 Markdown 报告
+├── session_<时间戳>.jsonl
+└── session_<时间戳>.md
 ```
 
-查询审计日志：
-
-```bash
-# 查看完整报告
-cat audit_log/session_20240115_143022.md
-
-# 查看所有调参决策
-jq 'select(.type=="adjustment") | {iter: .iteration, diagnosis: .diagnosis}' \
-    audit_log/session_20240115_143022.jsonl
-
-# 查看最终结果
-jq 'select(.type=="final")' audit_log/session_20240115_143022.jsonl
-```
-
-### 13.6 AI Agent 模拟盘自动化
-
-除了回测优化，Claude Code 也可以帮你自动化模拟盘工作流：
-
-```
-用模拟盘模式运行 my_strategy.py，每 30 秒刷新一次，
-开盘前自动扫描当日符合均线突破条件的股票加入股票池。
-```
-
-Claude Code 会：
-1. 读取策略文件
-2. 编写模拟盘启动脚本（调用 `run_paper_trade`）
-3. 添加盘前扫描逻辑（调用 `scan_market`）
-4. 运行模拟盘并监控输出
-
-你也可以要求 Claude Code 对比多个策略的模拟盘表现，或分析模拟盘数据生成日报。
+可用 `jq` 过滤 `adjustment`、`final` 等类型行做批量分析。
 
 ---
 

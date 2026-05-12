@@ -1,19 +1,16 @@
-"""EasyQuant AI Agent — Reference Rule-Based Strategy Optimizer.
+"""Reference rule-based strategy parameter search (EasyQuant).
 
-This module provides a **standalone, rule-based parameter search** for comparison
-with the AI-driven optimization workflow orchestrated by Claude Code.  It is **not**
-the primary optimization driver — Claude Code performs the full self-optimization
-loop directly (running backtests, analyzing results, editing strategy files, spawning
-code-review sub-agents), as documented in CLAUDE.md.
+This module provides a **standalone, rule-based parameter search** you can run from
+the command line or import in Python. It is a **reference implementation** for
+reproducible baselines; you can extend or replace it with your own search logic that
+calls ``eqlib`` APIs.
 
 Use this module to:
-  • Benchmark against the AI-driven approach
-  • Understand how a programmatic parameter search is implemented
-  • Run quick rule-based optimization without AI agent involvement
+  • Benchmark custom optimizers or manual workflows
+  • Learn how a programmatic grid / rule search is wired to ``run_backtest``
+  • Run quick parameter sweeps without extra tooling
 
-The AI-driven workflow (Claude Code) uses only agent/audit_log.py from the agent/
-directory for structured logging.  All analysis, decision-making, and file editing
-are performed by Claude Code itself.
+For structured logs of each iteration, optionally combine with ``agent/audit_log.py``.
 
 Usage (command-line, optional — reference only):
 

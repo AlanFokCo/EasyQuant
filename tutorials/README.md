@@ -29,7 +29,7 @@ tutorials/
 ├── 07_sector_rotation.md   ← 行业轮动策略
 ├── 08_multi_factor.md      ← 多因子选股
 ├── 09_combined_strategy.md ← 综合策略（全天候 Alpha）
-└── 10_agent_optimization.md  ← AI Agent 自动化策略优化
+└── 10_agent_optimization.md  ← 策略参数优化与审计
 ```
 
 ---
@@ -105,7 +105,7 @@ tutorials/
 | 07 | [行业轮动策略](07_sector_rotation.md) | 行业轮动 | 动量打分、等权调仓、行业 API | 20 min |
 | 08 | [多因子选股](08_multi_factor.md) | 因子选股 | Z-Score 标准化、因子合成、IC 检验 | 25 min |
 | 09 | [全天候 Alpha 综合策略](09_combined_strategy.md) | 综合策略 | 多因子+行业轮动+RSI/布林/MACD+ATR止损 | 30 min |
-| 10 | [AI Agent 自动化策略优化](10_agent_optimization.md) | Agent 工作流 | 自优化循环、数据驱动调参、审计日志 | 25 min |
+| 10 | [策略参数优化与审计](10_agent_optimization.md) | 参数化与工具 | PARAMS、`optimizer.py`、审计日志、审查清单 | 20 min |
 
 ---
 
@@ -161,13 +161,13 @@ tutorials/
 
 适合：已掌握单一策略，希望将所有技术融合到一个生产级策略的用户
 
-### 路径 G：AI Agent 自动化优化（推荐有一定基础的用户）
+### 路径 G：参数优化与审计（推荐有一定基础的用户）
 
 ```
-02 第一个策略 → 03 回测验证 → 04 策略优化 → 10 AI Agent 自动化优化
+02 第一个策略 → 03 回测验证 → 04 策略优化 → 10 参数优化与审计
 ```
 
-适合：想用 AI 工具自动调参、无需人工干预完成策略优化闭环的用户
+适合：希望用脚本或自建流程调参、并保留可审计记录的用户
 
 ---
 
@@ -185,7 +185,7 @@ tutorials/
 | **网格交易** | — | [Example 17](../examples/17_grid_trading_strategy.py) |
 | **支撑阻力位** | — | [Example 11](../examples/11_utils_library.py)、[Example 20](../examples/20_sr_strategy/README.md) |
 | **组合回测** | [Tutorial 03 第 8 节](03_backtesting.md#8-组合回测) | [Example 12](../examples/12_portfolio_backtest.py) |
-| **AI Agent 自动化优化** | [Tutorial 10](10_agent_optimization.md) | [agent/optimizer.py](../agent/optimizer.py)、[agent/strategy_template.py](../agent/strategy_template.py) |
+| **参数优化与审计** | [Tutorial 10](10_agent_optimization.md) | [agent/optimizer.py](../agent/optimizer.py)、[agent/strategy_template.py](../agent/strategy_template.py) |
 | **模拟盘 / 实盘** | [Tutorial 05](05_live_trading.md) | [Example 05](../examples/05_paper_trade.py)、[Example 13](../examples/13_ptrade_export.py) |
 
 ---

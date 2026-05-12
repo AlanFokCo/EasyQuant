@@ -154,49 +154,20 @@ python my_first_strategy.py
 
 ---
 
-## AI Agent — 自动化策略优化
+## 策略参数优化与审计
 
-EasyQuant 内置了由 **Claude Code** 驱动的 **AI Agent 工作流**。AI Agent（Claude Code 本身）直接读取策略文件、通过 `eqlib` API 运行回测、分析结果、编辑策略文件、调用代码审查子 Agent，并将每一步决策记录下来 —— 无需运行独立的优化脚本。
+EasyQuant 提供 **`PARAMS` / `PARAM_RANGES`** 约定、可参考运行的 **`agent/optimizer.py`** 规则搜索，以及 **`agent/audit_log.py`** 审计日志。你可以在脚本、Notebook 或 CI 中自行调用 `eqlib` API 完成「回测 → 分析 → 改参 → 再回测」闭环；**不依赖**任何特定编辑器或商业 AI 产品。
 
-### Agent 能做什么
+### 延伸阅读
 
-1. 你告诉 Claude Code 你的要求（例如"夏普 > 1.0，最大回撤 < 20%"）
-2. Claude Code 读取 `CLAUDE.md` 和你的策略文件
-3. 使用 `eqlib` API 运行回测并分析结果
-4. 诊断问题并提出数据驱动的参数调整方案
-5. 直接编辑策略文件应用参数变更
-6. 调用专门的代码审查子 Agent 验证修改
-7. 循环迭代直到满足所有要求
-8. 将每一步决策记录到结构化审计日志（JSONL + Markdown）
-
-完整工作流程详见 [`CLAUDE.md`](CLAUDE.md) 和 [`tutorials/10_agent_optimization.md`](tutorials/10_agent_optimization.md)。
-
-### 快速上手
-
-直接告诉 Claude Code 你的需求：
-
-```
-优化 agent/strategy_template.py，要求夏普比率 > 1.0，
-最大回撤 < 20%，在 2021、2022、2023 三个年度分别验证。
-```
-
-Claude Code 会自动完成所有工作 —— 无需运行任何命令。
-
-### 参考工具
-
-[`agent/optimizer.py`](agent/optimizer.py) 提供了一个独立的规则基参数搜索工具，用于与 AI 驱动方法进行比较。它可以独立运行，但**不是**主要的优化驱动方式。
-
-### Agent 相关文件
-
-- **[`CLAUDE.md`](CLAUDE.md)** — Claude Code 可识别的 AI Agent 配置文件，包含完整的自优化工作流、参数调整规则、审计日志格式和代码审查要求
-- **[`agent/audit_log.py`](agent/audit_log.py)** — 结构化审计日志（JSONL + Markdown）
+- **[Tutorial 10：参数优化与审计](tutorials/10_agent_optimization.md)** — 参数化、`optimizer.py`、审计与审查清单（中文）
+- **[`agent/optimizer.py`](agent/optimizer.py)** — 可选命令行规则搜索，用于基线对比
+- **[`agent/audit_log.py`](agent/audit_log.py)** — 结构化审计日志
 - **[`agent/strategy_template.py`](agent/strategy_template.py)** — 参数化策略模板
-- **[`agent/optimizer.py`](agent/optimizer.py)** — 参考用规则基优化器（可选，用于对比）
-- **[Tutorial 10: AI Agent 自动化策略优化](tutorials/10_agent_optimization.md)** — 完整使用教程
 
-### 审计日志
+### 审计日志目录
 
-每次优化会话在 `audit_log/` 目录下生成两个文件：
+每次优化会话可在 `audit_log/` 写入：
 
 ```
 audit_log/

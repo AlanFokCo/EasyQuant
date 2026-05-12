@@ -1378,105 +1378,39 @@ result = run_strategy(
 
 ---
 
-## 12. AI Agent 自动化工作流
+## 12. 参数化与优化相关 API 约定
 
-`eqlib` 的 API 被设计为可与 Claude Code（AI 编码智能体）配合使用，实现从回测到优化到模拟盘的全自动工作流。以下是 Claude Code 如何调用 `eqlib` API 完成自动化策略优化。
+`eqlib` 的生命周期与归因 API 可与**任意** Python 驱动流程配合：脚本、Notebook、定时任务等。常见用法是：对定义了 `PARAMS` / `PARAM_RANGES` 的策略反复调用 `run_backtest` / `run_strategy`，用 `analyze_returns` 等函数评估指标，再按规则写回 `PARAMS`；需要可追溯时，可配合 `agent/audit_log.py` 写入 `audit_log/`。
 
-### 12.1 AI Agent 如何调用 eqlib API
+### 12.1 典型调用链
 
-Claude Code 作为主驱，通过以下步骤完成自动化：
-
-| 步骤 | Claude Code 执行的动作 | 使用的 eqlib API |
-|------|----------------------|-----------------|
-| 基线回测 | 编写并运行 Python 脚本 | `run_backtest()` / `run_strategy()` |
-| 指标分析 | 调用分析函数 | `analyze_returns()` |
-| 归因分析 | 深度分析收益来源 | `brinson_attribution()` |
-| 因子分析 | 检查市场暴露 | `fama_french_analysis()` |
-| 数据查询 | 获取股票数据辅助诊断 | `get_price()`, `attribute_history()` |
-| 模拟盘 | 编写并启动模拟盘脚本 | `run_paper_trade()` |
+| 步骤 | 动作 | 常用 API |
+|------|------|----------|
+| 基线回测 | 得到 `result` | `run_backtest()` / `run_strategy()` |
+| 指标分析 | 夏普、回撤、胜率等 | `analyze_returns()` |
+| 归因 / 因子 | 可选深度分析 | `brinson_attribution()`、`fama_french_analysis()` |
+| 数据复查 | 核对行情与信号 | `get_price()`、`attribute_history()` |
+| 模拟盘 | 独立于回测验证 | `run_paper_trade()` |
 
 ### 12.2 策略参数化约定
 
-Claude Code 通过策略文件中的 `PARAMS` 和 `PARAM_RANGES` 字典识别可调参数：
+策略文件中的 `PARAMS`（当前值）与 `PARAM_RANGES`（搜索空间）应由你自己的优化脚本或 `agent/optimizer.py` 读取与更新；修改后重新运行回测即可验证。
 
-```python
-PARAMS = {
-    'fast_period':      5,
-    'slow_period':      20,
-    'stop_loss_pct':    0.08,
-}
+### 12.3 审计日志
 
-PARAM_RANGES = {
-    'fast_period':      (2,   15,   1),    # (min, max, step)
-    'slow_period':      (10,  60,   5),
-    'stop_loss_pct':    (0.03, 0.15, 0.01),
-}
-```
+若使用 `agent/audit_log.py`，建议在 `audit_log/` 中记录：
 
-Claude Code 使用 Edit 工具直接修改策略文件中的 `PARAMS` 块，然后重新运行回测验证。
+- 每轮使用的参数集与各时段指标  
+- 是否满足预设门槛  
+- 调参或改逻辑的依据摘要  
 
-### 12.3 用户如何触发 AI 优化
+### 12.4 代码审查清单（建议）
 
-无需运行任何命令 —— 直接在 Claude Code 对话中提出需求：
+每次变更 `PARAMS` 或策略逻辑后，建议核对：
 
-```
-帮我优化 agent/strategy_template.py：
-- 夏普比率 > 1.0
-- 最大回撤 < 20%
-- 在 2021、2022、2023 三个年度分别验证
-```
-
-Claude Code 会自动完成：回测运行 → 结果分析 → 参数调整 → 代码审查 → 再回测 → 审计报告。
-
-### 12.4 代码审查子 Agent
-
-每次参数变更后，Claude Code 会调用专门的代码审查子 Agent 验证：
-
-1. **值域检查**：新参数值是否在 `PARAM_RANGES` 范围内
-2. **约束检查**：`fast_period < slow_period`、`rsi_oversold < rsi_overbought` 等
-3. **参数使用检查**：修改的参数是否在策略代码中通过 `PARAMS[key]` 引用
-4. **前视偏差检查**：修改是否引入了使用未来数据的逻辑
-
-### 12.5 审计日志
-
-所有决策记录在 `audit_log/` 目录下：
-
-```
-audit_log/
-├── session_<时间戳>.jsonl   # 机器可读，支持 jq 查询
-└── session_<时间戳>.md      # 人类可读 Markdown 报告
-```
-
-每次迭代记录：
-- 使用的参数集
-- 各时段回测指标
-- 需求满足情况
-- 调参诊断依据和数据证据
-- 代码审查结果
-
-### 12.6 AI Agent 模拟盘自动化
-
-除了回测优化，Claude Code 也可以自动化模拟盘流程：
-
-```python
-from eqlib import run_paper_trade
-
-def initialize(context):
-    g.security = '601390'
-    set_benchmark('000300.XSHG')
-    run_daily(market_open, time='every_bar')
-
-def market_open(context):
-    # 策略逻辑从 PARAMS 读取参数
-    hist = attribute_history(g.security, PARAMS['slow_period'], '1d', ['close'])
-    # ...
-```
-
-Claude Code 可以：
-- 编写模拟盘启动脚本
-- 添加盘前股票池扫描
-- 对比多个策略的模拟盘表现
-- 生成模拟盘日报
+1. 新参数落在 `PARAM_RANGES` 内，且满足交叉约束（如快慢线顺序）。  
+2. 被调参数在策略中通过 `PARAMS['…']` 使用。  
+3. 未引入前视或未来函数。  
 
 ---
 
