@@ -1088,6 +1088,47 @@ weights = portfolio_optimizer(
 - `remove_local_data(security, adjust)` — 删除单个文件
 - `clear_all_local_data(adjust)` — 清空所有本地文件
 
+**推荐：目标股票本地化 + 快速验证**
+
+```python
+from eqlib import (
+    set_local_data_dir, save_stock_local, list_local_stocks,
+    run_strategy
+)
+
+set_local_data_dir("data")
+targets = ["601390", "600519", "000858", "000300.XSHG"]  # 含基准
+
+for sec in targets:
+    save_stock_local(sec, "2020-01-01", "2024-12-31")
+
+print(list_local_stocks())
+
+result = run_strategy(
+    initialize,
+    start_date="2024-01-01",
+    end_date="2024-12-31",
+    securities=["601390", "600519"],
+    benchmark="000300.XSHG",
+    use_local=True,
+)
+```
+
+### 8.5 数据源接入建议（扩展）
+
+当前默认数据源为 `akshare`。若需要更高可靠性或更多维度数据，建议按以下顺序扩展：
+
+1. 保持现有 API 入参/出参不变（避免策略层改动）；
+2. 先落盘统一格式（CSV/Parquet）再进入回测；
+3. 采用主备数据源切换与交叉校验（价格、成交量、复权、停牌）；
+4. 新增数据源先用小样本回测做一致性验证，再逐步扩大范围。
+
+### 8.6 相关文档
+
+- [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md)
+- [用户手册 7.12：数据源扩展与可靠性建议](user_guide.md#712-数据源扩展与可靠性建议规划)
+- [FAQ：首次回测慢或卡住](FAQ.md#q-首次回测很慢或卡住)
+
 ---
 
 ## 9. 日志 API
