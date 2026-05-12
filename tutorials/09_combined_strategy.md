@@ -4,7 +4,7 @@
 > 我们会逐步讲解每个组件的设计原理、数学公式和代码实现，
 > 并提供完整的回测和模拟盘代码，可直接运行。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **可运行代码：** [`examples/21_combined_strategy/`](../examples/21_combined_strategy/)（该目录脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 安装方式无关）
+**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **可运行代码：** [`examples/21_combined_strategy/README.md`](../examples/21_combined_strategy/README.md)（该目录脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 安装方式无关）
 
 ---
 
@@ -740,7 +740,7 @@ position_pct = min(kelly_f * 0.5, g.max_single_pct)
 | [Example 14: 布林带策略](../examples/14_bollinger_strategy.py) | Bollinger 均值回归 |
 | [Example 15: MACD 策略](../examples/15_macd_volume_strategy.py) | MACD+成交量+ATR |
 | [Example 16: 多因子策略](../examples/16_multi_factor_strategy.py) | 动量+成交量选股 |
-| [Example 20: 支撑阻力策略](../examples/20_sr_strategy/) | S/R+MACD+ATR 完整案例 |
+| [Example 20: 支撑阻力策略](../examples/20_sr_strategy/README.md) | S/R+MACD+ATR 完整案例 |
 | [Example 11: 工具库](../examples/11_utils_library.py) | 所有技术指标演示 |
 
 ---

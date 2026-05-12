@@ -3,7 +3,7 @@
 ## matplotlib 图表（PNG，`generate_chart` 输出）
 
 - **`sample_equity_vs_benchmark.svg`**：轻量示意图，说明「策略 vs 基准」累计收益曲线的读法。
-- **`example_report_19_localdata.png`**：与仓库根 [`reports/`](../reports/README.md) 中一次 **`examples/19_local_data_backtest.py`** 运行导出的 PNG **内容一致**（副本纳入 Git，便于在线预览教程）。
+- **`example_report_19_localdata.png`**：与仓库根 [`reports/`](../../reports/README.md) 中一次 **`examples/19_local_data_backtest.py`** 运行导出的 PNG **内容一致**（副本纳入 Git，便于在线预览教程）。
 - **`example_report_bollinger.png`**：Example 14 布林带策略报告（601088，+57.77%）。
 - **`example_report_macd_volume.png`**：Example 15 MACD+成交量策略报告（600536，+103.48%）。
 - **`example_report_grid.png`**：Example 17 网格交易策略报告（601857，+30.25%）。

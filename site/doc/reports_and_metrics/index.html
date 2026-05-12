@@ -1,0 +1,2347 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/doc/reports_and_metrics/">
+      
+      
+        <link rel="prev" href="../user_guide/">
+      
+      
+        <link rel="next" href="../ptrade_adapter/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Reports & Metrics - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#回测报告怎么看htmlpngmarkdownjson-与风险指标" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reports & Metrics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-运行后你会得到什么" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 运行后你会得到什么？
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 运行后你会得到什么？">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-html-报告页面概览" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 HTML 报告页面概览
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-html-报告页面结构从上到下" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. HTML 报告页面结构（从上到下）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. HTML 报告页面结构（从上到下）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-页头" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 页头
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-指标卡片可点击看说明" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 指标卡片（可点击看说明）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-k-线与技术图区若有" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 K 线与技术图区（若有）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-累计收益率" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 累计收益率
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-回撤曲线" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 回撤曲线
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-每日盈亏--每日收益率" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 每日盈亏 / 每日收益率
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-标签页成交日历持仓等" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 标签页：成交、日历、持仓等
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-对照走读示例reports19_localdata--html" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 对照走读示例（reports/…19_localdata + HTML）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-png-图generate_chart怎么读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. PNG 图（generate_chart）怎么读？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-analyze_returns-指标字典" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. analyze_returns 指标字典
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-markdown--json-报告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Markdown / JSON 报告
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5b-不同策略报告对比如何通过报告判断策略好坏" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5b. 不同策略报告对比：如何通过报告判断策略好坏
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5b. 不同策略报告对比：如何通过报告判断策略好坏">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#盈利策略macd-趋势--成交量确认10348" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        盈利策略：MACD 趋势 + 成交量确认（+103.48%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#震荡市表现好布林带均值回归5777" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        震荡市表现好：布林带均值回归（+57.77%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#组合策略多因子选股519" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        组合策略：多因子选股（+5.19%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#亏损策略动量组合-2569" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        亏损策略：动量组合（-25.69%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#如何从报告判断策略好坏" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        如何从报告判断策略好坏
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-进阶只生成某一种报告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 进阶：只生成某一种报告
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-相关文档" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 相关文档
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ptrade_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/09_combined_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-运行后你会得到什么" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 运行后你会得到什么？
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 运行后你会得到什么？">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-html-报告页面概览" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 HTML 报告页面概览
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-html-报告页面结构从上到下" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. HTML 报告页面结构（从上到下）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. HTML 报告页面结构（从上到下）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-页头" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 页头
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-指标卡片可点击看说明" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 指标卡片（可点击看说明）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-k-线与技术图区若有" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 K 线与技术图区（若有）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-累计收益率" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 累计收益率
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-回撤曲线" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 回撤曲线
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-每日盈亏--每日收益率" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 每日盈亏 / 每日收益率
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-标签页成交日历持仓等" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 标签页：成交、日历、持仓等
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-对照走读示例reports19_localdata--html" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 对照走读示例（reports/…19_localdata + HTML）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-png-图generate_chart怎么读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. PNG 图（generate_chart）怎么读？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-analyze_returns-指标字典" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. analyze_returns 指标字典
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-markdown--json-报告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Markdown / JSON 报告
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5b-不同策略报告对比如何通过报告判断策略好坏" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5b. 不同策略报告对比：如何通过报告判断策略好坏
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5b. 不同策略报告对比：如何通过报告判断策略好坏">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#盈利策略macd-趋势--成交量确认10348" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        盈利策略：MACD 趋势 + 成交量确认（+103.48%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#震荡市表现好布林带均值回归5777" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        震荡市表现好：布林带均值回归（+57.77%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#组合策略多因子选股519" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        组合策略：多因子选股（+5.19%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#亏损策略动量组合-2569" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        亏损策略：动量组合（-25.69%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#如何从报告判断策略好坏" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        如何从报告判断策略好坏
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-进阶只生成某一种报告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 进阶：只生成某一种报告
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-相关文档" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 相关文档
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="回测报告怎么看htmlpngmarkdownjson-与风险指标">回测报告怎么看：HTML、PNG、Markdown、JSON 与风险指标<a class="headerlink" href="#回测报告怎么看htmlpngmarkdownjson-与风险指标" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>配合 <a href="../user_guide/">用户手册 — 回测报告与图表解读</a> 阅读。生成报告的推荐入口是 <strong><code>run_strategy</code></strong>（一次得到 PNG、HTML、MD、JSON）。</p>
+<p><strong>仓库内真实输出样例：</strong> 见根目录 <a href="../../reports/"><code>reports/README.md</code></a>（与 <a href="../../examples/Examples/"><code>examples/</code></a> 各脚本对应）；教程中的截图与之一致，见 <a href="../../tutorials/assets/example_report_html_19_localdata.png"><code>tutorials/assets/example_report_html_19_localdata.png</code></a>。</p>
+</blockquote>
+<hr />
+<h2 id="1-运行后你会得到什么">1. 运行后你会得到什么？<a class="headerlink" href="#1-运行后你会得到什么" title="Permanent link">&para;</a></h2>
+<p>在代码中调用：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="n">run_strategy</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">run_strategy</span><span class="p">(</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">initialize</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2024-01-01&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2024-12-31&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">starting_cash</span><span class="o">=</span><span class="mi">100_000</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">benchmark</span><span class="o">=</span><span class="s2">&quot;000300.XSHG&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">securities</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;601390&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">report_dir</span><span class="o">=</span><span class="s2">&quot;reports&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span>
+</code></pre></div>
+<p>终端会打印类似路径（时间戳每次不同）：</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reports/backtest_YYYYMMDD_HHMMSS.png</code></td>
+<td>静态图：价格、均线、买卖点、组合净值/回撤等（与策略实现有关）</td>
+</tr>
+<tr>
+<td><code>reports/backtest_YYYYMMDD_HHMMSS.html</code></td>
+<td><strong>交互式报告</strong>：指标卡片、K 线、累计收益、回撤、每日盈亏、成交与持仓等</td>
+</tr>
+<tr>
+<td><code>reports/backtest_YYYYMMDD_HHMMSS.md</code></td>
+<td>人类可读的摘要 + 表格化交易记录</td>
+</tr>
+<tr>
+<td><code>reports/backtest_YYYYMMDD_HHMMSS.json</code></td>
+<td>程序化分析用结构化数据</td>
+</tr>
+</tbody>
+</table>
+<p>用浏览器 <strong>直接打开 <code>.html</code> 文件</strong>（双击或「文件 → 打开」），无需启动 Web 服务器。</p>
+<h3 id="11-html-报告页面概览">1.1 HTML 报告页面概览<a class="headerlink" href="#11-html-报告页面概览" title="Permanent link">&para;</a></h3>
+<p>打开 <code>.html</code> 文件后，你看到的页面大致分为以下区块（以下为 <a href="../../examples/22_stock_selection_strategy.py">Example 22 选股策略</a> 的回测截图）：</p>
+<p><img alt="选股策略 HTML 报告截图" src="../../tutorials/assets/example_report_html_stock_selection.png" /></p>
+<p>页头（标题 + 盈亏金额）→ 核心指标卡片 → 详细指标行 → K 线图 → 累计收益率 → 回撤 → 每日盈亏 → 成交/持仓标签页。</p>
+<p>下面是每个区块的详细说明。</p>
+<hr />
+<h2 id="2-html-报告页面结构从上到下">2. HTML 报告页面结构（从上到下）<a class="headerlink" href="#2-html-报告页面结构从上到下" title="Permanent link">&para;</a></h2>
+<p>以下为 <code>generate_html_report</code> 生成页面的逻辑顺序，便于你对照屏幕阅读。</p>
+<h3 id="21-页头">2.1 页头<a class="headerlink" href="#21-页头" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>标题</strong>：回测标的或组合说明。</li>
+<li><strong>摘要区</strong>：回测区间、初始资金、最终资产、盈亏金额与比例等。</li>
+</ul>
+<h3 id="22-指标卡片可点击看说明">2.2 指标卡片（可点击看说明）<a class="headerlink" href="#22-指标卡片可点击看说明" title="Permanent link">&para;</a></h3>
+<p>常见字段与<strong>读法</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>展示名 / 字段</th>
+<th>含义（直觉版）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>年化收益</strong></td>
+<td>把整段回测收益换算成「若按同样波动持续一年」的复利年化水平；便于跨周期对比</td>
+</tr>
+<tr>
+<td><strong>超额收益</strong></td>
+<td>策略总收益相对基准总收益的多出部分</td>
+</tr>
+<tr>
+<td><strong>基准收益</strong></td>
+<td>同一区间内基准指数涨跌幅</td>
+</tr>
+<tr>
+<td><strong>Alpha</strong></td>
+<td>相对基准回归后的年化超额收益（CAPM 意义下「跑赢/跑输」的一部分）</td>
+</tr>
+<tr>
+<td><strong>Beta</strong></td>
+<td>相对大盘的弹性；1 附近表示与指数同涨同跌，大于 1 波动更大</td>
+</tr>
+<tr>
+<td><strong>夏普比率</strong></td>
+<td>每承担一单位总波动，获得多少超过无风险利率的收益；一般 <strong>&gt; 1</strong> 认为尚可</td>
+</tr>
+<tr>
+<td><strong>胜率（交易）</strong></td>
+<td>完整「买—卖」配对中，盈利回合占比 → 对应 <code>win_rate_trade</code></td>
+</tr>
+<tr>
+<td><strong>盈亏比</strong></td>
+<td>平均盈利单 / 平均亏损单（绝对值比）</td>
+</tr>
+<tr>
+<td><strong>最大回撤</strong></td>
+<td>从历史峰值到之后谷底的最大跌幅，<strong>负数</strong>，绝对值越小风控越好</td>
+</tr>
+<tr>
+<td><strong>索提诺比率</strong></td>
+<td>类似夏普，但分母只用<strong>下行波动</strong>；更关注「跌的时候有多痛」</td>
+</tr>
+<tr>
+<td><strong>卡玛比率</strong></td>
+<td>年化收益 / |最大回撤|；回撤小且收益高则数值大</td>
+</tr>
+<tr>
+<td><strong>日超额收益（年化）</strong></td>
+<td>日度超额收益均值的年化</td>
+</tr>
+<tr>
+<td><strong>超额最大回撤</strong></td>
+<td>超额收益序列上的最大回撤</td>
+</tr>
+<tr>
+<td><strong>超额夏普</strong></td>
+<td>日超额收益的夏普</td>
+</tr>
+<tr>
+<td><strong>日胜率</strong></td>
+<td>盈利交易日 / 总交易日 → <code>win_rate_daily</code></td>
+</tr>
+<tr>
+<td><strong>盈利笔数 / 亏损笔数</strong></td>
+<td>配对交易后的笔数</td>
+</tr>
+<tr>
+<td><strong>信息比率</strong></td>
+<td>主动收益相对跟踪误差的效率</td>
+</tr>
+<tr>
+<td><strong>年化波动率</strong></td>
+<td>策略日收益年化标准差</td>
+</tr>
+<tr>
+<td><strong>基准波动率</strong></td>
+<td>基准日收益年化波动</td>
+</tr>
+<tr>
+<td><strong>交易次数</strong></td>
+<td>完成的配对交易笔数</td>
+</tr>
+</tbody>
+</table>
+<p>卡片上的「评级条」为根据阈值着色的快速提示，<strong>仍以你自己策略目标为准</strong>。</p>
+<h3 id="23-k-线与技术图区若有">2.3 K 线与技术图区（若有）<a class="headerlink" href="#23-k-线与技术图区若有" title="Permanent link">&para;</a></h3>
+<p>标题一般为 <strong>「K 线图 · 技术指标」</strong>：主图价格与成交量，叠加均线、买卖点等（依赖回测数据与记录）。</p>
+<h3 id="24-累计收益率">2.4 累计收益率<a class="headerlink" href="#24-累计收益率" title="Permanent link">&para;</a></h3>
+<ul>
+<li>策略累计收益（%）曲线。</li>
+<li>可与 <strong>基准</strong> 同图对比（数据来自指数行情接口，失败时可能仅显示策略线）。</li>
+</ul>
+<h3 id="25-回撤曲线">2.5 回撤曲线<a class="headerlink" href="#25-回撤曲线" title="Permanent link">&para;</a></h3>
+<p>显示组合从历史新高的回落深度，用于判断<strong>最差情况有多糟</strong>。</p>
+<h3 id="26-每日盈亏--每日收益率">2.6 每日盈亏 / 每日收益率<a class="headerlink" href="#26-每日盈亏--每日收益率" title="Permanent link">&para;</a></h3>
+<p>柱状或曲线展示 <strong>相邻交易日</strong> 组合价值变化；用于看「是否连续亏损」「波动是否集中」。</p>
+<h3 id="27-标签页成交日历持仓等">2.7 标签页：成交、日历、持仓等<a class="headerlink" href="#27-标签页成交日历持仓等" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>成交</strong>：每笔买卖的时间、价格、数量、佣金。</li>
+<li><strong>持仓</strong>：各期末或关键节点的持仓结构（以实际导出为准）。</li>
+<li>其他 Tab 为辅助信息（如数据源说明等）。</li>
+</ul>
+<h3 id="28-对照走读示例reports19_localdata--html">2.8 对照走读示例（<code>reports/…19_localdata</code> + HTML）<a class="headerlink" href="#28-对照走读示例reports19_localdata--html" title="Permanent link">&para;</a></h3>
+<p>下面用一次真实导出（与 <a href="../../reports/"><code>reports/README.md</code></a> 推荐组 <strong><code>backtest_*_19_localdata</code></strong> 对应，标的 <strong>000768</strong>，区间 <strong>2024-01-01～2024-12-31</strong>）说明：<strong>打开 HTML 时，各块数字在说什么</strong>。运行 <code>python examples/19_local_data_backtest.py</code> 后，在 <code>reports/</code> 下打开<strong>最新</strong> <code>*_19_localdata.html</code>，对照下表阅读（下列数值为该次运行的快照，与教程配图 <a href="../../tutorials/assets/example_report_html_19_localdata.png"><code>../tutorials/assets/example_report_html_19_localdata.png</code></a> 同源）。</p>
+<blockquote>
+<p><strong>说明：</strong>本示例策略在该区间<strong>亏损</strong>，用来读报告很合适——夏普为负、卡玛为负、回撤大，都是「风险指标在说话」。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>HTML 上常见位置</th>
+<th>本例约值（见 MD/JSON）</th>
+<th>读法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>页眉 / 总盈亏</strong></td>
+<td>约 <strong>-33.28%</strong></td>
+<td>全区间总收益率（相对初始资金），与 <code>summary.pnl_pct</code>、<code>risk_metrics.total_return</code> 一致。</td>
+</tr>
+<tr>
+<td><strong>摘要行</strong></td>
+<td>初始 100,000 → 期末 <strong>66,718</strong></td>
+<td>已扣交易成本后的组合净值终值。</td>
+</tr>
+<tr>
+<td><strong>年化收益</strong></td>
+<td><strong>-34.50%</strong></td>
+<td>由日收益折算的年化水平；亏损策略常为负。</td>
+</tr>
+<tr>
+<td><strong>年化波动率</strong></td>
+<td><strong>21.42%</strong></td>
+<td>收益波动幅度；越高曲线越「抖」。</td>
+</tr>
+<tr>
+<td><strong>夏普比率</strong></td>
+<td><strong>-2.01</strong></td>
+<td>风险调整后收益；低于无风险收益且波动大时为负。</td>
+</tr>
+<tr>
+<td><strong>索提诺比率</strong></td>
+<td><strong>-2.60</strong></td>
+<td>只看下行波动的风险调整指标；本例亦为负。</td>
+</tr>
+<tr>
+<td><strong>最大回撤</strong></td>
+<td><strong>-38.32%</strong></td>
+<td>从峰值到谷底的最大跌幅；本例回撤深，风控压力大。</td>
+</tr>
+<tr>
+<td><strong>卡玛比率</strong></td>
+<td><strong>-0.90</strong></td>
+<td>年化收益 / |最大回撤|；收益负时常为负。</td>
+</tr>
+<tr>
+<td><strong>日胜率</strong></td>
+<td><strong>14.1%</strong></td>
+<td><code>win_rate_daily</code>：盈利交易日占比，与「交易胜率」不同。</td>
+</tr>
+<tr>
+<td><strong>胜率（交易）</strong></td>
+<td><strong>12.5%</strong></td>
+<td><code>win_rate_trade</code>：完整买—卖配对中，盈利回合占比；本例 8 对里仅 1 对净赚。</td>
+</tr>
+<tr>
+<td><strong>盈利笔数 / 亏损笔数</strong></td>
+<td><strong>1 / 7</strong></td>
+<td>配对层面的赢/输笔数。</td>
+</tr>
+<tr>
+<td><strong>盈亏比</strong></td>
+<td><strong>0.07</strong></td>
+<td>平均盈利单相对平均亏损单；远小于 1 表示亏多赚少。</td>
+</tr>
+<tr>
+<td><strong>交易次数（配对）</strong></td>
+<td><strong>8</strong></td>
+<td>完成「一轮买+卖」的组数；与 JSON <code>summary.num_trades</code>（单边成交条数，本例 16）不同，见 <a href="../FAQ/#faq-json-num-trades">FAQ</a>。</td>
+</tr>
+<tr>
+<td><strong>年化换手率</strong></td>
+<td>约 <strong>807%</strong>（界面） / JSON <code>annual_turnover</code> <strong>8.07</strong></td>
+<td>为成交额相对规模的年化度量；界面常以百分数展示。</td>
+</tr>
+<tr>
+<td><strong>总佣金</strong></td>
+<td><strong>716.97</strong></td>
+<td>报告汇总佣金；净值路径已反映成本，此项便于审视成本占比。</td>
+</tr>
+<tr>
+<td><strong>Alpha / Beta / 信息比率</strong></td>
+<td>本例多为 <strong>0</strong> 或 <strong>1</strong></td>
+<td>当基准序列未对齐时可能为占位；<code>summary.benchmark_return</code> 为 <code>null</code> 时见 <a href="../FAQ/#faq-benchmark-null">FAQ</a>。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>交互区（K 线、累计收益、回撤、每日盈亏）</strong>：用鼠标在图上拖动、缩放；策略线 vs 基准线对比「是否跑赢指数」。若<strong>整页图表空白</strong>，多为 <strong>CDN 脚本被内网拦截</strong>，需联网或换网络（见 <a href="../FAQ/#faq-html-blank">FAQ — HTML 图表空白</a>）。</p>
+<p><strong>自己截 HTML 长图（可选）</strong>：浏览器全屏后使用系统截图（如 macOS <code>Cmd + Shift + 4</code>、Windows <code>Win + Shift + S</code>），截取页眉 + 指标卡片区，便于写笔记或与同事对齐结论。</p>
+<hr />
+<h2 id="3-png-图generate_chart怎么读">3. PNG 图（<code>generate_chart</code>）怎么读？<a class="headerlink" href="#3-png-图generate_chart怎么读" title="Permanent link">&para;</a></h2>
+<p>典型元素包括：</p>
+<ul>
+<li><strong>价格与均线</strong>：判断趋势与信号是否出现在合理位置。</li>
+<li><strong>买卖点标记</strong>：与策略逻辑对照，是否存在「追高杀跌」。</li>
+<li><strong>组合总价值或收益</strong>：右侧或副图，看资金曲线是否平滑上升。</li>
+<li><strong>回撤带</strong>：下方区域展示回撤深度。</li>
+</ul>
+<p>若图中缺少净值曲线，请对照 <a href="../FAQ/">FAQ — PNG 很空</a> 检查 <code>record</code> / 记录数据是否完整。</p>
+<hr />
+<h2 id="4-analyze_returns-指标字典">4. analyze_returns 指标字典<a class="headerlink" href="#4-analyze_returns-指标字典" title="Permanent link">&para;</a></h2>
+<p>对 <code>result = run_backtest(...)</code> 或 <code>run_strategy</code> 的返回值：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="n">analyze_returns</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">m</span> <span class="o">=</span> <span class="n">analyze_returns</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">risk_free_rate</span><span class="o">=</span><span class="mf">0.03</span><span class="p">,</span> <span class="n">trading_days</span><span class="o">=</span><span class="mi">252</span><span class="p">)</span>
+</code></pre></div>
+<p>当 <code>result["recorded_values"]</code> 不足以构造日净值序列时，函数可能返回 <strong><code>None</code></strong>，此时 HTML 中部分指标也会缺失。</p>
+<table>
+<thead>
+<tr>
+<th>键名</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>total_return</code></td>
+<td>全区间总收益率（基于起止组合价值）</td>
+</tr>
+<tr>
+<td><code>annual_return</code></td>
+<td>由日收益几何年化得到的年化收益</td>
+</tr>
+<tr>
+<td><code>annual_volatility</code></td>
+<td>日收益标准差 × √252</td>
+</tr>
+<tr>
+<td><code>sharpe_ratio</code></td>
+<td>夏普比率（年化，扣无风险利率）</td>
+</tr>
+<tr>
+<td><code>sortino_ratio</code></td>
+<td>索提诺比率</td>
+</tr>
+<tr>
+<td><code>max_drawdown</code></td>
+<td>最大回撤（负数）</td>
+</tr>
+<tr>
+<td><code>calmar_ratio</code></td>
+<td>年化收益 / |最大回撤|</td>
+</tr>
+<tr>
+<td><code>alpha</code></td>
+<td>年化 Alpha（相对基准）</td>
+</tr>
+<tr>
+<td><code>beta</code></td>
+<td>Beta</td>
+</tr>
+<tr>
+<td><code>information_ratio</code></td>
+<td>信息比率</td>
+</tr>
+<tr>
+<td><code>win_rate_daily</code></td>
+<td>日胜率</td>
+</tr>
+<tr>
+<td><code>win_rate_trade</code></td>
+<td>配对交易胜率</td>
+</tr>
+<tr>
+<td><code>trade_count</code></td>
+<td>完成配对交易次数</td>
+</tr>
+<tr>
+<td><code>win_count</code> / <code>loss_count</code></td>
+<td>盈利 / 亏损交易笔数</td>
+</tr>
+<tr>
+<td><code>profit_loss_ratio</code></td>
+<td>盈亏比</td>
+</tr>
+<tr>
+<td><code>annual_turnover</code></td>
+<td>年化换手率（成交额相对规模）</td>
+</tr>
+<tr>
+<td><code>total_commission</code></td>
+<td>佣金合计（报告用；净值已反映成本）</td>
+</tr>
+<tr>
+<td><code>net_return</code></td>
+<td>与 <code>total_return</code> 一致含义（见源码注释）</td>
+</tr>
+<tr>
+<td><code>excess_return</code></td>
+<td>策略总收益 − 基准总收益</td>
+</tr>
+<tr>
+<td><code>benchmark_return</code></td>
+<td>基准总收益</td>
+</tr>
+<tr>
+<td><code>excess_return_max_drawdown</code></td>
+<td>超额收益序列最大回撤</td>
+</tr>
+<tr>
+<td><code>excess_return_sharpe</code></td>
+<td>超额收益夏普</td>
+</tr>
+<tr>
+<td><code>daily_excess_return</code></td>
+<td>日超额收益年化均值</td>
+</tr>
+<tr>
+<td><code>benchmark_volatility</code></td>
+<td>基准年化波动率</td>
+</tr>
+</tbody>
+</table>
+<p>无风险利率默认 <strong><code>risk_free_rate=0.03</code></strong>（年化 3%），可按研究习惯修改。</p>
+<hr />
+<h2 id="5-markdown--json-报告">5. Markdown / JSON 报告<a class="headerlink" href="#5-markdown--json-报告" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Markdown</strong>：适合贴到笔记或版本库，快速浏览摘要与成交表。</li>
+<li><strong>JSON</strong>：适合写脚本批量对比多组参数、画自定义图、接入仪表板。</li>
+</ul>
+<p>JSON 顶层字段随版本可能扩展，以生成文件为准；核心通常包含盈亏比例、交易列表、记录序列等。</p>
+<p><strong>读 JSON 时注意：</strong><code>summary.num_trades</code> 多为单边成交条数，与「配对交易笔数」不同，见 <a href="../FAQ/#faq-json-num-trades">FAQ</a>。</p>
+<hr />
+<h2 id="5b-不同策略报告对比如何通过报告判断策略好坏">5b. 不同策略报告对比：如何通过报告判断策略好坏<a class="headerlink" href="#5b-不同策略报告对比如何通过报告判断策略好坏" title="Permanent link">&para;</a></h2>
+<p>以下是 4 个不同策略在 2024 年的回测截图，报告结构相同，数值各异。</p>
+<h3 id="盈利策略macd-趋势--成交量确认10348">盈利策略：MACD 趋势 + 成交量确认（+103.48%）<a class="headerlink" href="#盈利策略macd-趋势--成交量确认10348" title="Permanent link">&para;</a></h3>
+<p><img alt="MACD+成交量 HTML 报告" src="../../tutorials/assets/example_report_html_macd_volume.png" /></p>
+<ul>
+<li><strong>夏普比率</strong>：高 → 风险调整后收益好</li>
+<li><strong>交易次数</strong>：16 笔 → 不算太频繁</li>
+<li><strong>累计收益曲线</strong>：总体向上</li>
+<li><strong>关键判断</strong>：盈利主要来几次大行情，不是靠频繁交易堆积</li>
+</ul>
+<h3 id="震荡市表现好布林带均值回归5777">震荡市表现好：布林带均值回归（+57.77%）<a class="headerlink" href="#震荡市表现好布林带均值回归5777" title="Permanent link">&para;</a></h3>
+<p><img alt="布林带 HTML 报告" src="../../tutorials/assets/example_report_html_bollinger.png" /></p>
+<ul>
+<li><strong>交易次数</strong>：8 笔 → 低频策略</li>
+<li><strong>回撤</strong>：控制得当</li>
+<li><strong>关键判断</strong>：适合震荡市，趋势行情可能表现一般</li>
+</ul>
+<h3 id="组合策略多因子选股519">组合策略：多因子选股（+5.19%）<a class="headerlink" href="#组合策略多因子选股519" title="Permanent link">&para;</a></h3>
+<p><img alt="多因子 HTML 报告" src="../../tutorials/assets/example_report_html_multifactor.png" /></p>
+<ul>
+<li><strong>交易次数</strong>：135 笔 → 高频换手</li>
+<li><strong>换手率高</strong>：佣金成本需关注</li>
+<li><strong>关键判断</strong>：收益被高频交易成本侵蚀</li>
+</ul>
+<h3 id="亏损策略动量组合-2569">亏损策略：动量组合（-25.69%）<a class="headerlink" href="#亏损策略动量组合-2569" title="Permanent link">&para;</a></h3>
+<p><img alt="组合回测 HTML 报告" src="../../tutorials/assets/example_report_html_portfolio.png" /></p>
+<ul>
+<li><strong>夏普比率</strong>：负值</li>
+<li><strong>最大回撤</strong>：-33.10%</li>
+<li><strong>日胜率</strong>：42.3% → 输多赢少</li>
+<li><strong>关键判断</strong>：动量策略在震荡市中反复"追涨杀跌"</li>
+</ul>
+<h3 id="如何从报告判断策略好坏">如何从报告判断策略好坏<a class="headerlink" href="#如何从报告判断策略好坏" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>好策略</th>
+<th>差策略</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>年化收益</strong></td>
+<td>正数，&gt; 10%</td>
+<td>负数或 &lt; 5%</td>
+<td>基础要求</td>
+</tr>
+<tr>
+<td><strong>夏普比率</strong></td>
+<td>&gt; 1</td>
+<td>&lt; 0</td>
+<td>风险调整后收益</td>
+</tr>
+<tr>
+<td><strong>最大回撤</strong></td>
+<td>&lt; 15%</td>
+<td>&gt; 30%</td>
+<td>最大亏损承受</td>
+</tr>
+<tr>
+<td><strong>交易胜率</strong></td>
+<td>&gt; 50%</td>
+<td>&lt; 30%</td>
+<td>配对交易胜率</td>
+</tr>
+<tr>
+<td><strong>盈亏比</strong></td>
+<td>&gt; 1.5</td>
+<td>&lt; 1</td>
+<td>平均盈利/平均亏损</td>
+</tr>
+<tr>
+<td><strong>交易频率</strong></td>
+<td>适中</td>
+<td>过多或过少</td>
+<td>过多成本高</td>
+</tr>
+<tr>
+<td><strong>Alpha</strong></td>
+<td>正数</td>
+<td>零或负</td>
+<td>超额收益来源</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-进阶只生成某一种报告">6. 进阶：只生成某一种报告<a class="headerlink" href="#6-进阶只生成某一种报告" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="n">run_backtest</span><span class="p">,</span> <span class="n">generate_html_report</span><span class="p">,</span> <span class="n">analyze_returns</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">run_backtest</span><span class="p">(</span><span class="n">initialize</span><span class="p">,</span> <span class="s2">&quot;2024-01-01&quot;</span><span class="p">,</span> <span class="s2">&quot;2024-12-31&quot;</span><span class="p">,</span> <span class="n">securities</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;601390&quot;</span><span class="p">])</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">generate_html_report</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;reports/my_report.html&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">analyze_returns</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+</code></pre></div>
+<p>详见 <a href="../api_reference/">API 参考 — 报告与分析 API</a>。</p>
+<hr />
+<h2 id="7-相关文档">7. 相关文档<a class="headerlink" href="#7-相关文档" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../user_guide/">用户手册</a></li>
+<li><a href="../../reports/">示例报告索引（<code>reports/README.md</code>）</a></li>
+<li><a href="../FAQ/">常见问题 FAQ</a></li>
+<li><a href="../api_index/">API 速查索引</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

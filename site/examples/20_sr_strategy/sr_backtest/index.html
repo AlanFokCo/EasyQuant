@@ -1,0 +1,2564 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/examples/20_sr_strategy/sr_backtest/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Backtest Report - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#backtest-report" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Backtest Report
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/reports_and_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/ptrade_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/09_combined_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#risk-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trade-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trade Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trade-pl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trade P&amp;L
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#factor-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Factor Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#brinson-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brinson Attribution
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="backtest-report">Backtest Report<a class="headerlink" href="#backtest-report" title="Permanent link">&para;</a></h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Period</strong></td>
+<td>2020-01-01 to 2026-03-30</td>
+</tr>
+<tr>
+<td><strong>Initial Capital</strong></td>
+<td>1,000,000.00</td>
+</tr>
+<tr>
+<td><strong>Final Value</strong></td>
+<td>2,371,889.70</td>
+</tr>
+<tr>
+<td><strong>P&amp;L</strong></td>
+<td>+1,371,889.70 (+137.19%)</td>
+</tr>
+<tr>
+<td><strong>Benchmark</strong></td>
+<td>000001</td>
+</tr>
+<tr>
+<td><strong>Benchmark Return</strong></td>
+<td>+27.16%</td>
+</tr>
+</tbody>
+</table>
+<h2 id="risk-metrics">Risk Metrics<a class="headerlink" href="#risk-metrics" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Annual Return</td>
+<td>+15.52%</td>
+</tr>
+<tr>
+<td>Annual Volatility</td>
+<td>11.67%</td>
+</tr>
+<tr>
+<td>Sharpe Ratio</td>
+<td>1.04</td>
+</tr>
+<tr>
+<td>Sortino Ratio</td>
+<td>1.75</td>
+</tr>
+<tr>
+<td>Max Drawdown</td>
+<td>-12.00%</td>
+</tr>
+<tr>
+<td>Max DD Period</td>
+<td>2023-06-20 to 2023-12-15</td>
+</tr>
+<tr>
+<td>Calmar Ratio</td>
+<td>1.29</td>
+</tr>
+<tr>
+<td>Alpha (annual)</td>
+<td>+13.54%</td>
+</tr>
+<tr>
+<td>Beta</td>
+<td>0.29</td>
+</tr>
+<tr>
+<td>Information Ratio</td>
+<td>1.27</td>
+</tr>
+<tr>
+<td>Win Rate (daily)</td>
+<td>40.6%</td>
+</tr>
+<tr>
+<td>Trading Days</td>
+<td>1509</td>
+</tr>
+</tbody>
+</table>
+<h2 id="trade-summary">Trade Summary<a class="headerlink" href="#trade-summary" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Buy orders: 114</li>
+<li>Sell orders: 112</li>
+<li>Total commission: 60,731.90</li>
+<li>Securities traded: 8</li>
+</ul>
+<h2 id="trade-pl">Trade P&amp;L<a class="headerlink" href="#trade-pl" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Security</th>
+<th>Buy Date</th>
+<th>Buy Price</th>
+<th>Sell Date</th>
+<th>Sell Price</th>
+<th>P&amp;L</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>39</td>
+<td>601398</td>
+<td>2020-05-27</td>
+<td>3.240</td>
+<td>2020-06-02</td>
+<td>3.310</td>
+<td>+3,741</td>
+</tr>
+<tr>
+<td>40</td>
+<td>601390</td>
+<td>2020-05-22</td>
+<td>4.110</td>
+<td>2020-06-11</td>
+<td>3.920</td>
+<td>-11,937</td>
+</tr>
+<tr>
+<td>41</td>
+<td>601088</td>
+<td>2020-06-29</td>
+<td>1.990</td>
+<td>2020-07-06</td>
+<td>4.500</td>
+<td>+252,608</td>
+</tr>
+<tr>
+<td>42</td>
+<td>601857</td>
+<td>2020-06-03</td>
+<td>2.320</td>
+<td>2020-07-15</td>
+<td>2.540</td>
+<td>+17,539</td>
+</tr>
+<tr>
+<td>43</td>
+<td>601857</td>
+<td>2020-09-03</td>
+<td>2.360</td>
+<td>2020-09-24</td>
+<td>2.230</td>
+<td>-13,387</td>
+</tr>
+<tr>
+<td>44</td>
+<td>601398</td>
+<td>2020-08-31</td>
+<td>3.340</td>
+<td>2020-10-30</td>
+<td>3.300</td>
+<td>-4,276</td>
+</tr>
+<tr>
+<td>45</td>
+<td>518880</td>
+<td>2020-11-03</td>
+<td>3.949</td>
+<td>2020-11-10</td>
+<td>3.889</td>
+<td>-3,908</td>
+</tr>
+<tr>
+<td>46</td>
+<td>601390</td>
+<td>2020-11-02</td>
+<td>4.320</td>
+<td>2020-12-07</td>
+<td>4.510</td>
+<td>+13,165</td>
+</tr>
+<tr>
+<td>47</td>
+<td>601390</td>
+<td>2021-01-06</td>
+<td>4.440</td>
+<td>2021-01-22</td>
+<td>4.440</td>
+<td>-501</td>
+</tr>
+<tr>
+<td>48</td>
+<td>600536</td>
+<td>2021-01-29</td>
+<td>36.940</td>
+<td>2021-02-05</td>
+<td>30.780</td>
+<td>-52,173</td>
+</tr>
+<tr>
+<td>49</td>
+<td>600536</td>
+<td>2021-03-19</td>
+<td>30.690</td>
+<td>2021-04-12</td>
+<td>29.760</td>
+<td>-7,139</td>
+</tr>
+<tr>
+<td>50</td>
+<td>002594</td>
+<td>2021-03-08</td>
+<td>56.090</td>
+<td>2021-04-29</td>
+<td>51.490</td>
+<td>-24,824</td>
+</tr>
+<tr>
+<td>51</td>
+<td>601857</td>
+<td>2021-04-21</td>
+<td>2.360</td>
+<td>2021-05-12</td>
+<td>2.820</td>
+<td>+43,239</td>
+</tr>
+<tr>
+<td>52</td>
+<td>600916</td>
+<td>2021-05-26</td>
+<td>16.910</td>
+<td>2021-06-15</td>
+<td>15.120</td>
+<td>-26,132</td>
+</tr>
+<tr>
+<td>53</td>
+<td>002594</td>
+<td>2021-05-06</td>
+<td>47.180</td>
+<td>2021-06-30</td>
+<td>80.840</td>
+<td>+167,704</td>
+</tr>
+<tr>
+<td>54</td>
+<td>601398</td>
+<td>2021-06-23</td>
+<td>3.520</td>
+<td>2021-07-01</td>
+<td>3.640</td>
+<td>+5,779</td>
+</tr>
+<tr>
+<td>55</td>
+<td>601390</td>
+<td>2021-06-15</td>
+<td>4.190</td>
+<td>2021-07-19</td>
+<td>4.110</td>
+<td>-4,902</td>
+</tr>
+<tr>
+<td>56</td>
+<td>600916</td>
+<td>2021-07-06</td>
+<td>14.270</td>
+<td>2021-07-26</td>
+<td>13.350</td>
+<td>-18,456</td>
+</tr>
+<tr>
+<td>57</td>
+<td>518880</td>
+<td>2021-07-06</td>
+<td>3.679</td>
+<td>2021-08-06</td>
+<td>3.663</td>
+<td>-1,666</td>
+</tr>
+<tr>
+<td>58</td>
+<td>601857</td>
+<td>2021-08-12</td>
+<td>2.820</td>
+<td>2021-08-27</td>
+<td>2.950</td>
+<td>+11,893</td>
+</tr>
+<tr>
+<td>59</td>
+<td>600916</td>
+<td>2021-07-27</td>
+<td>13.170</td>
+<td>2021-09-23</td>
+<td>13.500</td>
+<td>+6,170</td>
+</tr>
+<tr>
+<td>60</td>
+<td>600536</td>
+<td>2021-10-20</td>
+<td>28.690</td>
+<td>2021-10-22</td>
+<td>31.290</td>
+<td>+22,446</td>
+</tr>
+<tr>
+<td>61</td>
+<td>601398</td>
+<td>2021-10-11</td>
+<td>3.390</td>
+<td>2021-11-08</td>
+<td>3.280</td>
+<td>-11,494</td>
+</tr>
+<tr>
+<td>62</td>
+<td>601398</td>
+<td>2021-11-08</td>
+<td>3.280</td>
+<td>2021-11-22</td>
+<td>3.280</td>
+<td>-441</td>
+</tr>
+<tr>
+<td>63</td>
+<td>600916</td>
+<td>2021-11-08</td>
+<td>12.830</td>
+<td>2021-12-15</td>
+<td>12.590</td>
+<td>-5,595</td>
+</tr>
+<tr>
+<td>64</td>
+<td>601398</td>
+<td>2021-11-26</td>
+<td>3.260</td>
+<td>2021-12-28</td>
+<td>3.330</td>
+<td>+4,102</td>
+</tr>
+<tr>
+<td>65</td>
+<td>518880</td>
+<td>2021-12-17</td>
+<td>3.629</td>
+<td>2021-12-28</td>
+<td>3.642</td>
+<td>+365</td>
+</tr>
+<tr>
+<td>66</td>
+<td>002594</td>
+<td>2022-01-11</td>
+<td>76.920</td>
+<td>2022-01-25</td>
+<td>77.330</td>
+<td>+859</td>
+</tr>
+<tr>
+<td>67</td>
+<td>600536</td>
+<td>2021-12-10</td>
+<td>29.020</td>
+<td>2022-01-26</td>
+<td>28.750</td>
+<td>-1,675</td>
+</tr>
+<tr>
+<td>68</td>
+<td>518880</td>
+<td>2022-01-11</td>
+<td>3.629</td>
+<td>2022-01-27</td>
+<td>3.606</td>
+<td>-1,879</td>
+</tr>
+<tr>
+<td>69</td>
+<td>601857</td>
+<td>2021-11-05</td>
+<td>3.250</td>
+<td>2022-01-28</td>
+<td>3.370</td>
+<td>+9,137</td>
+</tr>
+<tr>
+<td>70</td>
+<td>600916</td>
+<td>2022-02-14</td>
+<td>12.430</td>
+<td>2022-03-04</td>
+<td>12.010</td>
+<td>-12,082</td>
+</tr>
+<tr>
+<td>71</td>
+<td>002594</td>
+<td>2022-02-15</td>
+<td>76.660</td>
+<td>2022-03-07</td>
+<td>71.760</td>
+<td>-16,554</td>
+</tr>
+<tr>
+<td>72</td>
+<td>601390</td>
+<td>2022-03-15</td>
+<td>4.680</td>
+<td>2022-04-08</td>
+<td>5.890</td>
+<td>+85,867</td>
+</tr>
+<tr>
+<td>73</td>
+<td>601857</td>
+<td>2022-03-15</td>
+<td>3.350</td>
+<td>2022-04-25</td>
+<td>3.400</td>
+<td>+4,453</td>
+</tr>
+<tr>
+<td>74</td>
+<td>601398</td>
+<td>2022-05-11</td>
+<td>3.310</td>
+<td>2022-07-14</td>
+<td>3.310</td>
+<td>-429</td>
+</tr>
+<tr>
+<td>75</td>
+<td>600536</td>
+<td>2022-07-12</td>
+<td>28.780</td>
+<td>2022-08-05</td>
+<td>32.650</td>
+<td>+26,351</td>
+</tr>
+<tr>
+<td>76</td>
+<td>600916</td>
+<td>2022-04-26</td>
+<td>8.820</td>
+<td>2022-08-25</td>
+<td>13.270</td>
+<td>+179,419</td>
+</tr>
+<tr>
+<td>77</td>
+<td>601857</td>
+<td>2022-08-11</td>
+<td>3.640</td>
+<td>2022-08-25</td>
+<td>3.940</td>
+<td>+17,745</td>
+</tr>
+<tr>
+<td>78</td>
+<td>518880</td>
+<td>2022-09-09</td>
+<td>3.785</td>
+<td>2022-09-14</td>
+<td>3.760</td>
+<td>-2,938</td>
+</tr>
+<tr>
+<td>79</td>
+<td>518880</td>
+<td>2022-09-29</td>
+<td>3.780</td>
+<td>2022-10-21</td>
+<td>3.771</td>
+<td>-1,068</td>
+</tr>
+<tr>
+<td>80</td>
+<td>601398</td>
+<td>2022-08-03</td>
+<td>3.260</td>
+<td>2022-10-26</td>
+<td>3.220</td>
+<td>-3,021</td>
+</tr>
+<tr>
+<td>81</td>
+<td>002594</td>
+<td>2022-10-12</td>
+<td>84.710</td>
+<td>2022-10-28</td>
+<td>77.230</td>
+<td>-17,493</td>
+</tr>
+<tr>
+<td>82</td>
+<td>601390</td>
+<td>2022-09-28</td>
+<td>4.590</td>
+<td>2022-10-31</td>
+<td>4.320</td>
+<td>-21,578</td>
+</tr>
+<tr>
+<td>83</td>
+<td>601398</td>
+<td>2022-10-26</td>
+<td>3.220</td>
+<td>2022-10-31</td>
+<td>3.090</td>
+<td>-11,460</td>
+</tr>
+<tr>
+<td>84</td>
+<td>002594</td>
+<td>2022-11-01</td>
+<td>84.540</td>
+<td>2022-11-18</td>
+<td>82.160</td>
+<td>-11,807</td>
+</tr>
+<tr>
+<td>85</td>
+<td>601088</td>
+<td>2022-11-07</td>
+<td>22.120</td>
+<td>2022-12-12</td>
+<td>20.380</td>
+<td>-23,937</td>
+</tr>
+<tr>
+<td>86</td>
+<td>518880</td>
+<td>2022-12-28</td>
+<td>3.966</td>
+<td>2022-12-29</td>
+<td>3.960</td>
+<td>-1,213</td>
+</tr>
+<tr>
+<td>87</td>
+<td>002594</td>
+<td>2023-01-06</td>
+<td>86.000</td>
+<td>2023-02-01</td>
+<td>98.710</td>
+<td>+31,390</td>
+</tr>
+<tr>
+<td>88</td>
+<td>601088</td>
+<td>2023-01-04</td>
+<td>19.680</td>
+<td>2023-02-07</td>
+<td>20.100</td>
+<td>+5,742</td>
+</tr>
+<tr>
+<td>89</td>
+<td>601398</td>
+<td>2023-02-16</td>
+<td>3.220</td>
+<td>2023-03-02</td>
+<td>3.260</td>
+<td>+3,257</td>
+</tr>
+<tr>
+<td>90</td>
+<td>518880</td>
+<td>2023-03-02</td>
+<td>4.026</td>
+<td>2023-03-22</td>
+<td>4.223</td>
+<td>+11,608</td>
+</tr>
+<tr>
+<td>91</td>
+<td>601088</td>
+<td>2023-02-22</td>
+<td>19.810</td>
+<td>2023-03-28</td>
+<td>19.330</td>
+<td>-5,826</td>
+</tr>
+<tr>
+<td>92</td>
+<td>600536</td>
+<td>2023-04-06</td>
+<td>53.360</td>
+<td>2023-04-21</td>
+<td>48.540</td>
+<td>-23,516</td>
+</tr>
+<tr>
+<td>93</td>
+<td>600916</td>
+<td>2023-04-07</td>
+<td>11.570</td>
+<td>2023-04-24</td>
+<td>10.760</td>
+<td>-13,901</td>
+</tr>
+<tr>
+<td>94</td>
+<td>601857</td>
+<td>2022-12-29</td>
+<td>3.610</td>
+<td>2023-04-28</td>
+<td>6.540</td>
+<td>+315,113</td>
+</tr>
+<tr>
+<td>95</td>
+<td>600916</td>
+<td>2023-05-05</td>
+<td>11.520</td>
+<td>2023-05-17</td>
+<td>11.080</td>
+<td>-16,895</td>
+</tr>
+<tr>
+<td>96</td>
+<td>002594</td>
+<td>2023-03-13</td>
+<td>77.430</td>
+<td>2023-05-29</td>
+<td>78.910</td>
+<td>+3,115</td>
+</tr>
+<tr>
+<td>97</td>
+<td>600536</td>
+<td>2023-05-12</td>
+<td>41.520</td>
+<td>2023-06-26</td>
+<td>46.680</td>
+<td>+39,169</td>
+</tr>
+<tr>
+<td>98</td>
+<td>002594</td>
+<td>2023-06-06</td>
+<td>84.220</td>
+<td>2023-06-27</td>
+<td>83.950</td>
+<td>-1,820</td>
+</tr>
+<tr>
+<td>99</td>
+<td>518880</td>
+<td>2023-07-06</td>
+<td>4.365</td>
+<td>2023-07-07</td>
+<td>4.359</td>
+<td>-1,416</td>
+</tr>
+<tr>
+<td>100</td>
+<td>518880</td>
+<td>2023-07-10</td>
+<td>4.370</td>
+<td>2023-07-18</td>
+<td>4.422</td>
+<td>+4,894</td>
+</tr>
+<tr>
+<td>101</td>
+<td>601398</td>
+<td>2023-07-13</td>
+<td>3.810</td>
+<td>2023-07-28</td>
+<td>4.030</td>
+<td>+20,016</td>
+</tr>
+<tr>
+<td>102</td>
+<td>002594</td>
+<td>2023-08-15</td>
+<td>79.160</td>
+<td>2023-08-23</td>
+<td>74.340</td>
+<td>-29,642</td>
+</tr>
+<tr>
+<td>103</td>
+<td>600536</td>
+<td>2023-08-23</td>
+<td>46.320</td>
+<td>2023-09-12</td>
+<td>41.190</td>
+<td>-53,014</td>
+</tr>
+<tr>
+<td>104</td>
+<td>601390</td>
+<td>2023-09-21</td>
+<td>6.130</td>
+<td>2023-10-10</td>
+<td>5.760</td>
+<td>-21,432</td>
+</tr>
+<tr>
+<td>105</td>
+<td>600536</td>
+<td>2023-09-14</td>
+<td>39.700</td>
+<td>2023-10-17</td>
+<td>36.410</td>
+<td>-38,851</td>
+</tr>
+<tr>
+<td>106</td>
+<td>518880</td>
+<td>2023-10-19</td>
+<td>4.547</td>
+<td>2023-11-08</td>
+<td>4.551</td>
+<td>-241</td>
+</tr>
+<tr>
+<td>107</td>
+<td>601390</td>
+<td>2023-10-27</td>
+<td>5.760</td>
+<td>2023-11-10</td>
+<td>5.340</td>
+<td>-18,690</td>
+</tr>
+<tr>
+<td>108</td>
+<td>600916</td>
+<td>2023-10-18</td>
+<td>9.890</td>
+<td>2023-11-10</td>
+<td>9.540</td>
+<td>-16,478</td>
+</tr>
+<tr>
+<td>109</td>
+<td>600916</td>
+<td>2023-11-13</td>
+<td>9.590</td>
+<td>2023-11-30</td>
+<td>9.260</td>
+<td>-14,038</td>
+</tr>
+<tr>
+<td>110</td>
+<td>518880</td>
+<td>2023-11-29</td>
+<td>4.591</td>
+<td>2023-12-11</td>
+<td>4.557</td>
+<td>-2,639</td>
+</tr>
+<tr>
+<td>111</td>
+<td>601398</td>
+<td>2023-12-06</td>
+<td>3.940</td>
+<td>2024-01-12</td>
+<td>4.050</td>
+<td>+6,192</td>
+</tr>
+<tr>
+<td>112</td>
+<td>601857</td>
+<td>2023-12-06</td>
+<td>5.890</td>
+<td>2024-01-18</td>
+<td>6.270</td>
+<td>+14,803</td>
+</tr>
+<tr>
+<td>113</td>
+<td>601088</td>
+<td>2023-10-30</td>
+<td>24.210</td>
+<td>2024-02-05</td>
+<td>32.630</td>
+<td>+64,451</td>
+</tr>
+<tr>
+<td>114</td>
+<td>518880</td>
+<td>2024-02-01</td>
+<td>4.668</td>
+<td>2024-02-06</td>
+<td>4.633</td>
+<td>-2,851</td>
+</tr>
+<tr>
+<td>115</td>
+<td>518880</td>
+<td>2024-03-01</td>
+<td>4.667</td>
+<td>2024-03-06</td>
+<td>4.824</td>
+<td>+10,154</td>
+</tr>
+<tr>
+<td>116</td>
+<td>600536</td>
+<td>2024-02-02</td>
+<td>25.660</td>
+<td>2024-03-13</td>
+<td>36.190</td>
+<td>+95,325</td>
+</tr>
+<tr>
+<td>117</td>
+<td>601390</td>
+<td>2023-12-05</td>
+<td>5.120</td>
+<td>2024-04-10</td>
+<td>6.380</td>
+<td>+76,635</td>
+</tr>
+<tr>
+<td>118</td>
+<td>601390</td>
+<td>2024-05-20</td>
+<td>6.380</td>
+<td>2024-06-11</td>
+<td>5.960</td>
+<td>-33,643</td>
+</tr>
+<tr>
+<td>119</td>
+<td>600536</td>
+<td>2024-06-20</td>
+<td>28.980</td>
+<td>2024-07-08</td>
+<td>28.200</td>
+<td>-13,948</td>
+</tr>
+<tr>
+<td>120</td>
+<td>518880</td>
+<td>2024-07-03</td>
+<td>5.340</td>
+<td>2024-07-19</td>
+<td>5.425</td>
+<td>+5,268</td>
+</tr>
+<tr>
+<td>121</td>
+<td>600536</td>
+<td>2024-07-18</td>
+<td>29.620</td>
+<td>2024-08-12</td>
+<td>28.810</td>
+<td>-11,389</td>
+</tr>
+<tr>
+<td>122</td>
+<td>601857</td>
+<td>2024-07-30</td>
+<td>8.090</td>
+<td>2024-09-04</td>
+<td>7.560</td>
+<td>-26,137</td>
+</tr>
+<tr>
+<td>123</td>
+<td>601390</td>
+<td>2024-09-02</td>
+<td>5.210</td>
+<td>2024-09-09</td>
+<td>4.900</td>
+<td>-13,353</td>
+</tr>
+<tr>
+<td>124</td>
+<td>600536</td>
+<td>2024-08-29</td>
+<td>29.760</td>
+<td>2024-09-18</td>
+<td>33.840</td>
+<td>+39,465</td>
+</tr>
+<tr>
+<td>125</td>
+<td>601857</td>
+<td>2024-09-06</td>
+<td>7.350</td>
+<td>2024-10-15</td>
+<td>7.960</td>
+<td>+20,731</td>
+</tr>
+<tr>
+<td>126</td>
+<td>002594</td>
+<td>2024-08-20</td>
+<td>77.500</td>
+<td>2024-10-16</td>
+<td>95.270</td>
+<td>+88,114</td>
+</tr>
+<tr>
+<td>127</td>
+<td>601390</td>
+<td>2024-09-13</td>
+<td>4.760</td>
+<td>2024-11-11</td>
+<td>6.480</td>
+<td>+87,218</td>
+</tr>
+<tr>
+<td>128</td>
+<td>601088</td>
+<td>2024-11-27</td>
+<td>37.360</td>
+<td>2024-12-20</td>
+<td>38.100</td>
+<td>+5,434</td>
+</tr>
+<tr>
+<td>129</td>
+<td>601857</td>
+<td>2024-11-21</td>
+<td>7.640</td>
+<td>2025-01-21</td>
+<td>7.980</td>
+<td>+17,185</td>
+</tr>
+<tr>
+<td>130</td>
+<td>601398</td>
+<td>2024-11-12</td>
+<td>5.550</td>
+<td>2025-01-22</td>
+<td>6.130</td>
+<td>+54,983</td>
+</tr>
+<tr>
+<td>131</td>
+<td>600916</td>
+<td>2024-12-31</td>
+<td>8.270</td>
+<td>2025-02-13</td>
+<td>8.600</td>
+<td>+11,546</td>
+</tr>
+<tr>
+<td>132</td>
+<td>601390</td>
+<td>2025-01-10</td>
+<td>5.550</td>
+<td>2025-03-31</td>
+<td>5.270</td>
+<td>-11,800</td>
+</tr>
+<tr>
+<td>133</td>
+<td>601088</td>
+<td>2025-03-04</td>
+<td>32.110</td>
+<td>2025-04-08</td>
+<td>35.940</td>
+<td>+58,491</td>
+</tr>
+<tr>
+<td>134</td>
+<td>002594</td>
+<td>2025-04-07</td>
+<td>105.930</td>
+<td>2025-05-20</td>
+<td>130.280</td>
+<td>+96,595</td>
+</tr>
+<tr>
+<td>135</td>
+<td>600536</td>
+<td>2025-05-07</td>
+<td>46.090</td>
+<td>2025-05-23</td>
+<td>43.120</td>
+<td>-30,399</td>
+</tr>
+<tr>
+<td>136</td>
+<td>518880</td>
+<td>2025-06-04</td>
+<td>7.474</td>
+<td>2025-06-10</td>
+<td>7.405</td>
+<td>-6,332</td>
+</tr>
+<tr>
+<td>137</td>
+<td>518880</td>
+<td>2025-06-12</td>
+<td>7.497</td>
+<td>2025-06-20</td>
+<td>7.436</td>
+<td>-5,680</td>
+</tr>
+<tr>
+<td>138</td>
+<td>600916</td>
+<td>2025-07-14</td>
+<td>8.270</td>
+<td>2025-07-17</td>
+<td>8.180</td>
+<td>-7,259</td>
+</tr>
+<tr>
+<td>139</td>
+<td>600916</td>
+<td>2025-07-21</td>
+<td>8.230</td>
+<td>2025-07-22</td>
+<td>8.300</td>
+<td>+3,251</td>
+</tr>
+<tr>
+<td>140</td>
+<td>518880</td>
+<td>2025-07-15</td>
+<td>7.436</td>
+<td>2025-07-28</td>
+<td>7.388</td>
+<td>-3,518</td>
+</tr>
+<tr>
+<td>141</td>
+<td>518880</td>
+<td>2025-08-05</td>
+<td>7.455</td>
+<td>2025-08-14</td>
+<td>7.424</td>
+<td>-2,505</td>
+</tr>
+<tr>
+<td>142</td>
+<td>601398</td>
+<td>2025-07-29</td>
+<td>7.290</td>
+<td>2025-08-27</td>
+<td>7.270</td>
+<td>-2,522</td>
+</tr>
+<tr>
+<td>143</td>
+<td>600916</td>
+<td>2025-08-25</td>
+<td>8.220</td>
+<td>2025-09-01</td>
+<td>8.390</td>
+<td>+8,286</td>
+</tr>
+<tr>
+<td>144</td>
+<td>601398</td>
+<td>2025-08-27</td>
+<td>7.270</td>
+<td>2025-09-19</td>
+<td>7.060</td>
+<td>-14,322</td>
+</tr>
+<tr>
+<td>145</td>
+<td>601398</td>
+<td>2025-09-25</td>
+<td>7.240</td>
+<td>2025-12-10</td>
+<td>7.800</td>
+<td>+43,706</td>
+</tr>
+<tr>
+<td>146</td>
+<td>002594</td>
+<td>2025-11-28</td>
+<td>95.170</td>
+<td>2026-01-14</td>
+<td>96.100</td>
+<td>+3,494</td>
+</tr>
+<tr>
+<td>147</td>
+<td>601088</td>
+<td>2025-12-23</td>
+<td>41.150</td>
+<td>2026-01-21</td>
+<td>40.080</td>
+<td>-11,004</td>
+</tr>
+<tr>
+<td>148</td>
+<td>601390</td>
+<td>2025-12-05</td>
+<td>5.440</td>
+<td>2026-01-23</td>
+<td>5.310</td>
+<td>-8,312</td>
+</tr>
+<tr>
+<td>149</td>
+<td>601398</td>
+<td>2026-02-03</td>
+<td>7.180</td>
+<td>2026-02-26</td>
+<td>6.960</td>
+<td>-14,126</td>
+</tr>
+<tr>
+<td>150</td>
+<td>600536</td>
+<td>2026-03-03</td>
+<td>40.700</td>
+<td>2026-03-20</td>
+<td>38.390</td>
+<td>-25,382</td>
+</tr>
+<tr>
+<td>-</td>
+<td>601088</td>
+<td>2026-01-29</td>
+<td>41.380</td>
+<td>— open —</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>-</td>
+<td>600536</td>
+<td>2026-03-20</td>
+<td>38.390</td>
+<td>— open —</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="positions">Positions<a class="headerlink" href="#positions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Security</th>
+<th>Shares</th>
+<th>Avg Cost</th>
+<th>Market Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>601088</td>
+<td>14,100</td>
+<td>41.380</td>
+<td>674,262.00</td>
+</tr>
+<tr>
+<td>600536</td>
+<td>11,100</td>
+<td>38.390</td>
+<td>406,149.00</td>
+</tr>
+</tbody>
+</table>
+<h2 id="factor-analysis">Factor Analysis<a class="headerlink" href="#factor-analysis" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Market Beta</td>
+<td>0.29</td>
+</tr>
+<tr>
+<td>Market Exposure</td>
+<td>-0.71</td>
+</tr>
+<tr>
+<td>Annual Alpha</td>
+<td>+13.54%</td>
+</tr>
+<tr>
+<td>Momentum Correlation</td>
+<td>-0.024</td>
+</tr>
+<tr>
+<td>Residual Volatility</td>
+<td>10.65%</td>
+</tr>
+<tr>
+<td>Explained Variance (R²)</td>
+<td>16.77%</td>
+</tr>
+</tbody>
+</table>
+<h2 id="brinson-attribution">Brinson Attribution<a class="headerlink" href="#brinson-attribution" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Allocation</td>
+<td>-2.65%</td>
+</tr>
+<tr>
+<td>Selection</td>
+<td>+0.00%</td>
+</tr>
+<tr>
+<td>Interaction</td>
+<td>+1.77%</td>
+</tr>
+<tr>
+<td>Total Active Return</td>
+<td>-0.89%</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

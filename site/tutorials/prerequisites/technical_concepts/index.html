@@ -1,0 +1,2065 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/tutorials/prerequisites/technical_concepts/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>前置知识：技术分析基础概念 - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#前置知识技术分析基础概念" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              前置知识：技术分析基础概念
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/reports_and_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/ptrade_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../doc/utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../09_combined_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-价格数据ohlcv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 价格数据：OHLCV
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-移动均线ma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 移动均线（MA）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 移动均线（MA）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-简单移动均线sma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 简单移动均线（SMA）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-指数移动均线ema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 指数移动均线（EMA）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-wilder-平滑均线smma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Wilder 平滑均线（SMMA）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-均线的用途" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 均线的用途
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-rsi相对强弱指标" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. RSI：相对强弱指标
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. RSI：相对强弱指标">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-计算逻辑简化" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 计算逻辑（简化）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-读法" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 读法
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-macd异同移动平均" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. MACD：异同移动平均
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. MACD：异同移动平均">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#读法" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        读法
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-布林带bollinger-bands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 布林带（Bollinger Bands）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 布林带（Bollinger Bands）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#读法_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        读法
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-atr平均真实波幅" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. ATR：平均真实波幅
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. ATR：平均真实波幅">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#真实波幅tr的计算" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        真实波幅（TR）的计算
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#用法" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        用法
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-kdj--随机指标" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. KDJ / 随机指标
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-adx趋势强度" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. ADX：趋势强度
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-成交量相关概念" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 成交量相关概念
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-支撑与阻力" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 支撑与阻力
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-eqlibutils-对应的函数" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. eqlib.utils 对应的函数
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-下一步" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. 下一步
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="前置知识技术分析基础概念">前置知识：技术分析基础概念<a class="headerlink" href="#前置知识技术分析基础概念" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>本文面向<strong>从未接触过技术分析</strong>的读者。如果你已经了解均线、RSI、MACD，可直接跳过，从 <a href="../../01_quant_basics/">Tutorial 01</a> 开始。</p>
+</blockquote>
+<hr />
+<h2 id="目录">目录<a class="headerlink" href="#目录" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-价格数据ohlcv">价格数据：OHLCV</a></li>
+<li><a href="#2-移动均线ma">移动均线（MA）</a></li>
+<li><a href="#3-rsi相对强弱指标">RSI：相对强弱指标</a></li>
+<li><a href="#4-macd异同移动平均">MACD：异同移动平均</a></li>
+<li><a href="#5-布林带bollinger-bands">布林带（Bollinger Bands）</a></li>
+<li><a href="#6-atr平均真实波幅">ATR：平均真实波幅</a></li>
+<li><a href="#7-kdj--随机指标">KDJ / 随机指标</a></li>
+<li><a href="#8-adx趋势强度">ADX：趋势强度</a></li>
+<li><a href="#9-成交量相关概念">成交量相关概念</a></li>
+<li><a href="#10-支撑与阻力">支撑与阻力</a></li>
+<li><a href="#11-eqlibutils-对应的函数">eqlib.utils 对应的函数</a></li>
+<li><a href="#12-下一步">下一步</a></li>
+</ol>
+<hr />
+<h2 id="1-价格数据ohlcv">1. 价格数据：OHLCV<a class="headerlink" href="#1-价格数据ohlcv" title="Permanent link">&para;</a></h2>
+<p>每一根 K 线（Candlestick / Bar）包含 5 个字段，合称 <strong>OHLCV</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>英文</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open</code></td>
+<td>Open</td>
+<td>开盘价</td>
+</tr>
+<tr>
+<td><code>high</code></td>
+<td>High</td>
+<td>最高价</td>
+</tr>
+<tr>
+<td><code>low</code></td>
+<td>Low</td>
+<td>最低价</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td>Close</td>
+<td>收盘价</td>
+</tr>
+<tr>
+<td><code>volume</code></td>
+<td>Volume</td>
+<td>成交量（股数）</td>
+</tr>
+</tbody>
+</table>
+<p>有时还有 <code>money</code>（成交额，单位元）= 价格 × 成交量 的近似。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># eqlib 中获取 OHLCV 数据</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;open&#39;</span><span class="p">,</span> <span class="s1">&#39;high&#39;</span><span class="p">,</span> <span class="s1">&#39;low&#39;</span><span class="p">,</span> <span class="s1">&#39;close&#39;</span><span class="p">,</span> <span class="s1">&#39;volume&#39;</span><span class="p">])</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1">#           open   high    low  close      volume</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># 2024-01-02  4.85   4.92   4.80   4.88  1234567890</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># 2024-01-03  4.89   4.95   4.85   4.92  987654321</span>
+</code></pre></div>
+<p><strong>为什么常用收盘价？</strong><br />
+大多数策略用 <code>close</code>，因为它代表当天市场最终定价，最被广泛引用。某些策略会同时用到 <code>high</code> / <code>low</code> / <code>volume</code>（如 ATR 需要三者，布林带只需收盘价）。</p>
+<hr />
+<h2 id="2-移动均线ma">2. 移动均线（MA）<a class="headerlink" href="#2-移动均线ma" title="Permanent link">&para;</a></h2>
+<h3 id="21-简单移动均线sma">2.1 简单移动均线（SMA）<a class="headerlink" href="#21-简单移动均线sma" title="Permanent link">&para;</a></h3>
+<p>最近 N 天收盘价的<strong>算术平均</strong>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>MA(N) = (close[0] + close[1] + ... + close[N-1]) / N
+</code></pre></div>
+<p><strong>典型参数：</strong> MA5（周线）、MA10（两周）、MA20（月线）、MA60（季线）、MA120（半年）、MA250（年线）</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">ma</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">close</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># 手动计算</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">ma5</span>  <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">ma20</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1"># 用 eqlib.utils</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">ma5_series</span>  <span class="o">=</span> <span class="n">ma</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>    <span class="c1"># 返回整个 Series，iloc[-1] 取最新值</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">ma20_series</span> <span class="o">=</span> <span class="n">ma</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="22-指数移动均线ema">2.2 指数移动均线（EMA）<a class="headerlink" href="#22-指数移动均线ema" title="Permanent link">&para;</a></h3>
+<p>对近期数据<strong>赋予更高权重</strong>的均线，比 SMA 对价格变化反应更快：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">ema</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">ema12</span> <span class="o">=</span> <span class="n">ema</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">ema26</span> <span class="o">=</span> <span class="n">ema</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="mi">26</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="23-wilder-平滑均线smma">2.3 Wilder 平滑均线（SMMA）<a class="headerlink" href="#23-wilder-平滑均线smma" title="Permanent link">&para;</a></h3>
+<p>RSI、ATR、ADX 内部使用的平滑方法（也叫 RMA / Wilder's Smoothing）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">smma</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">smma14</span> <span class="o">=</span> <span class="n">smma</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="mi">14</span><span class="p">)</span>
+</code></pre></div>
+<blockquote>
+<p><strong>注意（来自项目约定）</strong>：<code>eqlib.utils.sma()</code> = 简单滚动均值；<code>eqlib.utils.smma()</code> = Wilder 平滑均线。RSI / ATR 相关指标请用 <code>smma()</code>。</p>
+</blockquote>
+<h3 id="24-均线的用途">2.4 均线的用途<a class="headerlink" href="#24-均线的用途" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>用法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>趋势判断</td>
+<td>价格在均线上方 = 多头；在均线下方 = 空头</td>
+</tr>
+<tr>
+<td>金叉 / 死叉</td>
+<td>短期均线上穿长期均线 = 买入信号（金叉）；下穿 = 卖出信号（死叉）</td>
+</tr>
+<tr>
+<td>支撑 / 压力</td>
+<td>均线本身常成为价格的支撑或压力位</td>
+</tr>
+<tr>
+<td>趋势强度</td>
+<td>多条均线多头排列（短 &gt; 中 &gt; 长）表示强趋势</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-rsi相对强弱指标">3. RSI：相对强弱指标<a class="headerlink" href="#3-rsi相对强弱指标" title="Permanent link">&para;</a></h2>
+<p><strong>RSI（Relative Strength Index）</strong> 衡量价格上涨动力与下跌动力的比值，结果映射到 0–100 区间。</p>
+<h3 id="31-计算逻辑简化">3.1 计算逻辑（简化）<a class="headerlink" href="#31-计算逻辑简化" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>1. 计算过去 N 天的涨幅（up）和跌幅（down）的平均值
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>2. RS = 平均涨幅 / 平均跌幅
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>3. RSI = 100 - 100 / (1 + RS)
+</code></pre></div>
+<p><strong>典型参数：</strong> <code>period=14</code>（最常用）</p>
+<h3 id="32-读法">3.2 读法<a class="headerlink" href="#32-读法" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>RSI 数值</th>
+<th>含义</th>
+<th>策略含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&gt; 70</td>
+<td>超买（Overbought）</td>
+<td>可能下跌，考虑卖出</td>
+</tr>
+<tr>
+<td>50–70</td>
+<td>偏强</td>
+<td>多头市场</td>
+</tr>
+<tr>
+<td>30–50</td>
+<td>偏弱</td>
+<td>空头市场</td>
+</tr>
+<tr>
+<td>&lt; 30</td>
+<td>超卖（Oversold）</td>
+<td>可能反弹，考虑买入</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">rsi</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">rsi14</span> <span class="o">=</span> <span class="n">rsi</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">],</span> <span class="mi">14</span><span class="p">)</span>   <span class="c1"># 返回 Series</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">current_rsi</span> <span class="o">=</span> <span class="n">rsi14</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">if</span> <span class="n">current_rsi</span> <span class="o">&lt;</span> <span class="mi">30</span><span class="p">:</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;超卖，关注买入机会&#39;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="4-macd异同移动平均">4. MACD：异同移动平均<a class="headerlink" href="#4-macd异同移动平均" title="Permanent link">&para;</a></h2>
+<p><strong>MACD（Moving Average Convergence/Divergence）</strong> 由两条均线的差值派生出三条线：</p>
+<table>
+<thead>
+<tr>
+<th>线</th>
+<th>计算</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DIF（MACD Line）</strong></td>
+<td>EMA(12) − EMA(26)</td>
+<td>短期与长期均线的差</td>
+</tr>
+<tr>
+<td><strong>DEA（Signal Line）</strong></td>
+<td>EMA(DIF, 9)</td>
+<td>DIF 的 9 日均线（平滑）</td>
+</tr>
+<tr>
+<td><strong>柱状图（Histogram）</strong></td>
+<td>(DIF − DEA) × 2</td>
+<td>两线距离，正/负代表多/空</td>
+</tr>
+</tbody>
+</table>
+<h3 id="读法">读法<a class="headerlink" href="#读法" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>DIF 上穿 DEA</strong>（柱状图由负转正）→ 买入信号（"金叉"）</li>
+<li><strong>DIF 下穿 DEA</strong>（柱状图由正转负）→ 卖出信号（"死叉"）</li>
+<li><strong>柱状图由缩短转放大</strong>（量能增加）→ 趋势强化</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">macd</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">dif</span><span class="p">,</span> <span class="n">dea</span><span class="p">,</span> <span class="n">histogram</span> <span class="o">=</span> <span class="n">macd</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">],</span> <span class="n">fast</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">slow</span><span class="o">=</span><span class="mi">26</span><span class="p">,</span> <span class="n">signal</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">latest_dif</span> <span class="o">=</span> <span class="n">dif</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">latest_dea</span> <span class="o">=</span> <span class="n">dea</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="k">if</span> <span class="n">latest_dif</span> <span class="o">&gt;</span> <span class="n">latest_dea</span><span class="p">:</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;MACD 多头排列&#39;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="5-布林带bollinger-bands">5. 布林带（Bollinger Bands）<a class="headerlink" href="#5-布林带bollinger-bands" title="Permanent link">&para;</a></h2>
+<p><strong>布林带</strong> 由三条线组成，基于收盘价的均值和标准差：</p>
+<table>
+<thead>
+<tr>
+<th>线</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>上轨（Upper Band）</strong></td>
+<td>MA(N) + k × Std(N)</td>
+</tr>
+<tr>
+<td><strong>中轨（Middle Band）</strong></td>
+<td>MA(N)（通常 N=20）</td>
+</tr>
+<tr>
+<td><strong>下轨（Lower Band）</strong></td>
+<td>MA(N) − k × Std(N)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>典型参数：</strong> <code>N=20</code>，<code>k=2</code>（即 ±2 个标准差）</p>
+<h3 id="读法_1">读法<a class="headerlink" href="#读法_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>价格触及<strong>上轨</strong> → 超买，可能回落</li>
+<li>价格触及<strong>下轨</strong> → 超卖，可能反弹</li>
+<li><strong>带宽收窄</strong> → 波动率下降，可能酝酿大行情</li>
+<li>价格持续沿上轨运行 → 强趋势，不宜做空</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">boll</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">upper</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">lower</span> <span class="o">=</span> <span class="n">boll</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">],</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">std_dev</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">price</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="k">if</span> <span class="n">price</span> <span class="o">&lt;</span> <span class="n">lower</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;触及布林下轨，均值回归买入信号&#39;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="6-atr平均真实波幅">6. ATR：平均真实波幅<a class="headerlink" href="#6-atr平均真实波幅" title="Permanent link">&para;</a></h2>
+<p><strong>ATR（Average True Range）</strong> 衡量每天价格的<strong>波动幅度</strong>，用于设置止损和仓位大小。</p>
+<h3 id="真实波幅tr的计算">真实波幅（TR）的计算<a class="headerlink" href="#真实波幅tr的计算" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>TR = max(High - Low, |High - PrevClose|, |Low - PrevClose|)
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>ATR(N) = Wilder平滑均值(TR, N)
+</code></pre></div>
+<p><strong>典型参数：</strong> <code>period=14</code></p>
+<h3 id="用法">用法<a class="headerlink" href="#用法" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">atr</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">,</span> <span class="s1">&#39;low&#39;</span><span class="p">,</span> <span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">atr14</span> <span class="o">=</span> <span class="n">atr</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;low&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">],</span> <span class="mi">14</span><span class="p">)</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">current_atr</span> <span class="o">=</span> <span class="n">atr14</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># ATR 止损：当前价 - 2倍 ATR</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="n">stop_loss_price</span> <span class="o">=</span> <span class="n">current_price</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">current_atr</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># ATR 仓位管理：按照每次最多亏损总资金 1% 确定买入股数</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="n">risk_per_trade</span> <span class="o">=</span> <span class="n">total_value</span> <span class="o">*</span> <span class="mf">0.01</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="n">shares</span> <span class="o">=</span> <span class="n">risk_per_trade</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">current_atr</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="7-kdj--随机指标">7. KDJ / 随机指标<a class="headerlink" href="#7-kdj--随机指标" title="Permanent link">&para;</a></h2>
+<p><strong>KDJ（也叫随机指标 Stochastic）</strong> 由三条线组成，通过价格在区间内的相对位置衡量超买超卖：</p>
+<table>
+<thead>
+<tr>
+<th>线</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>K</strong></td>
+<td>快速随机值（对 D 更敏感）</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>K 的均线（慢速，即 Signal）</td>
+</tr>
+<tr>
+<td><strong>J</strong></td>
+<td>3K − 2D（领先指标，超买超卖更极端）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>J &lt; 0 → 极度超卖</li>
+<li>J &gt; 100 → 极度超买</li>
+<li>K 上穿 D → 买入信号；K 下穿 D → 卖出信号</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">kdj</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">,</span> <span class="s1">&#39;low&#39;</span><span class="p">,</span> <span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">k</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">j</span> <span class="o">=</span> <span class="n">kdj</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;low&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+</code></pre></div>
+<hr />
+<h2 id="8-adx趋势强度">8. ADX：趋势强度<a class="headerlink" href="#8-adx趋势强度" title="Permanent link">&para;</a></h2>
+<p><strong>ADX（Average Directional Index）</strong> 衡量趋势的<strong>强弱</strong>，不判断方向：</p>
+<table>
+<thead>
+<tr>
+<th>ADX 数值</th>
+<th>趋势强度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 20</td>
+<td>无趋势或弱趋势（震荡市）</td>
+</tr>
+<tr>
+<td>20–40</td>
+<td>中等趋势</td>
+</tr>
+<tr>
+<td>&gt; 40</td>
+<td>强趋势</td>
+</tr>
+</tbody>
+</table>
+<p>ADX 不告诉你涨还是跌，只告诉你是否在趋势中。常配合均线使用：ADX &gt; 25 时才用趋势策略，ADX &lt; 20 时切换均值回归策略。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">adx</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">,</span> <span class="s1">&#39;low&#39;</span><span class="p">,</span> <span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">adx_val</span><span class="p">,</span> <span class="n">plus_di</span><span class="p">,</span> <span class="n">minus_di</span> <span class="o">=</span> <span class="n">adx</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;low&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">],</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">current_adx</span> <span class="o">=</span> <span class="n">adx_val</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</code></pre></div>
+<hr />
+<h2 id="9-成交量相关概念">9. 成交量相关概念<a class="headerlink" href="#9-成交量相关概念" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>含义</th>
+<th>在 eqlib 中</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>成交量（Volume）</strong></td>
+<td>当日成交的股数</td>
+<td><code>hist['volume']</code></td>
+</tr>
+<tr>
+<td><strong>成交额（Amount/Money）</strong></td>
+<td>当日成交的金额</td>
+<td><code>hist['money']</code></td>
+</tr>
+<tr>
+<td><strong>量比</strong></td>
+<td>当日成交量 / 过去 N 日平均成交量</td>
+<td>手动计算</td>
+</tr>
+<tr>
+<td><strong>OBV（On-Balance Volume）</strong></td>
+<td>累积价涨时加成交量、价跌时减</td>
+<td><code>eqlib.utils.obv()</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>成交量的意义</strong>：
+- 放量上涨 → 多头力量强，信号可信度高
+- 缩量上涨 → 上涨乏力，需谨慎
+- 放量下跌 → 空头力量强
+- 缩量下跌 → 下跌或将结束，关注反弹机会</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># 量比（当日成交量 / 20 日均量）</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">,</span> <span class="s1">&#39;volume&#39;</span><span class="p">])</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">avg_vol</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">today_vol</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">volume_ratio</span> <span class="o">=</span> <span class="n">today_vol</span> <span class="o">/</span> <span class="n">avg_vol</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="k">if</span> <span class="n">volume_ratio</span> <span class="o">&gt;</span> <span class="mf">1.5</span><span class="p">:</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;放量，信号更可信&#39;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="10-支撑与阻力">10. 支撑与阻力<a class="headerlink" href="#10-支撑与阻力" title="Permanent link">&para;</a></h2>
+<p><strong>支撑位（Support）</strong>：价格跌到某个水平时反复停止下跌并反弹的价格区域。<br />
+<strong>阻力位（Resistance）</strong>：价格涨到某个水平时反复停止上涨并回落的价格区域。</p>
+<p>常见支撑/阻力的来源：
+- 历史高点和低点
+- 整数价位（心理关口，如 5 元、10 元、100 元）
+- 均线（MA20、MA60 等）
+- 布林带上下轨
+- 斐波那契回撤位（38.2%、61.8%）
+- 成交量集中区（Volume Profile）</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">support_resistance_levels</span><span class="p">,</span> <span class="n">donchian</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1"># 斐波那契回撤</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">fibonacci_retracement</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">,</span> <span class="s1">&#39;low&#39;</span><span class="p">,</span> <span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="n">high</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="n">low</span>  <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;low&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="n">fib_levels</span> <span class="o">=</span> <span class="n">fibonacci_retracement</span><span class="p">(</span><span class="n">high</span><span class="p">,</span> <span class="n">low</span><span class="p">)</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># 返回 [0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100%] 对应的价格</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="c1"># 唐奇安通道（N 日最高/最低价）</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="n">upper_ch</span><span class="p">,</span> <span class="n">lower_ch</span> <span class="o">=</span> <span class="n">donchian</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="s1">&#39;high&#39;</span><span class="p">],</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;low&#39;</span><span class="p">],</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="11-eqlibutils-对应的函数">11. eqlib.utils 对应的函数<a class="headerlink" href="#11-eqlibutils-对应的函数" title="Permanent link">&para;</a></h2>
+<p>以下是本文提到的技术指标在 <code>eqlib.utils</code> 中的对应函数：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>函数</th>
+<th>返回</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SMA（简单均线）</td>
+<td><code>utils.ma(series, period)</code></td>
+<td>Series</td>
+</tr>
+<tr>
+<td>EMA（指数均线）</td>
+<td><code>utils.ema(series, period)</code></td>
+<td>Series</td>
+</tr>
+<tr>
+<td>Wilder 均线</td>
+<td><code>utils.smma(series, period)</code></td>
+<td>Series</td>
+</tr>
+<tr>
+<td>RSI</td>
+<td><code>utils.rsi(close, period=14)</code></td>
+<td>Series</td>
+</tr>
+<tr>
+<td>MACD</td>
+<td><code>utils.macd(close, fast, slow, signal)</code></td>
+<td>(dif, dea, hist)</td>
+</tr>
+<tr>
+<td>布林带</td>
+<td><code>utils.boll(close, period=20, std_dev=2)</code></td>
+<td>(upper, mid, lower)</td>
+</tr>
+<tr>
+<td>ATR</td>
+<td><code>utils.atr(high, low, close, period=14)</code></td>
+<td>Series</td>
+</tr>
+<tr>
+<td>KDJ</td>
+<td><code>utils.kdj(high, low, close, ...)</code></td>
+<td>(k, d, j)</td>
+</tr>
+<tr>
+<td>ADX</td>
+<td><code>utils.adx(high, low, close, period=14)</code></td>
+<td>(adx, +di, -di)</td>
+</tr>
+<tr>
+<td>OBV</td>
+<td><code>utils.obv(close, volume)</code></td>
+<td>Series</td>
+</tr>
+<tr>
+<td>斐波那契回撤</td>
+<td><code>utils.fibonacci_retracement(high, low)</code></td>
+<td>list of prices</td>
+</tr>
+<tr>
+<td>唐奇安通道</td>
+<td><code>utils.donchian(high, low, period)</code></td>
+<td>(upper, lower)</td>
+</tr>
+</tbody>
+</table>
+<p>完整函数列表和参数说明见 <a href="../../../doc/utils_reference/">工具库参考</a>。</p>
+<hr />
+<h2 id="12-下一步">12. 下一步<a class="headerlink" href="#12-下一步" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>继续前置知识</strong>：<a href="../ashare_knowledge/">A 股市场基础知识</a></li>
+<li><strong>进入正式教程</strong>：<a href="../../00_environment_and_first_run/">Tutorial 00：环境与第一次运行</a></li>
+<li><strong>Tutorial 06</strong> 详细讲解 RSI 均值回归策略的实战应用：<a href="../../06_rsi_mean_reversion/">06_rsi_mean_reversion.md</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

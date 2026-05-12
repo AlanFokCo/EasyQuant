@@ -4,7 +4,7 @@
 
 本项目提供 `eqlib` Python 包——核心库，包含事件驱动回测引擎、数据 API 和分析工具。
 
-[English](README.md) · [新手教程](tutorials/) · [**文档中心**](doc/README.md) · [用户手册](doc/user_guide.md) · [API 速查](doc/api_index.md) · [API 参考](doc/api_reference.md) · [示例](examples/Examples.md)
+[English](https://github.com/AlanFokCo/EasyQuant/blob/main/README.md) · [新手教程](tutorials/README.md) · [**文档中心**](doc/README.md) · [用户手册](doc/user_guide.md) · [API 速查](doc/api_index.md) · [API 参考](doc/api_reference.md) · [示例](examples/Examples.md)
 
 ---
 
@@ -112,7 +112,7 @@ python my_first_strategy.py
 
 ## 示例
 
-参见 [`examples/Examples.md`](examples/Examples.md) 索引；脚本位于 [`examples/`](examples/)：
+参见 [`examples/Examples.md`](examples/Examples.md) 索引；脚本位于 [`examples/README.md`](examples/README.md)：
 
 | # | 文件 | 说明 |
 |---|------|------|
@@ -145,7 +145,7 @@ python my_first_strategy.py
 
 ## 文档
 
-- [**新手教程**](tutorials/) — 从零基础到实盘部署，5 篇系列教程
+- [**新手教程**](tutorials/README.md) — 从零基础到实盘部署，5 篇系列教程
 - [**用户手册**](doc/user_guide.md) — 教程：编写策略、运行回测、解读报告
 - [**API 参考**](doc/api_reference.md) — 完整 API：结构体、参数说明、用法
 - [**工具库参考**](doc/utils_reference.md) — 计算工具：技术指标、统计分析、资金管理、支撑阻力位

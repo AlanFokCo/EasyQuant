@@ -1,0 +1,1999 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/doc/FAQ/">
+      
+      
+        <link rel="prev" href="../ptrade_adapter/">
+      
+      
+        <link rel="next" href="../api_index/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>FAQ - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#easyquant--eqlib-常见问题faq" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              FAQ
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports_and_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ptrade_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#安装与环境" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装与环境
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装与环境">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-pip-install--报错requires-a-different-python-39x-not-in-310" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: pip install . 报错「requires a different Python: 3.9.x not in '&gt;=3.10'」
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-只装了-akshare-等依赖import-eqlib-仍失败" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 只装了 akshare 等依赖，import eqlib 仍失败
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-需要安装哪些依赖" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 需要安装哪些依赖？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#数据与网络" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据与网络
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="数据与网络">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-首次回测很慢或卡住" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 首次回测很慢或卡住
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-get_price--attribute_history-返回空" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: get_price / attribute_history 返回空
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-分钟线tick-报错或数据不全" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 分钟线、Tick 报错或数据不全
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#回测与策略" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        回测与策略
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="回测与策略">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-回测结束生成了-html但-png-很空或没有净值曲线" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 回测结束生成了 HTML，但 PNG 很空或没有净值曲线
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-买入后当天想卖出提示可卖为-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 买入后当天想卖出，提示可卖为 0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-order--order_value-股数不是心里想的数" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: order / order_value 股数不是心里想的数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-基准设为-000300xshg-有什么作用" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 基准设为 000300.XSHG 有什么作用？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#报告与分析" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        报告与分析
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="报告与分析">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-html-里日胜率和交易胜率不一样" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: HTML 里「日胜率」和「交易胜率」不一样？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-html-报告里图表区域空白" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: HTML 报告里图表区域空白？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-json-里-summarynum_trades-和交易次数配对为什么不一样" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: JSON 里 summary.num_trades 和「交易次数（配对）」为什么不一样？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-benchmark_return-为-nullalpha--beta-接近-0-是否正常" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: benchmark_return 为 null，Alpha / Beta 接近 0 是否正常？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-如何只跑回测不要自动生成四份报告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 如何只跑回测、不要自动生成四份报告？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#模拟盘与导出" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模拟盘与导出
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="模拟盘与导出">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-run_paper_trade-与回测区别" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: run_paper_trade 与回测区别？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-如何导出到-ptrade--qmt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 如何导出到 PTrade / QMT？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#开发与测试" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开发与测试
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="开发与测试">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-修改了-eqlib-源码如何验证" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 修改了 eqlib 源码如何验证？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/09_combined_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#安装与环境" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装与环境
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装与环境">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-pip-install--报错requires-a-different-python-39x-not-in-310" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: pip install . 报错「requires a different Python: 3.9.x not in '&gt;=3.10'」
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-只装了-akshare-等依赖import-eqlib-仍失败" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 只装了 akshare 等依赖，import eqlib 仍失败
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-需要安装哪些依赖" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 需要安装哪些依赖？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#数据与网络" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据与网络
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="数据与网络">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-首次回测很慢或卡住" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 首次回测很慢或卡住
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-get_price--attribute_history-返回空" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: get_price / attribute_history 返回空
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-分钟线tick-报错或数据不全" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 分钟线、Tick 报错或数据不全
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#回测与策略" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        回测与策略
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="回测与策略">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-回测结束生成了-html但-png-很空或没有净值曲线" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 回测结束生成了 HTML，但 PNG 很空或没有净值曲线
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-买入后当天想卖出提示可卖为-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 买入后当天想卖出，提示可卖为 0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-order--order_value-股数不是心里想的数" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: order / order_value 股数不是心里想的数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-基准设为-000300xshg-有什么作用" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 基准设为 000300.XSHG 有什么作用？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#报告与分析" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        报告与分析
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="报告与分析">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-html-里日胜率和交易胜率不一样" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: HTML 里「日胜率」和「交易胜率」不一样？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-html-报告里图表区域空白" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: HTML 报告里图表区域空白？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-json-里-summarynum_trades-和交易次数配对为什么不一样" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: JSON 里 summary.num_trades 和「交易次数（配对）」为什么不一样？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-benchmark_return-为-nullalpha--beta-接近-0-是否正常" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: benchmark_return 为 null，Alpha / Beta 接近 0 是否正常？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-如何只跑回测不要自动生成四份报告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 如何只跑回测、不要自动生成四份报告？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#模拟盘与导出" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模拟盘与导出
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="模拟盘与导出">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-run_paper_trade-与回测区别" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: run_paper_trade 与回测区别？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-如何导出到-ptrade--qmt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 如何导出到 PTrade / QMT？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#开发与测试" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开发与测试
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="开发与测试">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-修改了-eqlib-源码如何验证" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: 修改了 eqlib 源码如何验证？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="easyquant--eqlib-常见问题faq">EasyQuant / eqlib 常见问题（FAQ）<a class="headerlink" href="#easyquant--eqlib-常见问题faq" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>与 <a href="../user_guide/">用户手册</a>、<a href="../reports_and_metrics/">报告与指标</a> 配合阅读。若此处未覆盖，可在 <a href="../api_reference/">API 参考</a> 中按符号名搜索。</p>
+</blockquote>
+<hr />
+<h2 id="安装与环境">安装与环境<a class="headerlink" href="#安装与环境" title="Permanent link">&para;</a></h2>
+<h3 id="q-pip-install--报错requires-a-different-python-39x-not-in-310">Q: <code>pip install .</code> 报错「requires a different Python: 3.9.x not in '&gt;=3.10'」<a class="headerlink" href="#q-pip-install--报错requires-a-different-python-39x-not-in-310" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong><code>eqlib</code> 要求 <strong>Python ≥ 3.10</strong>（见 <code>pyproject.toml</code> 中 <code>requires-python</code>）。</p>
+<p><strong>处理：</strong>安装并使用 3.10 / 3.11 / 3.12，例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3.12<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</code></pre></div>
+<h3 id="q-只装了-akshare-等依赖import-eqlib-仍失败">Q: 只装了 <code>akshare</code> 等依赖，<code>import eqlib</code> 仍失败<a class="headerlink" href="#q-只装了-akshare-等依赖import-eqlib-仍失败" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong><code>eqlib</code> 是本项目包，需从仓库根目录安装。</p>
+<p><strong>处理：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/EasyQuant
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pip<span class="w"> </span>install<span class="w"> </span>.
+</code></pre></div>
+<p>安装后任意工作目录均可 <code>import eqlib</code>。运行 <code>examples/</code> 下脚本前同样建议先完成上述安装（示例不再自动改写 <code>sys.path</code> 以导入 <code>eqlib</code>）。</p>
+<h3 id="q-需要安装哪些依赖">Q: 需要安装哪些依赖？<a class="headerlink" href="#q-需要安装哪些依赖" title="Permanent link">&para;</a></h3>
+<p><strong>最小集（已由 <code>pip install .</code> 安装）：</strong><code>akshare</code>、<code>pandas</code>、<code>numpy</code>、<code>matplotlib</code>、<code>scipy</code>。</p>
+<p><strong>可选：</strong><code>pip install pyarrow</code> 以提升部分磁盘缓存性能（见 <code>pyproject.toml</code> 的 <code>[project.optional-dependencies]</code>）。</p>
+<hr />
+<h2 id="数据与网络">数据与网络<a class="headerlink" href="#数据与网络" title="Permanent link">&para;</a></h2>
+<h3 id="q-首次回测很慢或卡住">Q: 首次回测很慢或卡住<a class="headerlink" href="#q-首次回测很慢或卡住" title="Permanent link">&para;</a></h3>
+<p><strong>常见原因：</strong><code>akshare</code> 在线拉取历史行情，受网络与数据源影响。</p>
+<p><strong>建议：</strong></p>
+<ul>
+<li>使用 <code>run_strategy(..., use_local=True)</code> 或 <code>run_backtest(..., use_local=True)</code>：首次下载并写入 <code>data/</code>，之后优先读本地 CSV。</li>
+<li>对多标的回测务必传入 <strong><code>securities=[...]</code></strong>，只预加载会交易的股票，显著减少请求量。</li>
+<li>参见用户手册「如何加速大回测」与 <a href="../api_reference/">API 参考</a> 中 <code>set_cache_dir</code> / <code>set_local_data_dir</code>。</li>
+</ul>
+<h3 id="q-get_price--attribute_history-返回空">Q: <code>get_price</code> / <code>attribute_history</code> 返回空<a class="headerlink" href="#q-get_price--attribute_history-返回空" title="Permanent link">&para;</a></h3>
+<p><strong>检查：</strong></p>
+<ol>
+<li>代码是否为 <strong>6 位 A 股代码</strong>（如 <code>601390</code>），指数基准形如 <code>000300.XSHG</code>。</li>
+<li>日期区间是否在股票上市之后、是否为交易日。</li>
+<li>网络是否正常；可换时段重试或改用本地数据 <code>use_local=True</code>。</li>
+</ol>
+<h3 id="q-分钟线tick-报错或数据不全">Q: 分钟线、Tick 报错或数据不全<a class="headerlink" href="#q-分钟线tick-报错或数据不全" title="Permanent link">&para;</a></h3>
+<p>分钟/Tick 依赖 <code>akshare</code> 对应接口与标的流动性，不同股票可用历史长度不同。详见 <a href="../api_reference/">API 参考 — 分钟线 / Tick</a>。</p>
+<hr />
+<h2 id="回测与策略">回测与策略<a class="headerlink" href="#回测与策略" title="Permanent link">&para;</a></h2>
+<h3 id="q-回测结束生成了-html但-png-很空或没有净值曲线">Q: 回测结束生成了 HTML，但 PNG 很空或没有净值曲线<a class="headerlink" href="#q-回测结束生成了-html但-png-很空或没有净值曲线" title="Permanent link">&para;</a></h3>
+<p><strong>常见原因：</strong><code>record()</code> 未在策略中记录 <strong><code>total_value</code></strong>，或 <code>recorded_values</code> 中缺少按日的组合价值，导致 <code>generate_chart</code> / HTML 中部分序列无法绘制。</p>
+<p><strong>处理：</strong>在每日逻辑末尾调用框架提供的记录（若使用 <code>run_daily</code> 等，引擎通常会记录组合；自定义时请确保与官方示例一致）。可参考 <code>examples/03_run_backtest.py</code> 与 <a href="../user_guide/">用户手册</a>。</p>
+<h3 id="q-买入后当天想卖出提示可卖为-0">Q: 买入后当天想卖出，提示可卖为 0<a class="headerlink" href="#q-买入后当天想卖出提示可卖为-0" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong>A 股 <strong>T+1</strong>，当日买入股数计入 <code>closeable_amount</code>，次日才可卖。引擎会按规则限制卖出数量。</p>
+<h3 id="q-order--order_value-股数不是心里想的数">Q: <code>order</code> / <code>order_value</code> 股数不是心里想的数<a class="headerlink" href="#q-order--order_value-股数不是心里想的数" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong>买入数量会 <strong>向下取整到 100 股的整数倍</strong>；资金不足时会按最大可买执行。</p>
+<h3 id="q-基准设为-000300xshg-有什么作用">Q: 基准设为 <code>000300.XSHG</code> 有什么作用？<a class="headerlink" href="#q-基准设为-000300xshg-有什么作用" title="Permanent link">&para;</a></h3>
+<p>用于计算 <strong>alpha、beta、信息比率、超额收益</strong> 等，并在 HTML/PNG 中与策略收益对比。详见 <a href="../reports_and_metrics/">报告与指标</a>。</p>
+<hr />
+<h2 id="报告与分析">报告与分析<a class="headerlink" href="#报告与分析" title="Permanent link">&para;</a></h2>
+<h3 id="q-html-里日胜率和交易胜率不一样">Q: HTML 里「日胜率」和「交易胜率」不一样？<a class="headerlink" href="#q-html-里日胜率和交易胜率不一样" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong><code>analyze_returns</code> 同时提供 <strong><code>win_rate_daily</code></strong>（按交易日盈亏比例）与 <strong><code>win_rate_trade</code></strong>（完整买卖配对后的胜率）。含义不同，勿混用。完整列表见 <a href="../reports_and_metrics/">报告与指标</a>。</p>
+<p><a id="faq-html-blank"></a></p>
+<h3 id="q-html-报告里图表区域空白">Q: HTML 报告里图表区域空白？<a class="headerlink" href="#q-html-报告里图表区域空白" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong>交互式 HTML 通过 <strong>CDN</strong>（如 jsDelivr / unpkg）加载 <strong>Lightweight Charts</strong> 脚本。公司内网、代理或离线环境可能拦截外联脚本，导致 <strong>K 线、累计收益、回撤等图区空白</strong>；页眉、摘要和指标卡片多为页面内嵌数据，通常仍可见。</p>
+<p><strong>处理：</strong>换可访问外网的网络；或将 <code>cdn.jsdelivr.net</code>、<code>unpkg.com</code> 加入白名单后刷新；在有网环境打开后自行截图存档。</p>
+<p><a id="faq-json-num-trades"></a></p>
+<h3 id="q-json-里-summarynum_trades-和交易次数配对为什么不一样">Q: JSON 里 <code>summary.num_trades</code> 和「交易次数（配对）」为什么不一样？<a class="headerlink" href="#q-json-里-summarynum_trades-和交易次数配对为什么不一样" title="Permanent link">&para;</a></h3>
+<p><strong>原因：</strong><code>summary.num_trades</code> 常表示 <strong>成交单边条数</strong>（每一笔 <code>BUY</code> / <code>SELL</code> 各计一条，例如 8 买 + 8 卖 = <strong>16</strong>）。报告/HTML 中的 <strong>「交易次数」若指配对回合</strong>，则为完整买—卖闭环数量（上例为 <strong>8</strong>）。阅读 JSON 时请同时看 <code>risk_metrics</code> 与 <code>trades</code> 列表。</p>
+<p><a id="faq-benchmark-null"></a></p>
+<h3 id="q-benchmark_return-为-nullalpha--beta-接近-0-是否正常">Q: <code>benchmark_return</code> 为 <code>null</code>，Alpha / Beta 接近 0 是否正常？<a class="headerlink" href="#q-benchmark_return-为-nullalpha--beta-接近-0-是否正常" title="Permanent link">&para;</a></h3>
+<p><strong>可能原因：</strong>拉取或对齐 <strong>基准指数日收益</strong> 失败（网络、指数代码转换、日期交集为空等）时，超额收益与 CAPM 相关展示可能为 <strong>0 或占位</strong>。<strong>策略净值、PNG 静态图、成交表仍以策略数据为准</strong>。可检查网络后重跑，或确认 <code>set_benchmark</code> 与回测区间内有有效指数行情。</p>
+<h3 id="q-如何只跑回测不要自动生成四份报告">Q: 如何只跑回测、不要自动生成四份报告？<a class="headerlink" href="#q-如何只跑回测不要自动生成四份报告" title="Permanent link">&para;</a></h3>
+<p>使用 <strong><code>run_backtest</code></strong>，自行按需调用 <code>generate_html_report</code>、<code>analyze_returns</code> 等。见 <a href="../api_reference/">API 参考</a>。</p>
+<hr />
+<h2 id="模拟盘与导出">模拟盘与导出<a class="headerlink" href="#模拟盘与导出" title="Permanent link">&para;</a></h2>
+<h3 id="q-run_paper_trade-与回测区别">Q: <code>run_paper_trade</code> 与回测区别？<a class="headerlink" href="#q-run_paper_trade-与回测区别" title="Permanent link">&para;</a></h3>
+<p>模拟盘按设定间隔拉 <strong>实时或最新行情</strong>，循环执行策略，<strong>不结束</strong>直到手动中断（Ctrl+C）。详见 <a href="../user_guide/">用户手册 — 模拟盘</a>。</p>
+<h3 id="q-如何导出到-ptrade--qmt">Q: 如何导出到 PTrade / QMT？<a class="headerlink" href="#q-如何导出到-ptrade--qmt" title="Permanent link">&para;</a></h3>
+<p>见 <a href="../ptrade_adapter/">ptrade_adapter.md</a> 与示例 <code>examples/13_ptrade_export.py</code>。</p>
+<hr />
+<h2 id="开发与测试">开发与测试<a class="headerlink" href="#开发与测试" title="Permanent link">&para;</a></h2>
+<h3 id="q-修改了-eqlib-源码如何验证">Q: 修改了 <code>eqlib</code> 源码如何验证？<a class="headerlink" href="#q-修改了-eqlib-源码如何验证" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/
+</code></pre></div>
+<p>（优化策略时一般 <strong>不</strong> 修改 <code>eqlib/</code>，只改策略与示例。）</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
