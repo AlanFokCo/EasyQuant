@@ -1,57 +1,50 @@
-# EasyQuant Docs
+# EasyQuant Documentation
 
-EasyQuant 是一个面向 **中国 A 股市场** 的事件驱动量化回测与策略开发框架，核心包为 [`eqlib`](https://github.com/AlanFokCo/EasyQuant/tree/main/eqlib)。
+EasyQuant is an event-driven quantitative backtesting and strategy development framework for the China A-share market, built around the core package [`eqlib`](https://github.com/AlanFokCo/EasyQuant/tree/main/eqlib).
 
-站点整合了项目文档中心、教程系列和 API 参考，方便按学习路径快速跳转。
+## Learning Paths
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch: **Quick Start**
+-   🚀 **Quick Start (快速入门)**
 
     ---
 
-    安装依赖、跑通第一份回测、打开 HTML 报告。
+    Install dependencies, run your first backtest, and open the HTML report.
 
-    [开始上手](doc/user_guide.md)
+    [Get Started](doc/user_guide.md)
 
--   :material-book-open-page-variant: **User Manual**
-
-    ---
-
-    阅读用户手册、报告指标说明、FAQ 与适配器文档。
-
-    [进入文档中心](doc/README.md)
-
--   :material-school: **Tutorials**
+-   📖 **User Manual (用户手册)**
 
     ---
 
-    从 Tutorial 00 到 Tutorial 10，按步骤学习回测、优化与实盘流程。
+    Core concepts, backtesting guide, reports & metrics, FAQ, and adapter docs.
 
-    [浏览教程](tutorials/README.md)
+    [Browse Manual](doc/README.md)
 
--   :material-api: **API Reference**
+-   🎓 **Tutorials (分步教程)**
 
     ---
 
-    查看 API 索引、完整参考和 `eqlib.utils` 工具库说明。
+    From Tutorial 00 to Tutorial 10 — step-by-step learning from basics to live trading.
 
-    [打开 API 文档](doc/api_index.md)
+    [View Tutorials](tutorials/README.md)
+
+-   💡 **Examples (示例代码)**
+
+    ---
+
+    Browse runnable example strategies covering MA crossover, RSI, multi-factor models, and more.
+
+    [View Examples](examples/Examples.md)
 
 </div>
 
-## 常用入口
+---
 
-- [项目仓库](https://github.com/AlanFokCo/EasyQuant)
-- [中文 README](README_zh.md)
-- [Examples 代码索引](examples/Examples.md)
-- [报告与指标详解](doc/reports_and_metrics.md)
+## Additional Resources
 
-## 本地预览
-
-```bash
-pip install -e ".[docs]"
-mkdocs serve
-```
-
-启动后访问 <http://127.0.0.1:8000>。
+- [中文 README](https://github.com/AlanFokCo/EasyQuant/blob/main/README_zh.md)
+- [GitHub Repository](https://github.com/AlanFokCo/EasyQuant)
+- [API Reference (API 参考)](doc/api_index.md)
+- [Reports & Metrics (报告与指标)](doc/reports_and_metrics.md)
