@@ -1,0 +1,3378 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/tutorials/09_combined_strategy/">
+      
+      
+        <link rel="prev" href="../08_multi_factor/">
+      
+      
+        <link rel="next" href="../10_agent_optimization/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>09 Combined Strategy - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tutorial-09-全天候-alpha-综合策略" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              09 Combined Strategy
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/reports_and_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/ptrade_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../doc/utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-策略概述" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 策略概述
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 策略概述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-设计目标" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 设计目标
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-策略架构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 策略架构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-股票池12-只覆盖-8-个行业" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 股票池（12 只，覆盖 8 个行业）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-第一层多因子选股z-score-标准化" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 第一层：多因子选股（Z-Score 标准化）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 第一层：多因子选股（Z-Score 标准化）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-为什么用多因子选股" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 为什么用多因子选股
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-四个因子定义" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 四个因子定义
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 四个因子定义">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#因子-1动量因子权重-35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 1：动量因子（权重 35%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#因子-2成交量放大因子权重-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 2：成交量放大因子（权重 30%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#因子-3短期反转修正权重-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 3：短期反转修正（权重 15%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#因子-4低波动率因子权重-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 4：低波动率因子（权重 20%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-z-score-标准化" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Z-Score 标准化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-综合得分合成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 综合得分合成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-第二层行业轮动评分加成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 第二层：行业轮动评分加成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 第二层：行业轮动评分加成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-行业动量计算" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 行业动量计算
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-行业加成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 行业加成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-第三层技术指标入场--离场信号" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 第三层：技术指标入场 / 离场信号
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 第三层：技术指标入场 / 离场信号">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-rsi-均值回归入场tutorial-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 RSI 均值回归入场（Tutorial 06）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-布林带均值回归example-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 布林带均值回归（Example 14）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-macd-趋势确认example-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 MACD 趋势确认（Example 15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-atr-追踪止损examples-15--20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 ATR 追踪止损（Examples 15 / 20）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-支撑阻力位确认example-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 支撑阻力位确认（Example 20）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-成交量确认example-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 成交量确认（Example 15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-唐奇安通道example-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 唐奇安通道（Example 20）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-第四层风险管理与仓位控制" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 第四层：风险管理与仓位控制
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 第四层：风险管理与仓位控制">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-入场条件的组合逻辑" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 入场条件的组合逻辑
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-离场条件的优先级" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 离场条件的优先级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-仓位控制" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 仓位控制
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-生命周期回调集成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 生命周期回调集成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 生命周期回调集成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-开盘前before_trading_start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 开盘前（before_trading_start）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-收盘后after_trading_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 收盘后（after_trading_end）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-完整策略代码说明" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 完整策略代码说明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 完整策略代码说明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-文件结构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 文件结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-策略模块结构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 策略模块结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-关键参数速查" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 关键参数速查
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-回测验证" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 回测验证
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 回测验证">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-直接运行回测" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 直接运行回测
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-回测代码详解" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 回测代码详解
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-回测结果解读指南" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 回测结果解读指南
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-使用本地数据加速推荐" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 使用本地数据加速（推荐）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-模拟盘部署" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 模拟盘部署
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 模拟盘部署">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-运行模拟盘" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 运行模拟盘
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-模拟盘注意事项" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 模拟盘注意事项
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-部署到-ptradeqmt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 部署到 PTrade/QMT
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-策略解读与改进方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 策略解读与改进方向
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. 策略解读与改进方向">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-策略适用的市场环境" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 策略适用的市场环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-可能的改进方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 可能的改进方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-过拟合风险警告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 过拟合风险警告
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#延伸阅读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        延伸阅读
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#附录一键运行命令" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：一键运行命令
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-策略概述" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 策略概述
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 策略概述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-设计目标" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 设计目标
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-策略架构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 策略架构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-股票池12-只覆盖-8-个行业" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 股票池（12 只，覆盖 8 个行业）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-第一层多因子选股z-score-标准化" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 第一层：多因子选股（Z-Score 标准化）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 第一层：多因子选股（Z-Score 标准化）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-为什么用多因子选股" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 为什么用多因子选股
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-四个因子定义" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 四个因子定义
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 四个因子定义">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#因子-1动量因子权重-35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 1：动量因子（权重 35%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#因子-2成交量放大因子权重-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 2：成交量放大因子（权重 30%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#因子-3短期反转修正权重-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 3：短期反转修正（权重 15%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#因子-4低波动率因子权重-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        因子 4：低波动率因子（权重 20%）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-z-score-标准化" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Z-Score 标准化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-综合得分合成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 综合得分合成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-第二层行业轮动评分加成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 第二层：行业轮动评分加成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 第二层：行业轮动评分加成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-行业动量计算" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 行业动量计算
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-行业加成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 行业加成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-第三层技术指标入场--离场信号" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 第三层：技术指标入场 / 离场信号
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 第三层：技术指标入场 / 离场信号">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-rsi-均值回归入场tutorial-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 RSI 均值回归入场（Tutorial 06）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-布林带均值回归example-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 布林带均值回归（Example 14）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-macd-趋势确认example-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 MACD 趋势确认（Example 15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-atr-追踪止损examples-15--20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 ATR 追踪止损（Examples 15 / 20）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-支撑阻力位确认example-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 支撑阻力位确认（Example 20）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-成交量确认example-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 成交量确认（Example 15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-唐奇安通道example-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 唐奇安通道（Example 20）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-第四层风险管理与仓位控制" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 第四层：风险管理与仓位控制
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 第四层：风险管理与仓位控制">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-入场条件的组合逻辑" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 入场条件的组合逻辑
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-离场条件的优先级" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 离场条件的优先级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-仓位控制" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 仓位控制
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-生命周期回调集成" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 生命周期回调集成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 生命周期回调集成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-开盘前before_trading_start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 开盘前（before_trading_start）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-收盘后after_trading_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 收盘后（after_trading_end）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-完整策略代码说明" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 完整策略代码说明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 完整策略代码说明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-文件结构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 文件结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-策略模块结构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 策略模块结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-关键参数速查" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 关键参数速查
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-回测验证" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 回测验证
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 回测验证">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-直接运行回测" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 直接运行回测
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-回测代码详解" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 回测代码详解
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-回测结果解读指南" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 回测结果解读指南
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-使用本地数据加速推荐" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 使用本地数据加速（推荐）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-模拟盘部署" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 模拟盘部署
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 模拟盘部署">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-运行模拟盘" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 运行模拟盘
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-模拟盘注意事项" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 模拟盘注意事项
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-部署到-ptradeqmt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 部署到 PTrade/QMT
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-策略解读与改进方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 策略解读与改进方向
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. 策略解读与改进方向">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-策略适用的市场环境" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 策略适用的市场环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-可能的改进方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 可能的改进方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-过拟合风险警告" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 过拟合风险警告
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#延伸阅读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        延伸阅读
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#附录一键运行命令" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：一键运行命令
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tutorial-09-全天候-alpha-综合策略">Tutorial 09: 全天候 Alpha 综合策略<a class="headerlink" href="#tutorial-09-全天候-alpha-综合策略" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>本教程将之前所有教程和示例中的策略技术整合成一个完整的、可投入实盘的综合策略。
+我们会逐步讲解每个组件的设计原理、数学公式和代码实现，
+并提供完整的回测和模拟盘代码，可直接运行。</p>
+</blockquote>
+<p><strong>环境：</strong> Python 3.10+，<a href="../00_environment_and_first_run/"><code>Tutorial 00</code></a> · <strong>可运行代码：</strong> <a href="../../examples/21_combined_strategy/"><code>examples/21_combined_strategy/README.md</code></a>（该目录脚本会将子目录加入 <code>sys.path</code> 以导入 <code>combined_strategy</code>，与 <code>eqlib</code> 安装方式无关）</p>
+<hr />
+<h2 id="目录">目录<a class="headerlink" href="#目录" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-策略概述">策略概述</a></li>
+<li><a href="#2-第一层多因子选股z-score-标准化">第一层：多因子选股（Z-Score 标准化）</a></li>
+<li><a href="#3-第二层行业轮动评分加成">第二层：行业轮动评分加成</a></li>
+<li><a href="#4-第三层技术指标入场--离场信号">第三层：技术指标入场 / 离场信号</a></li>
+<li><a href="#5-第四层风险管理与仓位控制">第四层：风险管理与仓位控制</a></li>
+<li><a href="#6-生命周期回调集成">生命周期回调集成</a></li>
+<li><a href="#7-完整策略代码说明">完整策略代码说明</a></li>
+<li><a href="#8-回测验证">回测验证</a></li>
+<li><a href="#9-模拟盘部署">模拟盘部署</a></li>
+<li><a href="#10-策略解读与改进方向">策略解读与改进方向</a></li>
+</ol>
+<hr />
+<h2 id="1-策略概述">1. 策略概述<a class="headerlink" href="#1-策略概述" title="Permanent link">&para;</a></h2>
+<h3 id="11-设计目标">1.1 设计目标<a class="headerlink" href="#11-设计目标" title="Permanent link">&para;</a></h3>
+<p>"全天候 Alpha"（All-Weather Alpha）策略的设计目标是：</p>
+<ul>
+<li><strong>鲁棒性</strong>：在牛市、熊市、震荡市都能有效运行，不依赖单一市场环境</li>
+<li><strong>多维度</strong>：同时利用基本面（因子得分）、技术面（RSI / MACD / 布林带）和结构面（支撑阻力位）</li>
+<li><strong>风险可控</strong>：多层止损（硬止损 + ATR 追踪止损），严格的仓位上限</li>
+<li><strong>可解释性</strong>：每一个买卖决策都有可追溯的量化依据</li>
+</ul>
+<h3 id="12-策略架构">1.2 策略架构<a class="headerlink" href="#12-策略架构" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌──────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│              每周一 — 多因子 + 行业轮动选股              │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│                                                          │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│  │ 动量因子 │  │ 成交量   │  │ 反转修正 │  │ 波动率 │  │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│  │ (35%)    │  │ (30%)    │  │ (15%)    │  │ (20%)  │  │
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬────┘  │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│       └──────────────┴─────────────┴─────────────┘       │
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│                        Z-Score 标准化                     │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│                     ↓ 合成综合得分                        │
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│              行业动量评分加成（+10%）                     │
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│                     ↓ 排名选 Top 5                       │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>└──────────────────────────────────────────────────────────┘
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                          ↓ g.selected_stocks
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>┌──────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│              每日 — 技术指标入场 / 离场                  │
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│                                                          │
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│  入场条件（必须同时满足 C + D + E）：                    │
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│    C. 超卖信号：RSI &lt; 35  OR  价格 &lt; 布林下轨            │
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│                OR  价格触及唐奇安下轨                    │
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│    D. 确认信号：MACD 金叉  OR  接近支撑位                │
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│    E. 成交量确认：当日量 ≥ 1.2 × 20日均量               │
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│                                                          │
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│  离场条件（任一满足即卖出）：                            │
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│    1. 硬止损：亏损 &gt; 8%                                  │
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│    2. ATR 追踪止损                                       │
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│    3. 布林上轨 + RSI 超买                               │
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│    4. MACD 死叉                                          │
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│    5. 唐奇安上轨突破                                    │
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│    6. 接近阻力位 + RSI 超买                             │
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>└──────────────────────────────────────────────────────────┘
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>┌──────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│                    生命周期回调                          │
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│  before_trading_start → 检查 ST 股，记录开盘前状态       │
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│  after_trading_end    → 记录收盘后组合快照               │
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>└──────────────────────────────────────────────────────────┘
+</code></pre></div>
+<h3 id="13-股票池12-只覆盖-8-个行业">1.3 股票池（12 只，覆盖 8 个行业）<a class="headerlink" href="#13-股票池12-只覆盖-8-个行业" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>名称</th>
+<th>行业</th>
+<th>选择理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>601398</td>
+<td>工商银行</td>
+<td>银行</td>
+<td>大盘蓝筹，波动低，适合均值回归</td>
+</tr>
+<tr>
+<td>600519</td>
+<td>贵州茅台</td>
+<td>白酒</td>
+<td>高 ROE 消费龙头，长期趋势强</td>
+</tr>
+<tr>
+<td>002594</td>
+<td>比亚迪</td>
+<td>新能源</td>
+<td>新能源板块龙头，波动大但趋势明显</td>
+</tr>
+<tr>
+<td>601857</td>
+<td>中国石油</td>
+<td>石油天然气</td>
+<td>能源板块，受大宗商品价格驱动</td>
+</tr>
+<tr>
+<td>601088</td>
+<td>中国神华</td>
+<td>煤炭</td>
+<td>高股息防御，与石油负相关</td>
+</tr>
+<tr>
+<td>601390</td>
+<td>中国中铁</td>
+<td>基础设施</td>
+<td>政策驱动，与经济周期相关</td>
+</tr>
+<tr>
+<td>600276</td>
+<td>恒瑞医药</td>
+<td>医药</td>
+<td>创新药龙头，抗周期性较强</td>
+</tr>
+<tr>
+<td>000333</td>
+<td>美的集团</td>
+<td>家电</td>
+<td>制造业龙头，ROE 稳定</td>
+</tr>
+<tr>
+<td>600916</td>
+<td>中国黄金</td>
+<td>黄金</td>
+<td>避险资产，与股票负相关</td>
+</tr>
+<tr>
+<td>000858</td>
+<td>五粮液</td>
+<td>白酒</td>
+<td>与茅台相关但相对折价</td>
+</tr>
+<tr>
+<td>601318</td>
+<td>中国平安</td>
+<td>保险</td>
+<td>大金融板块，估值低</td>
+</tr>
+<tr>
+<td>600887</td>
+<td>伊利股份</td>
+<td>消费品</td>
+<td>必需消费，抗跌性好</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>行业分散原则</strong>：选入不同行业的股票，使得不同市场环境下总有一部分股票处于强势。</p>
+</blockquote>
+<hr />
+<h2 id="2-第一层多因子选股z-score-标准化">2. 第一层：多因子选股（Z-Score 标准化）<a class="headerlink" href="#2-第一层多因子选股z-score-标准化" title="Permanent link">&para;</a></h2>
+<h3 id="21-为什么用多因子选股">2.1 为什么用多因子选股<a class="headerlink" href="#21-为什么用多因子选股" title="Permanent link">&para;</a></h3>
+<p>单一因子（如只看动量）容易在市场风格切换时失效。多因子模型通过综合多个维度，
+使策略在不同市场环境中均保持一定的选股能力（参考 <a href="../08_multi_factor/">Tutorial 08</a>）。</p>
+<h3 id="22-四个因子定义">2.2 四个因子定义<a class="headerlink" href="#22-四个因子定义" title="Permanent link">&para;</a></h3>
+<h4 id="因子-1动量因子权重-35">因子 1：动量因子（权重 35%）<a class="headerlink" href="#因子-1动量因子权重-35" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>momentum = (P_t / P_{t-20}) − 1
+</code></pre></div>
+<ul>
+<li><strong>经济含义</strong>：过去 20 个交易日的涨幅。动量越高，近期趋势越强。</li>
+<li><strong>权重最高</strong> 的原因：A 股市场"追涨杀跌"特征明显，动量效应在中短期有效。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">momentum</span> <span class="o">=</span> <span class="p">(</span><span class="n">close</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">close</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">20</span><span class="p">])</span> <span class="o">-</span> <span class="mf">1.0</span>
+</code></pre></div>
+<h4 id="因子-2成交量放大因子权重-30">因子 2：成交量放大因子（权重 30%）<a class="headerlink" href="#因子-2成交量放大因子权重-30" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>volume_ratio = mean(vol[-5:]) / mean(vol[-20:])
+</code></pre></div>
+<ul>
+<li><strong>经济含义</strong>：近期成交量相对历史均量的倍数。
+  量比 &gt; 1 说明近期资金关注度上升，价格上涨更可靠。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">vol_ratio</span> <span class="o">=</span> <span class="n">vol</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">/</span> <span class="n">vol</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+</code></pre></div>
+<h4 id="因子-3短期反转修正权重-15">因子 3：短期反转修正（权重 15%）<a class="headerlink" href="#因子-3短期反转修正权重-15" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>reversal = −((P_t / P_{t-5}) − 1)
+</code></pre></div>
+<ul>
+<li><strong>经济含义</strong>：对近 5 日涨幅取反值。
+  短期涨太多的股票（追高风险大）因子值低；
+  短期略有回调的股票因子值高（更安全的买点）。</li>
+<li>这是<strong>动量因子的补偿</strong>：避免选出近期已经涨了很多、性价比不高的股票。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">reversal</span> <span class="o">=</span> <span class="o">-</span><span class="p">((</span><span class="n">close</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">close</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">5</span><span class="p">])</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="因子-4低波动率因子权重-20">因子 4：低波动率因子（权重 20%）<a class="headerlink" href="#因子-4低波动率因子权重-20" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>neg_volatility = −std(daily_returns[-20:])
+</code></pre></div>
+<ul>
+<li><strong>经济含义</strong>：低波动率股票在相同收益下风险更小（低波动溢价）。
+  取负号是因为波动越低，因子值越高。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">daily_rets</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">pct_change</span><span class="p">()</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">neg_vol</span>    <span class="o">=</span> <span class="o">-</span><span class="n">daily_rets</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="23-z-score-标准化">2.3 Z-Score 标准化<a class="headerlink" href="#23-z-score-标准化" title="Permanent link">&para;</a></h3>
+<p>不同因子的量纲不同（动量是百分比、量比是倍数），直接加权会导致某个因子主导结果。
+Z-Score 标准化消除量纲差异：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>z_i = (x_i − μ) / σ
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>其中：
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  x_i = 股票 i 的因子原始值
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  μ   = 所有股票该因子的均值
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  σ   = 所有股票该因子的标准差（样本标准差，ddof=1）
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">def</span> <span class="nf">_zscore_normalize</span><span class="p">(</span><span class="n">values_dict</span><span class="p">):</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">vals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">values_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">mu</span>   <span class="o">=</span> <span class="n">statistics</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">sig</span>  <span class="o">=</span> <span class="n">statistics</span><span class="o">.</span><span class="n">stdev</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="ow">or</span> <span class="mf">1e-9</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="p">(</span><span class="n">v</span> <span class="o">-</span> <span class="n">mu</span><span class="p">)</span> <span class="o">/</span> <span class="n">sig</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">values_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+</code></pre></div>
+<h3 id="24-综合得分合成">2.4 综合得分合成<a class="headerlink" href="#24-综合得分合成" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>score = 0.35 × z_momentum
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>      + 0.30 × z_volume
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>      + 0.15 × z_reversal
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>      + 0.20 × z_neg_volatility
+</code></pre></div>
+<p>按 <code>score</code> 从高到低排名，选出 Top 5 股票。</p>
+<hr />
+<h2 id="3-第二层行业轮动评分加成">3. 第二层：行业轮动评分加成<a class="headerlink" href="#3-第二层行业轮动评分加成" title="Permanent link">&para;</a></h2>
+<p>参考 <a href="../07_sector_rotation/">Tutorial 07</a>，在多因子得分的基础上加入行业轮动维度。</p>
+<h3 id="31-行业动量计算">3.1 行业动量计算<a class="headerlink" href="#31-行业动量计算" title="Permanent link">&para;</a></h3>
+<p>每个行业取一只代表性股票，计算近 10 日收益率：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sector_momentum = (P_{sector,t} / P_{sector,t-10}) − 1
+</code></pre></div>
+<p>同样进行 Z-Score 标准化，得到各行业的相对强弱。</p>
+<h3 id="32-行业加成">3.2 行业加成<a class="headerlink" href="#32-行业加成" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>final_score = factor_score + 0.10 × sector_z_score
+</code></pre></div>
+<p><strong>加成权重只有 10%</strong> 的原因：
+行业信号通常比个股因子"滞后"（行业已经涨了很多才能被观测到），
+权重过高容易形成追高。10% 的加成能给行业信号一定影响力，而不至于主导整个排名。</p>
+<hr />
+<h2 id="4-第三层技术指标入场--离场信号">4. 第三层：技术指标入场 / 离场信号<a class="headerlink" href="#4-第三层技术指标入场--离场信号" title="Permanent link">&para;</a></h2>
+<p>多因子模型确定了"应该持有哪些股票"，但不告诉我们"什么时候买入最合适"。
+技术指标负责这个"精确入场时机"的工作。</p>
+<h3 id="41-rsi-均值回归入场tutorial-06">4.1 RSI 均值回归入场（Tutorial 06）<a class="headerlink" href="#41-rsi-均值回归入场tutorial-06" title="Permanent link">&para;</a></h3>
+<p><strong>公式：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>ΔP_t = P_t − P_{t-1}
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>AvgGain_t = EMA(max(ΔP_t, 0), N=14)
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>AvgLoss_t = EMA(max(−ΔP_t, 0), N=14)
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>RS        = AvgGain / AvgLoss
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>RSI       = 100 − 100 / (1 + RS)
+</code></pre></div></p>
+<p><strong>入场条件：</strong> <code>RSI &lt; 35</code>（超卖区）</p>
+<p><strong>逻辑：</strong> RSI &lt; 35 说明近期下跌力度明显超过上涨力度，市场可能过度悲观，
+存在反弹机会。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">rsi_series</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">rsi</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">oversold</span>   <span class="o">=</span> <span class="n">rsi_series</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">35</span>
+</code></pre></div>
+<h3 id="42-布林带均值回归example-14">4.2 布林带均值回归（Example 14）<a class="headerlink" href="#42-布林带均值回归example-14" title="Permanent link">&para;</a></h3>
+<p><strong>公式：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Middle = MA(close, N=20)
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Upper  = Middle + 2 × std(close, N=20)
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>Lower  = Middle − 2 × std(close, N=20)
+</code></pre></div></p>
+<p><strong>入场条件：</strong> <code>price ≤ Lower</code>（价格跌破下轨，统计意义上的超卖）</p>
+<p><strong>离场条件：</strong> <code>price ≥ Upper AND RSI ≥ 65</code>（统计意义上的超买）</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">bb_upper</span><span class="p">,</span> <span class="n">bb_mid</span><span class="p">,</span> <span class="n">bb_lower</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">boll</span><span class="p">(</span><span class="n">close</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">num_std</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">buy_signal</span>  <span class="o">=</span> <span class="n">price</span> <span class="o">&lt;=</span> <span class="n">bb_lower</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">sell_signal</span> <span class="o">=</span> <span class="n">price</span> <span class="o">&gt;=</span> <span class="n">bb_upper</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">rsi</span> <span class="o">&gt;=</span> <span class="mi">65</span>
+</code></pre></div>
+<h3 id="43-macd-趋势确认example-15">4.3 MACD 趋势确认（Example 15）<a class="headerlink" href="#43-macd-趋势确认example-15" title="Permanent link">&para;</a></h3>
+<p><strong>公式：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>EMA_fast = EMA(close, N=12)
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>EMA_slow = EMA(close, N=26)
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>DIF      = EMA_fast − EMA_slow
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>DEA      = EMA(DIF, N=9)           # Signal line
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>柱状图    = 2 × (DIF − DEA)
+</code></pre></div></p>
+<p><strong>金叉（看涨信号）：</strong> DIF 由下穿上越过 DEA
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">macd_golden</span> <span class="o">=</span> <span class="n">dif</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">dea</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">dif</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">dea</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+</code></pre></div></p>
+<p><strong>死叉（看跌信号）：</strong> DIF 由上穿下越过 DEA
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">macd_death</span> <span class="o">=</span> <span class="n">dif</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">dea</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">dif</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">dea</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+</code></pre></div></p>
+<h3 id="44-atr-追踪止损examples-15--20">4.4 ATR 追踪止损（Examples 15 / 20）<a class="headerlink" href="#44-atr-追踪止损examples-15--20" title="Permanent link">&para;</a></h3>
+<p><strong>ATR 公式：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>TR_t = max(High_t − Low_t,
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>           |High_t − Close_{t-1}|,
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>           |Low_t  − Close_{t-1}|)
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>ATR  = EMA(TR, N=14)
+</code></pre></div></p>
+<p><strong>追踪止损价：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>trailing_stop = max(close) 持仓以来最高价 − 2.5 × ATR
+</code></pre></div></p>
+<p>当 <code>current_price &lt; trailing_stop</code> 时止损卖出。</p>
+<p><strong>优势</strong>：追踪止损随着价格上涨而上移，既保护了利润，又允许价格正常波动。
+与固定百分比止损相比，ATR 止损能根据市场实际波动率动态调整。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">atr_values</span>    <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">atr</span><span class="p">(</span><span class="n">high</span><span class="p">,</span> <span class="n">low</span><span class="p">,</span> <span class="n">close</span><span class="p">,</span> <span class="mi">14</span><span class="p">)</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="n">current_atr</span>   <span class="o">=</span> <span class="n">atr_values</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">trailing_stop</span> <span class="o">=</span> <span class="n">highest_since_buy</span> <span class="o">-</span> <span class="mf">2.5</span> <span class="o">*</span> <span class="n">current_atr</span>
+</code></pre></div>
+<h3 id="45-支撑阻力位确认example-20">4.5 支撑阻力位确认（Example 20）<a class="headerlink" href="#45-支撑阻力位确认example-20" title="Permanent link">&para;</a></h3>
+<p>支撑阻力位通过识别历史价格中的摆动高低点聚类得到：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">sr</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">support_resistance_levels</span><span class="p">(</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="n">high</span><span class="p">,</span> <span class="n">low</span><span class="p">,</span> <span class="n">close</span><span class="p">,</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">lookback</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>       <span class="c1"># 回看 60 根 K 线</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>    <span class="n">tolerance</span><span class="o">=</span><span class="mf">0.025</span><span class="p">,</span>   <span class="c1"># 2.5% 容差</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="p">)</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="n">nearest_support</span>    <span class="o">=</span> <span class="n">sr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;nearest_support&quot;</span><span class="p">)</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="n">nearest_resistance</span> <span class="o">=</span> <span class="n">sr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;nearest_resistance&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>近支撑入场条件：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>dist_to_support = (price − nearest_support) / price &lt; 2.5%
+</code></pre></div></p>
+<p>即价格距离支撑位不超过 2.5%，认为"接近支撑位"。</p>
+<p><strong>近阻力离场条件：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>dist_to_resistance = (nearest_resistance − price) / price &lt; 2.5%
+</code></pre></div></p>
+<h3 id="46-成交量确认example-15">4.6 成交量确认（Example 15）<a class="headerlink" href="#46-成交量确认example-15" title="Permanent link">&para;</a></h3>
+<p><strong>公式：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>vol_ratio = current_volume / mean(volume[-20:])
+</code></pre></div></p>
+<p><strong>确认条件：</strong> <code>vol_ratio ≥ 1.2</code></p>
+<p><strong>逻辑：</strong> 价格下跌到支撑位，同时成交量扩大，说明有资金在接盘，
+下跌可能即将结束。Example 15 使用 1.5× 阈值；本策略使用 1.2× 阈值
+（稍宽松，因为已经有多个其他条件把关）。</p>
+<h3 id="47-唐奇安通道example-20">4.7 唐奇安通道（Example 20）<a class="headerlink" href="#47-唐奇安通道example-20" title="Permanent link">&para;</a></h3>
+<p><strong>公式：</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>DC_upper = max(high[-20:])    # 20 日最高价
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>DC_lower = min(low[-20:])     # 20 日最低价
+</code></pre></div></p>
+<ul>
+<li><strong>入场信号</strong>：<code>price ≤ DC_lower</code>（价格创 20 日新低，超卖）</li>
+<li><strong>离场信号</strong>：<code>price ≥ DC_upper</code>（价格创 20 日新高，获利了结）</li>
+</ul>
+<hr />
+<h2 id="5-第四层风险管理与仓位控制">5. 第四层：风险管理与仓位控制<a class="headerlink" href="#5-第四层风险管理与仓位控制" title="Permanent link">&para;</a></h2>
+<h3 id="51-入场条件的组合逻辑">5.1 入场条件的组合逻辑<a class="headerlink" href="#51-入场条件的组合逻辑" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>入场 = A AND B AND C AND D AND E
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>A. 该股在本周 Top-5 选股列表中
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>B. 当前持仓数 &lt; 5（仓位有空间）
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>C. 超卖信号（RSI &lt; 35  OR  价格 ≤ 布林下轨  OR  价格 ≤ 唐奇安下轨）
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>D. 确认信号（MACD 金叉  OR  价格接近支撑位）
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>E. 成交量确认（当日量 ≥ 1.2 × 20 日均量）
+</code></pre></div>
+<p><strong>多条件 AND 设计的好处</strong>：
+减少假信号。每个单独的技术信号都有约 50% 的假信号率；
+三个独立信号同时触发，假信号率理论上降低到 12.5%。</p>
+<h3 id="52-离场条件的优先级">5.2 离场条件的优先级<a class="headerlink" href="#52-离场条件的优先级" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>离场 = 以下任一条件满足（按优先级从高到低）：
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>1. 硬止损：loss_pct &lt; −8%          ← 无条件执行，保本为先
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>2. ATR 追踪止损                    ← 动态风险控制
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>3. 布林上轨 + RSI ≥ 65            ← 技术性获利了结
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>4. MACD 死叉                       ← 趋势转换信号
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>5. 唐奇安上轨                      ← 价格创新高后回落
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>6. 近阻力位 + RSI ≥ 65            ← 位置性获利了结
+</code></pre></div>
+<h3 id="53-仓位控制">5.3 仓位控制<a class="headerlink" href="#53-仓位控制" title="Permanent link">&para;</a></h3>
+<p><strong>等权配置</strong>：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>per_stock_value = min(
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>    total_value × 20%,          # 单股上限
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>    available_cash / num_buys,  # 按候选数量均分
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>)
+</code></pre></div></p>
+<p><strong>最大持仓数</strong>：<code>1 / 20% = 5</code> 只股票。</p>
+<p><strong>优势</strong>：等权配置避免了过度集中风险。例如即使某只股票触发止损，
+最多也只损失 20% × 8% = 1.6% 的总资金。</p>
+<hr />
+<h2 id="6-生命周期回调集成">6. 生命周期回调集成<a class="headerlink" href="#6-生命周期回调集成" title="Permanent link">&para;</a></h2>
+<p>参考 <a href="../../examples/08_lifecycle_callbacks.py">Example 08</a>，策略注册了两个生命周期回调。</p>
+<h3 id="61-开盘前before_trading_start">6.1 开盘前（before_trading_start）<a class="headerlink" href="#61-开盘前before_trading_start" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="k">def</span> <span class="nf">_before_market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>    <span class="c1"># 记录当前持仓状态</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;PRE-MARKET | total=</span><span class="si">%.2f</span><span class="s2"> | cash=</span><span class="si">%.2f</span><span class="s2"> | positions=</span><span class="si">%d</span><span class="s2">&quot;</span>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>             <span class="o">%</span> <span class="p">(</span><span class="o">...</span><span class="p">))</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>    <span class="c1"># 检查 ST 股票（停牌、戴帽等异常情况）</span>
+<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a>    <span class="n">st_map</span>    <span class="o">=</span> <span class="n">get_extras</span><span class="p">(</span><span class="s2">&quot;is_st&quot;</span><span class="p">,</span> <span class="n">security_list</span><span class="o">=</span><span class="n">universe</span><span class="p">)</span>
+<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>    <span class="n">st_stocks</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">flag</span> <span class="ow">in</span> <span class="n">st_map</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">flag</span><span class="p">]</span>
+<a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a>    <span class="k">if</span> <span class="n">st_stocks</span><span class="p">:</span>
+<a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a>        <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;ST stocks: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">st_stocks</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="62-收盘后after_trading_end">6.2 收盘后（after_trading_end）<a class="headerlink" href="#62-收盘后after_trading_end" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="k">def</span> <span class="nf">_after_market_close</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>    <span class="n">pnl_pct</span> <span class="o">=</span> <span class="p">(</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_value</span> <span class="o">-</span> <span class="n">portfolio</span><span class="o">.</span><span class="n">starting_cash</span><span class="p">)</span> <span class="o">/</span> <span class="n">portfolio</span><span class="o">.</span><span class="n">starting_cash</span>
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>    <span class="n">record</span><span class="p">(</span>
+<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>        <span class="n">total_value</span><span class="o">=</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_value</span><span class="p">,</span>
+<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>        <span class="n">cash</span><span class="o">=</span><span class="n">portfolio</span><span class="o">.</span><span class="n">available_cash</span><span class="p">,</span>
+<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>        <span class="n">num_holdings</span><span class="o">=</span><span class="n">held</span><span class="p">,</span>
+<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>        <span class="n">pnl_pct</span><span class="o">=</span><span class="n">pnl_pct</span><span class="p">,</span>
+<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>    <span class="p">)</span>
+</code></pre></div>
+<p><code>record()</code> 将数据保存到回测结果中，供 <code>generate_chart</code> 绘图使用。</p>
+<hr />
+<h2 id="7-完整策略代码说明">7. 完整策略代码说明<a class="headerlink" href="#7-完整策略代码说明" title="Permanent link">&para;</a></h2>
+<h3 id="71-文件结构">7.1 文件结构<a class="headerlink" href="#71-文件结构" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>examples/21_combined_strategy/
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>├── combined_strategy.py    # 完整策略模块（可导入、可修改）
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>├── run_backtest.py         # 回测运行脚本（直接可运行）
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>├── run_paper_trade.py      # 模拟盘运行脚本（直接可运行）
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>└── README.md               # 本教程摘要
+</code></pre></div>
+<h3 id="72-策略模块结构">7.2 策略模块结构<a class="headerlink" href="#72-策略模块结构" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1"># combined_strategy.py 结构</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="n">STOCK_POOL</span>     <span class="o">=</span> <span class="p">[</span><span class="o">...</span><span class="p">]</span>   <span class="c1"># 12 只股票</span>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="n">SECTOR_MAP</span>     <span class="o">=</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>   <span class="c1"># 股票→行业映射</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="n">SECTOR_REPRES</span><span class="o">.</span> <span class="o">=</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>   <span class="c1"># 行业代表股（用于行业动量计算）</span>
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a>
+<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="c1"># 参数配置（按需修改，使用模块级常量）</span>
+<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="n">TOP_N</span>          <span class="o">=</span> <span class="mi">5</span>
+<a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="n">RSI_OVERSOLD</span>   <span class="o">=</span> <span class="mi">35</span>
+<a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a><span class="n">ATR_MULTIPLIER</span> <span class="o">=</span> <span class="mf">2.5</span>
+<a id="__codelineno-35-11" name="__codelineno-35-11" href="#__codelineno-35-11"></a><span class="o">...</span>
+<a id="__codelineno-35-12" name="__codelineno-35-12" href="#__codelineno-35-12"></a>
+<a id="__codelineno-35-13" name="__codelineno-35-13" href="#__codelineno-35-13"></a><span class="c1"># 核心函数</span>
+<a id="__codelineno-35-14" name="__codelineno-35-14" href="#__codelineno-35-14"></a><span class="n">_zscore_normalize</span><span class="p">(</span><span class="n">values_dict</span><span class="p">)</span>          <span class="c1"># Z-Score 标准化工具</span>
+<a id="__codelineno-35-15" name="__codelineno-35-15" href="#__codelineno-35-15"></a><span class="n">_compute_factors</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>                  <span class="c1"># 计算单股四因子</span>
+<a id="__codelineno-35-16" name="__codelineno-35-16" href="#__codelineno-35-16"></a><span class="n">_score_sector_momentum</span><span class="p">()</span>                <span class="c1"># 行业动量评分</span>
+<a id="__codelineno-35-17" name="__codelineno-35-17" href="#__codelineno-35-17"></a><span class="n">rank_stocks_weekly</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>             <span class="c1"># 每周选股排名</span>
+<a id="__codelineno-35-18" name="__codelineno-35-18" href="#__codelineno-35-18"></a><span class="n">_compute_indicators</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>              <span class="c1"># 计算技术指标</span>
+<a id="__codelineno-35-19" name="__codelineno-35-19" href="#__codelineno-35-19"></a><span class="n">_check_sell</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="n">ind</span><span class="p">)</span>        <span class="c1"># 离场逻辑</span>
+<a id="__codelineno-35-20" name="__codelineno-35-20" href="#__codelineno-35-20"></a><span class="n">_check_buy</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="n">ind</span><span class="p">)</span>         <span class="c1"># 入场逻辑</span>
+<a id="__codelineno-35-21" name="__codelineno-35-21" href="#__codelineno-35-21"></a><span class="n">_before_market_open</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>    <span class="c1"># 生命周期：开盘前</span>
+<a id="__codelineno-35-22" name="__codelineno-35-22" href="#__codelineno-35-22"></a><span class="n">_after_market_close</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>    <span class="c1"># 生命周期：收盘后</span>
+<a id="__codelineno-35-23" name="__codelineno-35-23" href="#__codelineno-35-23"></a><span class="n">weekly_rebalance</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>              <span class="c1"># 每周一调仓</span>
+<a id="__codelineno-35-24" name="__codelineno-35-24" href="#__codelineno-35-24"></a><span class="n">daily_trading</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>                 <span class="c1"># 每日信号处理</span>
+<a id="__codelineno-35-25" name="__codelineno-35-25" href="#__codelineno-35-25"></a>
+<a id="__codelineno-35-26" name="__codelineno-35-26" href="#__codelineno-35-26"></a><span class="n">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>                    <span class="c1"># 策略入口（必须有）</span>
+</code></pre></div>
+<h3 id="73-关键参数速查">7.3 关键参数速查<a class="headerlink" href="#73-关键参数速查" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TOP_N</code></td>
+<td>5</td>
+<td>每周选股数量</td>
+</tr>
+<tr>
+<td><code>W_MOMENTUM</code></td>
+<td>0.35</td>
+<td>动量因子权重</td>
+</tr>
+<tr>
+<td><code>W_VOLUME</code></td>
+<td>0.30</td>
+<td>成交量因子权重</td>
+</tr>
+<tr>
+<td><code>W_REVERSAL</code></td>
+<td>0.15</td>
+<td>反转修正权重</td>
+</tr>
+<tr>
+<td><code>W_VOLATILITY</code></td>
+<td>0.20</td>
+<td>低波动率权重</td>
+</tr>
+<tr>
+<td><code>RSI_OVERSOLD</code></td>
+<td>35</td>
+<td>RSI 超卖阈值</td>
+</tr>
+<tr>
+<td><code>RSI_OVERBOUGHT</code></td>
+<td>65</td>
+<td>RSI 超买阈值</td>
+</tr>
+<tr>
+<td><code>BOLL_PERIOD</code></td>
+<td>20</td>
+<td>布林带周期</td>
+</tr>
+<tr>
+<td><code>ATR_MULTIPLIER</code></td>
+<td>2.5</td>
+<td>ATR 追踪止损倍数</td>
+</tr>
+<tr>
+<td><code>SR_LOOKBACK</code></td>
+<td>60</td>
+<td>支撑阻力回看期（天）</td>
+</tr>
+<tr>
+<td><code>SR_TOLERANCE</code></td>
+<td>0.025</td>
+<td>支撑阻力容差（2.5%）</td>
+</tr>
+<tr>
+<td><code>MAX_SINGLE_PCT</code></td>
+<td>0.20</td>
+<td>单股最大仓位（20%）</td>
+</tr>
+<tr>
+<td><code>HARD_STOP_PCT</code></td>
+<td>0.08</td>
+<td>硬止损阈值（8%）</td>
+</tr>
+<tr>
+<td><code>VOL_CONFIRM_RATIO</code></td>
+<td>1.2</td>
+<td>成交量确认倍数</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-回测验证">8. 回测验证<a class="headerlink" href="#8-回测验证" title="Permanent link">&para;</a></h2>
+<h3 id="81-直接运行回测">8.1 直接运行回测<a class="headerlink" href="#81-直接运行回测" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># 在项目根目录下运行</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>python<span class="w"> </span>examples/21_combined_strategy/run_backtest.py
+</code></pre></div>
+<p><strong>回测参数：</strong>
+- 时间段：2022-01-01 至 2024-12-31（3 年）
+- 初始资金：¥500,000
+- 基准：沪深 300（000300.XSHG）
+- 股票池：12 只（8 个行业）</p>
+<p><strong>输出报告：</strong>
+- <code>reports/backtest_&lt;时间戳&gt;.png</code>  — 净值曲线图
+- <code>reports/backtest_&lt;时间戳&gt;.html</code> — 交互式 HTML 报告
+- <code>reports/backtest_&lt;时间戳&gt;.md</code>   — Markdown 摘要
+- <code>reports/backtest_&lt;时间戳&gt;.json</code> — 完整回测数据</p>
+<h3 id="82-回测代码详解">8.2 回测代码详解<a class="headerlink" href="#82-回测代码详解" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># run_backtest.py 核心片段</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="kn">import</span> <span class="nn">sys</span><span class="o">,</span> <span class="nn">os</span>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="p">)</span>                          <span class="c1"># 项目根目录</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;examples/21_combined_strategy&quot;</span><span class="p">)</span>  <span class="c1"># 策略所在目录</span>
+<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>
+<a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a><span class="kn">from</span> <span class="nn">combined_strategy</span> <span class="kn">import</span> <span class="n">initialize</span><span class="p">,</span> <span class="n">STOCK_POOL</span>
+<a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="n">run_strategy</span><span class="p">,</span> <span class="n">analyze_returns</span>
+<a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a>
+<a id="__codelineno-37-10" name="__codelineno-37-10" href="#__codelineno-37-10"></a><span class="n">result</span> <span class="o">=</span> <span class="n">run_strategy</span><span class="p">(</span>
+<a id="__codelineno-37-11" name="__codelineno-37-11" href="#__codelineno-37-11"></a>    <span class="n">initialize_func</span><span class="o">=</span><span class="n">initialize</span><span class="p">,</span>     <span class="c1"># 策略入口函数</span>
+<a id="__codelineno-37-12" name="__codelineno-37-12" href="#__codelineno-37-12"></a>    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2022-01-01&quot;</span><span class="p">,</span>
+<a id="__codelineno-37-13" name="__codelineno-37-13" href="#__codelineno-37-13"></a>    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2024-12-31&quot;</span><span class="p">,</span>
+<a id="__codelineno-37-14" name="__codelineno-37-14" href="#__codelineno-37-14"></a>    <span class="n">starting_cash</span><span class="o">=</span><span class="mi">500_000</span><span class="p">,</span>
+<a id="__codelineno-37-15" name="__codelineno-37-15" href="#__codelineno-37-15"></a>    <span class="n">benchmark</span><span class="o">=</span><span class="s2">&quot;000300.XSHG&quot;</span><span class="p">,</span>
+<a id="__codelineno-37-16" name="__codelineno-37-16" href="#__codelineno-37-16"></a>    <span class="n">securities</span><span class="o">=</span><span class="n">STOCK_POOL</span><span class="p">,</span>          <span class="c1"># 预加载数据，加快回测速度</span>
+<a id="__codelineno-37-17" name="__codelineno-37-17" href="#__codelineno-37-17"></a>    <span class="n">report_dir</span><span class="o">=</span><span class="s2">&quot;reports&quot;</span><span class="p">,</span>
+<a id="__codelineno-37-18" name="__codelineno-37-18" href="#__codelineno-37-18"></a><span class="p">)</span>
+<a id="__codelineno-37-19" name="__codelineno-37-19" href="#__codelineno-37-19"></a>
+<a id="__codelineno-37-20" name="__codelineno-37-20" href="#__codelineno-37-20"></a><span class="c1"># 绩效分析</span>
+<a id="__codelineno-37-21" name="__codelineno-37-21" href="#__codelineno-37-21"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">analyze_returns</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">risk_free_rate</span><span class="o">=</span><span class="mf">0.03</span><span class="p">)</span>
+<a id="__codelineno-37-22" name="__codelineno-37-22" href="#__codelineno-37-22"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sharpe ratio : </span><span class="si">%.4f</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">])</span>
+<a id="__codelineno-37-23" name="__codelineno-37-23" href="#__codelineno-37-23"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Max drawdown : </span><span class="si">%.2f%%</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;max_drawdown&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span><span class="p">))</span>
+<a id="__codelineno-37-24" name="__codelineno-37-24" href="#__codelineno-37-24"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Win rate     : </span><span class="si">%.2f%%</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;win_rate&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span><span class="p">))</span>
+</code></pre></div>
+<h3 id="83-回测结果解读指南">8.3 回测结果解读指南<a class="headerlink" href="#83-回测结果解读指南" title="Permanent link">&para;</a></h3>
+<p>运行完成后，关注以下关键指标：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>含义</th>
+<th>参考值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>夏普比率</strong></td>
+<td>每单位波动风险的超额收益</td>
+<td>&gt; 1.0 为良好，&gt; 2.0 为优秀</td>
+</tr>
+<tr>
+<td><strong>最大回撤</strong></td>
+<td>从历史峰值到最低点的跌幅</td>
+<td>&lt; 20% 为可接受</td>
+</tr>
+<tr>
+<td><strong>Calmar 比率</strong></td>
+<td>年化收益率 / 最大回撤</td>
+<td>&gt; 1.0 为良好</td>
+</tr>
+<tr>
+<td><strong>Alpha</strong></td>
+<td>相对基准的超额收益</td>
+<td>&gt; 0 说明策略创造了价值</td>
+</tr>
+<tr>
+<td><strong>Beta</strong></td>
+<td>与大盘的相关性</td>
+<td>&lt; 1.0 说明策略波动小于大盘</td>
+</tr>
+<tr>
+<td><strong>胜率</strong></td>
+<td>盈利交易数 / 总交易数</td>
+<td>&gt; 50% 为较好</td>
+</tr>
+</tbody>
+</table>
+<h3 id="84-使用本地数据加速推荐">8.4 使用本地数据加速（推荐）<a class="headerlink" href="#84-使用本地数据加速推荐" title="Permanent link">&para;</a></h3>
+<p>首次运行时下载并保存数据，后续运行直接从本地读取：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="c1"># 第一步：预下载数据（只需一次）</span>
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>python<span class="w"> </span>examples/19_local_data_backtest.py<span class="w"> </span>--download-all
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="c1"># 第二步：使用本地数据运行回测（速度更快）</span>
+<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a><span class="c1"># 在 run_backtest.py 中修改：</span>
+<a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a><span class="c1"># result = run_strategy(..., use_local=True)</span>
+</code></pre></div>
+<hr />
+<h2 id="9-模拟盘部署">9. 模拟盘部署<a class="headerlink" href="#9-模拟盘部署" title="Permanent link">&para;</a></h2>
+<h3 id="91-运行模拟盘">9.1 运行模拟盘<a class="headerlink" href="#91-运行模拟盘" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># 默认设置（资金 ¥500,000，每 60 秒刷新一次报价）</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>python<span class="w"> </span>examples/21_combined_strategy/run_paper_trade.py
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="c1"># 自定义参数</span>
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a>python<span class="w"> </span>examples/21_combined_strategy/run_paper_trade.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="w">    </span>--cash<span class="w"> </span><span class="m">200000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="w">    </span>--interval<span class="w"> </span><span class="m">120</span>
+<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a>
+<a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a><span class="c1"># 按 Ctrl+C 停止</span>
+</code></pre></div>
+<h3 id="92-模拟盘注意事项">9.2 模拟盘注意事项<a class="headerlink" href="#92-模拟盘注意事项" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>运行时段</strong>：建议在 9:30-15:00 的交易时段内运行，获取实时行情</li>
+<li><strong>信号频率</strong>：策略每日只在每根 bar 触发一次，每周一额外触发选股</li>
+<li><strong>网络要求</strong>：需要网络访问 akshare 数据源</li>
+<li><strong>日志输出</strong>：所有买卖决策都有详细的日志记录，方便监控</li>
+</ol>
+<h3 id="93-部署到-ptradeqmt">9.3 部署到 PTrade/QMT<a class="headerlink" href="#93-部署到-ptradeqmt" title="Permanent link">&para;</a></h3>
+<p>参考 <a href="../05_live_trading/">Tutorial 05</a> 和 <a href="../../examples/13_ptrade_export.py">Example 13</a>，
+可以将本策略导出为 PTrade/QMT 格式：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="kn">from</span> <span class="nn">eqlib.ptrade_adapter</span> <span class="kn">import</span> <span class="n">export_ptrade_script</span>
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="c1"># 生成 QMT 可运行的策略文件</span>
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="n">export_ptrade_script</span><span class="p">(</span>
+<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>    <span class="n">initialize_func</span><span class="o">=</span><span class="n">initialize</span><span class="p">,</span>
+<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>    <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;combined_strategy_qmt.py&quot;</span><span class="p">,</span>
+<a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="10-策略解读与改进方向">10. 策略解读与改进方向<a class="headerlink" href="#10-策略解读与改进方向" title="Permanent link">&para;</a></h2>
+<h3 id="101-策略适用的市场环境">10.1 策略适用的市场环境<a class="headerlink" href="#101-策略适用的市场环境" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>市场环境</th>
+<th>策略表现预期</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>震荡市</strong></td>
+<td>较好</td>
+<td>RSI + 布林带均值回归起主导作用</td>
+</tr>
+<tr>
+<td><strong>牛市</strong></td>
+<td>较好</td>
+<td>动量因子 + MACD 趋势跟踪有效</td>
+</tr>
+<tr>
+<td><strong>熊市</strong></td>
+<td>较弱</td>
+<td>股票普跌，买入信号难以盈利；止损频繁触发</td>
+</tr>
+<tr>
+<td><strong>单边下跌</strong></td>
+<td>可控</td>
+<td>硬止损 + ATR 止损限制最大损失</td>
+</tr>
+</tbody>
+</table>
+<h3 id="102-可能的改进方向">10.2 可能的改进方向<a class="headerlink" href="#102-可能的改进方向" title="Permanent link">&para;</a></h3>
+<p><strong>1. 加入大盘过滤（推荐优先级最高）</strong></p>
+<p>参考 Tutorial 04，在大盘趋势向下时暂停买入：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="k">def</span> <span class="nf">_market_is_bullish</span><span class="p">():</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;检查大盘是否处于上升趋势（5 日均线 &gt; 20 日均线）。&quot;&quot;&quot;</span>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>    <span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s2">&quot;000300.XSHG&quot;</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="s2">&quot;1d&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;close&quot;</span><span class="p">])</span>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>    <span class="k">if</span> <span class="n">hist</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>        <span class="k">return</span> <span class="kc">True</span>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>    <span class="n">ma5</span>  <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s2">&quot;close&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a>    <span class="n">ma20</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s2">&quot;close&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>    <span class="k">return</span> <span class="n">ma5</span> <span class="o">&gt;</span> <span class="n">ma20</span>
+</code></pre></div>
+<p>在 <code>_check_buy()</code> 中增加：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">_market_is_bullish</span><span class="p">():</span>
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>    <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Market filter: index below MA20&quot;</span>
+</code></pre></div></p>
+<p><strong>2. 扩大股票池</strong></p>
+<p>可以将股票池从 12 只扩展到 20-30 只，涵盖更多行业，
+同时增加 <code>top_n = 8</code>，提升分散度。</p>
+<p><strong>3. 动态调整因子权重</strong></p>
+<p>在牛市中提高动量因子权重（到 50%），在震荡市中提高低波动因子权重（到 35%）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="k">def</span> <span class="nf">_get_factor_weights</span><span class="p">():</span>
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;根据市场状态动态调整因子权重。&quot;&quot;&quot;</span>
+<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>    <span class="k">if</span> <span class="n">_market_is_bullish</span><span class="p">():</span>
+<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;momentum&quot;</span><span class="p">:</span> <span class="mf">0.50</span><span class="p">,</span> <span class="s2">&quot;volume&quot;</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;reversal&quot;</span><span class="p">:</span> <span class="mf">0.10</span><span class="p">,</span> <span class="s2">&quot;volatility&quot;</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">}</span>
+<a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;momentum&quot;</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;volume&quot;</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;reversal&quot;</span><span class="p">:</span> <span class="mf">0.20</span><span class="p">,</span> <span class="s2">&quot;volatility&quot;</span><span class="p">:</span> <span class="mf">0.30</span><span class="p">}</span>
+</code></pre></div>
+<p><strong>4. 月度再平衡财务因子</strong></p>
+<p>每月加入 PE/PB 财务因子（参考 Tutorial 08 第 5 节），但仅作为辅助参考：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="k">def</span> <span class="nf">_compute_pe_factor</span><span class="p">(</span><span class="n">code</span><span class="p">):</span>
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>    <span class="n">val</span> <span class="o">=</span> <span class="n">get_valuation</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>    <span class="k">if</span> <span class="n">val</span> <span class="ow">and</span> <span class="n">val</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pe&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">val</span><span class="p">[</span><span class="s2">&quot;pe&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">80</span><span class="p">:</span>
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>        <span class="k">return</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">val</span><span class="p">[</span><span class="s2">&quot;pe&quot;</span><span class="p">]</span>
+<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a>    <span class="k">return</span> <span class="kc">None</span>
+</code></pre></div>
+<p><strong>5. Kelly 仓位调整</strong></p>
+<p>根据历史胜率动态调整仓位大小（参考 Example 11）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="kn">from</span> <span class="nn">eqlib.utils</span> <span class="kn">import</span> <span class="n">kelly_criterion</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a><span class="n">win_rate</span> <span class="o">=</span> <span class="n">historical_win_rate</span>   <span class="c1"># 从回测结果中提取</span>
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="n">avg_win</span>  <span class="o">=</span> <span class="n">historical_avg_win</span>
+<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a><span class="n">avg_loss</span> <span class="o">=</span> <span class="n">historical_avg_loss</span>
+<a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="n">kelly_f</span>  <span class="o">=</span> <span class="n">kelly_criterion</span><span class="p">(</span><span class="n">win_rate</span><span class="p">,</span> <span class="n">avg_win</span><span class="p">,</span> <span class="n">avg_loss</span><span class="p">)</span>
+<a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="c1"># 使用 Half-Kelly 降低风险</span>
+<a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a><span class="n">position_pct</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">kelly_f</span> <span class="o">*</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">g</span><span class="o">.</span><span class="n">max_single_pct</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="103-过拟合风险警告">10.3 过拟合风险警告<a class="headerlink" href="#103-过拟合风险警告" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>⚠️ <strong>重要提示</strong></p>
+<p>本策略的参数（如 RSI 阈值 35/65、ATR 倍数 2.5×、因子权重等）是根据量化研究文献
+和 A 股市场特征设定的合理默认值，而<strong>不是通过大量回测优化得到的最优参数</strong>。</p>
+<p>避免过拟合的最佳实践：
+1. <strong>样本外测试</strong>：只用 2020-2022 年数据调参，用 2023-2024 年数据验证
+2. <strong>参数稳定性</strong>：轻微改变参数（如 RSI 阈值从 35 改为 33 或 37），
+   如果收益大幅变化，说明参数不够鲁棒
+3. <strong>前瞻偏差检查</strong>：确保没有使用未来数据（<code>attribute_history</code> 始终只看历史）</p>
+</blockquote>
+<hr />
+<h2 id="延伸阅读">延伸阅读<a class="headerlink" href="#延伸阅读" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>教程</th>
+<th>相关内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../06_rsi_mean_reversion/">Tutorial 06: RSI 均值回归</a></td>
+<td>RSI 原理、布林带对比</td>
+</tr>
+<tr>
+<td><a href="../07_sector_rotation/">Tutorial 07: 行业轮动</a></td>
+<td>动量轮动、多维度行业评分</td>
+</tr>
+<tr>
+<td><a href="../08_multi_factor/">Tutorial 08: 多因子选股</a></td>
+<td>Z-Score 标准化、IC 检验</td>
+</tr>
+<tr>
+<td><a href="../04_strategy_optimization/">Tutorial 04: 策略优化</a></td>
+<td>大盘过滤、止损设计</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>示例</th>
+<th>相关代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../../examples/14_bollinger_strategy.py">Example 14: 布林带策略</a></td>
+<td>Bollinger 均值回归</td>
+</tr>
+<tr>
+<td><a href="../../examples/15_macd_volume_strategy.py">Example 15: MACD 策略</a></td>
+<td>MACD+成交量+ATR</td>
+</tr>
+<tr>
+<td><a href="../../examples/16_multi_factor_strategy.py">Example 16: 多因子策略</a></td>
+<td>动量+成交量选股</td>
+</tr>
+<tr>
+<td><a href="../../examples/20_sr_strategy/">Example 20: 支撑阻力策略</a></td>
+<td>S/R+MACD+ATR 完整案例</td>
+</tr>
+<tr>
+<td><a href="../../examples/11_utils_library.py">Example 11: 工具库</a></td>
+<td>所有技术指标演示</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="附录一键运行命令">附录：一键运行命令<a class="headerlink" href="#附录一键运行命令" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="c1"># 克隆项目后，在项目根目录执行：</span>
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="c1"># 安装依赖</span>
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>pip<span class="w"> </span>install<span class="w"> </span>akshare<span class="w"> </span>pandas<span class="w"> </span>numpy<span class="w"> </span>matplotlib<span class="w"> </span>scipy
+<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a>
+<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="c1"># 运行回测（约 60 秒）</span>
+<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a>python<span class="w"> </span>examples/21_combined_strategy/run_backtest.py
+<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a>
+<a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="c1"># 查看报告（浏览器打开生成的 HTML 文件）</span>
+<a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a><span class="c1"># 报告路径：reports/backtest_&lt;时间戳&gt;.html</span>
+<a id="__codelineno-46-11" name="__codelineno-46-11" href="#__codelineno-46-11"></a>
+<a id="__codelineno-46-12" name="__codelineno-46-12" href="#__codelineno-46-12"></a><span class="c1"># 模拟盘（需要网络，交易时段内运行效果最佳）</span>
+<a id="__codelineno-46-13" name="__codelineno-46-13" href="#__codelineno-46-13"></a>python<span class="w"> </span>examples/21_combined_strategy/run_paper_trade.py
+</code></pre></div>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

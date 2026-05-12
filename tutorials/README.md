@@ -177,9 +177,9 @@ tutorials/
 | **MACD 趋势确认** | [Tutorial 04 第 3.4 节](04_strategy_optimization.md#34-macd-辅助确认) | [Example 15](../examples/15_macd_volume_strategy.py) |
 | **行业轮动** | [Tutorial 07](07_sector_rotation.md) | [Example 10](../examples/10_index_concept.py) |
 | **多因子选股** | [Tutorial 08](08_multi_factor.md) | [Example 16](../examples/16_multi_factor_strategy.py)、[Example 09](../examples/09_attribution_analysis.py) |
-| **综合策略（全天候 Alpha）** | [Tutorial 09](09_combined_strategy.md) | [Example 21](../examples/21_combined_strategy/) |
+| **综合策略（全天候 Alpha）** | [Tutorial 09](09_combined_strategy.md) | [Example 21](../examples/21_combined_strategy/README.md) |
 | **网格交易** | — | [Example 17](../examples/17_grid_trading_strategy.py) |
-| **支撑阻力位** | — | [Example 11](../examples/11_utils_library.py)、[Example 20](../examples/20_sr_strategy/) |
+| **支撑阻力位** | — | [Example 11](../examples/11_utils_library.py)、[Example 20](../examples/20_sr_strategy/README.md) |
 | **组合回测** | [Tutorial 03 第 8 节](03_backtesting.md#8-组合回测) | [Example 12](../examples/12_portfolio_backtest.py) |
 | **AI Agent 自动化优化** | [Tutorial 10](10_agent_optimization.md) | [agent/optimizer.py](../agent/optimizer.py)、[agent/strategy_template.py](../agent/strategy_template.py) |
 | **模拟盘 / 实盘** | [Tutorial 05](05_live_trading.md) | [Example 05](../examples/05_paper_trade.py)、[Example 13](../examples/13_ptrade_export.py) |
@@ -220,12 +220,12 @@ tutorials/
 将所有教程的策略技术融合为一个完整的生产级综合策略，包含多因子选股、行业轮动、
 RSI/布林带/MACD/ATR 技术信号、支撑阻力位和生命周期回调，配有完整的回测和模拟盘代码。
 
-**[Example 21: 全天候 Alpha 综合策略](../examples/21_combined_strategy/)** —
+**[Example 21: 全天候 Alpha 综合策略](../examples/21_combined_strategy/README.md)** —
 完整可运行的综合策略代码，包含策略模块、回测脚本和模拟盘脚本。
 
 ### 支撑阻力位组合策略（完整实盘案例）
 
-**[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/)** —
+**[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/README.md)** —
 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），
 可以直接打开浏览器查看策略表现，也可以运行回测验证。
 

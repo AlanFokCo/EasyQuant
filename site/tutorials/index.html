@@ -1,0 +1,2203 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/tutorials/">
+      
+      
+        <link rel="prev" href="../doc/utils_reference/">
+      
+      
+        <link rel="next" href="00_environment_and_first_run/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Tutorial Guide - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tutorials" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href=".." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tutorial Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/reports_and_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/ptrade_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc/utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录结构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录结构
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#前置知识按需阅读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前置知识（按需阅读）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#新手首日打卡建议按顺序" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        新手首日打卡（建议按顺序）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#教程列表" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        教程列表
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="教程列表">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#前置知识可选按需阅读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前置知识（可选，按需阅读）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#环境与入门" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境与入门
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#策略专项教程按兴趣选读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略专项教程（按兴趣选读）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#学习路径" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        学习路径
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="学习路径">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#路径-a零基础入门推荐新手" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 A：零基础入门（推荐新手）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-b趋势跟踪策略方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 B：趋势跟踪策略方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-c均值回归策略方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 C：均值回归策略方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-d选股与组合方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 D：选股与组合方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-e快速上手实盘" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 E：快速上手实盘
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-f综合策略实战推荐进阶用户" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 F：综合策略实战（推荐进阶用户）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-gai-agent-自动化优化推荐有一定基础的用户" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 G：AI Agent 自动化优化（推荐有一定基础的用户）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#按策略类型查找" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        按策略类型查找
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#前置要求" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前置要求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#与示例的区别" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        与示例的区别
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#实战案例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实战案例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="实战案例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#全天候-alpha-综合策略完整生产级案例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全天候 Alpha 综合策略（完整生产级案例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#支撑阻力位组合策略完整实盘案例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        支撑阻力位组合策略（完整实盘案例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#多策略横向对比" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多策略横向对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="09_combined_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录结构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录结构
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#前置知识按需阅读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前置知识（按需阅读）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#新手首日打卡建议按顺序" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        新手首日打卡（建议按顺序）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#教程列表" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        教程列表
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="教程列表">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#前置知识可选按需阅读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前置知识（可选，按需阅读）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#环境与入门" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境与入门
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#策略专项教程按兴趣选读" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略专项教程（按兴趣选读）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#学习路径" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        学习路径
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="学习路径">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#路径-a零基础入门推荐新手" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 A：零基础入门（推荐新手）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-b趋势跟踪策略方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 B：趋势跟踪策略方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-c均值回归策略方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 C：均值回归策略方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-d选股与组合方向" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 D：选股与组合方向
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-e快速上手实盘" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 E：快速上手实盘
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-f综合策略实战推荐进阶用户" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 F：综合策略实战（推荐进阶用户）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#路径-gai-agent-自动化优化推荐有一定基础的用户" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        路径 G：AI Agent 自动化优化（推荐有一定基础的用户）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#按策略类型查找" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        按策略类型查找
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#前置要求" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前置要求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#与示例的区别" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        与示例的区别
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#实战案例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实战案例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="实战案例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#全天候-alpha-综合策略完整生产级案例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全天候 Alpha 综合策略（完整生产级案例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#支撑阻力位组合策略完整实盘案例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        支撑阻力位组合策略（完整实盘案例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#多策略横向对比" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多策略横向对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tutorials">Tutorials<a class="headerlink" href="#tutorials" title="Permanent link">&para;</a></h1>
+<p>EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖趋势跟踪、均值回归、行业轮动和多因子选股四大策略方向。</p>
+<p><strong>第一次使用请先阅读：<a href="00_environment_and_first_run/">Tutorial 00 — 环境与第一次运行</a></strong>（Python 3.10+、<code>pip install .</code>、运行 <code>examples/03_run_backtest.py</code>、打开 HTML 报告）。<strong>文档中心：</strong> <a href="../doc/"><code>doc/README.md</code></a>（用户手册、API 索引、FAQ、报告指标详解）。</p>
+<hr />
+<h2 id="目录结构">目录结构<a class="headerlink" href="#目录结构" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tutorials/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── prerequisites/          ← 前置知识（按需阅读）
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── README.md           ← 前置知识总览
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── python_basics.md    ← Python 语法、pandas/numpy、虚拟环境
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── technical_concepts.md  ← 均线、RSI、MACD、布林带、ATR、KDJ 等
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   └── ashare_knowledge.md ← A 股代码规则、T+1、涨跌停、指数、手续费
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── 00_environment_and_first_run.md   ← 安装、首跑回测（必读）
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── 01_quant_basics.md      ← 量化基础概念、策略要素、常见错误
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├── 02_first_strategy.md    ← 编写双均线策略
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>├── 03_backtesting.md       ← 解读回测报告与指标
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>├── 04_strategy_optimization.md  ← 参数调优、组合优化、归因分析
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>├── 05_live_trading.md      ← 模拟盘到实盘部署
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>├── 06_rsi_mean_reversion.md  ← RSI 均值回归策略
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>├── 07_sector_rotation.md   ← 行业轮动策略
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>├── 08_multi_factor.md      ← 多因子选股
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>├── 09_combined_strategy.md ← 综合策略（全天候 Alpha）
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>└── 10_agent_optimization.md  ← AI Agent 自动化策略优化
+</code></pre></div>
+<hr />
+<h2 id="前置知识按需阅读">前置知识（按需阅读）<a class="headerlink" href="#前置知识按需阅读" title="Permanent link">&para;</a></h2>
+<p>如果你在以下任一领域没有基础，建议先阅读对应的前置文件，再从 Tutorial 00 开始：</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>内容</th>
+<th>适合谁</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="prerequisites/python_basics/">Python 基础与环境配置</a></td>
+<td>语法速查、pandas/numpy 核心用法、虚拟环境</td>
+<td>没有写过 Python</td>
+</tr>
+<tr>
+<td><a href="prerequisites/technical_concepts/">技术分析基础概念</a></td>
+<td>OHLCV、均线、RSI、MACD、布林带、ATR、KDJ、ADX、支撑阻力</td>
+<td>没接触过技术指标</td>
+</tr>
+<tr>
+<td><a href="prerequisites/ashare_knowledge/">A 股市场基础知识</a></td>
+<td>股票代码、T+1、涨跌停、主要指数、ST 股、手续费与税、基本面数据</td>
+<td>没有 A 股投资经验</td>
+</tr>
+</tbody>
+</table>
+<p>→ 前置知识完整索引：<a href="prerequisites/">prerequisites/README.md</a></p>
+<hr />
+<h2 id="新手首日打卡建议按顺序">新手首日打卡（建议按顺序）<a class="headerlink" href="#新手首日打卡建议按顺序" title="Permanent link">&para;</a></h2>
+<ol>
+<li>安装并验证：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>.
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;from eqlib import *; print(&#39;eqlib OK&#39;)&quot;</span>
+</code></pre></div></li>
+<li>跑第一份完整报告：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>examples/03_run_backtest.py
+</code></pre></div></li>
+<li>打开 <code>reports/*.html</code> 看指标卡片、回撤曲线、交易记录。</li>
+<li>需要离线快速验证时，先跑本地数据示例（可选）：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>examples/19_local_data_backtest.py<span class="w"> </span>--download-all
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python<span class="w"> </span>examples/19_local_data_backtest.py
+</code></pre></div></li>
+<li>做最小功能验证（可选）：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python<span class="w"> </span>examples/01_fetch_data.py
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/
+</code></pre></div></li>
+</ol>
+<p>完成后继续阅读 <a href="01_quant_basics/">Tutorial 01</a> 与 <a href="02_first_strategy/">Tutorial 02</a>。</p>
+<hr />
+<h2 id="教程列表">教程列表<a class="headerlink" href="#教程列表" title="Permanent link">&para;</a></h2>
+<h3 id="前置知识可选按需阅读">前置知识（可选，按需阅读）<a class="headerlink" href="#前置知识可选按需阅读" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>内容摘要</th>
+<th>预计阅读</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="prerequisites/python_basics/">Python 基础与环境配置</a></td>
+<td>变量、函数、pandas/numpy 核心操作、虚拟环境</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td><a href="prerequisites/technical_concepts/">技术分析基础概念</a></td>
+<td>OHLCV、MA / RSI / MACD / 布林带 / ATR / KDJ / ADX、支撑阻力</td>
+<td>25 min</td>
+</tr>
+<tr>
+<td><a href="prerequisites/ashare_knowledge/">A 股市场基础知识</a></td>
+<td>股票代码格式、T+1、涨跌停、常用指数、ST 股、手续费与税</td>
+<td>20 min</td>
+</tr>
+</tbody>
+</table>
+<h3 id="环境与入门">环境与入门<a class="headerlink" href="#环境与入门" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>教程</th>
+<th>主题</th>
+<th>预计阅读</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>00</td>
+<td><a href="00_environment_and_first_run/"><strong>环境与第一次运行</strong></a></td>
+<td>Python 版本、安装、首跑回测、打开报告</td>
+<td>10 min</td>
+</tr>
+<tr>
+<td>01</td>
+<td><a href="01_quant_basics/">什么是量化交易策略</a></td>
+<td>量化交易基础、策略要素、常见错误</td>
+<td>15 min</td>
+</tr>
+<tr>
+<td>02</td>
+<td><a href="02_first_strategy/">写第一个策略</a></td>
+<td>编写双均线策略、运行回测</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>03</td>
+<td><a href="03_backtesting/">回测验证</a></td>
+<td>解读报告、风险指标、组合回测</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>04</td>
+<td><a href="04_strategy_optimization/">策略优化与改进</a></td>
+<td>参数调优、组合优化、归因分析</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>05</td>
+<td><a href="05_live_trading/">模拟盘到实盘</a></td>
+<td>模拟盘验证、PTrade/QMT 导出部署</td>
+<td>15 min</td>
+</tr>
+</tbody>
+</table>
+<h3 id="策略专项教程按兴趣选读">策略专项教程（按兴趣选读）<a class="headerlink" href="#策略专项教程按兴趣选读" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>教程</th>
+<th>策略类型</th>
+<th>核心技术</th>
+<th>预计阅读</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>06</td>
+<td><a href="06_rsi_mean_reversion/">RSI 均值回归策略</a></td>
+<td>均值回归</td>
+<td>RSI、布林带二次确认、止损</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>07</td>
+<td><a href="07_sector_rotation/">行业轮动策略</a></td>
+<td>行业轮动</td>
+<td>动量打分、等权调仓、行业 API</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>08</td>
+<td><a href="08_multi_factor/">多因子选股</a></td>
+<td>因子选股</td>
+<td>Z-Score 标准化、因子合成、IC 检验</td>
+<td>25 min</td>
+</tr>
+<tr>
+<td>09</td>
+<td><a href="09_combined_strategy/">全天候 Alpha 综合策略</a></td>
+<td>综合策略</td>
+<td>多因子+行业轮动+RSI/布林/MACD+ATR止损</td>
+<td>30 min</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="10_agent_optimization/">AI Agent 自动化策略优化</a></td>
+<td>Agent 工作流</td>
+<td>自优化循环、数据驱动调参、审计日志</td>
+<td>25 min</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="学习路径">学习路径<a class="headerlink" href="#学习路径" title="Permanent link">&para;</a></h2>
+<p>根据你的背景和目标，选择最适合的学习路径：</p>
+<h3 id="路径-a零基础入门推荐新手">路径 A：零基础入门（推荐新手）<a class="headerlink" href="#路径-a零基础入门推荐新手" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>00 环境与第一次运行 → 01 量化基础 → 02 第一个策略 → 03 回测验证 → 04 策略优化 → 05 实盘部署
+</code></pre></div>
+<p>适合：第一次接触量化交易，想系统了解整个流程</p>
+<h3 id="路径-b趋势跟踪策略方向">路径 B：趋势跟踪策略方向<a class="headerlink" href="#路径-b趋势跟踪策略方向" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>02 第一个策略（双均线）→ 03 回测验证 → 04 策略优化（止损/大盘过滤）→ 07 行业轮动
+</code></pre></div>
+<p>适合：想做趋势交易，关注动量、均线突破的用户</p>
+<h3 id="路径-c均值回归策略方向">路径 C：均值回归策略方向<a class="headerlink" href="#路径-c均值回归策略方向" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>02 第一个策略 → 03 回测验证 → 06 RSI 均值回归 → 04 策略优化
+</code></pre></div>
+<p>适合：想做震荡行情中的高抛低吸，关注 RSI、布林带的用户</p>
+<h3 id="路径-d选股与组合方向">路径 D：选股与组合方向<a class="headerlink" href="#路径-d选股与组合方向" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>02 第一个策略 → 03 回测验证 → 08 多因子选股 → 07 行业轮动 → 04 策略优化
+</code></pre></div>
+<p>适合：想构建多股票组合策略，关注量化选股的用户</p>
+<h3 id="路径-e快速上手实盘">路径 E：快速上手实盘<a class="headerlink" href="#路径-e快速上手实盘" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>02 第一个策略 → 03 回测验证 → 05 模拟盘到实盘
+</code></pre></div>
+<p>适合：有一定基础，想尽快把策略部署到 PTrade/QMT 的用户</p>
+<h3 id="路径-f综合策略实战推荐进阶用户">路径 F：综合策略实战（推荐进阶用户）<a class="headerlink" href="#路径-f综合策略实战推荐进阶用户" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>06 RSI 均值回归 → 07 行业轮动 → 08 多因子选股 → 09 综合策略
+</code></pre></div>
+<p>适合：已掌握单一策略，希望将所有技术融合到一个生产级策略的用户</p>
+<h3 id="路径-gai-agent-自动化优化推荐有一定基础的用户">路径 G：AI Agent 自动化优化（推荐有一定基础的用户）<a class="headerlink" href="#路径-gai-agent-自动化优化推荐有一定基础的用户" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>02 第一个策略 → 03 回测验证 → 04 策略优化 → 10 AI Agent 自动化优化
+</code></pre></div>
+<p>适合：想用 AI 工具自动调参、无需人工干预完成策略优化闭环的用户</p>
+<hr />
+<h2 id="按策略类型查找">按策略类型查找<a class="headerlink" href="#按策略类型查找" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>策略类型</th>
+<th>教程</th>
+<th>相关示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>趋势跟踪（双均线）</strong></td>
+<td><a href="02_first_strategy/">Tutorial 02</a>、<a href="04_strategy_optimization/">Tutorial 04</a></td>
+<td><a href="../examples/02_write_strategy.py">Example 02</a>、<a href="../examples/03_run_backtest.py">Example 03</a></td>
+</tr>
+<tr>
+<td><strong>均值回归（RSI）</strong></td>
+<td><a href="06_rsi_mean_reversion/">Tutorial 06</a></td>
+<td><a href="../examples/14_bollinger_strategy.py">Example 14</a>、<a href="../examples/18_strategy_comparison.py">Example 18</a></td>
+</tr>
+<tr>
+<td><strong>均值回归（布林带）</strong></td>
+<td><a href="06_rsi_mean_reversion/#8-与布林带策略的对比">Tutorial 06 第 8 节</a></td>
+<td><a href="../examples/14_bollinger_strategy.py">Example 14</a></td>
+</tr>
+<tr>
+<td><strong>MACD 趋势确认</strong></td>
+<td><a href="04_strategy_optimization/#34-macd-辅助确认">Tutorial 04 第 3.4 节</a></td>
+<td><a href="../examples/15_macd_volume_strategy.py">Example 15</a></td>
+</tr>
+<tr>
+<td><strong>行业轮动</strong></td>
+<td><a href="07_sector_rotation/">Tutorial 07</a></td>
+<td><a href="../examples/10_index_concept.py">Example 10</a></td>
+</tr>
+<tr>
+<td><strong>多因子选股</strong></td>
+<td><a href="08_multi_factor/">Tutorial 08</a></td>
+<td><a href="../examples/16_multi_factor_strategy.py">Example 16</a>、<a href="../examples/09_attribution_analysis.py">Example 09</a></td>
+</tr>
+<tr>
+<td><strong>综合策略（全天候 Alpha）</strong></td>
+<td><a href="09_combined_strategy/">Tutorial 09</a></td>
+<td><a href="../examples/21_combined_strategy/">Example 21</a></td>
+</tr>
+<tr>
+<td><strong>网格交易</strong></td>
+<td>—</td>
+<td><a href="../examples/17_grid_trading_strategy.py">Example 17</a></td>
+</tr>
+<tr>
+<td><strong>支撑阻力位</strong></td>
+<td>—</td>
+<td><a href="../examples/11_utils_library.py">Example 11</a>、<a href="../examples/20_sr_strategy/">Example 20</a></td>
+</tr>
+<tr>
+<td><strong>组合回测</strong></td>
+<td><a href="03_backtesting/#8-组合回测">Tutorial 03 第 8 节</a></td>
+<td><a href="../examples/12_portfolio_backtest.py">Example 12</a></td>
+</tr>
+<tr>
+<td><strong>AI Agent 自动化优化</strong></td>
+<td><a href="10_agent_optimization/">Tutorial 10</a></td>
+<td><a href="../agent/optimizer.py">agent/optimizer.py</a>、<a href="../agent/strategy_template.py">agent/strategy_template.py</a></td>
+</tr>
+<tr>
+<td><strong>模拟盘 / 实盘</strong></td>
+<td><a href="05_live_trading/">Tutorial 05</a></td>
+<td><a href="../examples/05_paper_trade.py">Example 05</a>、<a href="../examples/13_ptrade_export.py">Example 13</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="前置要求">前置要求<a class="headerlink" href="#前置要求" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Python <strong>3.10+</strong>（见 <a href="00_environment_and_first_run/">Tutorial 00</a>）</li>
+<li>已在仓库根目录执行 <strong><code>pip install .</code></strong> 或 <strong><code>pip install -e .</code></strong></li>
+<li>Python 基础（变量、函数、循环、条件判断） → 没有基础？见 <a href="prerequisites/python_basics/">Python 基础与环境配置</a></li>
+<li>技术指标基础（均线、RSI 等） → 没有基础？见 <a href="prerequisites/technical_concepts/">技术分析基础概念</a></li>
+<li>A 股市场常识（T+1、涨跌停、股票代码等） → 没有基础？见 <a href="prerequisites/ashare_knowledge/">A 股市场基础知识</a></li>
+</ul>
+<p><strong>排错与 API 速查：</strong> <a href="../doc/FAQ/"><code>doc/FAQ.md</code></a>、<a href="../doc/api_index/"><code>doc/api_index.md</code></a>。</p>
+<hr />
+<h2 id="与示例的区别">与示例的区别<a class="headerlink" href="#与示例的区别" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>教程 (tutorials/)</th>
+<th>示例 (examples/)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>形式</td>
+<td>Markdown 文档 + 代码片段</td>
+<td>可运行的 Python 脚本</td>
+</tr>
+<tr>
+<td>目标</td>
+<td>系统学习概念和方法</td>
+<td>快速参考和复制运行</td>
+</tr>
+<tr>
+<td>内容</td>
+<td>讲解"为什么"和"怎么做"</td>
+<td>展示"具体代码长什么样"</td>
+</tr>
+</tbody>
+</table>
+<p>建议：先用教程学习概念，再运行示例加深理解。</p>
+<hr />
+<h2 id="实战案例">实战案例<a class="headerlink" href="#实战案例" title="Permanent link">&para;</a></h2>
+<p>完成教程后，查看以下真实策略案例：</p>
+<h3 id="全天候-alpha-综合策略完整生产级案例">全天候 Alpha 综合策略（完整生产级案例）<a class="headerlink" href="#全天候-alpha-综合策略完整生产级案例" title="Permanent link">&para;</a></h3>
+<p><strong><a href="09_combined_strategy/">Tutorial 09: 全天候 Alpha 综合策略</a></strong> —
+将所有教程的策略技术融合为一个完整的生产级综合策略，包含多因子选股、行业轮动、
+RSI/布林带/MACD/ATR 技术信号、支撑阻力位和生命周期回调，配有完整的回测和模拟盘代码。</p>
+<p><strong><a href="../examples/21_combined_strategy/">Example 21: 全天候 Alpha 综合策略</a></strong> —
+完整可运行的综合策略代码，包含策略模块、回测脚本和模拟盘脚本。</p>
+<h3 id="支撑阻力位组合策略完整实盘案例">支撑阻力位组合策略（完整实盘案例）<a class="headerlink" href="#支撑阻力位组合策略完整实盘案例" title="Permanent link">&para;</a></h3>
+<p><strong><a href="../examples/20_sr_strategy/">Example 20: 支撑阻力位组合策略</a></strong> —
+一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），
+可以直接打开浏览器查看策略表现，也可以运行回测验证。</p>
+<p><strong>策略亮点：</strong> 8 只不同行业 A 股，结合支撑阻力位 + RSI + MACD + ATR 止损，
+回测期间（2020–2026）总收益 +137%。</p>
+<h3 id="多策略横向对比">多策略横向对比<a class="headerlink" href="#多策略横向对比" title="Permanent link">&para;</a></h3>
+<p><strong><a href="../examples/18_strategy_comparison.py">Example 18: 多策略对比</a></strong> —
+在同一只股票、同一时间段内，横向对比买入持有、双均线、RSI 均值回归、布林带四种策略。
+这是检验你对不同策略理解是否到位的最好工具。</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

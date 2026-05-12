@@ -1,0 +1,2938 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://AlanFokCo.github.io/EasyQuant/doc/ptrade_adapter/">
+      
+      
+        <link rel="prev" href="../reports_and_metrics/">
+      
+      
+        <link rel="next" href="../FAQ/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>PTrade/QMT Adapter - EasyQuant Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ptradeqmt-策略适配器" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="EasyQuant Docs" class="md-header__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            EasyQuant Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PTrade/QMT Adapter
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="EasyQuant Docs" class="md-nav__button md-logo" aria-label="EasyQuant Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    EasyQuant Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AlanFokCo/EasyQuant" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AlanFokCo/EasyQuant
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation & Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports_and_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTrade/QMT Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-概述" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 概述
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 概述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-什么是-ptradeqmt-适配器" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 什么是 PTrade/QMT 适配器
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-支持的-qmt-版本" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 支持的 QMT 版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-核心能力" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 核心能力
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-快速开始" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 快速开始
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 快速开始">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-最简单的方式使用导出工具" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 最简单的方式：使用导出工具
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-手动方式三步迁移" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 手动方式：三步迁移
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-工作原理" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 工作原理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 工作原理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-架构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 架构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-生命周期映射" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 生命周期映射
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-数据流" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 数据流
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-交易流" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 交易流
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-api-对照" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. API 对照
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. API 对照">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-完全兼容的-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 完全兼容的 API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-适配后兼容的-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 适配后兼容的 API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-新增-api仅-qmt-模式" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 新增 API（仅 QMT 模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-不支持的-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 不支持的 API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-使用方式" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 使用方式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 使用方式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-方式一直接粘贴到-qmt-编辑器" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 方式一：直接粘贴到 QMT 编辑器
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-方式二使用装饰器风格" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 方式二：使用装饰器风格
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-方式三使用导出工具" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 方式三：使用导出工具
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-代码格式转换" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 代码格式转换
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 代码格式转换">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-股票代码转换规则" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 股票代码转换规则
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-账户设置" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 账户设置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-订单类型" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 订单类型
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-注意事项" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 注意事项
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 注意事项">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-回测模式差异" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 回测模式差异
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-数据类型差异" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 数据类型差异
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-交易函数限制" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 交易函数限制
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-股票池" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 股票池
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-全局变量" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 全局变量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#76-滑点和手续费" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.6 滑点和手续费
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#77-contextinfo-直接访问" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.7 ContextInfo 直接访问
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#附录完整迁移示例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：完整迁移示例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="附录：完整迁移示例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#easyquant-原始代码本地回测" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EasyQuant 原始代码（本地回测）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qmt-版本实盘模拟" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QMT 版本（实盘/模拟）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/00_environment_and_first_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00 Environment & First Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/01_quant_basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Quant Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/02_first_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/03_backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 Backtesting Intro
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/04_strategy_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Strategy Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/05_live_trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Live Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/06_rsi_mean_reversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 RSI Mean Reversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/07_sector_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Sector Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/08_multi_factor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Multi-Factor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/09_combined_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 Combined Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/10_agent_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 Agent Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/AlanFokCo/EasyQuant/tree/main/examples" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#目录" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-概述" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 概述
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 概述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-什么是-ptradeqmt-适配器" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 什么是 PTrade/QMT 适配器
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-支持的-qmt-版本" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 支持的 QMT 版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-核心能力" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 核心能力
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-快速开始" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 快速开始
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 快速开始">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-最简单的方式使用导出工具" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 最简单的方式：使用导出工具
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-手动方式三步迁移" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 手动方式：三步迁移
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-工作原理" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 工作原理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 工作原理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-架构" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 架构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-生命周期映射" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 生命周期映射
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-数据流" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 数据流
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-交易流" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 交易流
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-api-对照" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. API 对照
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. API 对照">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-完全兼容的-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 完全兼容的 API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-适配后兼容的-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 适配后兼容的 API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-新增-api仅-qmt-模式" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 新增 API（仅 QMT 模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-不支持的-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 不支持的 API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-使用方式" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 使用方式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 使用方式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-方式一直接粘贴到-qmt-编辑器" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 方式一：直接粘贴到 QMT 编辑器
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-方式二使用装饰器风格" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 方式二：使用装饰器风格
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-方式三使用导出工具" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 方式三：使用导出工具
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-代码格式转换" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 代码格式转换
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 代码格式转换">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-股票代码转换规则" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 股票代码转换规则
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-账户设置" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 账户设置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-订单类型" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 订单类型
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-注意事项" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 注意事项
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 注意事项">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-回测模式差异" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 回测模式差异
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-数据类型差异" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 数据类型差异
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-交易函数限制" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 交易函数限制
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-股票池" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 股票池
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-全局变量" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 全局变量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#76-滑点和手续费" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.6 滑点和手续费
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#77-contextinfo-直接访问" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.7 ContextInfo 直接访问
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#附录完整迁移示例" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：完整迁移示例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="附录：完整迁移示例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#easyquant-原始代码本地回测" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EasyQuant 原始代码（本地回测）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qmt-版本实盘模拟" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QMT 版本（实盘/模拟）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="ptradeqmt-策略适配器">PTrade/QMT 策略适配器<a class="headerlink" href="#ptradeqmt-策略适配器" title="Permanent link">&para;</a></h1>
+<p>将 EasyQuant (eqlib) 编写的策略无缝转换为 PTrade/QMT 平台可运行格式。</p>
+<h2 id="目录">目录<a class="headerlink" href="#目录" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-概述">概述</a></li>
+<li><a href="#2-快速开始">快速开始</a></li>
+<li><a href="#3-工作原理">工作原理</a></li>
+<li><a href="#4-api-对照">API 对照</a></li>
+<li><a href="#5-使用方式">使用方式</a></li>
+<li><a href="#6-代码格式转换">代码格式转换</a></li>
+<li><a href="#7-注意事项">注意事项</a></li>
+</ol>
+<hr />
+<h2 id="1-概述">1. 概述<a class="headerlink" href="#1-概述" title="Permanent link">&para;</a></h2>
+<h3 id="11-什么是-ptradeqmt-适配器">1.1 什么是 PTrade/QMT 适配器<a class="headerlink" href="#11-什么是-ptradeqmt-适配器" title="Permanent link">&para;</a></h3>
+<p>EasyQuant 的 PTrade 适配器是一个兼容层（compatibility layer），让你用同一套策略代码：</p>
+<ul>
+<li><strong>本地</strong>：使用 <code>from eqlib import *</code> + <code>run_backtest()</code> 进行回测（数据源：akshare）</li>
+<li><strong>QMT 平台</strong>：使用 <code>from eqlib.ptrade_adapter import *</code> + <code>start()</code> / <code>on_bar()</code> 进行实盘/模拟（数据源：QMT 实时行情）</li>
+</ul>
+<p>策略逻辑完全一致，只需修改导入语句和入口函数。</p>
+<h3 id="12-支持的-qmt-版本">1.2 支持的 QMT 版本<a class="headerlink" href="#12-支持的-qmt-版本" title="Permanent link">&para;</a></h3>
+<p>适配器基于 QMT Python API 接口文档（<a href="https://qmt.ptradeapi.com/QMT_Python_API_Doc.html">QMT_Python_API_Doc</a>）编写，兼容 QMT 策略编辑器中的 Python 运行环境。</p>
+<h3 id="13-核心能力">1.3 核心能力<a class="headerlink" href="#13-核心能力" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>生命周期桥接</td>
+<td>EasyQuant 的 <code>initialize</code> → QMT 的 <code>init</code>，<code>handle_data</code> → QMT 的 <code>handlebar</code></td>
+</tr>
+<tr>
+<td>代码转换</td>
+<td><code>601390</code> → <code>601390.SH</code>，<code>000300.XSHG</code> → <code>000300.SH</code></td>
+</tr>
+<tr>
+<td>数据适配</td>
+<td><code>attribute_history</code> → <code>ContextInfo.get_market_data</code></td>
+</tr>
+<tr>
+<td>交易适配</td>
+<td><code>order_value</code> → QMT <code>order_value()</code>，<code>order_target</code> → <code>order_shares</code></td>
+</tr>
+<tr>
+<td>组合模拟</td>
+<td>内置 <code>Portfolio</code> / <code>Position</code> 模拟，可同步 QMT 真实账户状态</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-快速开始">2. 快速开始<a class="headerlink" href="#2-快速开始" title="Permanent link">&para;</a></h2>
+<h3 id="21-最简单的方式使用导出工具">2.1 最简单的方式：使用导出工具<a class="headerlink" href="#21-最简单的方式使用导出工具" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>examples/13_ptrade_export.py
+</code></pre></div>
+<p>生成 <code>examples/ptrade_strategy_generated.py</code>（默认由 <code>examples/03_run_backtest.py</code> 生成样例），复制到 QMT 策略编辑器即可运行。</p>
+<h3 id="22-手动方式三步迁移">2.2 手动方式：三步迁移<a class="headerlink" href="#22-手动方式三步迁移" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1: 编写 EasyQuant 策略</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># my_strategy.py — 本地回测用</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="o">=</span> <span class="s1">&#39;601390&#39;</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">set_benchmark</span><span class="p">(</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">run_daily</span><span class="p">(</span><span class="n">market_open</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="s1">&#39;every_bar&#39;</span><span class="p">)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">def</span> <span class="nf">market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">if</span> <span class="n">hist</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="k">return</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">ma</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">price</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="k">if</span> <span class="n">price</span> <span class="o">&gt;</span> <span class="n">ma</span><span class="p">:</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">order_value</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">available_cash</span><span class="p">)</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        <span class="n">order_target</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Step 2: 在 QMT 策略编辑器中创建策略</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># QMT 策略编辑器 — 实盘/模拟用</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span> <span class="nn">eqlib.ptrade_adapter</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># === 粘贴上面的策略代码（去掉 from eqlib import *） ===</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="o">=</span> <span class="s1">&#39;601390&#39;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">set_benchmark</span><span class="p">(</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;YOUR_ACCOUNT_ID&#39;</span><span class="p">)</span>  <span class="c1"># 你的 QMT 账号</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">run_daily</span><span class="p">(</span><span class="n">market_open</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="s1">&#39;every_bar&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">def</span> <span class="nf">market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">if</span> <span class="n">hist</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="k">return</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="n">ma</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="n">price</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="k">if</span> <span class="n">price</span> <span class="o">&gt;</span> <span class="n">ma</span><span class="p">:</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>        <span class="n">order_value</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">available_cash</span><span class="p">)</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="n">order_target</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="c1"># === QMT 入口函数 — 固定写法 ===</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;YOUR_ACCOUNT_ID&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    <span class="n">start</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="k">def</span> <span class="nf">handlebar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>    <span class="n">on_bar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Step 3: 在 QMT 中运行</strong></p>
+<p>设置账号 → 回测/实盘。</p>
+<hr />
+<h2 id="3-工作原理">3. 工作原理<a class="headerlink" href="#3-工作原理" title="Permanent link">&para;</a></h2>
+<h3 id="31-架构">3.1 架构<a class="headerlink" href="#31-架构" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>┌─────────────────────────────────────────────────┐
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>│              QMT Platform                        │
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>│                                                   │
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>│   init(ContextInfo) ──► start(ContextInfo)       │
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│                            │                     │
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│                            ▼                     │
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│                    initialize(context)           │
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│                    run_daily(func)               │
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│                    run_weekly(func)              │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│                    run_monthly(func)             │
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│                                                   │
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>│   handlebar(ContextInfo) ──► on_bar(ContextInfo) │
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>│                                │                 │
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>│                                ▼                 │
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>│                        handle_data(context)      │
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>│                        before_trading_start()    │
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>│                        after_trading_end()       │
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>└─────────────────────────────────────────────────┘
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>         │                          │
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>         ▼                          ▼
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>┌──────────────────┐    ┌──────────────────────┐
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>│ ContextInfo      │    │ Context (simulated)  │
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>│ (QMT native)     │───►│ - portfolio          │
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>│ - get_market_data│    │ - positions          │
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>│ - get_universe   │    │ - current_dt         │
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>│ - order_shares   │    │ - recorded_values    │
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>│ - order_value    │    └──────────────────────┘
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>│ - order_target_* │
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>└──────────────────┘
+</code></pre></div>
+<h3 id="32-生命周期映射">3.2 生命周期映射<a class="headerlink" href="#32-生命周期映射" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>EasyQuant</th>
+<th>QMT</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>initialize(context)</code></td>
+<td><code>init(ContextInfo)</code> → <code>start()</code></td>
+<td>策略初始化，只执行一次</td>
+</tr>
+<tr>
+<td><code>handle_data(context, data)</code></td>
+<td><code>handlebar(ContextInfo)</code> → <code>on_bar()</code></td>
+<td>每根 K 线执行</td>
+</tr>
+<tr>
+<td><code>run_daily(func)</code></td>
+<td><code>handlebar</code> → 每日回调</td>
+<td>每日定时回调</td>
+</tr>
+<tr>
+<td><code>run_weekly(func)</code></td>
+<td><code>handlebar</code> → 每周回调</td>
+<td>每周定时回调</td>
+</tr>
+<tr>
+<td><code>run_monthly(func)</code></td>
+<td><code>handlebar</code> → 每月回调</td>
+<td>每月定时回调</td>
+</tr>
+<tr>
+<td><code>before_trading_start(context)</code></td>
+<td>新交易日检测</td>
+<td>开盘前回调</td>
+</tr>
+<tr>
+<td><code>after_trading_end(context)</code></td>
+<td><code>is_last_bar()</code> 检测</td>
+<td>收盘后回调</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-数据流">3.3 数据流<a class="headerlink" href="#33-数据流" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>EasyQuant API              QMT Native API
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>─────────────              ──────────────
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>attribute_history()  ──►   ContextInfo.get_market_data()
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>get_price()          ──►   ContextInfo.get_market_data_ex()
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>get_current_data()   ──►   ContextInfo.get_full_tick()
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>get_universe()       ──►   ContextInfo.get_universe()
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>set_universe()       ──►   ContextInfo.set_universe()
+</code></pre></div>
+<h3 id="34-交易流">3.4 交易流<a class="headerlink" href="#34-交易流" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>EasyQuant API              QMT Native API
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>─────────────              ──────────────
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>order()              ──►   order_shares()
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>order_value()        ──►   order_value()
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>order_target()       ──►   order_shares() (with position calc)
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>order_target_value() ──►   order_target_value()
+</code></pre></div>
+<hr />
+<h2 id="4-api-对照">4. API 对照<a class="headerlink" href="#4-api-对照" title="Permanent link">&para;</a></h2>
+<h3 id="41-完全兼容的-api">4.1 完全兼容的 API<a class="headerlink" href="#41-完全兼容的-api" title="Permanent link">&para;</a></h3>
+<p>以下 API 在 QMT 中与本地回测行为一致：</p>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_benchmark(security)</code></td>
+<td><code>security</code>: 股票代码</td>
+<td>设置基准</td>
+</tr>
+<tr>
+<td><code>set_option(name, value)</code></td>
+<td><code>name</code>, <code>value</code></td>
+<td>设置选项</td>
+</tr>
+<tr>
+<td><code>run_daily(func, time)</code></td>
+<td><code>func</code>, <code>time</code></td>
+<td>每日调度</td>
+</tr>
+<tr>
+<td><code>run_weekly(func, day, time)</code></td>
+<td><code>func</code>, <code>day_of_week</code>, <code>time</code></td>
+<td>每周调度</td>
+</tr>
+<tr>
+<td><code>run_monthly(func, day, time)</code></td>
+<td><code>func</code>, <code>day_of_month</code>, <code>time</code></td>
+<td>每月调度</td>
+</tr>
+<tr>
+<td><code>log(msg)</code></td>
+<td><code>msg</code>: 字符串</td>
+<td>日志输出</td>
+</tr>
+<tr>
+<td><code>record(**kwargs)</code></td>
+<td>键值对</td>
+<td>记录数值</td>
+</tr>
+<tr>
+<td><code>g.*</code></td>
+<td>任意属性</td>
+<td>全局变量</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-适配后兼容的-api">4.2 适配后兼容的 API<a class="headerlink" href="#42-适配后兼容的-api" title="Permanent link">&para;</a></h3>
+<p>以下 API 在底层映射到 QMT 原生函数：</p>
+<table>
+<thead>
+<tr>
+<th>EasyQuant API</th>
+<th>QMT 原生</th>
+<th>差异说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>attribute_history(sec, count, unit, fields)</code></td>
+<td><code>ContextInfo.get_market_data()</code></td>
+<td>返回格式统一为 DataFrame</td>
+</tr>
+<tr>
+<td><code>history(end_date, count, unit, fields)</code></td>
+<td><code>ContextInfo.get_market_data()</code></td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>get_price(sec, start_date, end_date)</code></td>
+<td><code>ContextInfo.get_market_data_ex()</code></td>
+<td>支持日期范围查询</td>
+</tr>
+<tr>
+<td><code>order(sec, amount)</code></td>
+<td><code>order_shares()</code></td>
+<td>自动转换代码格式</td>
+</tr>
+<tr>
+<td><code>order_value(sec, value)</code></td>
+<td><code>order_value()</code></td>
+<td>正买负卖，自动转换代码</td>
+</tr>
+<tr>
+<td><code>order_target(sec, target_amount)</code></td>
+<td><code>order_shares()</code></td>
+<td>计算持仓差值后下单</td>
+</tr>
+<tr>
+<td><code>order_target_value(sec, target_value)</code></td>
+<td><code>order_target_value()</code></td>
+<td>直接映射</td>
+</tr>
+<tr>
+<td><code>get_current_data()</code></td>
+<td><code>ContextInfo.get_full_tick()</code></td>
+<td>返回字典，键为 EQ 格式代码</td>
+</tr>
+<tr>
+<td><code>get_index_stocks(index)</code></td>
+<td><code>ContextInfo.get_sector()</code></td>
+<td>返回 EQ 格式代码列表</td>
+</tr>
+<tr>
+<td><code>set_universe(securities)</code></td>
+<td><code>ContextInfo.set_universe()</code></td>
+<td>自动转换代码格式</td>
+</tr>
+<tr>
+<td><code>get_universe()</code></td>
+<td><code>ContextInfo.get_universe()</code></td>
+<td>返回 EQ 格式代码列表</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-新增-api仅-qmt-模式">4.3 新增 API（仅 QMT 模式）<a class="headerlink" href="#43-新增-api仅-qmt-模式" title="Permanent link">&para;</a></h3>
+<p>以下 API 仅在 QMT 适配器中提供：</p>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_account(account_id)</code></td>
+<td>设置 QMT 交易账号</td>
+</tr>
+<tr>
+<td><code>start(ContextInfo)</code></td>
+<td>在 QMT 的 <code>init()</code> 中调用，启动 EasyQuant 策略</td>
+</tr>
+<tr>
+<td><code>on_bar(ContextInfo)</code></td>
+<td>在 QMT 的 <code>handlebar()</code> 中调用，驱动策略逻辑</td>
+</tr>
+<tr>
+<td><code>export_ptrade_script(file, output)</code></td>
+<td>导出工具：生成 QMT 策略文件</td>
+</tr>
+<tr>
+<td><code>QMT_TEMPLATE</code></td>
+<td>QMT 策略模板字符串</td>
+</tr>
+<tr>
+<td><code>@initialize</code></td>
+<td>装饰器：注册初始化函数</td>
+</tr>
+<tr>
+<td><code>@handle_data</code></td>
+<td>装饰器：注册 handle_data 函数</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-不支持的-api">4.4 不支持的 API<a class="headerlink" href="#44-不支持的-api" title="Permanent link">&para;</a></h3>
+<p>以下 EasyQuant API 在 QMT 中<strong>不支持</strong>，需要使用 QMT 原生函数替代：</p>
+<table>
+<thead>
+<tr>
+<th>EasyQuant API</th>
+<th>替代方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fetch_stock_data()</code></td>
+<td>QMT 自带历史数据</td>
+</tr>
+<tr>
+<td><code>download_stock_data()</code></td>
+<td>不需要，QMT 已有本地数据</td>
+</tr>
+<tr>
+<td><code>load_csv()</code></td>
+<td>使用 pandas 直接读取</td>
+</tr>
+<tr>
+<td><code>scan_market()</code></td>
+<td>使用 QMT 的 <code>get_stock_list_in_sector()</code></td>
+</tr>
+<tr>
+<td><code>run_backtest()</code></td>
+<td>在 QMT 界面操作回测</td>
+</tr>
+<tr>
+<td><code>run_portfolio_backtest()</code></td>
+<td>在 QMT 界面操作回测</td>
+</tr>
+<tr>
+<td><code>generate_chart()</code></td>
+<td>QMT 自带图表</td>
+</tr>
+<tr>
+<td><code>get_financial_abstract()</code></td>
+<td>QMT 的 <code>get_financial_data()</code></td>
+</tr>
+<tr>
+<td><code>get_fundamentals()</code></td>
+<td>QMT 的 <code>get_factor_data()</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-使用方式">5. 使用方式<a class="headerlink" href="#5-使用方式" title="Permanent link">&para;</a></h2>
+<h3 id="51-方式一直接粘贴到-qmt-编辑器">5.1 方式一：直接粘贴到 QMT 编辑器<a class="headerlink" href="#51-方式一直接粘贴到-qmt-编辑器" title="Permanent link">&para;</a></h3>
+<p>适用于简单策略。将整个策略代码（含 <code>init</code> / <code>handlebar</code>）粘贴到 QMT 策略编辑器。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span> <span class="nn">eqlib.ptrade_adapter</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="o">=</span> <span class="s1">&#39;601390&#39;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">set_benchmark</span><span class="p">(</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;6000000248&#39;</span><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">run_daily</span><span class="p">(</span><span class="n">market_open</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="s1">&#39;every_bar&#39;</span><span class="p">)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="k">def</span> <span class="nf">market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="k">if</span> <span class="n">hist</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>        <span class="k">return</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="n">ma20</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="n">price</span> <span class="o">=</span> <span class="n">hist</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="k">if</span> <span class="n">price</span> <span class="o">&gt;</span> <span class="n">ma20</span> <span class="o">*</span> <span class="mf">1.02</span><span class="p">:</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>        <span class="n">order_value</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">available_cash</span><span class="p">)</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="k">elif</span> <span class="n">price</span> <span class="o">&lt;</span> <span class="n">ma20</span> <span class="o">*</span> <span class="mf">0.98</span><span class="p">:</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        <span class="n">order_target</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;6000000248&#39;</span><span class="p">)</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>    <span class="n">start</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="k">def</span> <span class="nf">handlebar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>    <span class="n">on_bar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="52-方式二使用装饰器风格">5.2 方式二：使用装饰器风格<a class="headerlink" href="#52-方式二使用装饰器风格" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span> <span class="nn">eqlib.ptrade_adapter</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">g</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nd">@initialize</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="k">def</span> <span class="nf">my_init</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">g</span><span class="p">[</span><span class="s1">&#39;security&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;601390&#39;</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">set_benchmark</span><span class="p">(</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;6000000248&#39;</span><span class="p">)</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">run_daily</span><span class="p">(</span><span class="n">market_open</span><span class="p">)</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="nd">@handle_data</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="k">def</span> <span class="nf">my_handler</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">sec</span> <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="s1">&#39;security&#39;</span><span class="p">]</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="n">sec</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="c1"># ... strategy logic ...</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="c1"># QMT 入口</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;6000000248&#39;</span><span class="p">)</span>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>    <span class="n">start</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="k">def</span> <span class="nf">handlebar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>    <span class="n">on_bar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="53-方式三使用导出工具">5.3 方式三：使用导出工具<a class="headerlink" href="#53-方式三使用导出工具" title="Permanent link">&para;</a></h3>
+<p>适用于已有完整的 EasyQuant 策略文件。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 可在 13_ptrade_export.py 中修改 strategy_file / output_file</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>python<span class="w"> </span>examples/13_ptrade_export.py
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># 输出 examples/ptrade_strategy_generated.py → 复制到 QMT</span>
+</code></pre></div>
+<hr />
+<h2 id="6-代码格式转换">6. 代码格式转换<a class="headerlink" href="#6-代码格式转换" title="Permanent link">&para;</a></h2>
+<h3 id="61-股票代码转换规则">6.1 股票代码转换规则<a class="headerlink" href="#61-股票代码转换规则" title="Permanent link">&para;</a></h3>
+<p>适配器自动处理以下转换：</p>
+<table>
+<thead>
+<tr>
+<th>EasyQuant 格式</th>
+<th>QMT 格式</th>
+<th>规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>601390</code></td>
+<td><code>601390.SH</code></td>
+<td>6 开头 → 上海</td>
+</tr>
+<tr>
+<td><code>000001</code></td>
+<td><code>000001.SZ</code></td>
+<td>0 开头 → 深圳</td>
+</tr>
+<tr>
+<td><code>300001</code></td>
+<td><code>300001.SZ</code></td>
+<td>3 开头 → 深圳（创业板）</td>
+</tr>
+<tr>
+<td><code>688001</code></td>
+<td><code>688001.SH</code></td>
+<td>68 开头 → 上海（科创板）</td>
+</tr>
+<tr>
+<td><code>000300.XSHG</code></td>
+<td><code>000300.SH</code></td>
+<td>.XSHG → .SH</td>
+</tr>
+<tr>
+<td><code>000001.XSHE</code></td>
+<td><code>000001.SZ</code></td>
+<td>.XSHE → .SZ</td>
+</tr>
+<tr>
+<td><code>601390.SH</code></td>
+<td><code>601390.SH</code></td>
+<td>已为 QMT 格式 → 不变</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-账户设置">6.2 账户设置<a class="headerlink" href="#62-账户设置" title="Permanent link">&para;</a></h3>
+<p>在 QMT 中交易需要设置账号：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;6000000248&#39;</span><span class="p">)</span>  <span class="c1"># 你的 QMT 资金账号</span>
+</code></pre></div>
+<p>或者在 QMT 入口函数中设置：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;6000000248&#39;</span><span class="p">)</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">start</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="63-订单类型">6.3 订单类型<a class="headerlink" href="#63-订单类型" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>EasyQuant</th>
+<th>QMT 等效</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_value(sec, 10000)</code></td>
+<td><code>order_value(sec.SH, 10000)</code></td>
+<td>买入 10000 元</td>
+</tr>
+<tr>
+<td><code>order_value(sec, -10000)</code></td>
+<td><code>order_value(sec.SH, -10000)</code></td>
+<td>卖出 10000 元</td>
+</tr>
+<tr>
+<td><code>order_target(sec, 0)</code></td>
+<td><code>order_shares(sec.SH, -持仓量)</code></td>
+<td>清仓</td>
+</tr>
+<tr>
+<td><code>order(sec, 100)</code></td>
+<td><code>order_shares(sec.SH, 100)</code></td>
+<td>买入 100 股</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-注意事项">7. 注意事项<a class="headerlink" href="#7-注意事项" title="Permanent link">&para;</a></h2>
+<h3 id="71-回测模式差异">7.1 回测模式差异<a class="headerlink" href="#71-回测模式差异" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>EasyQuant 本地回测</strong>：使用 akshare 数据，完整的报告/图表生成</li>
+<li><strong>QMT 回测模式</strong>：使用 QMT 本地数据，交易函数通过虚拟账号执行，在 K 线上记录买卖点</li>
+<li><strong>QMT 实盘模式</strong>：使用实时行情，交易函数产生实际委托</li>
+</ul>
+<h3 id="72-数据类型差异">7.2 数据类型差异<a class="headerlink" href="#72-数据类型差异" title="Permanent link">&para;</a></h3>
+<ul>
+<li>EasyQuant 的 <code>attribute_history</code> 返回 <code>pandas.DataFrame</code>，索引为日期</li>
+<li>QMT 的 <code>get_market_data</code> 返回格式取决于参数，适配器会统一转换为 DataFrame</li>
+</ul>
+<h3 id="73-交易函数限制">7.3 交易函数限制<a class="headerlink" href="#73-交易函数限制" title="Permanent link">&para;</a></h3>
+<ul>
+<li>QMT 回测模式中，<code>cancel</code>、<code>can_cancel_order</code>、<code>do_order</code> 等函数无实际意义</li>
+<li>QMT 模拟运行模式下，交易函数无效（需实盘或回测模式）</li>
+<li>EasyQuant 本地回测为“当日信号、次日开盘成交”；QMT 以平台成交规则为准（通常为当下委托撮合）</li>
+</ul>
+<h3 id="74-股票池">7.4 股票池<a class="headerlink" href="#74-股票池" title="Permanent link">&para;</a></h3>
+<ul>
+<li>EasyQuant 使用 <code>context.universe</code> 或 <code>set_universe()</code> 管理股票池</li>
+<li>QMT 使用 <code>ContextInfo.set_universe()</code> 设定，<code>ContextInfo.get_universe()</code> 获取</li>
+<li>适配器自动同步两者</li>
+</ul>
+<h3 id="75-全局变量">7.5 全局变量<a class="headerlink" href="#75-全局变量" title="Permanent link">&para;</a></h3>
+<ul>
+<li>EasyQuant 使用 <code>g.security</code> 等属性访问</li>
+<li>QMT 适配器中的 <code>g</code> 是一个字典，也支持属性访问：<code>g.security</code> 或 <code>g['security']</code></li>
+</ul>
+<h3 id="76-滑点和手续费">7.6 滑点和手续费<a class="headerlink" href="#76-滑点和手续费" title="Permanent link">&para;</a></h3>
+<ul>
+<li>EasyQuant 本地回测通过 <code>set_order_cost()</code> 配置</li>
+<li>QMT 回测通过 <code>ContextInfo.set_commission()</code> / <code>ContextInfo.set_slippage()</code> 配置</li>
+<li>QMT 实盘由券商实际费率决定</li>
+</ul>
+<h3 id="77-contextinfo-直接访问">7.7 ContextInfo 直接访问<a class="headerlink" href="#77-contextinfo-直接访问" title="Permanent link">&para;</a></h3>
+<p>适配器暴露了底层的 QMT ContextInfo 对象，可通过 <code>context._qmt</code> 访问，以便在需要时使用 QMT 独有 API：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span> <span class="nf">market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="c1"># EasyQuant API</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">hist</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="s1">&#39;601390&#39;</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="c1"># QMT native API (when needed)</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">ci</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">_qmt</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">barpos</span> <span class="o">=</span> <span class="n">ci</span><span class="o">.</span><span class="n">barpos</span>  <span class="c1"># current bar index</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="n">period</span> <span class="o">=</span> <span class="n">ci</span><span class="o">.</span><span class="n">period</span>  <span class="c1"># current period, e.g. &#39;1d&#39;</span>
+</code></pre></div>
+<hr />
+<h2 id="附录完整迁移示例">附录：完整迁移示例<a class="headerlink" href="#附录完整迁移示例" title="Permanent link">&para;</a></h2>
+<p>以下是一个完整的均线策略从 EasyQuant 到 QMT 的迁移。</p>
+<h3 id="easyquant-原始代码本地回测">EasyQuant 原始代码（本地回测）<a class="headerlink" href="#easyquant-原始代码本地回测" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span> <span class="nn">eqlib</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="o">=</span> <span class="s1">&#39;601390&#39;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">g</span><span class="o">.</span><span class="n">fast_period</span> <span class="o">=</span> <span class="mi">5</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">g</span><span class="o">.</span><span class="n">slow_period</span> <span class="o">=</span> <span class="mi">20</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="n">set_benchmark</span><span class="p">(</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="n">run_daily</span><span class="p">(</span><span class="n">market_open</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="s1">&#39;every_bar&#39;</span><span class="p">)</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="k">def</span> <span class="nf">market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="n">close_data</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    <span class="k">if</span> <span class="n">close_data</span><span class="o">.</span><span class="n">empty</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">close_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">g</span><span class="o">.</span><span class="n">slow_period</span><span class="p">:</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>        <span class="k">return</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>    <span class="n">ma_fast</span> <span class="o">=</span> <span class="n">close_data</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">fast_period</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>    <span class="n">ma_slow</span> <span class="o">=</span> <span class="n">close_data</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>    <span class="n">current_price</span> <span class="o">=</span> <span class="n">close_data</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>    <span class="k">if</span> <span class="n">current_price</span> <span class="o">&gt;</span> <span class="n">ma_fast</span> <span class="o">&gt;</span> <span class="n">ma_slow</span><span class="p">:</span>
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>        <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span> <span class="ow">or</span> \
+<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a>           <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">]</span><span class="o">.</span><span class="n">amount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a>            <span class="n">order_value</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">available_cash</span><span class="p">)</span>
+<a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a>            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;BUY </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">)</span>
+<a id="__codelineno-12-25" name="__codelineno-12-25" href="#__codelineno-12-25"></a>    <span class="k">elif</span> <span class="n">current_price</span> <span class="o">&lt;</span> <span class="n">ma_fast</span> <span class="o">&lt;</span> <span class="n">ma_slow</span><span class="p">:</span>
+<a id="__codelineno-12-26" name="__codelineno-12-26" href="#__codelineno-12-26"></a>        <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span> <span class="ow">and</span> \
+<a id="__codelineno-12-27" name="__codelineno-12-27" href="#__codelineno-12-27"></a>           <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">]</span><span class="o">.</span><span class="n">amount</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-12-28" name="__codelineno-12-28" href="#__codelineno-12-28"></a>            <span class="n">order_target</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-12-29" name="__codelineno-12-29" href="#__codelineno-12-29"></a>            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;SELL </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">)</span>
+<a id="__codelineno-12-30" name="__codelineno-12-30" href="#__codelineno-12-30"></a>
+<a id="__codelineno-12-31" name="__codelineno-12-31" href="#__codelineno-12-31"></a><span class="c1"># 运行回测</span>
+<a id="__codelineno-12-32" name="__codelineno-12-32" href="#__codelineno-12-32"></a><span class="n">result</span> <span class="o">=</span> <span class="n">run_backtest</span><span class="p">(</span><span class="n">initialize</span><span class="p">,</span> <span class="s1">&#39;2024-01-01&#39;</span><span class="p">,</span> <span class="s1">&#39;2024-12-31&#39;</span><span class="p">,</span>
+<a id="__codelineno-12-33" name="__codelineno-12-33" href="#__codelineno-12-33"></a>                      <span class="n">starting_cash</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span> <span class="n">benchmark</span><span class="o">=</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="qmt-版本实盘模拟">QMT 版本（实盘/模拟）<a class="headerlink" href="#qmt-版本实盘模拟" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span> <span class="nn">eqlib.ptrade_adapter</span> <span class="kn">import</span> <span class="o">*</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="o">=</span> <span class="s1">&#39;601390&#39;</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">g</span><span class="o">.</span><span class="n">fast_period</span> <span class="o">=</span> <span class="mi">5</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">g</span><span class="o">.</span><span class="n">slow_period</span> <span class="o">=</span> <span class="mi">20</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">set_benchmark</span><span class="p">(</span><span class="s1">&#39;000300.XSHG&#39;</span><span class="p">)</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;YOUR_ACCOUNT_ID&#39;</span><span class="p">)</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="n">run_daily</span><span class="p">(</span><span class="n">market_open</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="s1">&#39;every_bar&#39;</span><span class="p">)</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="k">def</span> <span class="nf">market_open</span><span class="p">(</span><span class="n">context</span><span class="p">):</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="n">close_data</span> <span class="o">=</span> <span class="n">attribute_history</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="s1">&#39;1d&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">])</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    <span class="k">if</span> <span class="n">close_data</span><span class="o">.</span><span class="n">empty</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">close_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">g</span><span class="o">.</span><span class="n">slow_period</span><span class="p">:</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>        <span class="k">return</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>    <span class="n">ma_fast</span> <span class="o">=</span> <span class="n">close_data</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">fast_period</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>    <span class="n">ma_slow</span> <span class="o">=</span> <span class="n">close_data</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>    <span class="n">current_price</span> <span class="o">=</span> <span class="n">close_data</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>    <span class="k">if</span> <span class="n">current_price</span> <span class="o">&gt;</span> <span class="n">ma_fast</span> <span class="o">&gt;</span> <span class="n">ma_slow</span><span class="p">:</span>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>        <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span> <span class="ow">or</span> \
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>           <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">]</span><span class="o">.</span><span class="n">amount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>            <span class="n">order_value</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">available_cash</span><span class="p">)</span>
+<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;BUY </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">)</span>
+<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>    <span class="k">elif</span> <span class="n">current_price</span> <span class="o">&lt;</span> <span class="n">ma_fast</span> <span class="o">&lt;</span> <span class="n">ma_slow</span><span class="p">:</span>
+<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>        <span class="k">if</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span> <span class="ow">and</span> \
+<a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>           <span class="n">context</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">]</span><span class="o">.</span><span class="n">amount</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>            <span class="n">order_target</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;SELL </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">g</span><span class="o">.</span><span class="n">security</span><span class="p">)</span>
+<a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>
+<a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a><span class="c1"># QMT 入口</span>
+<a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>    <span class="n">set_account</span><span class="p">(</span><span class="s1">&#39;YOUR_ACCOUNT_ID&#39;</span><span class="p">)</span>
+<a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>    <span class="n">start</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+<a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>
+<a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a><span class="k">def</span> <span class="nf">handlebar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">):</span>
+<a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a>    <span class="n">on_bar</span><span class="p">(</span><span class="n">ContextInfo</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>仅三处差异</strong>：
+1. <code>from eqlib import *</code> → <code>from eqlib.ptrade_adapter import *</code>
+2. 增加 <code>set_account('YOUR_ACCOUNT_ID')</code>
+3. 增加 <code>init()</code> / <code>handlebar()</code> 入口函数</p>
+<p>策略逻辑完全不变。</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 07:35:46 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="2026年5月12日 03:14:02 UTC">2026年5月12日</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.sections", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
