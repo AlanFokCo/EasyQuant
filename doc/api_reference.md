@@ -1136,12 +1136,55 @@ result = run_strategy(
 
 ### `log.info(msg)`, `log.debug(msg)`, `log.warn(msg)`, `log.error(msg)`
 
-策略内日志输出。
+基础日志输出（兼容旧用法）。
 
 ```python
 log.info("买入 %s" % security)
 log.warn("价格异常: %s" % code)
 log.error("数据获取失败")
+```
+
+### `log.section(title, **fields)`
+
+用于标记一个高层阶段（例如“回测开始/结束”）。
+
+```python
+log.section("Backtest started", start="2024-01-01", end="2024-12-31")
+```
+
+### `log.step(name, status='RUN', **fields)`
+
+用于记录步骤执行状态（`RUN` / `OK` / `FAIL` 等）。
+
+```python
+log.step("Preloading market data", status="RUN", securities=120)
+log.step("Market data preloaded", status="OK", securities=120)
+```
+
+### `log.progress(current, total, label='Progress', **fields)`
+
+用于显示进度与百分比，适合长流程任务。
+
+```python
+log.progress(30, 120, label="Backtest progress", date="2024-03-15")
+```
+
+### `log.action(name, target=None, **fields)`
+
+用于记录具体操作动作（如下单、调仓、数据写入）。
+
+```python
+log.action("Queue order", "601390", amount="+1000", fill="next_open")
+```
+
+### `log.set_level(level)` / `log.set_quiet(enabled=True)`
+
+控制日志详细程度：
+
+```python
+log.set_level("DEBUG")   # 输出更详细
+log.set_quiet(True)      # 仅 WARNING/ERROR
+log.set_quiet(False)     # 恢复 INFO
 ```
 
 ---
