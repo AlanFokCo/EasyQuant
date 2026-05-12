@@ -5,6 +5,8 @@ repo_name: AlanFokCo/EasyQuant
 docs_dir: docs
 theme:
   name: material
+  logo: assets/logo-icon.svg
+  favicon: assets/logo-icon.svg
   language: zh
   features:
     - navigation.tabs

@@ -703,6 +703,13 @@ def run_backtest(initialize_func, start_date, end_date,
                 if not sec_df.empty:
                     result["ohlcv_data"][sec] = sec_df
 
+    # Pre-align CSI300 + SSE cumulative % for HTML charts (same dates as recorded_values)
+    try:
+        from eqlib.report import attach_chart_dual_indices
+        attach_chart_dual_indices(result)
+    except Exception:
+        pass
+
     _clear_session()
     return result
 

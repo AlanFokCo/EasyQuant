@@ -149,7 +149,11 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         if is_idx:
             # Indices: always download full history once and cache it all
             prefix = "sh" if ".XSHG" in code else "sz"
-            df = ak.stock_zh_index_daily_em(symbol=f"{prefix}{symbol}")
+            try:
+                df = ak.stock_zh_index_daily_em(symbol=f"{prefix}{symbol}")
+            except Exception:
+                # Fallback to Sina source when EastMoney is unavailable
+                df = ak.stock_zh_index_daily(symbol=f"{prefix}{symbol}")
         elif _is_etf(symbol):
             df = ak.fund_etf_hist_em(
                 symbol=symbol, period="daily",

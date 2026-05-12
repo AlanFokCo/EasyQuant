@@ -1,3 +1,5 @@
+<p align="center"><a href="https://github.com/AlanFokCo/EasyQuant"><img src="../assets/logo.svg" width="160" alt="EasyQuant"/></a></p>
+
 # Examples（示例总览）
 
 本文件是 `examples/` 目录的准确导航与快速入口，按实际文件整理。

@@ -1,3 +1,7 @@
+<p align="center">
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="180" alt="EasyQuant"/></a>
+</p>
+
 # EasyQuant 文档中心
 
 面向 **中国 A 股** 的本地回测与策略开发。核心包名为 **`eqlib`**（与仓库名 EasyQuant 对应）。

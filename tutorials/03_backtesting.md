@@ -79,7 +79,7 @@
 
 **同一组结果还可打开：**
 
-- `../reports/backtest_20260511_234245_19_localdata.html`（仓库根下 `reports/`，交互式报告）
+- `../reports/backtest_20260511_234245_19_localdata.html`（仓库根下 `reports/`，交互式报告；**累计收益与回撤图**中含沪深300与上证综指双线基准）
 - 若你尚未生成：在仓库根执行 `python examples/19_local_data_backtest.py`，再在 `reports/` 中找到最新生成的 `*_19_localdata.*`。
 
 抽象「策略 vs 基准」折线示意见仍保留：`assets/sample_equity_vs_benchmark.svg`。

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="eq-i">
+  <title id="eq-i">EasyQuant</title>
+  <defs>
+    <linearGradient id="eq-i-bg" x1="12%" y1="88%" x2="88%" y2="12%">
+      <stop offset="0%" stop-color="#0c1222"/>
+      <stop offset="100%" stop-color="#151b2e"/>
+    </linearGradient>
+    <linearGradient id="eq-i-st" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="55%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#f8fafc"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="5" width="54" height="54" rx="16" fill="url(#eq-i-bg)"/>
+  <path
+    d="M 17 42 C 22 42 25 35 29 29 C 33 23 39 18 47 16"
+    fill="none"
+    stroke="url(#eq-i-st)"
+    stroke-width="2.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <circle cx="47" cy="16" r="1.85" fill="#f8fafc"/>
+</svg>

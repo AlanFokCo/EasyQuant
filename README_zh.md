@@ -1,10 +1,11 @@
-# EasyQuant
-
-一个面向 **中国 A 股市场** 的量化策略与回测工具。
-
-本项目提供 `eqlib` Python 包——核心库，包含事件驱动回测引擎、数据 API 和分析工具。
-
-[English](https://github.com/AlanFokCo/EasyQuant/blob/main/README.md) · [新手教程](tutorials/README.md) · [**文档中心**](doc/README.md) · [用户手册](doc/user_guide.md) · [API 速查](doc/api_index.md) · [API 参考](doc/api_reference.md) · [示例](examples/Examples.md)
+<div align="center">
+<a href="https://github.com/AlanFokCo/EasyQuant"><img src="assets/logo.svg" width="220" alt="EasyQuant logo"/></a>
+<p><strong>EasyQuant</strong> - 面向 <strong>中国 A 股市场</strong> 的量化策略与回测工具。</p>
+<p>核心 Python 包为 <code>eqlib</code>：事件驱动回测引擎、数据 API 与分析工具。</p>
+<p>
+<a href="https://github.com/AlanFokCo/EasyQuant/blob/main/README.md">English</a> · <a href="tutorials/README.md">新手教程</a> · <a href="doc/README.md"><b>文档中心</b></a> · <a href="doc/user_guide.md">用户手册</a> · <a href="doc/api_index.md">API 速查</a> · <a href="doc/api_reference.md">API 参考</a> · <a href="examples/Examples.md">示例</a>
+</p>
+</div>
 
 ---
 
