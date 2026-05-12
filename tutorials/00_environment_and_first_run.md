@@ -68,7 +68,50 @@ python examples/01_fetch_data.py
 
 ---
 
-## 5. 教程、示例与「正式文档」怎么配合？
+## 5. 推荐：先下载目标股票到本地，再做快速回测验证
+
+如果你已经有明确的研究标的，建议先把数据下载到本地，再用 `use_local=True` 做快速回测，这样可以显著减少网络波动带来的不确定性。
+
+```bash
+python - <<'PY'
+from eqlib import set_local_data_dir, save_stock_local, list_local_stocks
+
+set_local_data_dir('/home/user/eqlib_data')  # 推荐绝对路径，便于多项目复用
+targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
+
+for sec in targets:
+    path = save_stock_local(sec, start_date='2020-01-01', end_date='2024-12-31')
+    print(sec, '->', path)
+
+print('local files:', list_local_stocks())
+PY
+```
+
+然后运行任一回测脚本时开启本地模式：
+
+```python
+result = run_strategy(
+    initialize,
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    securities=['601390'],
+    use_local=True,
+)
+```
+
+建议先跑 [`examples/19_local_data_backtest.py`](../examples/19_local_data_backtest.py) 做离线流程验证。
+
+> 提示：本地已下载数据的日期区间应覆盖你的回测区间；若回测起止超出本地文件范围，请先补齐对应日期数据再运行。
+
+更多接口说明见：
+
+- [用户手册 7.11：下载与加载本地 CSV](../doc/user_guide.md#711-下载与加载本地-csv)
+- [API 参考 8：缓存 API](../doc/api_reference.md#8-缓存-api)
+- [FAQ：首次回测慢或卡住](../doc/FAQ.md#q-首次回测很慢或卡住)
+
+---
+
+## 6. 教程、示例与「正式文档」怎么配合？
 
 | 资源 | 用途 |
 |------|------|
@@ -78,7 +121,7 @@ python examples/01_fetch_data.py
 
 ---
 
-## 6. 下一步
+## 7. 下一步
 
 当你已能成功运行 `examples/03_run_backtest.py` 并打开 HTML 报告后，请继续：
 

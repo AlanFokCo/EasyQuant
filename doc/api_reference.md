@@ -1088,19 +1088,109 @@ weights = portfolio_optimizer(
 - `remove_local_data(security, adjust)` — 删除单个文件
 - `clear_all_local_data(adjust)` — 清空所有本地文件
 
+**推荐：目标股票本地化 + 快速验证**
+
+```python
+from eqlib import (
+    set_local_data_dir, save_stock_local, list_local_stocks,
+    run_strategy
+)
+
+set_local_data_dir('/home/user/eqlib_data')  # 建议使用绝对路径，便于多项目复用
+targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
+
+for sec in targets:
+    path = save_stock_local(sec, '2020-01-01', '2024-12-31')
+    print(sec, '->', path)
+
+print(list_local_stocks())
+
+result = run_strategy(
+    initialize,
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    securities=['601390', '600519'],
+    benchmark='000300.XSHG',
+    use_local=True,
+)
+```
+
+### 8.5 数据源接入建议（扩展）
+
+当前默认数据源为 `akshare`。若需要更高可靠性或更多维度数据，建议按以下顺序扩展：
+
+1. 保持现有 API 入参/出参不变（避免策略层改动）；
+2. 先落盘统一格式（CSV/Parquet）再进入回测；
+3. 采用主备数据源切换与交叉校验（价格、成交量、复权、停牌）；
+4. 新增数据源先用小样本回测做一致性验证，再逐步扩大范围。
+
+### 8.6 相关文档
+
+- [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md#5-推荐先下载目标股票到本地再做快速回测验证)
+- [用户手册：数据源扩展与可靠性建议（见 7.12 小节）](user_guide.md#712-数据源扩展与可靠性建议)
+- [FAQ：首次回测慢或卡住](FAQ.md#q-首次回测很慢或卡住)
+
 ---
 
 ## 9. 日志 API
 
+日志输出默认带有语义化 emoji 指示符，帮助快速识别级别、阶段、步骤、进度与动作。
+
 ### `log.info(msg)`, `log.debug(msg)`, `log.warn(msg)`, `log.error(msg)`
 
-策略内日志输出。
+基础日志输出（兼容旧用法）。
 
 ```python
 log.info("买入 %s" % security)
 log.warn("价格异常: %s" % code)
 log.error("数据获取失败")
 ```
+
+### `log.section(title, **fields)`
+
+用于标记一个高层阶段（例如“回测开始/结束”）。
+
+```python
+log.section("Backtest started", start="2024-01-01", end="2024-12-31")
+```
+
+### `log.step(name, status='RUN', **fields)`
+
+用于记录步骤执行状态（`RUN` / `OK` / `FAIL` 等）。
+
+```python
+log.step("Preloading market data", status="RUN", securities=120)
+log.step("Market data preloaded", status="OK", securities=120)
+```
+
+### `log.progress(current, total, label='Progress', **fields)`
+
+用于显示进度与百分比，适合长流程任务。
+
+```python
+log.progress(30, 120, label="Backtest progress", date="2024-03-15")
+```
+
+### `log.action(name, target=None, **fields)`
+
+用于记录具体操作动作（如下单、调仓、数据写入）。
+
+```python
+log.action("Queue order", "601390", amount="+1000", fill="next_open")
+```
+
+### `log.set_level(level)` / `log.set_quiet(enabled=True)` / `log.set_propagate(enabled=False)`
+
+控制日志详细程度：
+
+```python
+log.set_level("DEBUG")   # 输出更详细
+log.set_quiet(True)      # 仅 WARNING/ERROR
+log.set_quiet(False)     # 恢复 INFO
+log.set_propagate(True)  # 透传到父级 logger（用于宿主应用集中采集）
+```
+
+也可通过环境变量 `EQLIB_LOG_PROPAGATE=1` 在启动时默认开启透传。
 
 ---
 

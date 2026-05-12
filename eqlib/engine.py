@@ -523,13 +523,14 @@ def run_backtest(initialize_func, start_date, end_date,
 
     # ── Preload OHLCV data ─────────────────────────────────────────────────
     if securities:
-        log.info(f"Preloading data for {len(securities)} securities"
-                 f"{' (local)' if use_local else ''}...")
+        log.step("Preloading market data", status="RUN",
+                 securities=len(securities),
+                 source="local" if use_local else "akshare")
         warmup_start = (start_date - datetime.timedelta(days=365)
                         if isinstance(start_date, datetime.date) else start_date)
         preloaded.load(securities, warmup_start, end_date, adjust="qfq",
                        use_local=use_local, max_memory_mb=max_memory_mb)
-        log.info("Data preloaded.")
+        log.step("Market data preloaded", status="OK", securities=len(securities))
 
     trading_days = _get_trading_days(start_date, end_date, preloaded)
     if not trading_days:
@@ -557,11 +558,21 @@ def run_backtest(initialize_func, start_date, end_date,
         if sess_rebalance is not None:
             selection_rebalance = sess_rebalance
 
-    log.info(f"Backtest started: {start_date} to {end_date}, "
-             f"{len(trading_days)} trading days, cash={starting_cash:,.0f}")
+    total_days = len(trading_days)
+    progress_step = max(1, total_days // 10)
+
+    log.section("Backtest started",
+                start=start_date, end=end_date, trading_days=total_days,
+                cash=f"{starting_cash:,.0f}", benchmark=session._benchmark)
+    log.step("Strategy initialized", status="OK",
+             scheduled=len(session._scheduled_funcs),
+             before_hooks=len(session._before_trading_start_funcs),
+             after_hooks=len(session._after_trading_end_funcs),
+             has_handle_data=session._handle_data_func is not None,
+             selection=selection_func is not None)
 
     # ── Main trading loop ──────────────────────────────────────────────────
-    for day in trading_days:
+    for idx, day in enumerate(trading_days, start=1):
         context.current_dt = datetime.datetime.combine(day, datetime.time(9, 30))
 
         # ── T+1 unlock: restore closeable_amount for yesterday's buys ──────
@@ -586,7 +597,8 @@ def run_backtest(initialize_func, start_date, end_date,
                     selected = selection_func(context)
                     if selected:
                         context.universe = selected
-                        log.info(f"Stock selection ({day}): {len(selected)} securities")
+                        log.step("Stock selection updated", status="OK",
+                                 date=day.isoformat(), selected=len(selected))
                 except Exception as e:
                     log.warn(f"Stock selection failed on {day}: {e}")
 
@@ -637,7 +649,17 @@ def run_backtest(initialize_func, start_date, end_date,
         context.current_dt = datetime.datetime.combine(day, datetime.time(9, 30))
         context.previous_date = day
 
-    log.info(f"Backtest finished: final_value={context.portfolio.total_value:,.2f}")
+        if idx == 1 or idx % progress_step == 0 or idx == total_days:
+            log.progress(idx, total_days, label="Backtest progress",
+                         date=day.isoformat(),
+                         positions=len(context.portfolio.positions),
+                         total_value=context.portfolio.total_value,
+                         cash=context.portfolio.available_cash)
+
+    log.section("Backtest finished",
+                final_value=f"{context.portfolio.total_value:,.2f}",
+                trades=len(session._trade_log),
+                records=len(session._recorded_values))
 
     # ── Fetch benchmark OHLCV for reporting ────────────────────────────────
     benchmark_values = []
