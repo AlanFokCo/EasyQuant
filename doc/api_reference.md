@@ -1134,6 +1134,8 @@ result = run_strategy(
 
 ## 9. 日志 API
 
+日志输出默认带有语义化 emoji 指示符，帮助快速识别级别、阶段、步骤、进度与动作。
+
 ### `log.info(msg)`, `log.debug(msg)`, `log.warn(msg)`, `log.error(msg)`
 
 基础日志输出（兼容旧用法）。
