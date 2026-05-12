@@ -76,7 +76,7 @@ python examples/01_fetch_data.py
 python - <<'PY'
 from eqlib import set_local_data_dir, save_stock_local, list_local_stocks
 
-set_local_data_dir('/absolute/path/to/data')  # 推荐绝对路径，便于多项目复用
+set_local_data_dir('/home/user/eqlib_data')  # 推荐绝对路径，便于多项目复用
 targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
 
 for sec in targets:
