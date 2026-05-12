@@ -1096,20 +1096,21 @@ from eqlib import (
     run_strategy
 )
 
-set_local_data_dir("data")
-targets = ["601390", "600519", "000858", "000300.XSHG"]  # 含基准
+set_local_data_dir('data')
+targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
 
 for sec in targets:
-    save_stock_local(sec, "2020-01-01", "2024-12-31")
+    path = save_stock_local(sec, '2020-01-01', '2024-12-31')
+    print(sec, '->', path)
 
 print(list_local_stocks())
 
 result = run_strategy(
     initialize,
-    start_date="2024-01-01",
-    end_date="2024-12-31",
-    securities=["601390", "600519"],
-    benchmark="000300.XSHG",
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    securities=['601390', '600519'],
+    benchmark='000300.XSHG',
     use_local=True,
 )
 ```
@@ -1126,7 +1127,7 @@ result = run_strategy(
 ### 8.6 相关文档
 
 - [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md#5-推荐先下载目标股票到本地再做快速回测验证)
-- [用户手册 7.12：数据源扩展与可靠性建议](user_guide.md)
+- [用户手册：数据源扩展与可靠性建议（见 7.12 小节）](user_guide.md)
 - [FAQ：首次回测慢或卡住](FAQ.md#q-首次回测很慢或卡住)
 
 ---

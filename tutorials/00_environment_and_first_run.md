@@ -76,14 +76,14 @@ python examples/01_fetch_data.py
 python - <<'PY'
 from eqlib import set_local_data_dir, save_stock_local, list_local_stocks
 
-set_local_data_dir("data")  # 可改为绝对路径
-targets = ["601390", "600519", "000858", "000300.XSHG"]  # 含基准
+set_local_data_dir('data')  # 可改为绝对路径
+targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
 
 for sec in targets:
-    path = save_stock_local(sec, start_date="2020-01-01", end_date="2024-12-31")
-    print(sec, "->", path)
+    path = save_stock_local(sec, start_date='2020-01-01', end_date='2024-12-31')
+    print(sec, '->', path)
 
-print("local files:", list_local_stocks())
+print('local files:', list_local_stocks())
 PY
 ```
 
@@ -92,9 +92,9 @@ PY
 ```python
 result = run_strategy(
     initialize,
-    start_date="2024-01-01",
-    end_date="2024-12-31",
-    securities=["601390"],
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    securities=['601390'],
     use_local=True,
 )
 ```

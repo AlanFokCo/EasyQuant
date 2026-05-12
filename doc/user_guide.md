@@ -500,8 +500,8 @@ set_local_data_dir('data')  # 建议使用绝对路径，便于多项目复用
 
 # 先预下载策略股票 + 基准
 for sec in ['601390', '600519', '000300.XSHG']:
-    save_stock_local(sec, '2020-01-01', '2024-12-31')
-    print(sec, 'ready =', has_local_data(sec))
+    path = save_stock_local(sec, '2020-01-01', '2024-12-31')
+    print(sec, '->', path, '; ready =', has_local_data(sec))
 
 # 回测时开启 use_local，提高稳定性与速度
 result = run_backtest(
