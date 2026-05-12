@@ -1,4 +1,4 @@
-"""Audit logging for the EasyQuant AI optimization agent.
+"""Audit logging for EasyQuant strategy optimization sessions.
 
 Writes a dual-format audit trail:
   • JSONL file  — one JSON object per line, machine-readable, queryable with jq
@@ -6,12 +6,11 @@ Writes a dual-format audit trail:
 
 Both files share the same session ID (timestamp) and live in the audit_log/ dir.
 
-This module is used directly by Claude Code during the AI-driven optimization
-workflow. It is NOT called by optimizer.py during the primary workflow — optimizer.py
-is a reference utility only. Claude Code imports AuditLog and calls its methods
-to record every step of the optimization process.
+Import ``AuditLog`` from your own optimization driver (script, notebook, or CI job) to
+append iteration / adjustment / review / final entries. ``optimizer.py`` does not
+invoke this module by default; it is optional instrumentation.
 
-Usage (by Claude Code during AI-driven optimization):
+Usage:
     from agent.audit_log import AuditLog
     log = AuditLog(output_dir="audit_log")
     log.log_iteration(0, params, periods_results, aggregate, requirements_met, failing)

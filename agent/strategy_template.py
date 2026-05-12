@@ -1,26 +1,26 @@
-"""EasyQuant AI Agent — Parameterized Strategy Template.
+"""Parameterized strategy template (EasyQuant).
 
-This file is the default strategy used for AI-driven optimization when no custom
-strategy is provided. It implements a dual-MA crossover with:
+Default example strategy for parameter search demos. It implements a dual-MA
+crossover with:
+
   - Volume confirmation
   - ATR-based or fixed stop-loss
   - RSI filter (optional)
   - Market (index) filter (optional)
 
-It is deliberately structured to expose ALL tunable knobs via the PARAMS dict
-and their valid search space via PARAM_RANGES, so Claude Code can vary them
-automatically across optimization iterations.
+All tunable knobs live in ``PARAMS`` with bounds in ``PARAM_RANGES`` so scripts such
+as ``agent/optimizer.py`` (or your own driver) can vary them across iterations.
 
-To use this as a starting point for your own strategy:
+To use this as a starting point:
+
   1. Copy this file.
-  2. Adjust SECURITIES and PARAMS to match your target.
-  3. Modify market_open() to implement your own trading logic.
-  4. Tell Claude Code to optimize it — it will read PARAMS/PARAM_RANGES,
-     run backtests, analyze results, and edit PARAMS directly.
+  2. Adjust ``SECURITIES`` and ``PARAMS`` to match your target.
+  3. Implement your logic in ``market_open()``.
+  4. Point ``optimizer.py`` or your custom loop at the file and iterate.
 
 Requirement:
-  - Keep PARAMS and PARAM_RANGES at module level.
-  - Read all tunable values from PARAMS inside initialize() / market_open().
+  - Keep ``PARAMS`` and ``PARAM_RANGES`` at module level.
+  - Read all tunable values from ``PARAMS`` inside ``initialize()`` / ``market_open()``.
 """
 
 from eqlib import *

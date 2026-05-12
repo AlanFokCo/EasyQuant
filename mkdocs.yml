@@ -92,7 +92,7 @@ nav:
       - "07 - Sector Rotation (行业轮动)": tutorials/07_sector_rotation.md
       - "08 - Multi-Factor (多因子)": tutorials/08_multi_factor.md
       - "09 - Combined Strategy (组合策略)": tutorials/09_combined_strategy.md
-      - "10 - Agent Optimization (Agent 优化)": tutorials/10_agent_optimization.md
+      - "10 - Parameter tuning & audit (参数优化与审计)": tutorials/10_agent_optimization.md
 
   - Examples (示例代码):
       - Example Index (示例索引): examples/Examples.md
