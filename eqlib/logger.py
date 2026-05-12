@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 
@@ -100,7 +101,9 @@ def _action_icon(name: str) -> str:
 _logger = logging.getLogger("eqlib")
 # Prevent duplicate logs when host apps configure root logging handlers.
 # eqlib emits through its own dedicated handler for stable output layout.
-_logger.propagate = False
+_logger.propagate = os.getenv("EQLIB_LOG_PROPAGATE", "").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 _handler = logging.StreamHandler()
 _handler.setFormatter(_CleanFormatter(datefmt="%H:%M:%S"))
 if not _logger.handlers:
@@ -142,6 +145,11 @@ class Logger:
         _logger.setLevel(logging.WARNING if enabled else logging.INFO)
 
     @staticmethod
+    def set_propagate(enabled: bool = False):
+        """Enable/disable forwarding logs to parent loggers."""
+        _logger.propagate = bool(enabled)
+
+    @staticmethod
     def section(title: str, **fields):
         """High-level section marker for a major stage."""
         _logger.info(f"🧭 ━━ {title} ━━{_fmt_fields(fields)}")
@@ -163,7 +171,11 @@ class Logger:
     def progress(current: int, total: int, label: str = "Progress", **fields):
         """Progress indicator with normalized percent."""
         total_safe = max(int(total), 1)
-        current_safe = max(0, min(int(current), total_safe))
+        raw_current = int(current)
+        current_safe = max(0, min(raw_current, total_safe))
+        if current_safe != raw_current:
+            _logger.warning("Progress clamped: current=%s total=%s -> current=%s",
+                            raw_current, total_safe, current_safe)
         pct = current_safe / total_safe * 100.0
         _logger.info(f"📍 {label}: {current_safe}/{total_safe} ({pct:.1f}%){_fmt_fields(fields)}")
 

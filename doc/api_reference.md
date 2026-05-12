@@ -1179,7 +1179,7 @@ log.progress(30, 120, label="Backtest progress", date="2024-03-15")
 log.action("Queue order", "601390", amount="+1000", fill="next_open")
 ```
 
-### `log.set_level(level)` / `log.set_quiet(enabled=True)`
+### `log.set_level(level)` / `log.set_quiet(enabled=True)` / `log.set_propagate(enabled=False)`
 
 控制日志详细程度：
 
@@ -1187,7 +1187,10 @@ log.action("Queue order", "601390", amount="+1000", fill="next_open")
 log.set_level("DEBUG")   # 输出更详细
 log.set_quiet(True)      # 仅 WARNING/ERROR
 log.set_quiet(False)     # 恢复 INFO
+log.set_propagate(True)  # 透传到父级 logger（用于宿主应用集中采集）
 ```
+
+也可通过环境变量 `EQLIB_LOG_PROPAGATE=1` 在启动时默认开启透传。
 
 ---
 

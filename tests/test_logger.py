@@ -39,6 +39,7 @@ def test_logger_progress_clamps_values():
         log.progress(20, 10, label="Run")
         text = stream.getvalue()
         assert "📍 Run: 10/10 (100.0%)" in text
+        assert "Progress clamped: current=20 total=10 -> current=10" in text
 
     _with_capture(run)
 
@@ -53,3 +54,15 @@ def test_logger_quiet_mode():
         assert "this warning should appear" in text
 
     _with_capture(run)
+
+
+def test_logger_set_propagate():
+    import eqlib.logger as logger_mod
+    old = logger_mod._logger.propagate
+    try:
+        log.set_propagate(True)
+        assert logger_mod._logger.propagate is True
+        log.set_propagate(False)
+        assert logger_mod._logger.propagate is False
+    finally:
+        logger_mod._logger.propagate = old
