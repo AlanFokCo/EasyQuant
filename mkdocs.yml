@@ -63,4 +63,6 @@ nav:
       - 08 Multi-Factor: tutorials/08_multi_factor.md
       - 09 Combined Strategy: tutorials/09_combined_strategy.md
       - 10 Agent Optimization: tutorials/10_agent_optimization.md
-  - Example Code: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
+  - Examples:
+      - Example Index: examples/Examples.md
+      - Browse Code: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
