@@ -2,6 +2,10 @@
 
 > 在按顺序阅读 [Tutorial 01](01_quant_basics.md) 之前，请先完成本节：保证 Python 环境、`eqlib` 安装与一次成功回测，避免后续教程中的代码无法运行。
 
+**没有 Python 基础？** 先阅读 [前置知识：Python 基础与环境配置](prerequisites/python_basics.md)。  
+**不了解技术指标？** 阅读 [前置知识：技术分析基础概念](prerequisites/technical_concepts.md)。  
+**不熟悉 A 股规则？** 阅读 [前置知识：A 股市场基础知识](prerequisites/ashare_knowledge.md)。
+
 ---
 
 ## 1. 你需要什么环境？

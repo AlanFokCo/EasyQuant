@@ -291,16 +291,24 @@ avg_volume = vol['volume'].mean()
 
 ## 5. 你需要掌握哪些知识
 
-### 5.1 必备
+以下三个前置知识文件提供了更完整的学习材料，可在需要时深入阅读：
+
+| 前置文件 | 涵盖内容 | 链接 |
+|---------|---------|------|
+| **Python 基础与环境配置** | 语法速查、pandas/numpy 核心操作、虚拟环境 | [prerequisites/python_basics.md](prerequisites/python_basics.md) |
+| **技术分析基础概念** | OHLCV、均线、RSI、MACD、布林带、ATR、KDJ、ADX | [prerequisites/technical_concepts.md](prerequisites/technical_concepts.md) |
+| **A 股市场基础知识** | 股票代码格式、T+1、涨跌停、常用指数、ST 股、手续费与税 | [prerequisites/ashare_knowledge.md](prerequisites/ashare_knowledge.md) |
+
+### 5.1 必备（开始写策略前）
 
 | 领域 | 内容 | 学习建议 |
 |------|------|---------|
-| Python 基础 | 变量、函数、循环、条件判断 | 1-2 周 |
-| pandas | DataFrame、Series、索引、聚合 | 1-2 周 |
-| 技术指标 | 均线、MACD、RSI、布林带 | 边学边用 |
-| 基础统计 | 均值、标准差、相关性 | 回测时自然学会 |
+| Python 基础 | 变量、函数、循环、条件判断 | 1-2 周；或直接查 [前置文件](prerequisites/python_basics.md) |
+| pandas | DataFrame、Series、索引、聚合 | 1-2 周；核心用法见 [前置文件 §4](prerequisites/python_basics.md#4-pandas-核心用法) |
+| 技术指标 | 均线、MACD、RSI、布林带 | 边学边用；系统介绍见 [前置文件](prerequisites/technical_concepts.md) |
+| A 股基础规则 | T+1、涨跌停、手续费 | 半天；详见 [前置文件](prerequisites/ashare_knowledge.md) |
 
-### 5.2 推荐
+### 5.2 推荐（深入优化策略时）
 
 | 领域 | 内容 |
 |------|------|

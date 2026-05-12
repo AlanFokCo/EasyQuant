@@ -43,6 +43,31 @@ pip install .
 
 ---
 
+## 新手上手（前 30 分钟）
+
+如果你是第一次使用 EasyQuant，建议按以下顺序执行：
+
+1. **验证安装是否成功**
+   ```bash
+   python -c "from eqlib import *; print('eqlib OK')"
+   ```
+2. **运行第一条完整回测链路**
+   ```bash
+   python examples/03_run_backtest.py
+   ```
+3. **打开 `reports/` 下生成的 HTML 报告**（可交互图表 + 指标卡片）。
+4. **做两项快速检查**
+   ```bash
+   python examples/01_fetch_data.py
+   # 可选：运行测试
+   pip install -e ".[dev]"
+   python -m pytest tests/
+   ```
+
+建议先阅读 [Tutorial 00：环境与第一次运行](tutorials/00_environment_and_first_run.md) 再继续后续教程。
+
+---
+
 ## 快速开始
 
 ```python
@@ -72,6 +97,16 @@ result = run_strategy(
     use_local=True,
 )
 ```
+
+可将以上代码保存为 `my_first_strategy.py`，然后执行：
+
+```bash
+python my_first_strategy.py
+```
+
+> 订单执行模型：`order*` 系列 API 在当前回调里只是下单，实际按**下一个交易日开盘价**成交（避免未来函数偏差）。
+>
+> **输出结果：** 运行后会在 `reports/` 生成 `.png`、`.html`、`.md`、`.json` 四类文件。优先在浏览器打开 `.html` 查看完整报告。
 
 ---
 

@@ -88,6 +88,31 @@ After `pip install .`, you can `import eqlib` from any working directory. Run `p
 
 ---
 
+## Beginner Onboarding (First 30 Minutes)
+
+If you are new to EasyQuant, follow these steps in order:
+
+1. **Verify installation**
+   ```bash
+   python -c "from eqlib import *; print('eqlib OK')"
+   ```
+2. **Run your first end-to-end backtest**
+   ```bash
+   python examples/03_run_backtest.py
+   ```
+3. **Open the generated HTML report** in `reports/` (interactive charts + metrics cards).
+4. **Run quick checks**
+   ```bash
+   python examples/01_fetch_data.py
+   # optional test suite
+   pip install -e ".[dev]"
+   python -m pytest tests/
+   ```
+
+For step-by-step beginner guidance, start with [Tutorial 00](tutorials/00_environment_and_first_run.md).
+
+---
+
 ## Quick Start
 
 ```python
@@ -116,6 +141,12 @@ result = run_strategy(
     securities=['601390'],
     use_local=True,
 )
+```
+
+Save the script as `my_first_strategy.py`, then run:
+
+```bash
+python my_first_strategy.py
 ```
 
 > Execution model: orders created by `order*` APIs are queued in the current callback and filled at the **next trading day open** to avoid look-ahead bias.
