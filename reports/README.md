@@ -46,7 +46,7 @@
 
 ## 与教程中图片的关系
 
-[`tutorials/assets/README.md`](../tutorials/assets/README.md) 下的 `example_report_*.png` 与上表中的对应 `.png` 为同一次示例运行的副本，纳入 Git 后方便在 GitHub 等环境直接预览教程配图。**你本地学习时以本机 `reports/` 下最新生成的为准。**
+[`tutorials/assets/README.md`](../tutorials/assets/README.md) 提供了教程配图索引；其中列出的 `example_report_*.png` 与上表中的对应 `.png` 为同一次示例运行的副本，纳入 Git 后方便在 GitHub 等环境直接预览教程配图。**你本地学习时以本机 `reports/` 下最新生成的为准。**
 
 | 教程截图 | 对应报告 |
 |---------|---------|
