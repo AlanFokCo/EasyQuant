@@ -14,6 +14,33 @@ _LEVEL_ICONS = {
     "CRITICAL": "🛑",
 }
 
+_STATUS_ICONS = {
+    "RUN": "🔄",
+    "OK": "✅",
+    "DONE": "✅",
+    "PASS": "✅",
+    "WARN": "⚠️",
+    "WARNING": "⚠️",
+    "FAIL": "❌",
+    "ERROR": "❌",
+    "SKIP": "⏭️",
+    "START": "🚀",
+}
+
+_ACTION_HINT_ICONS = [
+    ("queue", "📝"),
+    ("order", "💸"),
+    ("buy", "🟢"),
+    ("sell", "🔴"),
+    ("fill", "✅"),
+    ("preload", "📦"),
+    ("load", "📥"),
+    ("save", "💾"),
+    ("select", "🎯"),
+    ("backtest", "📊"),
+    ("trade", "📈"),
+]
+
 
 class _CleanFormatter(logging.Formatter):
     """Compact, readable logger formatter."""
@@ -52,6 +79,21 @@ def _to_level(level: str | int) -> int:
     if name in ("WARN", "WARNING"):
         return logging.WARNING
     return getattr(logging, name, logging.INFO)
+
+
+def _status_icon(status: str) -> str:
+    """Resolve an emoji icon for a step status."""
+    key = str(status or "").upper()
+    return _STATUS_ICONS.get(key, "⚙️")
+
+
+def _action_icon(name: str) -> str:
+    """Resolve an emoji icon from action name heuristics."""
+    text = str(name or "").strip().lower()
+    for hint, icon in _ACTION_HINT_ICONS:
+        if hint in text:
+            return icon
+    return "➡️"
 
 
 # Internal logger
@@ -102,18 +144,20 @@ class Logger:
     @staticmethod
     def section(title: str, **fields):
         """High-level section marker for a major stage."""
-        _logger.info(f"━━ {title} ━━{_fmt_fields(fields)}")
+        _logger.info(f"🧭 ━━ {title} ━━{_fmt_fields(fields)}")
 
     @staticmethod
     def step(name: str, status: str = "RUN", **fields):
         """Single process step marker."""
-        _logger.info(f"[{status}] {name}{_fmt_fields(fields)}")
+        icon = _status_icon(status)
+        _logger.info(f"{icon} [{status}] {name}{_fmt_fields(fields)}")
 
     @staticmethod
     def action(name: str, target: str | None = None, **fields):
         """Action-oriented operation log."""
         target_text = f" -> {target}" if target else ""
-        _logger.info(f"{name}{target_text}{_fmt_fields(fields)}")
+        icon = _action_icon(name)
+        _logger.info(f"{icon} {name}{target_text}{_fmt_fields(fields)}")
 
     @staticmethod
     def progress(current: int, total: int, label: str = "Progress", **fields):
@@ -121,7 +165,7 @@ class Logger:
         total_safe = max(int(total), 1)
         current_safe = max(0, min(int(current), total_safe))
         pct = current_safe / total_safe * 100.0
-        _logger.info(f"{label}: {current_safe}/{total_safe} ({pct:.1f}%){_fmt_fields(fields)}")
+        _logger.info(f"📍 {label}: {current_safe}/{total_safe} ({pct:.1f}%){_fmt_fields(fields)}")
 
 
 log = Logger()

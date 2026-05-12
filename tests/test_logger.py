@@ -25,10 +25,10 @@ def test_logger_structured_helpers():
         log.progress(1, 4, label="Backtest progress", date="2024-01-02")
         log.action("Queue order", "601390", amount="+100")
         text = stream.getvalue()
-        assert "Backtest started" in text
-        assert "Preloading market data" in text
-        assert "Backtest progress: 1/4 (25.0%)" in text
-        assert "Queue order -> 601390" in text
+        assert "🧭 ━━ Backtest started ━━" in text
+        assert "🔄 [RUN] Preloading market data" in text
+        assert "📍 Backtest progress: 1/4 (25.0%)" in text
+        assert "📝 Queue order -> 601390" in text
         assert "start=2024-01-01" in text
 
     _with_capture(run)
@@ -38,7 +38,7 @@ def test_logger_progress_clamps_values():
     def run(stream):
         log.progress(20, 10, label="Run")
         text = stream.getvalue()
-        assert "Run: 10/10 (100.0%)" in text
+        assert "📍 Run: 10/10 (100.0%)" in text
 
     _with_capture(run)
 
