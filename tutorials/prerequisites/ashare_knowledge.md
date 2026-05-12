@@ -249,7 +249,7 @@ def initialize(context):
 | **PB** | Price-to-Book | 市净率 = 股价 / 每股净资产 | 越低越"便宜" |
 | **PS** | Price-to-Sales | 市销率 = 市值 / 年销售额 | — |
 | **ROE** | Return on Equity | 净资产收益率 = 净利润 / 净资产 | 越**高**越好（质量因子） |
-| **ROA** | Return on Assets | 总资产收益率 | 越高���好 |
+| **ROA** | Return on Assets | 总资产收益率 | 越高越好 |
 | **EPS** | Earnings Per Share | 每股收益 | 越高越好 |
 | **毛利率** | Gross Margin | 毛利润 / 营收 | 越高越好（竞争护城河） |
 
