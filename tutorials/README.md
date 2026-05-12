@@ -6,6 +6,44 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 
 ---
 
+## 目录结构
+
+```
+tutorials/
+├── prerequisites/          ← 前置知识（按需阅读）
+│   ├── README.md           ← 前置知识总览
+│   ├── python_basics.md    ← Python 语法、pandas/numpy、虚拟环境
+│   ├── technical_concepts.md  ← 均线、RSI、MACD、布林带、ATR、KDJ 等
+│   └── ashare_knowledge.md ← A 股代码规则、T+1、涨跌停、指数、手续费
+├── 00_environment_and_first_run.md   ← 安装、首跑回测（必读）
+├── 01_quant_basics.md      ← 量化基础概念、策略要素、常见错误
+├── 02_first_strategy.md    ← 编写双均线策略
+├── 03_backtesting.md       ← 解读回测报告与指标
+├── 04_strategy_optimization.md  ← 参数调优、组合优化、归因分析
+├── 05_live_trading.md      ← 模拟盘到实盘部署
+├── 06_rsi_mean_reversion.md  ← RSI 均值回归策略
+├── 07_sector_rotation.md   ← 行业轮动策略
+├── 08_multi_factor.md      ← 多因子选股
+├── 09_combined_strategy.md ← 综合策略（全天候 Alpha）
+└── 10_agent_optimization.md  ← AI Agent 自动化策略优化
+```
+
+---
+
+## 前置知识（按需阅读）
+
+如果你在以下任一领域没有基础，建议先阅读对应的前置文件，再从 Tutorial 00 开始：
+
+| 文件 | 内容 | 适合谁 |
+|------|------|--------|
+| [Python 基础与环境配置](prerequisites/python_basics.md) | 语法速查、pandas/numpy 核心用法、虚拟环境 | 没有写过 Python |
+| [技术分析基础概念](prerequisites/technical_concepts.md) | OHLCV、均线、RSI、MACD、布林带、ATR、KDJ、ADX、支撑阻力 | 没接触过技术指标 |
+| [A 股市场基础知识](prerequisites/ashare_knowledge.md) | 股票代码、T+1、涨跌停、主要指数、ST 股、手续费与税、基本面数据 | 没有 A 股投资经验 |
+
+→ 前置知识完整索引：[prerequisites/README.md](prerequisites/README.md)
+
+---
+
 ## 新手首日打卡（建议按顺序）
 
 1. 安装并验证：
@@ -30,6 +68,14 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 ---
 
 ## 教程列表
+
+### 前置知识（可选，按需阅读）
+
+| 文件 | 内容摘要 | 预计阅读 |
+|------|---------|---------|
+| [Python 基础与环境配置](prerequisites/python_basics.md) | 变量、函数、pandas/numpy 核心操作、虚拟环境 | 20 min |
+| [技术分析基础概念](prerequisites/technical_concepts.md) | OHLCV、MA / RSI / MACD / 布林带 / ATR / KDJ / ADX、支撑阻力 | 25 min |
+| [A 股市场基础知识](prerequisites/ashare_knowledge.md) | 股票代码格式、T+1、涨跌停、常用指数、ST 股、手续费与税 | 20 min |
 
 ### 环境与入门
 
@@ -139,8 +185,9 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 
 - Python **3.10+**（见 [Tutorial 00](00_environment_and_first_run.md)）
 - 已在仓库根目录执行 **`pip install .`** 或 **`pip install -e .`**
-- Python 基础（变量、函数、循环、条件判断）
-- 建议了解 pandas 的 DataFrame 基本操作
+- Python 基础（变量、函数、循环、条件判断） → 没有基础？见 [Python 基础与环境配置](prerequisites/python_basics.md)
+- 技术指标基础（均线、RSI 等） → 没有基础？见 [技术分析基础概念](prerequisites/technical_concepts.md)
+- A 股市场常识（T+1、涨跌停、股票代码等） → 没有基础？见 [A 股市场基础知识](prerequisites/ashare_knowledge.md)
 
 **排错与 API 速查：** [`doc/FAQ.md`](../doc/FAQ.md)、[`doc/api_index.md`](../doc/api_index.md)。
 
