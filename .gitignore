@@ -41,6 +41,7 @@ data/
 # Backtest / strategy output
 backtest_results/
 strategy_results/
+site/
 reports/*
 !reports/README.md
 *.log
