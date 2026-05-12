@@ -56,6 +56,8 @@ def _to_level(level: str | int) -> int:
 
 # Internal logger
 _logger = logging.getLogger("eqlib")
+# Prevent duplicate logs when host apps configure root logging handlers.
+# eqlib emits through its own dedicated handler for stable output layout.
 _logger.propagate = False
 _handler = logging.StreamHandler()
 _handler.setFormatter(_CleanFormatter(datefmt="%H:%M:%S"))
