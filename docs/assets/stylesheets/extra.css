@@ -1,0 +1,15 @@
+/* Better card layout */
+.md-typeset .grid {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+/* Hide raw HTML comments */
+[hidden] {
+  display: none;
+}
+
+/* Better code block styling */
+.md-typeset pre > code {
+  border-radius: 0.5rem;
+}
