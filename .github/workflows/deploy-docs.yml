@@ -36,6 +36,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # Full history is needed by mkdocs-git-revision-date-localized-plugin.
           fetch-depth: 0
 
       - name: Setup Python
