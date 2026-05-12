@@ -6,6 +6,29 @@ EasyQuant 量化策略入门教程系列，从零基础到实盘部署，涵盖�
 
 ---
 
+## 新手首日打卡（建议按顺序）
+
+1. 安装并验证：
+   ```bash
+   pip install .
+   python -c "from eqlib import *; print('eqlib OK')"
+   ```
+2. 跑第一份完整报告：
+   ```bash
+   python examples/03_run_backtest.py
+   ```
+3. 打开 `reports/*.html` 看指标卡片、回撤曲线、交易记录。
+4. 做最小功能验证（可选）：
+   ```bash
+   python examples/01_fetch_data.py
+   pip install -e ".[dev]"
+   python -m pytest tests/
+   ```
+
+完成后继续阅读 [Tutorial 01](01_quant_basics.md) 与 [Tutorial 02](02_first_strategy.md)。
+
+---
+
 ## 教程列表
 
 ### 环境与入门

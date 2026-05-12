@@ -6,6 +6,7 @@
 
 ## 目录
 
+0. [新手先完成这 4 步](#0-新手先完成这-4-步)
 1. [简介与适用范围](#1-简介与适用范围)
 2. [安装](#2-安装)
 3. [快速开始：5 分钟写一个策略](#3-快速开始5-分钟写一个策略)
@@ -28,6 +29,34 @@
 12. [模拟盘交易](#12-模拟盘交易)
 13. [使用 Claude Code AI Agent 自动化策略优化](#13-使用-claude-code-ai-agent-自动化策略优化)
 14. [常见问题](#14-常见问题)
+
+---
+
+## 0. 新手先完成这 4 步
+
+如果你是第一次接触 EasyQuant，请先完成以下最小闭环，再阅读后续章节：
+
+1. 安装：
+   ```bash
+   pip install .
+   ```
+2. 验证导入：
+   ```bash
+   python -c "from eqlib import *; print('eqlib OK')"
+   ```
+3. 跑一次完整回测：
+   ```bash
+   python examples/03_run_backtest.py
+   ```
+4. 打开 `reports/` 下最新 `.html`，确认图表和指标正常显示。
+
+可选测试：
+
+```bash
+python examples/01_fetch_data.py
+pip install -e ".[dev]"
+python -m pytest tests/
+```
 
 ---
 
