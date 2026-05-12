@@ -63,3 +63,4 @@ python examples/03_run_backtest.py
 
 - 项目说明（中文）：[`README_zh.md`](../README_zh.md)
 - AI 优化约定：[`CLAUDE.md`](../CLAUDE.md)
+- 本地数据快速验证：[`tutorials/00_environment_and_first_run.md`](../tutorials/00_environment_and_first_run.md)

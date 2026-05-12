@@ -1,14 +1,113 @@
-"""Logging facility (mirrors EasyQuant's log object)."""
+"""Professional logging facility with progress/step helpers."""
+
+from __future__ import annotations
 
 import logging
-import datetime
+import os
+from typing import Any
+
+
+_LEVEL_ICONS = {
+    "DEBUG": "🔎",
+    "INFO": "ℹ️",
+    "WARNING": "⚠️",
+    "ERROR": "❌",
+    "CRITICAL": "🛑",
+}
+
+_STATUS_ICONS = {
+    "RUN": "🔄",
+    "OK": "✅",
+    "DONE": "✅",
+    "PASS": "✅",
+    "WARN": "⚠️",
+    "WARNING": "⚠️",
+    "FAIL": "❌",
+    "ERROR": "❌",
+    "SKIP": "⏭️",
+    "START": "🚀",
+}
+
+_ACTION_HINT_ICONS = [
+    ("queue", "📝"),
+    ("order", "💸"),
+    ("buy", "🟢"),
+    ("sell", "🔴"),
+    ("fill", "✅"),
+    ("preload", "📦"),
+    ("load", "📥"),
+    ("save", "💾"),
+    ("select", "🎯"),
+    ("backtest", "📊"),
+    ("trade", "📈"),
+]
+
+
+class _CleanFormatter(logging.Formatter):
+    """Compact, readable logger formatter."""
+
+    def format(self, record):
+        ts = self.formatTime(record, self.datefmt)
+        level = record.levelname.upper()
+        icon = _LEVEL_ICONS.get(level, "•")
+        msg = record.getMessage()
+        return f"{ts} | {icon} {level:<8} | {msg}"
+
+
+def _fmt_value(value: Any) -> str:
+    """Format values into concise log-friendly text."""
+    if isinstance(value, float):
+        return f"{value:.4f}".rstrip("0").rstrip(".")
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _fmt_fields(fields: dict[str, Any]) -> str:
+    """Format key-value metadata fields."""
+    clean = {k: v for k, v in fields.items() if v is not None}
+    if not clean:
+        return ""
+    text = ", ".join(f"{k}={_fmt_value(v)}" for k, v in clean.items())
+    return f" | {text}"
+
+
+def _to_level(level: str | int) -> int:
+    """Normalize level from int/string."""
+    if isinstance(level, int):
+        return level
+    name = str(level).upper()
+    if name in ("WARN", "WARNING"):
+        return logging.WARNING
+    return getattr(logging, name, logging.INFO)
+
+
+def _status_icon(status: str) -> str:
+    """Resolve an emoji icon for a step status."""
+    key = str(status or "").upper()
+    return _STATUS_ICONS.get(key, "⚙️")
+
+
+def _action_icon(name: str) -> str:
+    """Resolve an emoji icon from action name heuristics."""
+    text = str(name or "").strip().lower()
+    for hint, icon in _ACTION_HINT_ICONS:
+        if hint in text:
+            return icon
+    return "➡️"
+
 
 # Internal logger
 _logger = logging.getLogger("eqlib")
+# Prevent duplicate logs when host apps configure root logging handlers.
+# eqlib emits through its own dedicated handler for stable output layout.
+_logger.propagate = os.getenv("EQLIB_LOG_PROPAGATE", "").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 _handler = logging.StreamHandler()
-_handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s %(message)s",
-                                        datefmt="%H:%M:%S"))
-_logger.addHandler(_handler)
+_handler.setFormatter(_CleanFormatter(datefmt="%H:%M:%S"))
+if not _logger.handlers:
+    _logger.addHandler(_handler)
 _logger.setLevel(logging.INFO)
 
 
@@ -34,6 +133,51 @@ class Logger:
     @staticmethod
     def error(msg, *args):
         _logger.error(msg, *args)
+
+    @staticmethod
+    def set_level(level: str | int):
+        """Set logger verbosity, e.g. 'DEBUG'/'INFO'/'WARNING'."""
+        _logger.setLevel(_to_level(level))
+
+    @staticmethod
+    def set_quiet(enabled: bool = True):
+        """Enable/disable quiet mode (WARNING+ only)."""
+        _logger.setLevel(logging.WARNING if enabled else logging.INFO)
+
+    @staticmethod
+    def set_propagate(enabled: bool = False):
+        """Enable/disable forwarding logs to parent loggers."""
+        _logger.propagate = bool(enabled)
+
+    @staticmethod
+    def section(title: str, **fields):
+        """High-level section marker for a major stage."""
+        _logger.info(f"🧭 ━━ {title} ━━{_fmt_fields(fields)}")
+
+    @staticmethod
+    def step(name: str, status: str = "RUN", **fields):
+        """Single process step marker."""
+        icon = _status_icon(status)
+        _logger.info(f"{icon} [{status}] {name}{_fmt_fields(fields)}")
+
+    @staticmethod
+    def action(name: str, target: str | None = None, **fields):
+        """Action-oriented operation log."""
+        target_text = f" -> {target}" if target else ""
+        icon = _action_icon(name)
+        _logger.info(f"{icon} {name}{target_text}{_fmt_fields(fields)}")
+
+    @staticmethod
+    def progress(current: int, total: int, label: str = "Progress", **fields):
+        """Progress indicator with normalized percent."""
+        total_safe = max(int(total), 1)
+        raw_current = int(current)
+        current_safe = max(0, min(raw_current, total_safe))
+        if current_safe != raw_current:
+            _logger.warning("Progress clamped: current=%s total=%s -> current=%s",
+                            raw_current, total_safe, current_safe)
+        pct = current_safe / total_safe * 100.0
+        _logger.info(f"📍 {label}: {current_safe}/{total_safe} ({pct:.1f}%){_fmt_fields(fields)}")
 
 
 log = Logger()
