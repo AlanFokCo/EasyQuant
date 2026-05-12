@@ -17,7 +17,7 @@
 | `backtest_*_17_grid.*` | [`examples/17_grid_trading_strategy.py`](../examples/17_grid_trading_strategy.py) | 601857 中国石油 | +30.25% | 网格交易 |
 | `backtest_*_16_multifactor.*` | [`examples/16_multi_factor_strategy.py`](../examples/16_multi_factor_strategy.py) | 10 只股票池 | +5.19% | 多因子选股 |
 | `backtest_*_22_stockselection.*` | [`examples/22_stock_selection_strategy.py`](../examples/22_stock_selection_strategy.py) | 14 只股票池 | +16.96% | 选股策略界面 |
-| `backtest_*_20_sr.*` | [`examples/20_sr_strategy/run_backtest.py`](../examples/20_sr_strategy/) | 8 只股票池 | +119.97% | 支撑/阻力位组合 |
+| `backtest_*_20_sr.*` | [`examples/20_sr_strategy/run_backtest.py`](../examples/20_sr_strategy/README.md) | 8 只股票池 | +119.97% | 支撑/阻力位组合 |
 | `backtest_*_19_localdata.*` | [`examples/19_local_data_backtest.py`](../examples/19_local_data_backtest.py) | 000768 中航光电 | -33.28% | 本地 CSV 模式（亏损示例，适合读报告） |
 | `backtest_*_12_portfolio.*` | [`examples/12_portfolio_backtest.py`](../examples/12_portfolio_backtest.py) | 5 只股票池 | -25.69% | 组合回测模式 |
 | `backtest_*_momentum_v2.*` | [`examples/12_portfolio_backtest.py`](../examples/12_portfolio_backtest.py)（旧版） | — | — | 中间调试版本 |
@@ -46,7 +46,7 @@
 
 ## 与教程中图片的关系
 
-[`tutorials/assets/`](../tutorials/assets/) 下的 `example_report_*.png` 与上表中的对应 `.png` 为同一次示例运行的副本，纳入 Git 后方便在 GitHub 等环境直接预览教程配图。**你本地学习时以本机 `reports/` 下最新生成的为准。**
+[`tutorials/assets/README.md`](../tutorials/assets/README.md) 提供了教程配图索引；其中列出的 `example_report_*.png` 与上表中的对应 `.png` 为同一次示例运行的副本，纳入 Git 后方便在 GitHub 等环境直接预览教程配图。**你本地学习时以本机 `reports/` 下最新生成的为准。**
 
 | 教程截图 | 对应报告 |
 |---------|---------|

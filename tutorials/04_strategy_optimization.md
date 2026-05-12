@@ -438,4 +438,4 @@ def market_open(context):
 - **[Tutorial 06: RSI 均值回归策略](06_rsi_mean_reversion.md)** — 学习一个与双均线思路截然不同的策略
 - **[Tutorial 07: 行业轮动策略](07_sector_rotation.md)** — 利用 A 股行业轮动特性构建超额收益策略
 - **[Tutorial 08: 多因子选股](08_multi_factor.md)** — 系统性的多因子量化选股方法
-- **[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），可直接查看策略表现
+- **[Example 20: 支撑阻力位组合策略](../examples/20_sr_strategy/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），可直接查看策略表现

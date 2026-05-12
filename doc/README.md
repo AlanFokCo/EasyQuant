@@ -59,6 +59,17 @@ python examples/03_run_backtest.py
 
 ---
 
+## 本地预览文档站点
+
+```bash
+pip install -e ".[docs]"
+mkdocs serve
+```
+
+启动后访问 <http://127.0.0.1:8000>，用于预览 GitHub Pages 文档站点。
+
+---
+
 ## 相关链接
 
 - 项目说明（中文）：[`README_zh.md`](../README_zh.md)

@@ -1,0 +1,68 @@
+site_name: EasyQuant Docs
+site_url: https://AlanFokCo.github.io/EasyQuant
+repo_url: https://github.com/AlanFokCo/EasyQuant
+repo_name: AlanFokCo/EasyQuant
+docs_dir: docs
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.expand
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+  - git-revision-date-localized:
+      enable_creation_date: true
+      fallback_to_build_date: true
+markdown_extensions:
+  - admonition
+  - attr_list
+  - codehilite
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation & Setup: doc/user_guide.md
+      - Your First Strategy: tutorials/02_first_strategy.md
+  - User Manual:
+      - Overview: doc/README.md
+      - User Guide: doc/user_guide.md
+      - Reports & Metrics: doc/reports_and_metrics.md
+      - PTrade/QMT Adapter: doc/ptrade_adapter.md
+      - FAQ: doc/FAQ.md
+  - API Reference:
+      - Index: doc/api_index.md
+      - Full Reference: doc/api_reference.md
+      - Utilities: doc/utils_reference.md
+  - Tutorials:
+      - Tutorial Guide: tutorials/README.md
+      - 00 Environment & First Run: tutorials/00_environment_and_first_run.md
+      - 01 Quant Basics: tutorials/01_quant_basics.md
+      - 02 First Strategy: tutorials/02_first_strategy.md
+      - 03 Backtesting Intro: tutorials/03_backtesting.md
+      - 04 Strategy Optimization: tutorials/04_strategy_optimization.md
+      - 05 Live Trading: tutorials/05_live_trading.md
+      - 06 RSI Mean Reversion: tutorials/06_rsi_mean_reversion.md
+      - 07 Sector Rotation: tutorials/07_sector_rotation.md
+      - 08 Multi-Factor: tutorials/08_multi_factor.md
+      - 09 Combined Strategy: tutorials/09_combined_strategy.md
+      - 10 Agent Optimization: tutorials/10_agent_optimization.md
+  - Examples:
+      - Example Index: examples/Examples.md
+      - Browse Code: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
