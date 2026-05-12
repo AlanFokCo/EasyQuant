@@ -101,6 +101,8 @@ result = run_strategy(
 
 建议先跑 [`examples/19_local_data_backtest.py`](../examples/19_local_data_backtest.py) 做离线流程验证。
 
+> 提示：本地已下载数据的日期区间应覆盖你的回测区间；若回测起止超出本地文件范围，请先补齐对应日期数据再运行。
+
 更多接口说明见：
 
 - [用户手册 7.11：下载与加载本地 CSV](../doc/user_guide.md#711-下载与加载本地-csv)
