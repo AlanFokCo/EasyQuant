@@ -1125,8 +1125,8 @@ result = run_strategy(
 
 ### 8.6 相关文档
 
-- [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md)
-- [用户手册 7.12：数据源扩展与可靠性建议](user_guide.md#712-数据源扩展与可靠性建议规划)
+- [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md#5-推荐先下载目标股票到本地再做快速回测验证)
+- [用户手册 7.12：数据源扩展与可靠性建议](user_guide.md)
 - [FAQ：首次回测慢或卡住](FAQ.md#q-首次回测很慢或卡住)
 
 ---
