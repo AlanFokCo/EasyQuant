@@ -1,0 +1,34 @@
+:root {
+  --bg: #f0f2f5;
+  --card: #fff;
+  --primary: #1890ff;
+  --text: #262626;
+  --text-secondary: #595959;
+  --text-dim: #8c8c8c;
+  --up: #f5222d;
+  --down: #52c41a;
+  --success-text: #135200;
+  --error-text: #cf1322;
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: var(--font-stack);
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
