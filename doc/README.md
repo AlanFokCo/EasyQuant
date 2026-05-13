@@ -12,12 +12,29 @@
 
 ---
 
+## 我是哪类读者？
+
+| 你的情况 | 建议从这里开始 |
+|----------|----------------|
+| 第一次克隆仓库，想尽快跑通 | [用户手册 §0～§3](user_guide.md#0-新手先完成这-4-步)（安装 → 最小策略 → 出报告） |
+| 跟着教程系统学 | [Tutorial 00 — 环境与第一次运行](../tutorials/00_environment_and_first_run.md) → [教程导读](../tutorials/README.md) |
+| 查函数签名、参数、返回值 | [API 速查索引](api_index.md) 或 [完整 API 参考](api_reference.md) |
+| 报告 / JSON 里指标看不懂 | [报告与指标 → §2.8 走读](reports_and_metrics.md#28-对照走读示例reports19_localdata--html) 或通读 [报告与指标](reports_and_metrics.md) |
+| 安装失败、无数据、很慢、图表空白 | [常见问题 FAQ](FAQ.md) |
+| 做参数搜索、审计日志 | [Tutorial 10](../tutorials/10_agent_optimization.md) 与 GitHub 上 [`agent/`](https://github.com/AlanFokCo/EasyQuant/tree/main/agent) 目录 |
+
+!!! note "仓库名与包名"
+
+    GitHub 仓库名是 **EasyQuant**，Python 包名是 **`eqlib`**。文档与示例中的 `pip install .` 均在**仓库根目录**执行。
+
+---
+
 ## 建议阅读顺序
 
 | 顺序 | 文档 | 说明 |
 |------|------|------|
 | 1 | [用户手册](user_guide.md) | 安装、策略骨架、`run_strategy` / `run_backtest`、数据与报告概览 |
-| 2 | [环境、报告与指标详解](reports_and_metrics.md) | 打开 HTML/PNG、**第 2.8 节 HTML 对照走读**、`analyze_returns` 全字段 |
+| 2 | [环境、报告与指标详解](reports_and_metrics.md)（[§2.8 对照走读](reports_and_metrics.md#28-对照走读示例reports19_localdata--html)） | 打开 HTML/PNG、**HTML 逐屏对照**、`analyze_returns` 全字段 |
 | 3 | [常见问题 FAQ](FAQ.md) | 安装失败、数据下载、回测无图、性能与排错 |
 | 4 | [API 速查索引](api_index.md) | 按主题跳转 `api_reference.md` 章节 |
 | 5 | [API 参考（完整）](api_reference.md) | 全部公开 API 的参数与示例 |

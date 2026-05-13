@@ -2,6 +2,12 @@
 
 > EasyQuant 是一个面向中国 A 股市场的量化策略与回测工具。核心库为 `eqlib` Python 包，通过 `from eqlib import *` 导入使用。
 
+!!! abstract "如何使用本手册"
+
+    - **第一次使用**：完成下面 **[§0](#0-新手先完成这-4-步)** 四步即可跑通并打开 HTML 报告（约 **15 分钟**）。
+    - **写法提示**：多数官方示例用 **`run_daily(market_open, …)`** 注册每日逻辑；**`handle_data`** 是另一种「每 bar 自动调用」的入口，可与调度函数组合使用，完整顺序见 **[§4](#4-策略生命周期)**。
+    - **按需跳读**：目录较长时，可用浏览器搜索（`Ctrl+F` / `⌘F`）或文档站左上角 **搜索** 定位关键词（如 `use_local`、`OrderCost`）。
+
 ---
 
 ## 目录
@@ -105,7 +111,7 @@ print("eqlib OK")
 
 ## 3. 快速开始：5 分钟写一个策略
 
-一个完整的策略由三个部分组成：`initialize`（初始化）、`handle_data`（每日逻辑）、以及调度函数（`run_daily` 等）。
+一个可运行的策略**至少**包含：**`initialize(context)`**（初始化），以及 **用 `run_daily` / `run_weekly` / `run_monthly` 等注册的交易函数**（本节示例为 `market_open`）。你也可以在 `initialize` 里通过 **`set_handle_data`** 注册全局 **`handle_data`**，引擎会在每个交易日调用它；**调度函数与 `handle_data` 的先后关系见 [§4](#4-策略生命周期)**。新手可先只掌握下面的 `run_daily(market_open)` 写法。
 
 ```python
 from eqlib import *
