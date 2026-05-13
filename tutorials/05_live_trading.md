@@ -1,8 +1,16 @@
 # Tutorial 05: 模拟盘到实盘
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 理解回测 → 模拟盘 → QMT/PTrade 实盘的差异与部署步骤 |
+    | **预计用时** | 约 60 分钟 |
+    | **前置** | [Tutorial 00](00_environment_and_first_run.md)；导出见 [`doc/ptrade_adapter.md`](../doc/ptrade_adapter.md) |
+
 > 回测通过后，用实时行情验证策略，再导出到 PTrade/QMT 进行实盘部署。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **PTrade 导出：** [`doc/ptrade_adapter.md`](../doc/ptrade_adapter.md)
+**导出适配：** [`doc/ptrade_adapter.md`](../doc/ptrade_adapter.md)
 
 ---
 

@@ -1,8 +1,16 @@
 # Tutorial 03: 回测验证
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 读懂回测输出与风险指标，识别过拟合、未来函数与数据问题 |
+    | **预计用时** | 60～90 分钟 |
+    | **前置** | [Tutorial 00](00_environment_and_first_run.md)、[Tutorial 02](02_first_strategy.md)；详表见 [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md) |
+
 > 深入理解回测结果，解读报告和图表，判断策略是否真的有效。
 
-**前置：** [Tutorial 00](00_environment_and_first_run.md) · **报告字段全书：** [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md) · **FAQ：** [`doc/FAQ.md`](../doc/FAQ.md)
+**延伸阅读：** [`doc/FAQ.md`](../doc/FAQ.md)（HTML 空白、JSON 字段等排错）。
 
 ---
 

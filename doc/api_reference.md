@@ -6,6 +6,10 @@
 >
 > **速查入口：** [文档中心 README](README.md) · [API 速查索引](api_index.md) · [报告与指标解读](reports_and_metrics.md) · [常见问题 FAQ](FAQ.md)
 
+!!! abstract "文档说明"
+
+    本文按 **章节** 列出 `eqlib` 全部公开 API 的签名、参数与注意事项。**新手**请先完成 [用户手册](user_guide.md) 再按需跳转本章；函数名检索也可用文档站 **搜索** 或浏览器页内查找（`Ctrl+F` / `⌘F`）。
+
 ---
 
 ## 目录

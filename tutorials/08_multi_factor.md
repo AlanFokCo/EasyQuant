@@ -1,8 +1,16 @@
 # Tutorial 08: 多因子选股
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 掌握多因子打分、标准化与组合，理解机构常用选股流程 |
+    | **预计用时** | 约 90～120 分钟 |
+    | **前置** | [Tutorial 07](07_sector_rotation.md)；链式选股见 [`doc/api_reference.md`](../doc/api_reference.md) 第 3.14 节 |
+
 > 多因子选股是机构量化基金最常用的方法之一。它不依赖单一指标，而是从价格、财务、情绪等多个维度综合评分，系统性地找出"性价比最高"的股票。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **选股 API：** [`doc/api_reference.md`](../doc/api_reference.md) 第 3.14 节链式选股、`MultiFactorSelector` 第 11 章
+**选股 API：** [`doc/api_reference.md`](../doc/api_reference.md) 第 3.14 节（链式选股）、第 11 章（`MultiFactorSelector`）
 
 ---
 

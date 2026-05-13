@@ -1,8 +1,16 @@
 # Tutorial 07: 行业轮动策略
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 理解 A 股行业轮动现象，并用 `eqlib` 行业 API 实现动量轮动示例 |
+    | **预计用时** | 约 90 分钟 |
+    | **前置** | [Tutorial 02](02_first_strategy.md)；行业 API 见 [`doc/api_index.md`](../doc/api_index.md) |
+
 > A 股市场有一个显著特点：资金不会同时追捧所有板块，而是在不同行业之间"轮流炒作"。理解和利用这一规律，可以构建超越大盘的行业轮动策略。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **API：** [`doc/api_index.md`](../doc/api_index.md)（行业/指数相关）
+**行业 / 指数 API：** [`doc/api_index.md`](../doc/api_index.md)
 
 ---
 

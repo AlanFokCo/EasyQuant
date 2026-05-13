@@ -1,8 +1,14 @@
 # Tutorial 02: 写第一个策略
 
-> 从零开始，用 EasyQuant 编写并运行你的第一个量化交易策略。
+!!! abstract "本篇导览"
 
-**环境：** 请先完成 [Tutorial 00](00_environment_and_first_run.md)（Python 3.10+、`pip install .`）。
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 手写双均线策略，理解 `initialize` / `run_daily` / `order_*` 与 `g` 的用法 |
+    | **预计用时** | 约 45 分钟 |
+    | **前置** | [Tutorial 00](00_environment_and_first_run.md)；概念可先读 [Tutorial 01](01_quant_basics.md) |
+
+> 从零开始，用 EasyQuant 编写并运行你的第一个量化交易策略。
 
 ---
 

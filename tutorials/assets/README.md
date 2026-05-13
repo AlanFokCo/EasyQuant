@@ -1,5 +1,9 @@
 # 教程配图目录
 
+!!! abstract "说明"
+
+    本目录存放教程与 README 中引用的 **静态配图**（PNG/SVG），便于在 GitHub 与文档站中无需本地跑回测即可预览报告样式。若需复现数据，请直接运行对应 `examples/` 脚本。
+
 ## matplotlib 图表（PNG，`generate_chart` 输出）
 
 - **`sample_equity_vs_benchmark.svg`**：轻量示意图，说明「策略 vs 基准」累计收益曲线的读法。

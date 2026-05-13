@@ -1,5 +1,9 @@
 # `reports/` 回测产物索引
 
+!!! abstract "本篇说明"
+
+    本页帮助你在本地 `reports/` 目录中**对照文件名**找到与教程截图、示例脚本对应的回测输出。生成文件通常被 `.gitignore` 忽略，克隆仓库后需自行运行示例才会出现。
+
 运行 `run_strategy()`、`run_backtest()` 后配合 `generate_html_report` / `generate_chart` 等，默认会在**仓库根目录**下的 `reports/` 中写入带时间戳的：
 
 - `backtest_*.html` — 交互式报告（浏览器打开）

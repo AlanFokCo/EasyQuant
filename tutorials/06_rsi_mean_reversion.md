@@ -1,8 +1,16 @@
 # Tutorial 06: RSI 均值回归策略
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 从 RSI 原理到完整策略代码、风控与改进思路 |
+    | **预计用时** | 约 90 分钟 |
+    | **前置** | [Tutorial 02](02_first_strategy.md)、[Tutorial 03](03_backtesting.md) |
+
 > 均值回归是最经典的量化策略思想之一。本教程从 RSI 指标原理出发，系统讲解如何设计、回测和改进一个 RSI 均值回归策略。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **示例：** [`examples/14_bollinger_strategy.py`](../examples/14_bollinger_strategy.py) 等（见 [`Examples.md`](../examples/Examples.md)）
+**相关示例：** [`examples/14_bollinger_strategy.py`](../examples/14_bollinger_strategy.py) 等（见 [`Examples.md`](../examples/Examples.md)）
 
 ---
 

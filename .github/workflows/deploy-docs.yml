@@ -11,6 +11,7 @@ on:
       - "reports/**"
       - "agent/**"
       - "README_zh.md"
+      - "README.md"
       - "pyproject.toml"
       - "mkdocs.yml"
       - ".github/workflows/deploy-docs.yml"

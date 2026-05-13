@@ -1,5 +1,13 @@
 # Tutorial 00: 环境与第一次运行
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 配好 Python 环境、安装 `eqlib`、跑通一次回测并在浏览器中打开 HTML 报告 |
+    | **预计用时** | 约 30 分钟 |
+    | **前置** | 无（零基础可先读下方「前置知识」链接） |
+
 > 在按顺序阅读 [Tutorial 01](01_quant_basics.md) 之前，请先完成本节：保证 Python 环境、`eqlib` 安装与一次成功回测，避免后续教程中的代码无法运行。
 
 **没有 Python 基础？** 先阅读 [前置知识：Python 基础与环境配置](prerequisites/python_basics.md)。  

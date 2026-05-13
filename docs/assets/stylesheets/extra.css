@@ -216,3 +216,97 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+/* =============================================================================
+   正文专业排版（通用于 doc / tutorials）
+   ============================================================================= */
+
+/* 引用块：与 Material 默认区分，偏「提示」气质 */
+.md-typeset blockquote {
+  border-left: 4px solid rgba(24, 144, 255, 0.45);
+  background: rgba(24, 144, 255, 0.04);
+  border-radius: 0 0.35rem 0.35rem 0;
+  padding: 0.65rem 1rem 0.65rem 1.1rem;
+  margin: 1rem 0;
+}
+
+[data-md-color-scheme="slate"] .md-typeset blockquote {
+  border-left-color: rgba(64, 169, 255, 0.55);
+  background: rgba(64, 169, 255, 0.06);
+}
+
+/* Admonition：标题略突出 */
+.md-typeset .admonition {
+  border-radius: 0.4rem;
+  border-width: 0 0 0 4px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.md-typeset .admonition.abstract .admonition-title,
+.md-typeset .admonition.tip .admonition-title,
+.md-typeset .admonition.note .admonition-title {
+  font-weight: 600;
+}
+
+/* abstract 内表格：与正文表格区分，略紧凑 */
+.md-typeset .admonition.abstract table {
+  font-size: 0.86rem;
+  margin: 0.5rem 0 0;
+}
+
+.md-typeset .admonition.abstract table th {
+  background: rgba(24, 144, 255, 0.1);
+}
+
+/* 定义列表（def_list） */
+.md-typeset dl {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(24, 144, 255, 0.06);
+  border-radius: 0.35rem;
+}
+
+[data-md-color-scheme="slate"] .md-typeset dl {
+  background: rgba(64, 169, 255, 0.08);
+}
+
+.md-typeset dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.md-typeset dt:first-child {
+  margin-top: 0;
+}
+
+.md-typeset dd {
+  margin: 0.25rem 0 0.5rem 0.5rem;
+}
+
+/* 行内 code */
+.md-typeset code:not(pre > code) {
+  border-radius: 0.2rem;
+  padding: 0.08em 0.35em;
+  font-size: 0.88em;
+}
+
+/* 分隔线 */
+.md-typeset hr {
+  margin: 2rem 0;
+}
+
+/* 有序 / 无序列表层级间距 */
+.md-typeset ol,
+.md-typeset ul {
+  margin: 0.65em 0;
+}
+
+.md-typeset li > ul,
+.md-typeset li > ol {
+  margin: 0.35em 0;
+}
+
+/* 侧边栏当前章节略强调 */
+.md-nav__link--active {
+  font-weight: 600;
+}

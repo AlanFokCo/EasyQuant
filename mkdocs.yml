@@ -85,45 +85,48 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.details
+  - pymdownx.betterem
+  - pymdownx.smartsymbols
+  - def_list
 nav:
   - Home: index.md
 
-  - Getting Started (快速入门):
+  - 快速入门:
       - 仓库中文简介 (README_zh): README_zh.md
       - 文档中心（索引）: doc/README.md
       - 安装与用户手册: doc/user_guide.md
       - 环境与第一次运行: tutorials/00_environment_and_first_run.md
 
-  - User Manual (用户手册):
-      - Design Spec — Web 策略工作室: doc/design_spec_web_strategy_studio.md
-      - Reports output index (reports 目录说明): reports/README.md
-      - Reports & Metrics (报告与指标): doc/reports_and_metrics.md
-      - PTrade/QMT Adapter (实盘适配): doc/ptrade_adapter.md
-      - FAQ (常见问题): doc/FAQ.md
+  - 用户手册:
+      - Web 策略工作室（Design Spec）: doc/design_spec_web_strategy_studio.md
+      - reports 目录说明: reports/README.md
+      - 报告与指标解读: doc/reports_and_metrics.md
+      - PTrade/QMT 实盘适配: doc/ptrade_adapter.md
+      - 常见问题 FAQ: doc/FAQ.md
 
-  - API Reference (API 参考):
-      - Index (索引): doc/api_index.md
-      - Complete API (完整 API): doc/api_reference.md
-      - Utilities (工具库): doc/utils_reference.md
+  - API 参考:
+      - API 速查索引: doc/api_index.md
+      - 完整 API 参考: doc/api_reference.md
+      - 工具库 utils: doc/utils_reference.md
 
-  - Tutorials (分步教程):
-      - Tutorial Overview (教程导读): tutorials/README.md
+  - 分步教程:
+      - 教程导读: tutorials/README.md
       - Prerequisites (前置阅读):
           - 前置知识总览: tutorials/prerequisites/README.md
           - Python 基础: tutorials/prerequisites/python_basics.md
           - 技术分析基础: tutorials/prerequisites/technical_concepts.md
           - A 股市场基础: tutorials/prerequisites/ashare_knowledge.md
-      - "00 - Environment Setup (环境配置)": tutorials/00_environment_and_first_run.md
-      - "01 - Quant Basics (量化基础)": tutorials/01_quant_basics.md
-      - "02 - First Strategy (首个策略)": tutorials/02_first_strategy.md
-      - "03 - Backtesting (回测入门)": tutorials/03_backtesting.md
-      - "04 - Strategy Optimization (策略优化)": tutorials/04_strategy_optimization.md
-      - "05 - Live Trading (实盘交易)": tutorials/05_live_trading.md
-      - "06 - RSI Mean Reversion (RSI 均值回归)": tutorials/06_rsi_mean_reversion.md
-      - "07 - Sector Rotation (行业轮动)": tutorials/07_sector_rotation.md
-      - "08 - Multi-Factor (多因子)": tutorials/08_multi_factor.md
-      - "09 - Combined Strategy (组合策略)": tutorials/09_combined_strategy.md
-      - "10 - Parameter tuning & audit (参数优化与审计)": tutorials/10_agent_optimization.md
+      - "00 · 环境与第一次运行": tutorials/00_environment_and_first_run.md
+      - "01 · 量化基础": tutorials/01_quant_basics.md
+      - "02 · 首个策略": tutorials/02_first_strategy.md
+      - "03 · 回测入门": tutorials/03_backtesting.md
+      - "04 · 策略优化": tutorials/04_strategy_optimization.md
+      - "05 · 模拟盘与实盘": tutorials/05_live_trading.md
+      - "06 · RSI 均值回归": tutorials/06_rsi_mean_reversion.md
+      - "07 · 行业轮动": tutorials/07_sector_rotation.md
+      - "08 · 多因子选股": tutorials/08_multi_factor.md
+      - "09 · 综合策略": tutorials/09_combined_strategy.md
+      - "10 · 参数优化与审计": tutorials/10_agent_optimization.md
       - 教程配图与资源: tutorials/assets/README.md
 
   - Examples (示例代码):

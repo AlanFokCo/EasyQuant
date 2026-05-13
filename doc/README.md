@@ -90,3 +90,9 @@ python examples/03_run_backtest.py
 - 项目说明（中文）：[`README_zh.md`](../README_zh.md)
 - 参数优化与审计（Tutorial 10）：[`tutorials/10_agent_optimization.md`](../tutorials/10_agent_optimization.md)
 - 本地数据快速验证：[`tutorials/00_environment_and_first_run.md`](../tutorials/00_environment_and_first_run.md)
+
+---
+
+## 文档排版说明（GitHub Pages）
+
+本站由 **MkDocs Material** 构建。教程与手册文首的 **「本篇导览」**、`!!! tip` 等块在 **GitHub 仓库内联预览** 中可能显示为纯文本；在 **[在线文档站](https://AlanFokCo.github.io/EasyQuant/)** 中渲染最佳。编写新文档时建议：先写 **一段摘要** + **读者 / 前置 / 预计时间**，再展开正文。

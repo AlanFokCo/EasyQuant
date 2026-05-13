@@ -6,6 +6,10 @@
 
 本系列从零基础到实盘部署，涵盖趋势跟踪、均值回归、行业轮动和多因子选股等方向。**英文标题「Tutorials」仅作导航标识，正文以中文为主。**
 
+!!! tip "阅读格式"
+
+    自 Tutorial 00 起，每篇教程文首带有 **「本篇导览」** 表格，便于你快速判断**目标、预计用时与前置教程**；正文仍保留原有目录与深度讲解。
+
 **第一次使用请先阅读：[Tutorial 00 — 环境与第一次运行](00_environment_and_first_run.md)**（Python 3.10+、`pip install .`、运行 `examples/03_run_backtest.py`、打开 HTML 报告）。**文档中心：** [`doc/README.md`](../doc/README.md)（用户手册、API 索引、FAQ、报告指标详解）。
 
 ---

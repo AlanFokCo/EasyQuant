@@ -1,8 +1,14 @@
 # Tutorial 10: 策略参数优化与审计
 
-> 本章说明如何用 **PARAMS / PARAM_RANGES** 参数化策略，结合仓库内 `agent/optimizer.py`（规则搜索参考）、`agent/audit_log.py`（审计日志）与 `eqlib` API，搭建**可复现**的调参与记录流程。你也可以自行编写 Python 脚本或在常用 IDE 里编排相同步骤；EasyQuant **不绑定**任何特定编辑器或商业 AI 产品。
+!!! abstract "本篇导览"
 
-**前置：** [Tutorial 00](00_environment_and_first_run.md) · **报告指标：** [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md)
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 用 `PARAMS` / `PARAM_RANGES` 管理可调参数，结合 `optimizer.py` 与 `audit_log.py` 做可复现调参 |
+    | **预计用时** | 约 40 分钟 |
+    | **前置** | [Tutorial 00](00_environment_and_first_run.md)；指标含义见 [`doc/reports_and_metrics.md`](../doc/reports_and_metrics.md) |
+
+> 本章说明如何用 **PARAMS / PARAM_RANGES** 参数化策略，结合仓库内 `agent/optimizer.py`（规则搜索参考）、`agent/audit_log.py`（审计日志）与 `eqlib` API，搭建**可复现**的调参与记录流程。你也可以自行编写 Python 脚本或在常用 IDE 里编排相同步骤；EasyQuant **不绑定**任何特定编辑器或商业 AI 产品。
 
 ---
 

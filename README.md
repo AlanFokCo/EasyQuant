@@ -3,7 +3,7 @@
 <p><strong>EasyQuant</strong> - A quantitative strategy and backtesting tool for the <strong>China A-share market</strong>.</p>
 <p><code>eqlib</code> is the core library: event-driven backtesting engine, data APIs, and analysis tools.</p>
 <p>
-<a href="README_zh.md">中文文档</a> · <a href="tutorials/">新手教程</a> · <a href="doc/README.md"><b>Documentation hub</b></a> · <a href="doc/user_guide.md">User guide</a> · <a href="doc/api_index.md">API index</a> · <a href="doc/api_reference.md">API reference</a> · <a href="examples/Examples.md">Examples</a>
+<a href="README_zh.md">中文文档</a> · <a href="https://AlanFokCo.github.io/EasyQuant/">在线文档站</a> · <a href="tutorials/">新手教程</a> · <a href="doc/README.md"><b>Documentation hub</b></a> · <a href="doc/user_guide.md">User guide</a> · <a href="doc/api_index.md">API index</a> · <a href="doc/api_reference.md">API reference</a> · <a href="examples/Examples.md">Examples</a>
 </p>
 </div>
 

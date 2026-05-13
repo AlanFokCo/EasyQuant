@@ -1,10 +1,18 @@
 # Tutorial 09: 全天候 Alpha 综合策略
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 将选股、轮动、风控等模块整合为可运行的综合策略，并对接回测与模拟盘 |
+    | **预计用时** | 2 小时以上（可按目录分次阅读） |
+    | **前置** | Tutorial 04～08 建议至少通读一遍；代码见 [`examples/21_combined_strategy/`](../examples/21_combined_strategy/README.md) |
+
 > 本教程将之前所有教程和示例中的策略技术整合成一个完整的、可投入实盘的综合策略。
 > 我们会逐步讲解每个组件的设计原理、数学公式和代码实现，
 > 并提供完整的回测和模拟盘代码，可直接运行。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **可运行代码：** [`examples/21_combined_strategy/README.md`](../examples/21_combined_strategy/README.md)（该目录脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 安装方式无关）
+**说明：** [`examples/21_combined_strategy/README.md`](../examples/21_combined_strategy/README.md) 目录内脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 的安装方式无关。
 
 ---
 
