@@ -16,7 +16,7 @@
 
 | 你的情况 | 建议从这里开始 |
 |----------|----------------|
-| 第一次克隆仓库，想尽快跑通 | [用户手册 §0～§3](user_guide/index.md)（从 [§0](user_guide/00_first_steps.md) 起连续阅读至 [§3](user_guide/03_quickstart_strategy.md)） |
+| 第一次克隆仓库，想尽快跑通 | [用户手册](user_guide.md)（从 §0 新手四步起） |
 | 跟着教程系统学 | [Tutorial 00 — 环境与第一次运行](../tutorials/00_environment_and_first_run.md) → [教程导读](../tutorials/README.md) |
 | 查函数签名、参数、返回值 | [API 速查索引](api_index.md) 或 [完整 API 参考](api_reference.md) |
 | 报告 / JSON 里指标看不懂 | [报告与指标 → §2.8 走读](reports_and_metrics.md#28-对照走读示例reports19_localdata--html) 或通读 [报告与指标](reports_and_metrics.md) |
@@ -33,7 +33,7 @@
 
 | 顺序 | 文档 | 说明 |
 |------|------|------|
-| 1 | [用户手册](user_guide/index.md) | 安装、策略骨架、`run_strategy` / `run_backtest`、数据与报告概览 |
+| 1 | [用户手册](user_guide.md) | 安装、策略骨架、`run_strategy` / `run_backtest`、数据与报告概览 |
 | 2 | [环境、报告与指标详解](reports_and_metrics.md)（[§2.8 对照走读](reports_and_metrics.md#28-对照走读示例reports19_localdata--html)） | 打开 HTML/PNG、**HTML 逐屏对照**、`analyze_returns` 全字段 |
 | 3 | [常见问题 FAQ](FAQ.md) | 安装失败、数据下载、回测无图、性能与排错 |
 | 4 | [API 速查索引](api_index.md) | 按主题跳转 `api_reference.md` 章节 |
@@ -86,7 +86,6 @@ python examples/03_run_backtest.py
 
 ## 相关链接
 
-- Web 策略编辑与回测服务（**Design Spec**，供实现对照）：[`design_spec_web_strategy_studio.md`](design_spec_web_strategy_studio.md)
 - 项目说明（中文）：[`README_zh.md`](../README_zh.md)
 - 参数优化与审计（Tutorial 10）：[`tutorials/10_agent_optimization.md`](../tutorials/10_agent_optimization.md)
 - 本地数据快速验证：[`tutorials/00_environment_and_first_run.md`](../tutorials/00_environment_and_first_run.md)

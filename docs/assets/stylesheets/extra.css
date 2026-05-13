@@ -1,45 +1,45 @@
 /* =============================================================================
-   EasyQuant Docs — GitHub Pages 品牌与阅读体验
-   与 eqlib HTML 报告设计 token 对齐：主色 #1890ff、背景 #f0f2f5 系
+   EasyQuant Docs — 暗色极简专业风格
    ============================================================================= */
 
-/* ----- Material 主题色（与报告 Ant Design 蓝一致） ----- */
-[data-md-color-scheme="default"] {
-  --md-primary-fg-color: #1890ff;
-  --md-primary-fg-color--light: #40a9ff;
-  --md-primary-fg-color--dark: #096dd9;
-  --md-accent-fg-color: #096dd9;
-  --md-typeset-a-color: #1890ff;
-}
-
+/* ----- 主色 ----- */
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #40a9ff;
-  --md-primary-fg-color--light: #69c0ff;
-  --md-primary-fg-color--dark: #1890ff;
-  --md-accent-fg-color: #69c0ff;
-  --md-typeset-a-color: #69c0ff;
+  --md-primary-fg-color: #3b82f6;
+  --md-primary-fg-color--light: #60a5fa;
+  --md-primary-fg-color--dark: #2563eb;
+  --md-accent-fg-color: #60a5fa;
+  --md-typeset-a-color: #60a5fa;
+  --md-default-bg-color: #1e1e2e;
 }
 
-/* ----- 版心与排版 ----- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #3b82f6;
+  --md-primary-fg-color--light: #60a5fa;
+  --md-primary-fg-color--dark: #2563eb;
+  --md-accent-fg-color: #2563eb;
+  --md-typeset-a-color: #3b82f6;
+}
+
+/* ----- 版心 ----- */
 .md-grid {
-  max-width: 92rem;
+  max-width: 88rem;
 }
 
 .md-typeset {
-  font-size: 0.92rem;
-  line-height: 1.72;
+  font-size: 0.9rem;
+  line-height: 1.7;
 }
 
+/* ----- 标题 ----- */
 .md-typeset h1 {
   font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--md-default-fg-color);
+  letter-spacing: -0.01em;
 }
 
 .md-typeset h2 {
   font-weight: 600;
-  margin-top: 2.25rem;
-  padding-bottom: 0.35rem;
+  margin-top: 2rem;
+  padding-bottom: 0.3rem;
   border-bottom: 1px solid var(--md-default-fg-color--lightest);
 }
 
@@ -47,227 +47,94 @@
   font-weight: 600;
 }
 
-/* 正文内链接下划线更清晰 */
-.md-typeset a:not(.md-button):hover {
-  text-decoration-thickness: 2px;
+/* ----- 首页卡片 ----- */
+.md-typeset .grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
 }
 
-/* ----- 首页 Hero ----- */
-.eq-hero {
-  text-align: center;
-  padding: 1.25rem 1rem 2rem;
-  margin: -0.5rem -0.8rem 1.5rem;
-  border-radius: 0.5rem;
-  background: linear-gradient(
-    165deg,
-    rgba(24, 144, 255, 0.06) 0%,
-    rgba(24, 144, 255, 0.02) 45%,
-    transparent 100%
-  );
-  border: 1px solid var(--md-default-fg-color--lightest);
-}
-
-[data-md-color-scheme="slate"] .eq-hero {
-  background: linear-gradient(
-    165deg,
-    rgba(64, 169, 255, 0.12) 0%,
-    rgba(64, 169, 255, 0.04) 50%,
-    transparent 100%
-  );
-}
-
-.eq-hero-logo {
-  margin: 0 0 0.75rem;
-}
-
-.eq-hero-img {
-  display: inline-block;
-  vertical-align: middle;
-}
-
-.eq-hero h1 {
-  font-size: 1.65rem;
-  line-height: 1.35;
-  margin: 0.5rem 0 0.75rem;
-  border: none;
-  max-width: 36rem;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.eq-hero > p:not(.eq-hero-logo) {
-  font-size: 1.02rem;
-  color: var(--md-default-fg-color--light);
-  max-width: 40rem;
-  margin: 0 auto 1rem;
-  line-height: 1.65;
-}
-
-.eq-hero .admonition {
-  text-align: left;
-  max-width: 44rem;
-  margin: 1rem auto 0;
-}
-
-/* ----- 卡片网格（首页四宫格） ----- */
-.md-typeset .grid.eq-cards {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.1rem;
-}
-
-.md-typeset .grid.eq-cards > ul {
+.md-typeset .grid > ul {
   display: contents;
 }
 
-.md-typeset .grid.eq-cards > ul > li {
+.md-typeset .grid > ul > li {
   border: 1px solid var(--md-default-fg-color--lightest);
-  border-radius: 0.5rem;
-  padding: 1rem 1.15rem 1.25rem;
+  border-radius: 0.4rem;
+  padding: 0.9rem 1rem;
   background: var(--md-default-bg-color);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
-.md-typeset .grid.eq-cards > ul > li:hover {
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  border-color: rgba(24, 144, 255, 0.35);
-  transform: translateY(-2px);
+.md-typeset .grid .md-button {
+  margin-top: 0.4rem;
 }
 
-[data-md-color-scheme="slate"] .md-typeset .grid.eq-cards > ul > li:hover {
-  border-color: rgba(64, 169, 255, 0.4);
-}
-
-.md-typeset .grid.eq-cards > ul > li > hr {
-  margin: 0.65rem 0;
-}
-
-.md-typeset .grid.eq-cards .middle {
-  vertical-align: middle;
-}
-
-.md-typeset .grid.eq-cards .lg {
-  font-size: 1.75rem;
-}
-
-.md-typeset .grid.eq-cards .md-button {
-  margin-top: 0.5rem;
-}
-
-/* ----- 表格可读性 ----- */
+/* ----- 表格 ----- */
 .md-typeset table:not([class]) {
-  font-size: 0.88rem;
-  border-radius: 0.35rem;
+  font-size: 0.86rem;
+  border-radius: 0.3rem;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .md-typeset table:not([class]) th {
-  background: rgba(24, 144, 255, 0.08);
+  background: rgba(59, 130, 246, 0.08);
   font-weight: 600;
 }
 
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
-  background: rgba(64, 169, 255, 0.12);
-}
-
-.md-typeset table:not([class]) tr:hover {
-  background: rgba(24, 144, 255, 0.04);
+  background: rgba(59, 130, 246, 0.12);
 }
 
 /* ----- 代码块 ----- */
 .md-typeset pre > code {
-  border-radius: 0.45rem;
+  border-radius: 0.4rem;
 }
 
-.md-typeset div.tabbed-set {
-  border-radius: 0.45rem;
-  border: 1px solid var(--md-default-fg-color--lightest);
-  overflow: hidden;
+.md-typeset code:not(pre > code) {
+  border-radius: 0.2rem;
+  padding: 0.08em 0.35em;
+  font-size: 0.88em;
 }
 
-.md-typeset .tabbed-labels > label {
-  font-weight: 500;
-}
-
-/* ----- 页脚提示 ----- */
-.eq-footer-note {
-  font-size: 0.85rem;
-  color: var(--md-default-fg-color--light);
-  text-align: center;
-  padding: 1rem;
-  margin-top: 2rem;
-  border-top: 1px solid var(--md-default-fg-color--lightest);
-}
-
-/* ----- 通用 grid ----- */
-.md-typeset .grid {
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-/* ----- 隐藏元素 ----- */
-[hidden] {
-  display: none !important;
-}
-
-/* ----- 顶栏标题：中文站名更易识别 ----- */
-.md-header__topic .md-ellipsis {
+/* ----- 侧边栏当前项强调 ----- */
+.md-nav__link--active {
   font-weight: 600;
-  letter-spacing: 0.02em;
 }
 
-/* =============================================================================
-   正文专业排版（通用于 doc / tutorials）
-   ============================================================================= */
+/* ----- 分隔线 ----- */
+.md-typeset hr {
+  margin: 2rem 0;
+}
 
-/* 引用块：与 Material 默认区分，偏「提示」气质 */
+/* ----- 引用块 ----- */
 .md-typeset blockquote {
-  border-left: 4px solid rgba(24, 144, 255, 0.45);
-  background: rgba(24, 144, 255, 0.04);
+  border-left: 4px solid rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.04);
   border-radius: 0 0.35rem 0.35rem 0;
-  padding: 0.65rem 1rem 0.65rem 1.1rem;
+  padding: 0.6rem 1rem;
   margin: 1rem 0;
 }
 
 [data-md-color-scheme="slate"] .md-typeset blockquote {
-  border-left-color: rgba(64, 169, 255, 0.55);
-  background: rgba(64, 169, 255, 0.06);
+  border-left-color: rgba(96, 165, 250, 0.55);
+  background: rgba(96, 165, 250, 0.06);
 }
 
-/* Admonition：标题略突出 */
+/* ----- Admonition ----- */
 .md-typeset .admonition {
   border-radius: 0.4rem;
   border-width: 0 0 0 4px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.md-typeset .admonition.abstract .admonition-title,
-.md-typeset .admonition.tip .admonition-title,
-.md-typeset .admonition.note .admonition-title {
-  font-weight: 600;
-}
-
-/* abstract 内表格：与正文表格区分，略紧凑 */
-.md-typeset .admonition.abstract table {
-  font-size: 0.86rem;
-  margin: 0.5rem 0 0;
-}
-
-.md-typeset .admonition.abstract table th {
-  background: rgba(24, 144, 255, 0.1);
-}
-
-/* 定义列表（def_list） */
+/* ----- 定义列表 ----- */
 .md-typeset dl {
   margin: 1rem 0;
-  padding: 0.75rem 1rem;
-  background: rgba(24, 144, 255, 0.06);
+  padding: 0.6rem 1rem;
+  background: rgba(59, 130, 246, 0.06);
   border-radius: 0.35rem;
 }
 
 [data-md-color-scheme="slate"] .md-typeset dl {
-  background: rgba(64, 169, 255, 0.08);
+  background: rgba(96, 165, 250, 0.08);
 }
 
 .md-typeset dt {
@@ -275,38 +142,6 @@
   margin-top: 0.5rem;
 }
 
-.md-typeset dt:first-child {
-  margin-top: 0;
-}
-
 .md-typeset dd {
   margin: 0.25rem 0 0.5rem 0.5rem;
-}
-
-/* 行内 code */
-.md-typeset code:not(pre > code) {
-  border-radius: 0.2rem;
-  padding: 0.08em 0.35em;
-  font-size: 0.88em;
-}
-
-/* 分隔线 */
-.md-typeset hr {
-  margin: 2rem 0;
-}
-
-/* 有序 / 无序列表层级间距 */
-.md-typeset ol,
-.md-typeset ul {
-  margin: 0.65em 0;
-}
-
-.md-typeset li > ul,
-.md-typeset li > ol {
-  margin: 0.35em 0;
-}
-
-/* 侧边栏当前章节略强调 */
-.md-nav__link--active {
-  font-weight: 600;
 }

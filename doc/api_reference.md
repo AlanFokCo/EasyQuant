@@ -1,129 +1,23 @@
-# EasyQuant API 参考文档
+# EasyQuant API 参考
 
-> 本文档描述 `eqlib` 核心库的全部 API。`eqlib` 是 EasyQuant 项目的 Python 包，提供策略编写、数据拉取、回测执行、模拟盘和风险分析等能力。
->
+> 本文档描述 `eqlib` 核心库的全部公开 API。
 > **注意：本工具仅支持中国 A 股市场。**
->
-> **速查入口：** [文档中心 README](README.md) · [API 速查索引](api_index.md) · [报告与指标解读](reports_and_metrics.md) · [常见问题 FAQ](FAQ.md)
 
-!!! abstract "文档说明"
+!!! tip "阅读提示"
 
-    本文按 **章节** 列出 `eqlib` 全部公开 API 的签名、参数与注意事项。**新手**请先完成 [用户手册 · §0～§3](user_guide/index.md) 再按需跳转本章；函数名检索也可用文档站 **搜索** 或浏览器页内查找（`Ctrl+F` / `⌘F`）。
+    函数名可用浏览器页内查找（`Ctrl+F` / `⌘F`）。新手请先完成 [用户手册](user_guide.md) 再按需跳转本章。
 
 ---
 
-## 章节目录
+## 策略生命周期结构体
 
-以下卡片跳转到 **本页** 对应章节锚点。
-
-<div class="grid cards eq-cards" markdown>
-
--   :material-sitemap: **§1** 结构体
-
-    ---
-
-    [:octicons-arrow-right-24: Context / Portfolio](#1-策略生命周期结构体){ .md-button }
-
--   :material-swap-horizontal: **§2** 交易
-
-    ---
-
-    [:octicons-arrow-right-24: order / order_value](#2-交易-api){ .md-button }
-
--   :material-database: **§3** 数据
-
-    ---
-
-    [:octicons-arrow-right-24: get_price / history](#3-数据-api){ .md-button }
-
--   :material-play-speed: **§4** 回测引擎
-
-    ---
-
-    [:octicons-arrow-right-24: run_backtest](#4-回测与模拟盘引擎){ .md-button }
-
--   :material-tune: **§5** 配置
-
-    ---
-
-    [:octicons-arrow-right-24: set_benchmark](#5-配置-api){ .md-button }
-
--   :material-chart-line: **§6** 报告
-
-    ---
-
-    [:octicons-arrow-right-24: generate_html_report](#6-报告与分析-api){ .md-button }
-
--   :material-chart-scatter-plot: **§7** 组合优化
-
-    ---
-
-    [:octicons-arrow-right-24: portfolio_optimizer](#7-组合优化-api){ .md-button }
-
--   :material-harddisk: **§8** 缓存
-
-    ---
-
-    [:octicons-arrow-right-24: set_cache_dir](#8-缓存-api){ .md-button }
-
--   :material-text-box: **§9** 日志
-
-    ---
-
-    [:octicons-arrow-right-24: log.info](#9-日志-api){ .md-button }
-
--   :material-tools: **§10** 辅助工具
-
-    ---
-
-    [:octicons-arrow-right-24: get_session](#10-辅助工具-api){ .md-button }
-
--   :material-filter-variant: **§11** 选股
-
-    ---
-
-    [:octicons-arrow-right-24: run_selection](#11-选股策略-api){ .md-button }
-
--   :material-cog-outline: **§12** 参数化约定
-
-    ---
-
-    [:octicons-arrow-right-24: 优化与审计](#12-参数化与优化相关-api-约定){ .md-button }
-
-</div>
-
----
-
-## 目录
-
-1. [策略生命周期结构体](#1-策略生命周期结构体)
-2. [交易 API](#2-交易-api)
-3. [数据 API](#3-数据-api)
-4. [回测与模拟盘引擎](#4-回测与模拟盘引擎)
-5. [配置 API](#5-配置-api)（含滑点、会话）
-6. [报告与分析 API](#6-报告与分析-api)
-7. [组合优化 API](#7-组合优化-api)
-8. [缓存 API](#8-缓存-api)
-9. [日志 API](#9-日志-api)
-10. [辅助工具 API](#10-辅助工具-api)
-11. [选股策略 API](#11-选股策略-api)
-12. [参数化与优化相关 API 约定](#12-参数化与优化相关-api-约定)
-
----
-
-## 1. 策略生命周期结构体
-
-策略编写涉及以下核心结构体：`Context`、`Portfolio`、`Position`、`GlobalObject (g)`。
-
-### 1.1 `Context`
+### Context
 
 策略执行上下文，由框架在回调时自动传入。
 
-**属性：**
-
 | 属性 | 类型 | 说明 |
 |------|------|------|
-| `current_dt` | `datetime` | 当前模拟时间（回测中为交易日 9:30） |
+| `current_dt` | `datetime` | 当前模拟时间 |
 | `start_date` | `date` | 回测开始日期 |
 | `end_date` | `date` | 回测结束日期 |
 | `frequency` | `str` | `'daily'` 或 `'minute'` |
@@ -131,75 +25,34 @@
 | `universe` | `list[str]` | 当前策略股票池 |
 | `run_params` | `dict` | 回测参数字典 |
 
-**使用方式：**
-
-```python
-def initialize(context):
-    print(context.start_date, context.portfolio.available_cash)
-
-def market_open(context):
-    print(context.current_dt, context.universe)
-```
-
-### 1.2 `Portfolio`
+### Portfolio
 
 投资组合状态，通过 `context.portfolio` 访问。
 
-**属性：**
+| 属性 | 说明 | 用户输入 |
+|------|------|----------|
+| `starting_cash` | 初始资金 | 由 `starting_cash` 参数设定 |
+| `available_cash` | 可用现金 | 框架自动维护 |
+| `positions` | 持仓字典，key 为股票代码 | 框架自动维护 |
+| `total_value` | 总资产 = 现金 + 持仓市值 | 框架自动计算 |
+| `returns` | 总收益率 | 只读 |
 
-| 属性 | 类型 | 说明 | 用户输入 |
-|------|------|------|----------|
-| `starting_cash` | `float` | 初始资金 | 由 `starting_cash` 参数设定 |
-| `available_cash` | `float` | 可用现金 | 框架自动维护，不可直接修改 |
-| `positions` | `dict[str, Position]` | 持仓字典，key 为股票代码 | 框架自动维护 |
-| `total_value` | `float` | 总资产 = 现金 + 持仓市值 | 框架自动计算 |
-| `returns` | `float` | 总收益率 = (total_value - starting_cash) / starting_cash | 只读 |
-
-**使用方式：**
-
-```python
-cash = context.portfolio.available_cash
-total = context.portfolio.total_value
-pct = context.portfolio.returns * 100
-pos = context.portfolio.positions.get('601390')
-```
-
-### 1.3 `Position`
+### Position
 
 单只股票持仓，通过 `context.portfolio.positions[code]` 访问。
 
-**属性：**
+| 属性 | 说明 | 用户输入 |
+|------|------|----------|
+| `security` | 股票代码 | 框架自动设定 |
+| `amount` | 持仓数量（股） | 框架自动维护 |
+| `closeable_amount` | 今日可卖数量（T+1 限制） | 框架自动维护 |
+| `avg_cost` | 持仓均价 | 框架自动计算 |
+| `total_value` | 持仓市值 | 框架自动计算 |
+| `price` | 当前价 | 只读 |
 
-| 属性 | 类型 | 说明 | 用户输入 |
-|------|------|------|----------|
-| `security` | `str` | 股票代码 | 框架自动设定 |
-| `amount` | `int` | 持仓数量（股） | 框架自动维护 |
-| `closeable_amount` | `float` | 今日可卖数量（T+1 限制） | 框架自动维护 |
-| `avg_cost` | `float` | 持仓均价 | 框架自动计算 |
-| `total_value` | `float` | 持仓市值 = amount * 当前价 | 框架自动计算 |
-| `price` | `float` | 当前价（`current_price` 的别名） | 只读 |
-
-**使用方式：**
-
-```python
-pos = context.portfolio.positions.get('601390')
-if pos and pos.amount > 0:
-    print("持仓 %d 股，成本 %.3f，市值 %.2f"
-          % (pos.amount, pos.avg_cost, pos.total_value))
-```
-
-### 1.4 `g` — GlobalObject
+### g — GlobalObject
 
 策略级别的全局对象，用于跨交易日存储自定义变量。
-
-**说明：**
-- 全局唯一实例，通过 `from eqlib import g` 导入
-- 可动态设定任意属性
-- 在 `initialize` 中初始化，在回调函数中读写
-
-**属性：** 用户自定义（无固定字段）
-
-**使用方式：**
 
 ```python
 from eqlib import g
@@ -207,49 +60,45 @@ from eqlib import g
 def initialize(context):
     g.security = '601390'
     g.ma_period = 20
-    g.max_positions = 10
-    g.trade_count = 0
 
 def market_open(context):
-    g.trade_count += 1
     hist = attribute_history(g.security, g.ma_period, '1d', ['close'])
 ```
 
 ---
 
-## 2. 交易 API
+## 交易 API
 
-用于在策略中下单买卖。
+> 回测执行语义：`order*` 系列 API 只负责在当前回调中提交请求，订单会在**下一交易日开盘价**统一撮合成交。
 
-> 回测执行语义：`order*` 系列 API 只负责在当前回调中提交请求，订单会在**下一交易日开盘价**统一撮合成交，以避免前视偏差。
-
-### 2.1 `order(security, amount, style=None)`
+### order
 
 按股数下单买卖。
 
-**参数：**
+```python
+order(security, amount, style=None)
+```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `security` | `str` | 是 | 股票代码，如 `'601390'` |
 | `amount` | `int` | 是 | 股数，正数=买入，负数=卖出 |
-| `style` | — | 否 | 订单类型（保留参数，暂不支持限价） |
+| `style` | — | 否 | 订单类型（保留参数） |
 
-**返回：** `str` 挂单 ID，失败返回 `None`  
-格式：`PENDING_<ACTION>_<SECURITY>`，其中 `<ACTION>` 为 `ORDER` / `ORDER_VALUE` / `ORDER_TARGET` / `ORDER_TARGET_VALUE`（如 `PENDING_ORDER_601390`、`PENDING_ORDER_TARGET_601390`）
-
-**说明：** 买入自动取整到 100 的整数倍（A 股最小交易单位）。资金不足时自动按最大可买数量执行。
+返回挂单 ID（`str`），失败返回 `None`。买入自动取整到 100 的整数倍。
 
 ```python
 order('601390', 1000)    # 买入 1000 股
 order('601390', -500)    # 卖出 500 股
 ```
 
-### 2.2 `order_value(security, value, style=None)`
+### order_value
 
 按金额下单买卖。
 
-**参数：**
+```python
+order_value(security, value, style=None)
+```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -257,18 +106,17 @@ order('601390', -500)    # 卖出 500 股
 | `value` | `float` | 是 | 金额，正数=买入，负数=卖出 |
 | `style` | — | 否 | 订单类型 |
 
-**返回：** `str` 挂单 ID，失败返回 `None`
-
 ```python
 order_value('601390', 50000)    # 买入 5 万元
-order_value('601390', -30000)   # 卖出 3 万元
 ```
 
-### 2.3 `order_target(security, amount, style=None)`
+### order_target
 
 调整持仓到目标股数。
 
-**参数：**
+```python
+order_target(security, amount, style=None)
+```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -276,18 +124,13 @@ order_value('601390', -30000)   # 卖出 3 万元
 | `amount` | `int` | 是 | 目标持仓股数，0 = 清仓 |
 | `style` | — | 否 | 订单类型 |
 
-**返回：** `str` 挂单 ID，失败返回 `None`
-
-```python
-order_target('601390', 5000)   # 调到 5000 股
-order_target('601390', 0)      # 清仓
-```
-
-### 2.4 `order_target_value(security, value, style=None)`
+### order_target_value
 
 调整持仓到目标市值。
 
-**参数：**
+```python
+order_target_value(security, value, style=None)
+```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -295,580 +138,245 @@ order_target('601390', 0)      # 清仓
 | `value` | `float` | 是 | 目标市值，0 = 清仓 |
 | `style` | — | 否 | 订单类型 |
 
-**返回：** `str` 挂单 ID，失败返回 `None`
+### 手续费说明
 
-```python
-order_target_value('601390', 100000)   # 持仓市值调到 10 万
-order_target_value('601390', 0)        # 清仓
-```
-
-### 2.5 手续费说明
-
-所有交易自动计算手续费，默认配置：
-
-| 费用类型 | 费率 | 说明 |
-|----------|------|------|
-| 买入印花税 | 0% | A 股买入无印花税 |
-| 卖出印花税 | 0.1% | A 股卖出收取 |
-| 买入/卖出佣金 | 0.03% | 券商佣金 |
-| 最低佣金 | 5 元 | 不足 5 元按 5 元收取 |
-
-通过 `set_order_cost()` 修改（见第 5 节）。
+通过 `set_order_cost()` 修改（见配置 API）。默认：买入印花税 0%、卖出印花税 0.1%、买卖佣金 0.03%、最低佣金 5 元。
 
 ---
 
-## 3. 数据 API
+## 数据 API
 
-### 3.1 历史日线数据
-
-#### `get_price(security, start_date=None, end_date=None, frequency='daily', fields=None, count=None)`
+### get_price
 
 获取历史价格数据。
 
-**参数：**
+```python
+get_price(security, start_date=None, end_date=None, frequency='daily', fields=None, count=None)
+```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `security` | `str` 或 `list` | 是 | 股票代码，可传多只 |
-| `start_date` | `str` / `date` | 否 | 开始日期，如 `'2024-01-01'` |
-| `end_date` | `str` / `date` | 否 | 结束日期 |
-| `frequency` | `str` | 否 | 当前仅支持 `'daily'`（分钟线请使用 `fetch_minute_data` / `get_price_minute`） |
-| `fields` | `list` | 否 | 指定返回字段，如 `['close', 'volume']` |
+| `security` | `str` 或 `list` | 是 | 股票代码 |
+| `start_date` | `str`/`date` | 否 | 开始日期 |
+| `end_date` | `str`/`date` | 否 | 结束日期 |
+| `frequency` | `str` | 否 | 仅支持 `'daily'` |
+| `fields` | `list` | 否 | 指定返回字段 |
 | `count` | `int` | 否 | 返回最近 N 根 bar |
 
-**返回：** `DataFrame`（单只股票）或 `dict[str, DataFrame]`（多只股票）
+返回 `DataFrame`（单只）或 `dict[str, DataFrame]`（多只）。
 
-> `frequency` 参数当前为兼容保留项，建议省略或显式传 `'daily'`；传入其他值不会切换到分钟线。分钟线请见下文“分钟线数据”小节（`fetch_minute_data` / `get_price_minute`）。
+### history
 
-```python
-# 单只股票
-df = get_price('601390', start_date='2024-01-01', end_date='2024-06-30')
-
-# 多只股票
-dfs = get_price(['601390', '600519'], start_date='2024-01-01', end_date='2024-06-30')
-
-# 最近 30 天
-df = get_price('601390', count=30)
-```
-
-#### `history(count, unit='1d', field='close', security=None, df=False)`
-
-获取从当前回测时间向前推 `count` 根 bar 的数据。仅在策略回调函数内可用。
-
-**参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `count` | `int` | 是 | bar 数量 |
-| `unit` | `str` | 否 | `'1d'`（日线） |
-| `field` | `str` | 否 | 字段名 |
-| `security` | `str` | 否 | 股票代码，默认使用 `context.universe` |
-| `df` | `bool` | 否 | `True` 返回 DataFrame，`False` 返回 dict |
-
-**返回：**
-
-- 单标的 + `df=False`：`Series`
-- 单标的 + `df=True`：`DataFrame`
-- 多标的 + `df=False`：`dict[str, Series]`
-- 多标的 + `df=True`：`DataFrame`
+获取从当前回测时间向前推 `count` 根 bar 的数据。仅在策略回调内可用。
 
 ```python
-def market_open(context):
-    close = history(20, '1d', 'close', '601390')
-    ma20 = close.mean()
+history(count, unit='1d', field='close', security=None, df=False)
 ```
 
-#### `attribute_history(security, count, unit='1d', fields=('close',), df=True, skip_paused=True, fq='pre')`
+### attribute_history
 
 获取单只股票的历史属性数据。
 
-**参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `security` | `str` | 是 | 股票代码 |
-| `count` | `int` | 是 | bar 数量 |
-| `unit` | `str` | 否 | `'1d'` |
-| `fields` | `tuple` | 否 | 字段列表 |
-| `df` | `bool` | 否 | 返回 DataFrame |
-| `fq` | `str` | 否 | `'pre'`（前复权）/ `'post'`（后复权） |
-
-**返回：** `DataFrame`
-
 ```python
-hist = attribute_history('601390', 30, '1d',
-                         fields=['open', 'close', 'volume', 'high', 'low'])
+attribute_history(security, count, unit='1d', fields=('close',), df=True, skip_paused=True, fq='pre')
 ```
 
-**DataFrame 列说明：**
+返回 `DataFrame`，列包括：`open`, `high`, `low`, `close`, `volume`, `money`, `pct_change`, `turnover`。
 
-| 列名 | 说明 |
-|------|------|
-| `open` | 开盘价 |
-| `high` | 最高价 |
-| `low` | 最低价 |
-| `close` | 收盘价 |
-| `volume` | 成交量（股） |
-| `money` | 成交额（元） |
-| `pct_change` | 涨跌幅 (%) |
-| `turnover` | 换手率 (%) |
+### get_current_data
 
-### 3.2 实时行情与快照
+获取全部 A 股实时快照。返回 `dict[str, dict]`，包含 `code`, `name`, `price`, `pct_change`, `volume`, `pe`, `pb`, `total_value` 等字段。
 
-#### `get_current_data()`
+### get_security_info
 
-获取全部 A 股实时快照。
+获取单只股票基本信息。返回 `SecurityInfo` 对象（`code`, `name`, `industry`, `total_shares`, `float_shares`, `total_value`, `list_date`）。
 
-**返回：** `dict[str, dict]`，key 为股票代码，value 包含：
+### get_valuation
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `code` | `str` | 股票代码 |
-| `name` | `str` | 股票名称 |
-| `price` | `float` | 最新价 |
-| `pct_change` | `float` | 涨跌幅 |
-| `volume` | `float` | 成交量 |
-| `money` | `float` | 成交额 |
-| `high` | `float` | 最高价 |
-| `low` | `float` | 最低价 |
-| `open` | `float` | 开盘价 |
-| `prev_close` | `float` | 昨收价 |
-| `turnover` | `float` | 换手率 |
-| `pe` | `float` | 市盈率（动态） |
-| `pb` | `float` | 市净率 |
-| `total_value` | `float` | 总市值 |
-| `float_value` | `float` | 流通市值 |
+获取估值数据。返回 `dict` 或 `None`。
 
-```python
-data = get_current_data()
-info = data['601390']
-print(info['price'], info['pe'])
-```
-
-#### `get_security_info(code)`
-
-获取单只股票基本信息。
-
-**返回：** `SecurityInfo` 对象，属性：
-
-| 属性 | 说明 |
-|------|------|
-| `code` | 股票代码 |
-| `name` | 股票简称 |
-| `industry` | 所属行业 |
-| `total_shares` | 总股本 |
-| `float_shares` | 流通股 |
-| `total_value` | 总市值 |
-| `float_value` | 流通市值 |
-| `list_date` | 上市时间 |
-
-#### `get_valuation(code)`
-
-获取估值数据（使用缓存的行情快照）。
-
-**返回：** `dict` 或 `None`，字段同 `get_current_data` 的估值子集。
-
-### 3.3 选股与扫描
-
-#### `scan_market(min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50)`
+### scan_market
 
 扫描 A 股并筛选。
 
-**参数：**
+```python
+scan_market(min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50)
+```
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `min_price` | `float` | 最低价格 |
-| `min_pct_change` | `float` | 最小涨幅 |
-| `max_pct_change` | `float` | 最大涨幅 |
-| `max_pe` | `float` | 最大市盈率 |
-
-**返回：** 筛选后的 `DataFrame`（code, name, price, pct_change, pe）
-
-#### `get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None, min_roe=None, min_revenue=None, min_profit=None)`
+### get_financial_screen
 
 按财务指标筛选。
 
-**参数：** 所有参数均为可选阈值。
+```python
+get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None, min_roe=None)
+```
 
-**返回：** 筛选后的 `DataFrame`。
+### get_all_securities
 
-#### `check_golden_cross(code, fast_period=5, slow_period=20, min_rows=30)`
+获取全部 A 股列表。返回 `DataFrame`（code, name）。
 
-检查是否存在金叉。
+### get_trade_days
 
-**返回：** `bool`
+获取交易日历。返回 `list[date]`。
 
-### 3.4 股票列表与交易日历
+### 指数与行业
 
-#### `get_all_securities(types=None, date=None)`
+| API | 说明 | 返回 |
+|-----|------|------|
+| `get_index_stocks(index_code)` | 指数成分股 | `DataFrame` |
+| `get_industry_list()` | 所有行业板块 | `list[str]` |
+| `get_industry_stocks(industry_name)` | 某行业成分股 | `DataFrame` |
+| `get_industry(code)` | 单只股票行业分类 | `dict` 或 `None` |
+| `get_index_weights(index_code, date=None)` | 指数成分股权重 | `DataFrame` |
 
-获取全部 A 股列表。
+### 概念板块
 
-**返回：** `DataFrame`（code, name）
+| API | 说明 | 返回 |
+|-----|------|------|
+| `get_concept_list()` | 所有概念板块 | `list[str]` |
+| `get_concept_stocks(concept_name)` | 概念股成分 | `DataFrame` |
 
-#### `get_trade_days(start_date=None, end_date=None, count=None)`
-
-获取交易日历。
-
-**返回：** `list[date]`
-
-### 3.5 指数与行业
-
-#### `get_index_stocks(index_code)`
-
-获取指数成分股。
-
-**参数：** `index_code` — 指数代码，如 `'000300.XSHG'`（沪深300）
-
-**返回：** `DataFrame`（code, name, include_date）
-
-#### `get_industry_list()`
-
-获取所有行业板块名称。
-
-**返回：** `list[str]`
-
-#### `get_industry_stocks(industry_name)`
-
-获取某行业的成分股。
-
-**返回：** `DataFrame`（含价格、涨跌幅、PE、PB、市值等）
-
-#### `get_industry(code)`
-
-获取单只股票的行业分类。
-
-**返回：** `dict`（code, name, industry）或 `None`
-
-#### `get_index_weights(index_code, date=None)`
-
-获取指数成分股权重。
-
-**返回：** `DataFrame`（code, name, weight）
-
-### 3.6 概念板块
-
-#### `get_concept_list()`
-
-获取所有概念板块名称。
-
-**返回：** `list[str]`
-
-#### `get_concept_stocks(concept_name)`
-
-获取概念股成分。
-
-**返回：** `DataFrame`
-
-### 3.7 分钟线数据
-
-#### `fetch_minute_data(code, period='5m', start_date=None, end_date=None, adjust='qfq')`
-
-获取分钟级 K 线数据。
-
-**参数：**
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `code` | `str` | 股票代码 |
-| `period` | `str` | `'1m'`, `'5m'`, `'15m'`, `'30m'`, `'60m'` |
-| `adjust` | `str` | `'qfq'`（前复权），`'hfq'`（后复权） |
-
-**返回：** `DataFrame`，索引为 `datetime`
-
-#### `get_price_minute(security, count=None, period='5m', fields=None, adjust='qfq')`
-
-获取分钟级价格数据（策略内使用）。
-
-### 3.8 Tick 数据
-
-#### `get_tick_data(code, trade_date=None)`
-
-获取当日逐笔成交数据。
-
-**返回：** `DataFrame`（time, price, volume, money, direction）
-
-### 3.9 资金流与龙虎榜
-
-#### `get_money_flow(code, start_date=None, end_date=None, count=None)`
-
-获取资金流向数据。
-
-**返回：** `DataFrame`（含主力/超大单/大单/中单/小单净流入）
-
-#### `get_billboard_list(stock_list=None, date=None, start_date=None, end_date=None)`
-
-获取龙虎榜数据。
-
-**返回：** `DataFrame`
-
-### 3.10 财务数据
-
-#### `get_financial_abstract(code)`
-
-获取财务摘要。
-
-**返回：** `DataFrame`（指标为行名）
-
-### 3.14 链式选股 API
-
-#### `query(*fields)`
-
-创建链式查询对象，支持 `.filter()`、`.order_by()`、`.limit()` 方法。
-
-**可用字段（通过 `valuation` 命名空间）：**
-
-| 字段 | 说明 | 单位 |
-|------|------|------|
-| `valuation.code` | 股票代码 | — |
-| `valuation.market_cap` | 流通市值 | 亿元 |
-| `valuation.total_value` | 总市值 | 亿元 |
-| `valuation.float_value` | 流通市值 | 亿元 |
-| `valuation.pe` | 市盈率（动态） | — |
-| `valuation.pb` | 市净率 | — |
-| `valuation.turnover` | 换手率 | % |
-| `valuation.price` | 最新价 | 元 |
-| `valuation.pct_change` | 涨跌幅 | % |
-
-**链式方法：**
-
-| 方法 | 说明 |
-|------|------|
-| `.filter(*conditions)` | 添加过滤条件（AND 连接） |
-| `.order_by(*clauses)` | 添加排序（`.asc()` / `.desc()`） |
-| `.limit(n)` | 限制返回行数 |
-
-**字段比较运算符：** `==`, `!=`, `>`, `>=`, `<`, `<=`, `.between(low, high)`, `.in_(values)`
+### 分钟线数据
 
 ```python
-q = (
-    query(
-        valuation.code,
-        valuation.market_cap,
-        valuation.pe,
-    )
-    .filter(
-        valuation.market_cap.between(20, 30),
-        valuation.pe > 0,
-    )
-    .order_by(
-        valuation.market_cap.asc(),
-    )
+fetch_minute_data(code, period='5m', start_date=None, end_date=None, adjust='qfq')
+get_price_minute(security, count=None, period='5m', fields=None, adjust='qfq')
+```
+
+支持周期：`1m`, `5m`, `15m`, `30m`, `60m`。
+
+### Tick 数据
+
+```python
+get_tick_data(code, trade_date=None)
+```
+
+### 资金流与龙虎榜
+
+```python
+get_money_flow(code, start_date=None, end_date=None, count=None)
+get_billboard_list(stock_list=None, date=None, start_date=None, end_date=None)
+```
+
+### 财务数据
+
+```python
+get_financial_abstract(code)
+```
+
+### 链式选股 API
+
+```python
+query(*fields)
+get_fundamentals(query_or_code, date=None)
+```
+
+可用字段通过 `valuation` 命名空间访问：`code`, `market_cap`, `total_value`, `float_value`, `pe`, `pb`, `turnover`, `price`, `pct_change`。
+
+链式方法：`.filter()`、`.order_by()`、`.limit()`。
+
+```python
+q = query(valuation.code, valuation.market_cap, valuation.pe) \
+    .filter(valuation.market_cap.between(20, 30), valuation.pe > 0) \
+    .order_by(valuation.market_cap.asc()) \
     .limit(5)
-)
 df = get_fundamentals(q)
 ```
 
-#### `get_fundamentals(query_or_code, date=None)`
+### get_current_data_object
 
-获取基本面数据。
+获取带属性访问的实时行情快照。返回 `dict[str, _StockDataObj]`。
 
-**双签名：**
-- 传入 `Query` 对象：执行链式查询，返回筛选后的 `DataFrame`
-- 传入股票代码字符串：返回财务摘要 `DataFrame`（原有行为）
+### get_extras
 
-```python
-# 链式查询用法
-df = get_fundamentals(q)
+获取额外数据字段（`'is_st'` 或 `'net_value'`）。
 
-# 单只股票用法（向后兼容）
-df = get_fundamentals('601390')
-```
-
-#### `get_current_data_object()`
-
-获取带属性访问的实时行情快照。
-
-**返回：** `dict[str, _StockDataObj]`，每个对象具有 `.paused`、`.price`、`.pe` 等属性。
+### 股票池管理
 
 ```python
-data = get_current_data_object()
-stock = data['601390']
-print(stock.price, stock.paused, stock.pe)
+set_universe(security_list)   # 设置策略股票池
+get_universe()                 # 获取当前股票池
 ```
 
-**Limitation (V1)：** 市值/PE/PB 等估值数据来自 akshare 的实时快照，非历史数据。在回测中，这些数据反映当前时刻的值，而非回测日的历史值。
+### 本地文件
 
-### 3.11 额外字段
-
-#### `get_extras(field, security_list=None, start_date=None, end_date=None)`
-
-获取额外数据字段。
-
-**参数：**
-- `field`：`'is_st'`（ST 标记）或 `'net_value'`（净资产估值）
-- `security_list`：可选，限定股票范围
-
-**返回：** `dict[str, bool/float]`
-
-### 3.12 股票池管理
-
-#### `set_universe(security_list)`
-
-设置策略股票池。
-
-**参数：** `security_list` — `list[str]` 股票代码列表
-
-#### `get_universe()`
-
-获取当前策略股票池。
-
-**返回：** `list[str]`
-
-### 3.13 本地文件
-
-#### `download_stock_data(code, start_date, end_date, adjust='qfq', output_dir=None, filename=None)`
-
-下载日线数据并保存为 CSV。
-
-**返回：** 文件路径 `str` 或 `None`
-
-#### `load_csv(path, index_col='date', parse_dates=True)`
-
-从本地 CSV 加载数据。
-
-**返回：** `DataFrame`
-
-#### `clear_cache()`
-
-清除内存与行情快照缓存。
+| API | 说明 |
+|-----|------|
+| `download_stock_data(code, start_date, end_date, adjust='qfq', output_dir=None)` | 下载日线数据为 CSV |
+| `load_csv(path, index_col='date', parse_dates=True)` | 从本地 CSV 加载数据 |
+| `clear_cache()` | 清除内存缓存 |
+| `save_stock_local(security, start_date, end_date)` | 下载并保存本地 |
+| `load_stock_local(security, start_date, end_date)` | 从本地加载 |
+| `has_local_data(security)` | 检查是否存在 |
+| `list_local_stocks()` | 列出所有本地文件 |
+| `remove_local_data(security)` | 删除单个文件 |
+| `clear_all_local_data()` | 清空所有本地文件 |
 
 ---
 
-## 4. 回测与模拟盘引擎
+## 回测与模拟盘引擎
 
-### 4.1 `run_strategy(initialize_func, start_date, end_date, starting_cash=100000, benchmark='000300.XSHG', handle_data=None, securities=None, report_dir='reports', use_local=False, max_memory_mb=1024, selection_func=None, selection_rebalance='monthly:1')`
+### run_strategy
 
 一站式回测 + 报告生成。
 
-**参数：**
+```python
+run_strategy(initialize_func, start_date, end_date, starting_cash=100000,
+             benchmark='000300.XSHG', handle_data=None, securities=None,
+             report_dir='reports', use_local=False, max_memory_mb=1024,
+             selection_func=None, selection_rebalance='monthly:1')
+```
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `initialize_func` | `callable` | 是 | 用户 `initialize(context)` 函数 |
-| `start_date` | `str` / `date` | 否 | 回测开始日期（默认：今天往前 365 天） |
-| `end_date` | `str` / `date` | 否 | 回测结束日期（默认：今天） |
-| `starting_cash` | `float` | 否 | 初始资金，默认 100,000 |
-| `benchmark` | `str` | 否 | 基准代码，默认 `'000300.XSHG'` |
-| `handle_data` | `callable` | 否 | `handle_data(context, data)` 函数 |
-| `securities` | `list` | 否 | 预加载股票代码列表 |
-| `report_dir` | `str` | 否 | 报告输出目录 |
-| `use_local` | `bool` | 否 | 使用本地 CSV 数据，默认 False |
-| `max_memory_mb` | `int` | 否 | 内存限制（MB），默认 1024（1GB） |
-| `selection_func` | `callable` | 否 | 选股函数，返回股票代码列表 |
-| `selection_rebalance` | `str` | 否 | 选股频率，`"monthly:N"` / `"weekly:N"` / `"daily"` |
+返回回测结果 `dict`。
 
-**返回：** 回测结果 `dict`，包含 `context`, `trade_log`, `recorded_values`
-
-**`max_memory_mb` 说明：** 回测引擎会在内存允许的情况下构建快速查找字典缓存（O(1)）。如果估计内存超过此限制，会自动回退到紧凑的 DataFrame 切片模式（O(log n)），结果完全一致但略慢。你可以通过 `estimate_memory_mb(securities, rows_per_sec)` 提前估算内存需求。
-
-### 4.2 `run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency='daily', benchmark='000300.XSHG', securities=None, use_local=False, max_memory_mb=1024, selection_func=None, selection_rebalance='monthly:1')`
+### run_backtest
 
 运行回测（不生成报告）。
 
-**参数：** 与 `run_strategy` 类似，额外支持 `frequency`（`'daily'` 或 `'minute'`）、`selection_func`（选股函数）、`selection_rebalance`（选股频率）。
-
-**返回：**
-
 ```python
-{
-    "context": Context,            # 策略上下文
-    "trade_log": list[dict],       # 交易记录
-    "recorded_values": dict,       # record() 记录 (date -> dict)
-    "benchmark": str,              # 基准代码
-}
+run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0,
+             frequency='daily', benchmark='000300.XSHG', securities=None,
+             use_local=False, max_memory_mb=1024,
+             selection_func=None, selection_rebalance='monthly:1')
 ```
 
-### 4.3 `run_portfolio_backtest(config, strategy_func, report_dir='reports')`
+返回 `{"context": Context, "trade_log": list, "recorded_values": dict, "benchmark": str}`。
 
-面向多股票组合的高层回测接口。使用 `StrategyConfig` 定义初始资金、股票池、仓位比例和报告后缀，策略函数从 `context.universe` 中选股并交易。
+### run_portfolio_backtest
 
-**参数：**
+面向多股票组合的高层回测接口。
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `config` | `StrategyConfig` | 策略配置对象 |
-| `strategy_func` | `callable` | 策略函数，签名 `func(context)` |
-| `report_dir` | `str` | 报告输出目录，默认 `'reports'` |
+```python
+run_portfolio_backtest(config, strategy_func, report_dir='reports')
+```
 
-#### `StrategyConfig` 类
+#### StrategyConfig
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `securities` | `list[str]` | 必填 | 股票池代码列表 |
-| `start_date` | `str`/`date` | 必填 | 回测开始日期 |
-| `end_date` | `str`/`date` | 必填 | 回测结束日期 |
+| `securities` | `list[str]` | 必填 | 股票池 |
+| `start_date` | `str`/`date` | 必填 | 开始日期 |
+| `end_date` | `str`/`date` | 必填 | 结束日期 |
 | `starting_cash` | `float` | `100000` | 初始资金 |
 | `benchmark` | `str` | `"000300.XSHG"` | 基准指数 |
-| `position_pct` | `float` | `0.33` | 每只股票最大仓位比例（可用资金的百分比） |
-| `position_amount` | `int` | `0` | 固定买入股数（非零时覆盖 `position_pct`） |
-| `report_suffix` | `str` | `""` | 报告文件名后缀，用于区分不同版本 |
+| `position_pct` | `float` | `0.33` | 每只股票最大仓位比例 |
+| `position_amount` | `int` | `0` | 固定买入股数 |
+| `report_suffix` | `str` | `""` | 报告文件名后缀 |
 | `frequency` | `str` | `"daily"` | `"daily"` 或 `"minute"` |
 
-```python
-from eqlib import StrategyConfig, run_portfolio_backtest
+### estimate_memory_mb
 
-config = StrategyConfig(
-    starting_cash=200000,
-    securities=['601390', '600519', '000858'],
-    benchmark='000300.XSHG',
-    position_pct=0.33,
-    start_date='2024-01-01',
-    end_date='2024-12-31',
-    report_suffix='v1',
-)
+估算预加载数据的内存需求。返回 `dict`（`panel_mb`, `close_dict_mb`, `bar_cache_mb`, `total_mb`）。
 
-def my_strategy(context):
-    for sec in context.universe:
-        hist = attribute_history(sec, 20, '1d', ['close'])
-        if hist.empty:
-            continue
-        price = hist['close'].iloc[-1]
-        ma20 = hist['close'].mean()
-        if price > ma20 * 1.02:
-            order_value(sec, context.portfolio.available_cash * config.position_pct)
-        elif price < ma20 * 0.98 and context.portfolio.positions.get(sec):
-            order_target(sec, 0)
+### run_paper_trade
 
-result = run_portfolio_backtest(config, my_strategy, report_dir='reports')
-```
-
-### 4.4 `estimate_memory_mb(securities, rows_per_sec)`
-
-估算预加载数据的内存需求。
-
-**参数：**
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `securities` | `list[str]` | 股票代码列表 |
-| `rows_per_sec` | `int` | 每只股票的数据行数（交易日数） |
-
-**返回：** `dict`，包含 `panel_mb`、`close_dict_mb`、`bar_cache_mb`、`total_mb`、`securities`、`rows_per_sec`
+模拟盘交易，持续运行直到 `Ctrl+C` 终止。
 
 ```python
-from eqlib import estimate_memory_mb
-est = estimate_memory_mb(['601390', '600519'], 1500)
-print(f"预计内存: {est['total_mb']} MB")
+run_paper_trade(initialize_func, starting_cash=100000.0, benchmark='000300.XSHG', interval=60)
 ```
 
-### 4.5 `run_paper_trade(initialize_func, starting_cash=100000.0, benchmark='000300.XSHG', interval=60)`
-
-模拟盘交易。
-
-**参数：**
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `initialize_func` | `callable` | 策略初始化函数 |
-| `starting_cash` | `float` | 初始资金 |
-| `benchmark` | `str` | 基准代码 |
-| `interval` | `int` | 轮询间隔（秒），默认 60 |
-
-**说明：** 模拟盘会持续运行直到 `Ctrl+C` 终止，使用实时行情数据。
-
-### 4.6 `record(**kwargs)`
+### record
 
 在策略中记录自定义数据点。
 
@@ -876,111 +384,58 @@ print(f"预计内存: {est['total_mb']} MB")
 record(price=current_price, ma5=ma5, signal='BUY')
 ```
 
-记录的数据出现在报告 JSON 的 `recorded_values` 字段中。
+### 调度函数
 
-### 4.7 调度函数
+| API | 说明 |
+|-----|------|
+| `run_daily(func, time='every_bar')` | 每日定时执行 |
+| `run_weekly(func, day_of_week=1, time='09:30')` | 每周定时执行 |
+| `run_monthly(func, day_of_month=1, time='09:30')` | 每月定时执行 |
+| `run_selection(func, rebalance='monthly:1')` | 注册选股函数，按周期执行 |
 
-#### `run_daily(func, time='every_bar')`
+`rebalance` 格式：`"monthly:N"`（每月第 N 天）、`"weekly:N"`（周几，0=周一）、`"daily"`（每个交易日）。
 
-每日定时执行函数。
+### 生命周期回调
 
-#### `run_weekly(func, day_of_week=1, time='09:30')`
-
-每周定时执行。`day_of_week`：0=周一，1=周二，...，4=周五。
-
-#### `run_monthly(func, day_of_month=1, time='09:30')`
-
-每月定时执行。`day_of_month`：1-31。
-
-#### `run_selection(func, rebalance='monthly:1')`
-
-注册选股函数，按周期执行并自动更新 `context.universe`。
-
-**参数：**
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `func` | `callable` | 选股函数，签名 `func(context) -> list[str]` |
-| `rebalance` | `str` | 调度频率，见下表 |
-
-**Rebalance 格式：**
-
-| 值 | 含义 | 示例 |
-|---|---|---|
-| `"monthly:N"` | 每月第 N 天（1-31） | `"monthly:1"`（1号）、`"monthly:15"`（15号） |
-| `"weekly:N"` | 周几（0=周一, 4=周五） | `"weekly:0"`（周一）、`"weekly:4"`（周五） |
-| `"daily"` | 每个交易日 | `"daily"` |
-
-**使用方式：**
-
-```python
-def my_selection(context):
-    candidates = filter_st_stocks(context.universe)
-    return TopNSelector(factor='pe', top_n=5).rank(candidates, context)
-
-def initialize(context):
-    run_selection(my_selection, rebalance='monthly:1')
-```
-
-**选股策略编写模式：**
-
-1. **普通函数**（最简单）：编写一个函数，返回股票代码列表
-2. **StockSelector 子类**（适合复杂逻辑）：继承 `StockSelector`，实现 `filter()` 和 `rank()` 方法
-3. **通过 `run_strategy` 参数**：`run_strategy(..., selection_func=my_selection, selection_rebalance='weekly:0')`
-
-### 4.8 生命周期回调
-
-#### `before_trading_start(func)`
-
-注册盘前回调函数（9:30 前执行）。函数签名：`func(context, data)`。
-
-#### `after_trading_end(func)`
-
-注册盘后回调函数（15:00 后执行）。函数签名：`func(context, data)`。
+| API | 说明 |
+|-----|------|
+| `before_trading_start(func)` | 注册盘前回调 |
+| `after_trading_end(func)` | 注册盘后回调 |
 
 ---
 
-## 5. 配置 API
+## 配置 API
 
-### 5.1 `set_benchmark(security)`
+### set_benchmark
 
-设置回测基准用于对比收益。
+设置回测基准。
 
-**参数：** `security` — 基准代码，如 `'000300.XSHG'`（沪深300）
+```python
+set_benchmark('000300.XSHG')   # 沪深300
+```
 
-### 5.2 `set_order_cost(cost, type='stock', ref=None)`
+### set_order_cost
 
 设置交易手续费。
 
-**参数：**
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `cost` | `OrderCost` | 手续费对象 |
-| `type` | `str` | `'stock'`（固定值） |
-
-#### `OrderCost` 类
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `open_tax` | `float` | `0` | 买入印花税 |
-| `close_tax` | `float` | `0.001` | 卖出印花税（0.1%） |
-| `open_commission` | `float` | `0.0003` | 买入佣金（0.03%） |
-| `close_commission` | `float` | `0.0003` | 卖出佣金 |
-| `close_today_commission` | `float` | `0` | 今日卖出佣金 |
-| `min_commission` | `float` | `5` | 最低佣金（元） |
-
 ```python
-set_order_cost(OrderCost(
-    open_tax=0,
-    close_tax=0.001,
-    open_commission=0.0003,
-    close_commission=0.0003,
-    min_commission=5,
-))
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001,
+                         open_commission=0.0003, close_commission=0.0003,
+                         min_commission=5))
 ```
 
-### 5.3 `set_option(name, value)`
+#### OrderCost
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `open_tax` | `0` | 买入印花税 |
+| `close_tax` | `0.001` | 卖出印花税 |
+| `open_commission` | `0.0003` | 买入佣金 |
+| `close_commission` | `0.0003` | 卖出佣金 |
+| `close_today_commission` | `0` | 今日卖出佣金 |
+| `min_commission` | `5` | 最低佣金（元） |
+
+### set_option
 
 设置策略选项。
 
@@ -988,515 +443,203 @@ set_order_cost(OrderCost(
 set_option('use_real_price', True)
 ```
 
-### 5.4 `set_slippage(model)`
+### set_slippage
 
-在回测成交时按模型调整执行价，使结果更接近真实冲击成本。
-
-**参数：**
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `model` | `SlippageModel` | 滑点模型实例 |
-
-**内置模型：**
+设置滑点模型。
 
 | 类 | 说明 |
-|------|------|
-| `SlippageModel` | 基类；不对价格做调整 |
-| `FixedSlippage(pct=0.001)` | 固定比例：买入 `price * (1 + pct)`，卖出 `price * (1 - pct)` |
-| `VolumeSlippage(impact=0.05)` | 与「委托股数 / 当日成交量」成比例；当日成交量未知时不调整 |
+|-----|------|
+| `SlippageModel` | 基类，不调整价格 |
+| `FixedSlippage(pct=0.001)` | 固定比例滑点 |
+| `VolumeSlippage(impact=0.05)` | 与成交量成比例的冲击成本 |
 
-```python
-from eqlib import set_slippage, FixedSlippage, VolumeSlippage
+### BacktestSession 与 get_session
 
-set_slippage(FixedSlippage(0.0005))
-# 或：set_slippage(VolumeSlippage(impact=0.05))
-```
-
-### 5.5 `BacktestSession` 与 `get_session()`（进阶）
-
-`BacktestSession` 封装单次回测的可变状态（上下文、`g`、成交记录、调度表等）。`run_backtest` 内部会创建并注册会话，**普通策略不必使用**。
-
-若你在**多线程**中并行跑多组回测，可为每线程使用独立会话，避免共享全局状态冲突：
-
-```python
-from eqlib import BacktestSession, get_session
-
-# 典型用法见 eqlib._state 与引擎实现；进阶用户再查阅源码。
-```
+`BacktestSession` 封装单次回测的可变状态。普通策略不必使用，多线程并行回测时可为每线程创建独立会话。
 
 ---
 
-## 6. 报告与分析 API
+## 报告与分析 API
 
-### 6.1 `generate_chart(result, out_path)`
+### generate_chart
 
 生成回测图表（PNG）。
 
-**参数：**
-- `result` — `run_backtest` 返回的字典
-- `out_path` — 输出路径，如 `'reports/chart.png'`
+```python
+generate_chart(result, out_path)
+```
 
-### 6.2 `generate_report_md(result, out_path)`
+### generate_report_md
 
-生成 Markdown 格式回测报告。
+生成 Markdown 格式报告。
 
-### 6.3 `generate_report_json(result, out_path)`
+### generate_report_json
 
-生成 JSON 格式回测报告（结构化数据）。
+生成 JSON 格式报告。
 
-### 6.4 `generate_html_report(result, out_path)`
+### generate_html_report
 
-生成交互式 HTML 回测报告（图表 + 汇总统计，可直接在浏览器打开）。
+生成交互式 HTML 报告。
 
-**参数：**
-- `result` — `run_backtest` 返回的字典
-- `out_path` — 输出路径，如 `'reports/chart.html'`
-
-### 6.5 `analyze_returns(result, risk_free_rate=0.03, trading_days=252)`
+### analyze_returns
 
 计算综合风险指标。
 
-**参数：**
+```python
+metrics = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
+```
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `result` | `dict` | 回测结果 |
-| `risk_free_rate` | `float` | 无风险利率（年化），默认 3% |
-| `trading_days` | `int` | 年交易天数，默认 252 |
+返回 `dict`：`total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`。
 
-**返回：** `dict` 包含以下指标：
+### brinson_attribution
 
-| 指标 | 类型 | 说明 |
-|------|------|------|
-| `total_return` | `float` | 总收益率 |
-| `annual_return` | `float` | 年化收益率 |
-| `annual_volatility` | `float` | 年化波动率 |
-| `sharpe_ratio` | `float` | 夏普比率 |
-| `sortino_ratio` | `float` | 索提诺比率 |
-| `max_drawdown` | `float` | 最大回撤 |
-| `max_drawdown_start` | `date` | 最大回撤起始日 |
-| `max_drawdown_end` | `date` | 最大回撤结束日 |
-| `calmar_ratio` | `float` | 卡玛比率 |
-| `alpha` | `float` | 年化超额收益 |
-| `beta` | `float` | 市场敏感度 |
-| `information_ratio` | `float` | 信息比率 |
-| `win_rate` | `float` | 日胜率 |
-| `trading_days` | `int` | 回测天数 |
-| `num_trades` | `int` | 交易次数 |
+Brinson 归因分析。返回 `dict`（`allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`）。
 
-### 6.6 `brinson_attribution(result, sector_data=None)`
+### fama_french_analysis
 
-Brinson 归因分析：配置效应 + 选股效应 + 交互效应。
-
-**返回：** `dict`（allocation_effect, selection_effect, interaction_effect, total_active_return）
-
-### 6.7 `fama_french_analysis(result, factors=None)`
-
-Fama-French 风格因子分析。
-
-**返回：** `dict`（market_beta, market_exposure, alpha_annual, momentum_correlation, vol_of_vol, residual_volatility, explained_variance）
+Fama-French 因子分析。返回 `dict`（`market_beta`, `market_exposure`, `alpha_annual`, `momentum_correlation`, `vol_of_vol`, `residual_volatility`, `explained_variance`）。
 
 ---
 
-## 7. 组合优化 API
+## 组合优化 API
 
-### 7.1 `portfolio_optimizer(securities, prices, target=None, constraints=None, bounds=None, default_range=(0.0, 1.0), ftol=1e-9, return_none_if_fail=True)`
+### portfolio_optimizer
 
 投资组合权重优化。
 
-**参数：**
+```python
+portfolio_optimizer(securities, prices, target=None, constraints=None, bounds=None,
+                    default_range=(0.0, 1.0), ftol=1e-9, return_none_if_fail=True)
+```
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `securities` | `list[str]` | 股票代码列表 |
-| `prices` | `DataFrame` | 价格矩阵，columns=股票代码 |
-| `target` | `MinVariance` / `MaxSharpe` / `RiskParity` | 优化目标 |
-| `constraints` | `dict` | `{'max_weight': 0.3, 'min_weight': 0.0}` |
-| `bounds` | `list[Bound]` | 每只股票的权重上下限 |
-| `default_range` | `tuple` | 默认权重范围 |
-| `ftol` | `float` | 优化容差 |
-| `return_none_if_fail` | `bool` | 失败时返回 None |
+| `prices` | `DataFrame` | 价格矩阵 |
+| `target` | `MinVariance`/`MaxSharpe`/`RiskParity` | 优化目标 |
+| `constraints` | `dict` | `{'max_weight': 0.3}` |
+| `bounds` | `list[Bound]` | 每只股票权重上下限 |
 
-**返回：** `Series`（优化后的权重，key 为股票代码）或 `None`
+返回优化后的权重 `Series` 或 `None`。
 
-#### 优化目标类
+#### 优化目标
 
 ```python
-MinVariance()                          # 最小方差
-MaxSharpe(risk_free_rate=0.03)          # 最大夏普比
-RiskParity()                           # 风险平价
-```
-
-#### `Bound` 类
-
-```python
-Bound(lower=0.0, upper=1.0)   # 单只股票的权重上下限
-```
-
-**示例：**
-
-```python
-from eqlib import portfolio_optimizer, MinVariance, Bound
-
-weights = portfolio_optimizer(
-    securities=['601390', '600519', '000858'],
-    prices=price_df,
-    target=MinVariance(),
-    constraints={'max_weight': 0.4},
-)
+MinVariance()
+MaxSharpe(risk_free_rate=0.03)
+RiskParity()
 ```
 
 ---
 
-## 8. 缓存 API
+## 缓存 API
 
-### 8.1 `set_cache_dir(path)`
+| API | 说明 |
+|-----|------|
+| `set_cache_dir(path)` | 设置磁盘缓存目录 |
+| `fetch_cached(security, start_date, end_date, adjust='qfq')` | 获取数据，优先使用缓存 |
 
-设置磁盘缓存目录。
-
-### 8.2 `fetch_cached(security, start_date, end_date, adjust='qfq')`
-
-获取数据，优先使用磁盘缓存。
-
-**返回：** `DataFrame`
-
-### 8.3 `estimate_memory_mb(securities, rows_per_sec)`
-
-估算预加载数据的内存需求。详见 4.4 节。
-
-### 8.4 本地 CSV 数据
-
-- `save_stock_local(security, start_date, end_date, adjust)` — 下载并保存
-- `load_stock_local(security, start_date, end_date, adjust)` — 从本地加载
-- `has_local_data(security, adjust)` — 检查是否存在
-- `list_local_stocks(adjust)` — 列出所有本地文件
-- `remove_local_data(security, adjust)` — 删除单个文件
-- `clear_all_local_data(adjust)` — 清空所有本地文件
-
-**推荐：目标股票本地化 + 快速验证**
-
-```python
-from eqlib import (
-    set_local_data_dir, save_stock_local, list_local_stocks,
-    run_strategy
-)
-
-set_local_data_dir('/home/user/eqlib_data')  # 建议使用绝对路径，便于多项目复用
-targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
-
-for sec in targets:
-    path = save_stock_local(sec, '2020-01-01', '2024-12-31')
-    print(sec, '->', path)
-
-print(list_local_stocks())
-
-result = run_strategy(
-    initialize,
-    start_date='2024-01-01',
-    end_date='2024-12-31',
-    securities=['601390', '600519'],
-    benchmark='000300.XSHG',
-    use_local=True,
-)
-```
-
-### 8.5 数据源接入建议（扩展）
-
-当前默认数据源为 `akshare`。若需要更高可靠性或更多维度数据，建议按以下顺序扩展：
-
-1. 保持现有 API 入参/出参不变（避免策略层改动）；
-2. 先落盘统一格式（CSV/Parquet）再进入回测；
-3. 采用主备数据源切换与交叉校验（价格、成交量、复权、停牌）；
-4. 新增数据源先用小样本回测做一致性验证，再逐步扩大范围。
-
-### 8.6 相关文档
-
-- [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md#5-推荐先下载目标股票到本地再做快速回测验证)
-- [用户手册：数据源扩展与可靠性建议（见 7.12 小节）](user_guide/07_data.md#712-数据源扩展与可靠性建议)
-- [FAQ：首次回测慢或卡住](FAQ.md#q-首次回测很慢或卡住)
+数据源接入建议：保持 API 入参/出参不变，先落盘统一格式再进入回测，采用主备数据源切换与交叉校验。
 
 ---
 
-## 9. 日志 API
+## 日志 API
 
-日志输出默认带有语义化 emoji 指示符，帮助快速识别级别、阶段、步骤、进度与动作。
-
-### `log.info(msg)`, `log.debug(msg)`, `log.warn(msg)`, `log.error(msg)`
-
-基础日志输出（兼容旧用法）。
+### 基础日志
 
 ```python
-log.info("买入 %s" % security)
-log.warn("价格异常: %s" % code)
-log.error("数据获取失败")
+log.info(msg)
+log.debug(msg)
+log.warn(msg)
+log.error(msg)
 ```
 
-### `log.section(title, **fields)`
+### 结构化日志
 
-用于标记一个高层阶段（例如“回测开始/结束”）。
-
-```python
-log.section("Backtest started", start="2024-01-01", end="2024-12-31")
-```
-
-### `log.step(name, status='RUN', **fields)`
-
-用于记录步骤执行状态（`RUN` / `OK` / `FAIL` 等）。
-
-```python
-log.step("Preloading market data", status="RUN", securities=120)
-log.step("Market data preloaded", status="OK", securities=120)
-```
-
-### `log.progress(current, total, label='Progress', **fields)`
-
-用于显示进度与百分比，适合长流程任务。
-
-```python
-log.progress(30, 120, label="Backtest progress", date="2024-03-15")
-```
-
-### `log.action(name, target=None, **fields)`
-
-用于记录具体操作动作（如下单、调仓、数据写入）。
-
-```python
-log.action("Queue order", "601390", amount="+1000", fill="next_open")
-```
-
-### `log.set_level(level)` / `log.set_quiet(enabled=True)` / `log.set_propagate(enabled=False)`
-
-控制日志详细程度：
-
-```python
-log.set_level("DEBUG")   # 输出更详细
-log.set_quiet(True)      # 仅 WARNING/ERROR
-log.set_quiet(False)     # 恢复 INFO
-log.set_propagate(True)  # 透传到父级 logger（用于宿主应用集中采集）
-```
-
-也可通过环境变量 `EQLIB_LOG_PROPAGATE=1` 在启动时默认开启透传。
+| API | 说明 |
+|-----|------|
+| `log.section(title, **fields)` | 标记高层阶段 |
+| `log.step(name, status='RUN', **fields)` | 记录步骤状态 |
+| `log.progress(current, total, label='Progress')` | 显示进度 |
+| `log.action(name, target=None, **fields)` | 记录操作动作 |
+| `log.set_level(level)` | 控制详细程度 |
+| `log.set_quiet(enabled=True)` | 仅输出 WARNING/ERROR |
 
 ---
 
-## 10. 辅助工具 API
+## 辅助工具 API
 
-### `engine.get_context()`
-
-获取当前回测上下文（引擎内部使用）。
-
-### `engine.get_g()`
-
-获取全局对象（引擎内部使用）。
-
-### `engine.get_trade_log()`
-
-获取交易记录列表。
-
-### `engine.get_recorded_values()`
-
-获取 `record()` 记录列表。
+| API | 说明 |
+|-----|------|
+| `engine.get_context()` | 获取当前回测上下文 |
+| `engine.get_g()` | 获取全局对象 |
+| `engine.get_trade_log()` | 获取交易记录 |
+| `engine.get_recorded_values()` | 获取 record() 记录 |
 
 ---
 
-## 11. 选股策略 API
+## 选股策略 API
 
-选股策略允许你定义周期性的股票筛选逻辑，框架会在指定的调度频率（每周/每月）自动执行选股并更新 `context.universe`。
+### 编写选股策略
 
-### 11.1 编写选股策略
-
-**模式一：普通函数（最简单）**
-
-编写一个函数，接收 `context`，返回股票代码列表：
+**模式一：普通函数**
 
 ```python
 def my_selection(context):
-    """返回当期要交易的股票列表。"""
-    # 1. 筛选：剔除 ST 股
-    candidates = filter_st_stocks(["601390", "600519", "000858"])
-    # 2. 打分：按 PE 排序，选最低的 5 只
+    candidates = filter_st_stocks(["601390", "600519"])
     df = fetch_factor_data(candidates, fields=["pe"])
-    df = df.dropna(subset=["pe"]).sort_values("pe", ascending=True)
-    return df.head(5).index.tolist()
+    return df.sort_values("pe").head(5).index.tolist()
 ```
 
-**模式二：StockSelector 子类（适合复杂逻辑）**
-
-继承 `StockSelector` 基类，实现 `filter()` 和 `rank()` 两个方法：
+**模式二：StockSelector 子类**
 
 ```python
 class MySelector(StockSelector):
-    def __init__(self, top_n=5, max_pe=50):
-        self.top_n = top_n
-        self.max_pe = max_pe
-
     def filter(self, candidates, context):
-        """初选：剔除不合格股票"""
-        filtered = filter_st_stocks(candidates)       # 剔除 ST
-        filtered = filter_paused_stocks(filtered, context)  # 剔除停牌
-        return filter_high_pe_stocks(filtered, max_pe=self.max_pe)  # 剔除高 PE
-
+        return filter_st_stocks(candidates)
     def rank(self, securities, context):
-        """打分排序：选出最优组合"""
-        return TopNSelector(factor="pe", top_n=self.top_n).rank(securities, context)
+        return TopNSelector(factor="pe", top_n=5).rank(securities, context)
 ```
 
-**模式三：内置选择器（最快捷）**
-
-直接使用 `TopNSelector` 或 `MultiFactorSelector`：
+**模式三：内置选择器**
 
 ```python
-# 单因子：选 PE 最低的 5 只
-sel = TopNSelector(factor="pe", top_n=5, ascending=True)
-
-# 多因子：加权综合评分
-sel = MultiFactorSelector(
-    factors={"pe": -0.4, "pb": -0.2, "pct_change": 0.4},
-    top_n=5,
-)
+TopNSelector(factor="pe", top_n=5, ascending=True)
+MultiFactorSelector(factors={"pe": -0.4, "pb": -0.2, "pct_change": 0.4}, top_n=5)
 ```
 
-### 11.2 注册与调用
-
-**方式一：在 `initialize` 中调用 `run_selection`**
+### 注册与调用
 
 ```python
-def initialize(context):
-    run_selection(my_selection, rebalance="monthly:1")  # 每月1号执行
-    run_daily(trade, time="every_bar")
+# 在 initialize 中调用
+run_selection(my_selection, rebalance="monthly:1")
+
+# 或通过 run_strategy 参数
+result = run_strategy(initialize, selection_func=my_selection, selection_rebalance="weekly:0")
 ```
 
-**方式二：通过 `run_strategy` 参数传入**
+### 工具函数
 
-```python
-result = run_strategy(
-    initialize_func=initialize,
-    selection_func=my_selection,
-    selection_rebalance="weekly:0",  # 每周一执行
-)
-```
+| API | 说明 |
+|-----|------|
+| `StockSelector` | 选股基类 |
+| `filter_st_stocks(securities)` | 剔除 ST 股票 |
+| `filter_paused_stocks(securities, context)` | 剔除停牌股票 |
+| `filter_low_price_stocks(securities, min_price=2.0)` | 剔除低价股 |
+| `filter_high_pe_stocks(securities, max_pe=100.0)` | 剔除高 PE 股 |
+| `fetch_factor_data(securities, fields=None)` | 获取多维度因子数据 |
+| `TopNSelector(factor, top_n, ascending)` | 单因子 Top-N 选择器 |
+| `MultiFactorSelector(factors, top_n)` | 多因子加权选择器 |
 
-### 11.3 `run_selection(func, rebalance='monthly:1')`
-
-注册选股函数到回测引擎。
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `func` | `callable` | 选股函数，签名 `func(context) -> list[str]` |
-| `rebalance` | `str` | 调度频率（见下表） |
-
-**Rebalance 格式：**
-
-| 值 | 含义 | 示例 |
-|---|---|---|
-| `"monthly:N"` | 每月第 N 天（1-31） | `"monthly:1"`（1号） |
-| `"weekly:N"` | 周几（0=周一, 4=周五） | `"weekly:0"`（周一） |
-| `"daily"` | 每个交易日 | `"daily"` |
-
-### 11.4 工具函数
-
-#### `StockSelector`
-
-选股基类，子类需实现 `filter()` 和 `rank()` 方法。
-
-#### `filter_st_stocks(securities)`
-
-剔除 ST / *ST 股票。
-
-**返回：** 非 ST 股票列表
-
-#### `filter_paused_stocks(securities, context)`
-
-剔除停牌股票（成交量为 0）。
-
-**参数：** `context` 可选，回测模式下用于获取当前交易日
-
-**返回：** 活跃交易股票列表
-
-#### `filter_low_price_stocks(securities, min_price=2.0)`
-
-剔除低于最低价格的股票。
-
-#### `filter_high_pe_stocks(securities, max_pe=100.0)`
-
-剔除高于最高 PE 的股票。
-
-#### `fetch_factor_data(securities, fields=None)`
-
-获取多维度因子数据。
-
-**可用字段：**
-
-| 字段 | 说明 | 来源 |
-|------|------|------|
-| `price` | 最新价 | 行情快照 |
-| `pct_change` | 涨跌幅 | 行情快照 |
-| `total_value` | 总市值 | 行情快照 |
-| `pe` | 市盈率（动态） | 行情快照 |
-| `pb` | 市净率 | 行情快照 |
-| `turnover` | 换手率 | 行情快照 |
-| `ma5` | 5日均价 | 预加载日线 |
-| `ma10` | 10日均价 | 预加载日线 |
-| `ma20` | 20日均价 | 预加载日线 |
-| `rsi14` | 14日 RSI | 预加载日线 |
-
-**返回：** `DataFrame`，索引为股票代码
-
-#### `TopNSelector(factor='pe', top_n=5, ascending=True)`
-
-按单因子排序，选出 Top-N。
-
-| 参数 | 说明 |
-|------|------|
-| `factor` | 因子名称（`fetch_factor_data` 中的字段名） |
-| `top_n` | 选取数量 |
-| `ascending` | `True` 表示从小到大（如低 PE） |
-
-#### `MultiFactorSelector(factors, top_n=5)`
-
-按多因子加权综合评分排序。
-
-| 参数 | 说明 |
-|------|------|
-| `factors` | `dict`，因子名 -> 权重（正权重=越大越好，负权重=越小越好） |
-| `top_n` | 选取数量 |
+`fetch_factor_data` 可用字段：`price`, `pct_change`, `total_value`, `pe`, `pb`, `turnover`, `ma5`, `ma10`, `ma20`, `rsi14`。
 
 ---
 
-## 12. 参数化与优化相关 API 约定
+## 参数化与优化约定
 
-`eqlib` 的生命周期与归因 API 可与**任意** Python 驱动流程配合：脚本、Notebook、定时任务等。常见用法是：对定义了 `PARAMS` / `PARAM_RANGES` 的策略反复调用 `run_backtest` / `run_strategy`，用 `analyze_returns` 等函数评估指标，再按规则写回 `PARAMS`；需要可追溯时，可配合 `agent/audit_log.py` 写入 `audit_log/`。
+`eqlib` 的 API 可与任意 Python 流程配合（脚本、Notebook、定时任务）。典型调用链：`run_backtest()` → `analyze_returns()` → `brinson_attribution()` → 分析结果 → 修改参数 → 再回测。
 
-### 12.1 典型调用链
-
-| 步骤 | 动作 | 常用 API |
-|------|------|----------|
-| 基线回测 | 得到 `result` | `run_backtest()` / `run_strategy()` |
-| 指标分析 | 夏普、回撤、胜率等 | `analyze_returns()` |
-| 归因 / 因子 | 可选深度分析 | `brinson_attribution()`、`fama_french_analysis()` |
-| 数据复查 | 核对行情与信号 | `get_price()`、`attribute_history()` |
-| 模拟盘 | 独立于回测验证 | `run_paper_trade()` |
-
-### 12.2 策略参数化约定
-
-策略文件中的 `PARAMS`（当前值）与 `PARAM_RANGES`（搜索空间）应由你自己的优化脚本或 `agent/optimizer.py` 读取与更新；修改后重新运行回测即可验证。
-
-### 12.3 审计日志
-
-若使用 `agent/audit_log.py`，建议在 `audit_log/` 中记录：
-
-- 每轮使用的参数集与各时段指标  
-- 是否满足预设门槛  
-- 调参或改逻辑的依据摘要  
-
-### 12.4 代码审查清单（建议）
-
-每次变更 `PARAMS` 或策略逻辑后，建议核对：
-
-1. 新参数落在 `PARAM_RANGES` 内，且满足交叉约束（如快慢线顺序）。  
-2. 被调参数在策略中通过 `PARAMS['…']` 使用。  
-3. 未引入前视或未来函数。  
+策略文件定义 `PARAMS`（当前值）与 `PARAM_RANGES`（搜索空间），由优化脚本读取与更新。每次变更后建议核对：新参数落在范围内、满足交叉约束、未引入前视偏差。
 
 ---
 
@@ -1504,52 +647,45 @@ result = run_strategy(
 
 ```python
 from eqlib import (
-    # === 生命周期 ===
+    # 生命周期
     run_backtest, run_strategy, run_portfolio_backtest,
-    run_daily, run_weekly, run_monthly,
+    run_daily, run_weekly, run_monthly, run_selection,
     set_handle_data, record, run_paper_trade,
-    # === 配置 ===
+    # 配置
     set_benchmark, set_option, set_order_cost, set_slippage,
     OrderCost, SlippageModel, FixedSlippage, VolumeSlippage,
-    # === 交易 ===
+    # 交易
     order, order_target, order_value, order_target_value,
-    # === 数据 ===
+    # 数据
     get_price, history, attribute_history, get_all_securities,
     fetch_stock_data, download_stock_data, load_csv, clear_cache,
-    # === 扫描 ===
     scan_market, check_golden_cross, get_financial_screen,
-    # === 指数/行业/概念 ===
     get_index_stocks, get_industry_list, get_industry_stocks,
     get_concept_list, get_concept_stocks, get_industry,
-    # === 分钟线 / Tick ===
     fetch_minute_data, get_price_minute, get_tick_data,
-    # === 行情快照 / 基本面 ===
     get_current_data, get_security_info, get_trade_days,
     get_fundamentals, get_financial_abstract, get_money_flow,
     get_billboard_list, get_valuation, get_index_weights, get_extras,
-    # === 链式选股 ===
     query, valuation, get_current_data_object,
-    # === 股票池 ===
     set_universe, get_universe,
-    # === 生命周期回调 ===
     before_trading_start, after_trading_end,
-    # === 日志 ===
+    # 日志
     log,
-    # === 对象 ===
+    # 对象
     g, GlobalObject, Context, Portfolio, Position,
     StrategyConfig,
-    # === 报告 ===
+    # 报告
     generate_chart, generate_report_md, generate_report_json, generate_html_report,
-    # === 组合优化 ===
+    # 组合优化
     portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
-    # === 分析 ===
+    # 分析
     analyze_returns, brinson_attribution, fama_french_analysis,
-    # === 选股策略 ===
+    # 选股
     StockSelector, TopNSelector, MultiFactorSelector,
     filter_st_stocks, filter_paused_stocks,
     filter_low_price_stocks, filter_high_pe_stocks,
-    fetch_factor_data, run_selection,
-    # === 缓存 ===
+    fetch_factor_data,
+    # 缓存
     set_cache_dir, set_local_data_dir, fetch_cached, estimate_memory_mb,
     save_stock_local, load_stock_local, has_local_data,
     list_local_stocks, remove_local_data, clear_all_local_data,
