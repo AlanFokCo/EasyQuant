@@ -72,6 +72,7 @@ nav:
 
   - User Manual (用户手册):
       - Overview (概览): doc/README.md
+      - Design Spec — Web 策略工作室: doc/design_spec_web_strategy_studio.md
       - Reports output index (reports 目录说明): reports/README.md
       - Reports & Metrics (报告与指标): doc/reports_and_metrics.md
       - PTrade/QMT Adapter (实盘适配): doc/ptrade_adapter.md

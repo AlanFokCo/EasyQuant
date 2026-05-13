@@ -65,6 +65,7 @@ python examples/03_run_backtest.py
 
 ## 相关链接
 
+- Web 策略编辑与回测服务（**Design Spec**，供实现对照）：[`design_spec_web_strategy_studio.md`](design_spec_web_strategy_studio.md)
 - 项目说明（中文）：[`README_zh.md`](../README_zh.md)
 - 参数优化与审计（Tutorial 10）：[`tutorials/10_agent_optimization.md`](../tutorials/10_agent_optimization.md)
 - 本地数据快速验证：[`tutorials/00_environment_and_first_run.md`](../tutorials/00_environment_and_first_run.md)
