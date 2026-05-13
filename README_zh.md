@@ -18,8 +18,53 @@
 - **组合优化** — 最小方差、最大夏普、风险平价
 - **模拟盘** — 使用实时行情运行策略
 - **PTrade/QMT 适配器** — 将 EasyQuant 策略一键导出为 PTrade/QMT 平台格式，无缝上线实盘
+- **选股** — 按因子定期调仓（ST/PB/PE/动量过滤、Top-N、多因子评分）
 - **工具库** — 技术指标（MA、MACD、RSI、KDJ、布林带、ATR）、统计分析、仓位管理（Kelly、ATR、固定比例）
-- **报告输出** — 图表（PNG）、Markdown、JSON
+- **报告输出** — 交互式 HTML 报告（可在浏览器打开）、图表（PNG）、Markdown、JSON，包含 20+ 风险/收益指标
+- **直接查询股票** — 链式 API（`query` / `valuation` / `get_fundamentals`）用于基本面筛选
+
+---
+
+## 报告预览
+
+`run_strategy` 生成**交互式 HTML 报告**（可在任意浏览器打开），同时输出 PNG、Markdown 和 JSON 文件。以下为真实回测结果截图——布局相同，数据不同。
+
+### 盈利策略
+
+| **MACD 趋势 + 成交量** (600536) | **布林带均值回归** (601088) | **支撑/阻力位** (8 只股票) |
+|:---:|:---:|:---:|
+| **+103.48%** · 16 笔 | **+57.77%** · 8 笔 | **+119.97%** · 171 笔 |
+| [![MACD+Volume](tutorials/assets/example_report_macd_volume.png)](tutorials/assets/example_report_macd_volume.png) | [![Bollinger](tutorials/assets/example_report_bollinger.png)](tutorials/assets/example_report_bollinger.png) | [![S/R](tutorials/assets/example_report_sr_strategy.png)](tutorials/assets/example_report_sr_strategy.png) |
+| HTML 报告: [![HTML](tutorials/assets/example_report_html_macd_volume.png)](tutorials/assets/example_report_html_macd_volume.png) | HTML 报告: [![HTML](tutorials/assets/example_report_html_bollinger.png)](tutorials/assets/example_report_html_bollinger.png) | HTML 报告: [![HTML](tutorials/assets/example_report_html_sr_strategy.png)](tutorials/assets/example_report_html_sr_strategy.png) |
+
+| **网格交易** (601857) | **多因子** (10 只股票) | **选股策略** (14 只股票) |
+|:---:|:---:|:---:|
+| **+30.25%** · 10 笔 | **+5.19%** · 135 笔 | **+16.96%** · 5 只持仓 |
+| [![Grid](tutorials/assets/example_report_grid.png)](tutorials/assets/example_report_grid.png) | [![Multi-Factor](tutorials/assets/example_report_multifactor.png)](tutorials/assets/example_report_multifactor.png) | [![Stock Selection](tutorials/assets/example_report_stock_selection.png)](tutorials/assets/example_report_stock_selection.png) |
+| HTML 报告: [![HTML](tutorials/assets/example_report_html_grid.png)](tutorials/assets/example_report_html_grid.png) | HTML 报告: [![HTML](tutorials/assets/example_report_html_multifactor.png)](tutorials/assets/example_report_html_multifactor.png) | HTML 报告: [![HTML](tutorials/assets/example_report_html_stock_selection.png)](tutorials/assets/example_report_html_stock_selection.png) |
+
+### 亏损策略（用于学习）
+
+| **动量组合** (5 只股票) | **本地数据** (000768) |
+|:---:|:---:|
+| **−25.69%** · 52 笔 | **−33.28%** · 16 笔 |
+| [![Portfolio](tutorials/assets/example_report_portfolio.png)](tutorials/assets/example_report_portfolio.png) | [![Local Data](tutorials/assets/example_report_19_localdata.png)](tutorials/assets/example_report_19_localdata.png) |
+| HTML 报告: [![HTML](tutorials/assets/example_report_html_portfolio.png)](tutorials/assets/example_report_html_portfolio.png) | HTML 报告: [![HTML](tutorials/assets/example_report_html_19_localdata.png)](tutorials/assets/example_report_html_19_localdata.png) |
+
+> **如何阅读报告：** 每个 HTML 页面依次展示：头部摘要 → 指标卡片（夏普、最大回撤、alpha 等）→ K 线图 → 累计收益 vs 基准 → 回撤曲线 → 每日盈亏 → 交易/持仓标签页。字段详解见 [**报告与指标说明**](doc/reports_and_metrics.md)。
+
+---
+
+---
+
+## 性能
+
+- **内存感知数据加载** — 从磁盘缓存（parquet）或本地 CSV 文件预加载数据，
+  自动限制内存用量（默认 1 GB）。超出限制时引擎自动切换为紧凑切片模式——
+  结果完全一致，只是略慢。
+- **快速 I/O** — `attribute_history` 直接读取内存中的数据，避免每次调用都访问
+  磁盘或网络，将典型的 6 年以上回测时间从约 20 分钟缩短至约 1 分钟。
+- **并行数据加载** — 多线程预加载，加快启动速度。
 
 ---
 
@@ -113,7 +158,7 @@ python my_first_strategy.py
 
 ## 示例
 
-参见 [`examples/Examples.md`](examples/Examples.md) 索引；脚本位于 [`examples/README.md`](examples/README.md)：
+完整索引见 [`examples/Examples.md`](examples/Examples.md)，脚本位于 [`examples/`](examples/)。
 
 | # | 文件 | 说明 |
 |---|------|------|
@@ -146,7 +191,7 @@ python my_first_strategy.py
 
 ## 文档
 
-- [**新手教程**](tutorials/README.md) — 从零基础到实盘部署，5 篇系列教程
+- [**新手教程**](tutorials/) — 从零基础到实盘部署的入门指南，以及参数调优（教程 10）
 - [**用户手册**](doc/user_guide.md) — 教程：编写策略、运行回测、解读报告
 - [**API 参考**](doc/api_reference.md) — 完整 API：结构体、参数说明、用法
 - [**工具库参考**](doc/utils_reference.md) — 计算工具：技术指标、统计分析、资金管理、支撑阻力位
@@ -177,6 +222,100 @@ audit_log/
 
 每次参数调整都记录了：触发调整的具体指标数值、预期效果和代码审查结果。
 用户可以追溯每一个决策的数据依据。
+
+---
+
+## 选股
+
+EasyQuant 支持通过选股接口实现定期调仓。你无需硬编码股票池，只需定义一个选股函数，按周、按月或以任意自定义频率运行。
+
+### 快速开始
+
+```python
+from eqlib import *
+
+def my_selection(context):
+    """返回本期要交易的股票列表。"""
+    # 过滤 ST 股，然后按 PE 最低取前 5
+    candidates = filter_st_stocks(["601390", "600519", "000858", "600036"])
+    df = fetch_factor_data(candidates, fields=["pe"])
+    df = df.dropna(subset=["pe"]).sort_values("pe", ascending=True)
+    return df.head(5).index.tolist()
+
+def initialize(context):
+    context.universe = ["601390"]  # 初始股票池
+    run_selection(my_selection, rebalance="monthly:1")  # 每月 1 日运行
+    run_daily(trade, time="every_bar")
+
+def trade(context):
+    selected = context.universe
+    # ... 卖出不在 selected 的股票，买入 selected 中的股票 ...
+```
+
+### 调仓频率
+
+| 值 | 含义 | 示例 |
+|-------|---------|---------|
+| `"monthly:N"` | 每月第 N 日（1-31） | `"monthly:1"`（1 日），`"monthly:15"`（15 日） |
+| `"weekly:N"` | 每周第 N 个工作日（0=周一，4=周五） | `"weekly:0"`（周一），`"weekly:4"`（周五） |
+| `"daily"` | 每个交易日 | `"daily"` |
+
+### 三种定义选股的方式
+
+**1. 普通函数**（最简单）：
+
+```python
+def simple_selection(context):
+    candidates = filter_st_stocks(CANDIDATE_POOL)
+    return TopNSelector(factor="pe", top_n=5).rank(candidates, context)
+```
+
+**2. StockSelector 子类**（复杂逻辑）：
+
+```python
+class MySelector(StockSelector):
+    def filter(self, candidates, context):
+        candidates = filter_st_stocks(candidates)
+        return filter_high_pe_stocks(candidates, max_pe=50)
+    def rank(self, securities, context):
+        return MultiFactorSelector(
+            factors={"pe": -0.4, "pb": -0.3, "pct_change": 0.3},
+            top_n=5
+        ).rank(securities, context)
+```
+
+**3. 通过 `run_strategy` 参数传入**：
+
+```python
+result = run_strategy(
+    initialize_func=initialize,
+    selection_func=my_selection,
+    selection_rebalance="weekly:0",
+)
+```
+
+### 可用过滤器与选择器
+
+| API | 说明 |
+|-----|-------------|
+| `filter_st_stocks(securities)` | 移除 ST / *ST 股票 |
+| `filter_paused_stocks(securities, context)` | 移除停牌股票 |
+| `filter_low_price_stocks(securities, min_price)` | 移除低于价格阈值的股票 |
+| `filter_high_pe_stocks(securities, max_pe)` | 移除 PE 高于阈值的股票 |
+| `fetch_factor_data(securities, fields)` | 获取多维度数据（PE/PB/动量/MA/RSI） |
+| `TopNSelector(factor, top_n, ascending)` | 按单因子排名 |
+| `MultiFactorSelector(factors, top_n)` | 按加权综合评分排名 |
+
+完整示例见 [`examples/22_stock_selection_strategy.py`](examples/22_stock_selection_strategy.py)。
+
+---
+
+## 目录结构
+
+| 目录 | 用途 |
+|-----------|---------|
+| `data/` | 日线 OHLCV 本地 CSV 缓存。当 `use_local=True` 或调用 `save_stock_local()` 时自动创建。删除后将从网络重新下载。 |
+| `reports/` | 回测报告输出目录（PNG 图表、HTML、Markdown、JSON）。由 `run_strategy()` 和 `generate_chart()` 自动创建。 |
 
 ---
 
