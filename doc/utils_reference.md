@@ -3,6 +3,10 @@
 > 本文档描述 `eqlib.utils` 中全部计算工具的 **具体用法** 和 **底层计算原理**。
 > `eqlib.utils` 是 EasyQuant 项目的 Python 包，通过 `from eqlib import utils` 导入。
 
+!!! abstract "文档说明"
+
+    本文档给出各工具函数的 **用法示例** 与 **数学定义**。若仅需在策略中调用，可先查 [API 速查索引](api_index.md) 再回跳对应小节。
+
 ---
 
 ## 目录

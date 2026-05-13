@@ -1,5 +1,13 @@
 # 前置知识：Python 基础与环境配置
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **适合** | 几乎没有 Python 经验、或尚未用过 pandas / numpy 的读者 |
+    | **预计** | 60～90 分钟（可查表跳读） |
+    | **若已熟练** | 请直接开始 [Tutorial 00](../00_environment_and_first_run.md) |
+
 > 本文面向**几乎没有 Python 经验**的读者。如果你已经能熟练使用 pandas、numpy，可直接跳过本文，从 [Tutorial 00](../00_environment_and_first_run.md) 开始。
 
 ---

@@ -1,8 +1,16 @@
 # Tutorial 04: 策略优化与改进
 
+!!! abstract "本篇导览"
+
+    | 项目 | 说明 |
+    |------|------|
+    | **目标** | 参数扫描与稳定性、信号过滤、组合与归因、避免盲目调参 |
+    | **预计用时** | 约 60 分钟 |
+    | **前置** | [Tutorial 03](03_backtesting.md) |
+
 > 在回测验证的基础上，改进策略参数、丰富策略逻辑、构建组合策略。
 
-**环境：** Python 3.10+，[`Tutorial 00`](00_environment_and_first_run.md) · **文档：** [`doc/README.md`](../doc/README.md)
+**文档索引：** [`doc/README.md`](../doc/README.md)
 
 ---
 
