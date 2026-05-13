@@ -29,7 +29,7 @@ hide:
 
     安装 `eqlib`、运行示例回测、在浏览器中打开 HTML 报告。
 
-    [:octicons-arrow-right-24: 安装与用户手册](doc/user_guide.md){ .md-button .md-button--primary }
+    [:octicons-arrow-right-24: 安装与用户手册](doc/user_guide/index.md){ .md-button .md-button--primary }
 
 -   :material-school-outline:{ .lg .middle } __系统学习__
 
@@ -61,7 +61,7 @@ hide:
 
 | 我想… | 建议阅读 |
 |------|----------|
-| 第一次安装并验证环境 | [环境与第一次运行](tutorials/00_environment_and_first_run.md) → [用户手册 · 安装](doc/user_guide.md) |
+| 第一次安装并验证环境 | [环境与第一次运行](tutorials/00_environment_and_first_run.md) → [用户手册总览](doc/user_guide/index.md) |
 | 弄懂 HTML 报告里每张图、每个指标 | [报告与指标](doc/reports_and_metrics.md) |
 | 查 `order` / `run_backtest` 等 API | [API 速查索引](doc/api_index.md) 或 [完整 API 参考](doc/api_reference.md) |
 | 排查数据下载、无交易、无图等问题 | [常见问题 FAQ](doc/FAQ.md) |

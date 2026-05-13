@@ -4,7 +4,7 @@
 
 !!! tip "第一次使用？"
 
-    若尚未跑通安装与示例回测，请先完成 [**用户手册 §0～§3**](user_guide.md#0-新手先完成这-4-步)，再回到本页按「场景」查 API。
+    若尚未跑通安装与示例回测，请先完成 [**用户手册 §0～§3**](user_guide/index.md)（从 [§0](user_guide/00_first_steps.md) 读到 [§3](user_guide/03_quickstart_strategy.md)），再回到本页按「场景」查 API。
 
 ---
 
@@ -12,7 +12,7 @@
 
 | 我想… | 优先看 |
 |--------|--------|
-| 第一次跑通回测 + 出报告 | [用户手册第 9 节](user_guide.md)；[API 参考第 4 章 `run_strategy`](api_reference.md#4-回测与模拟盘引擎)（在章节内搜索函数名） |
+| 第一次跑通回测 + 出报告 | [用户手册 §9](user_guide/09_backtest.md)；[API 参考第 4 章 `run_strategy`](api_reference.md#4-回测与模拟盘引擎)（在章节内搜索函数名） |
 | 只要回测结果、自己后处理 | [API 参考第 4 章 `run_backtest`](api_reference.md#4-回测与模拟盘引擎) |
 | 多标的固定规则组合 | [API 参考第 4 章 `run_portfolio_backtest`](api_reference.md#4-回测与模拟盘引擎) |
 | 读懂 HTML/指标含义 | [**reports_and_metrics.md**](reports_and_metrics.md) |
