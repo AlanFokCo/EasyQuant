@@ -1,0 +1,18 @@
+# Web Strategy Studio — Docker Compose (optional)
+
+services:
+  studio-api:
+    build:
+      context: ..
+      dockerfile: web_strategy_studio/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      EQ_STUDIO_DATABASE_URL: sqlite+aiosqlite:////data/studio.sqlite3
+      EQ_STUDIO_ARTIFACT_DIR: /data/artifacts
+      EQ_STUDIO_REPO_ROOT: /app
+    volumes:
+      - studio-data:/data
+
+volumes:
+  studio-data: {}
