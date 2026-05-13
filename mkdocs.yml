@@ -1,37 +1,57 @@
-site_name: EasyQuant Docs
+site_name: EasyQuant 文档
+site_description: EasyQuant / eqlib — 中国 A 股事件驱动回测框架官方文档站
 site_url: https://AlanFokCo.github.io/EasyQuant
 repo_url: https://github.com/AlanFokCo/EasyQuant
 repo_name: AlanFokCo/EasyQuant
 docs_dir: docs
+copyright: Copyright &copy; AlanFokCo · MIT License
 theme:
   name: material
   logo: assets/logo-icon.svg
   favicon: assets/logo-icon.svg
   language: zh
+  font:
+    text: "Noto Sans SC"
+    code: "JetBrains Mono"
   features:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.expand
     - navigation.indexes
     - navigation.top
+    - navigation.footer
+    - navigation.instant
     - toc.follow
     - search.highlight
+    - search.suggest
+    - search.share
     - content.code.copy
+    - content.tooltips
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
         icon: material/brightness-auto
-        name: Switch to light/dark mode
+        name: 切换浅色 / 深色 / 跟随系统
     - media: "(prefers-color-scheme: light)"
       scheme: default
+      primary: blue
+      accent: blue
       toggle:
         icon: material/brightness-7
-        name: Switch to dark mode
+        name: 切换深色模式
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
+      primary: blue
+      accent: blue
       toggle:
         icon: material/brightness-4
-        name: Switch to system preference
+        name: 跟随系统配色
+extra:
+  homepage: https://AlanFokCo.github.io/EasyQuant
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/AlanFokCo/EasyQuant
+      name: GitHub 仓库
 extra_css:
   - assets/stylesheets/extra.css
 plugins:
@@ -62,16 +82,19 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.inlinehilite
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
 nav:
   - Home: index.md
 
   - Getting Started (快速入门):
-      - Introduction (项目简介): doc/README.md
-      - Installation (安装配置): doc/user_guide.md
-      - Quick Start Guide (快速开始): tutorials/00_environment_and_first_run.md
+      - 仓库中文简介 (README_zh): README_zh.md
+      - 文档中心（索引）: doc/README.md
+      - 安装与用户手册: doc/user_guide.md
+      - 环境与第一次运行: tutorials/00_environment_and_first_run.md
 
   - User Manual (用户手册):
-      - Overview (概览): doc/README.md
       - Design Spec — Web 策略工作室: doc/design_spec_web_strategy_studio.md
       - Reports output index (reports 目录说明): reports/README.md
       - Reports & Metrics (报告与指标): doc/reports_and_metrics.md
@@ -85,6 +108,11 @@ nav:
 
   - Tutorials (分步教程):
       - Tutorial Overview (教程导读): tutorials/README.md
+      - Prerequisites (前置阅读):
+          - 前置知识总览: tutorials/prerequisites/README.md
+          - Python 基础: tutorials/prerequisites/python_basics.md
+          - 技术分析基础: tutorials/prerequisites/technical_concepts.md
+          - A 股市场基础: tutorials/prerequisites/ashare_knowledge.md
       - "00 - Environment Setup (环境配置)": tutorials/00_environment_and_first_run.md
       - "01 - Quant Basics (量化基础)": tutorials/01_quant_basics.md
       - "02 - First Strategy (首个策略)": tutorials/02_first_strategy.md
@@ -96,10 +124,16 @@ nav:
       - "08 - Multi-Factor (多因子)": tutorials/08_multi_factor.md
       - "09 - Combined Strategy (组合策略)": tutorials/09_combined_strategy.md
       - "10 - Parameter tuning & audit (参数优化与审计)": tutorials/10_agent_optimization.md
+      - 教程配图与资源: tutorials/assets/README.md
 
   - Examples (示例代码):
-      - Example Index (示例索引): examples/Examples.md
-      - Browse on GitHub (GitHub 浏览): https://github.com/AlanFokCo/EasyQuant/tree/main/examples
+      - 示例索引: examples/Examples.md
+      - examples 目录说明: examples/README.md
+      - 支撑阻力策略 (20):
+          - 说明与运行: examples/20_sr_strategy/README.md
+          - 回测笔记: examples/20_sr_strategy/sr_backtest.md
+      - 组合策略 (21): examples/21_combined_strategy/README.md
+      - 在 GitHub 上浏览 examples: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
 
-  - GitHub Repository: https://github.com/AlanFokCo/EasyQuant
+  - 源码仓库: https://github.com/AlanFokCo/EasyQuant
 

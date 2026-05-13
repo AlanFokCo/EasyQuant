@@ -1,15 +1,218 @@
-/* Better card layout */
+/* =============================================================================
+   EasyQuant Docs — GitHub Pages 品牌与阅读体验
+   与 eqlib HTML 报告设计 token 对齐：主色 #1890ff、背景 #f0f2f5 系
+   ============================================================================= */
+
+/* ----- Material 主题色（与报告 Ant Design 蓝一致） ----- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1890ff;
+  --md-primary-fg-color--light: #40a9ff;
+  --md-primary-fg-color--dark: #096dd9;
+  --md-accent-fg-color: #096dd9;
+  --md-typeset-a-color: #1890ff;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #40a9ff;
+  --md-primary-fg-color--light: #69c0ff;
+  --md-primary-fg-color--dark: #1890ff;
+  --md-accent-fg-color: #69c0ff;
+  --md-typeset-a-color: #69c0ff;
+}
+
+/* ----- 版心与排版 ----- */
+.md-grid {
+  max-width: 92rem;
+}
+
+.md-typeset {
+  font-size: 0.92rem;
+  line-height: 1.72;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  margin-top: 2.25rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+}
+
+/* 正文内链接下划线更清晰 */
+.md-typeset a:not(.md-button):hover {
+  text-decoration-thickness: 2px;
+}
+
+/* ----- 首页 Hero ----- */
+.eq-hero {
+  text-align: center;
+  padding: 1.25rem 1rem 2rem;
+  margin: -0.5rem -0.8rem 1.5rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(
+    165deg,
+    rgba(24, 144, 255, 0.06) 0%,
+    rgba(24, 144, 255, 0.02) 45%,
+    transparent 100%
+  );
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+[data-md-color-scheme="slate"] .eq-hero {
+  background: linear-gradient(
+    165deg,
+    rgba(64, 169, 255, 0.12) 0%,
+    rgba(64, 169, 255, 0.04) 50%,
+    transparent 100%
+  );
+}
+
+.eq-hero-logo {
+  margin: 0 0 0.75rem;
+}
+
+.eq-hero-img {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.eq-hero h1 {
+  font-size: 1.65rem;
+  line-height: 1.35;
+  margin: 0.5rem 0 0.75rem;
+  border: none;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.eq-hero > p:not(.eq-hero-logo) {
+  font-size: 1.02rem;
+  color: var(--md-default-fg-color--light);
+  max-width: 40rem;
+  margin: 0 auto 1rem;
+  line-height: 1.65;
+}
+
+.eq-hero .admonition {
+  text-align: left;
+  max-width: 44rem;
+  margin: 1rem auto 0;
+}
+
+/* ----- 卡片网格（首页四宫格） ----- */
+.md-typeset .grid.eq-cards {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.1rem;
+}
+
+.md-typeset .grid.eq-cards > ul {
+  display: contents;
+}
+
+.md-typeset .grid.eq-cards > ul > li {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+  padding: 1rem 1.15rem 1.25rem;
+  background: var(--md-default-bg-color);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.md-typeset .grid.eq-cards > ul > li:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border-color: rgba(24, 144, 255, 0.35);
+  transform: translateY(-2px);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .grid.eq-cards > ul > li:hover {
+  border-color: rgba(64, 169, 255, 0.4);
+}
+
+.md-typeset .grid.eq-cards > ul > li > hr {
+  margin: 0.65rem 0;
+}
+
+.md-typeset .grid.eq-cards .middle {
+  vertical-align: middle;
+}
+
+.md-typeset .grid.eq-cards .lg {
+  font-size: 1.75rem;
+}
+
+.md-typeset .grid.eq-cards .md-button {
+  margin-top: 0.5rem;
+}
+
+/* ----- 表格可读性 ----- */
+.md-typeset table:not([class]) {
+  font-size: 0.88rem;
+  border-radius: 0.35rem;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.md-typeset table:not([class]) th {
+  background: rgba(24, 144, 255, 0.08);
+  font-weight: 600;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background: rgba(64, 169, 255, 0.12);
+}
+
+.md-typeset table:not([class]) tr:hover {
+  background: rgba(24, 144, 255, 0.04);
+}
+
+/* ----- 代码块 ----- */
+.md-typeset pre > code {
+  border-radius: 0.45rem;
+}
+
+.md-typeset div.tabbed-set {
+  border-radius: 0.45rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  overflow: hidden;
+}
+
+.md-typeset .tabbed-labels > label {
+  font-weight: 500;
+}
+
+/* ----- 页脚提示 ----- */
+.eq-footer-note {
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+  text-align: center;
+  padding: 1rem;
+  margin-top: 2rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* ----- 通用 grid ----- */
 .md-typeset .grid {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1rem;
 }
 
-/* Hide raw HTML comments */
+/* ----- 隐藏元素 ----- */
 [hidden] {
-  display: none;
+  display: none !important;
 }
 
-/* Better code block styling */
-.md-typeset pre > code {
-  border-radius: 0.5rem;
+/* ----- 顶栏标题：中文站名更易识别 ----- */
+.md-header__topic .md-ellipsis {
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
