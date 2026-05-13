@@ -4,6 +4,11 @@
 >
 > **仓库内真实输出样例：** 见根目录 [`reports/README.md`](../reports/README.md)（与 [`examples/`](../examples/Examples.md) 各脚本对应）；教程中的截图与之一致，见 [`tutorials/assets/example_report_html_19_localdata.png`](../tutorials/assets/example_report_html_19_localdata.png)。
 
+!!! abstract "阅读路线"
+
+    - **只想对照屏幕搞懂每张图、每个指标**：直接看 **[§2.8 对照走读示例](#28-对照走读示例reports19_localdata--html)**。
+    - **要先弄清会生成哪些文件**：从下面 **[§1](#1-运行后你会得到什么)** 开始。
+
 ---
 
 ## 1. 运行后你会得到什么？

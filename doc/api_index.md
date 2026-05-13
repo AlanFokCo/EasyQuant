@@ -2,6 +2,10 @@
 
 > 一页看清「能做什么、去哪查细节」。完整签名与边界条件以 [**api_reference.md**](api_reference.md) 为准；工具函数见 [**utils_reference.md**](utils_reference.md)；链式选股见 api_reference **第 3.14 节**。
 
+!!! tip "第一次使用？"
+
+    若尚未跑通安装与示例回测，请先完成 [**用户手册 §0～§3**](user_guide.md#0-新手先完成这-4-步)，再回到本页按「场景」查 API。
+
 ---
 
 ## 按使用场景跳转
