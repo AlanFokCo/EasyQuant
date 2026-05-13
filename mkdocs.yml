@@ -94,10 +94,27 @@ nav:
   - 快速入门:
       - 仓库中文简介 (README_zh): README_zh.md
       - 文档中心（索引）: doc/README.md
-      - 安装与用户手册: doc/user_guide.md
       - 环境与第一次运行: tutorials/00_environment_and_first_run.md
 
   - 用户手册:
+      - EasyQuant 用户手册:
+          - 总览与章节目录: doc/user_guide/index.md
+          - 「单页」兼容入口: doc/user_guide.md
+          - "§0 新手四步": doc/user_guide/00_first_steps.md
+          - "§1 简介与适用范围": doc/user_guide/01_intro_scope.md
+          - "§2 安装": doc/user_guide/02_install.md
+          - "§3 快速开始（示例策略）": doc/user_guide/03_quickstart_strategy.md
+          - "§4 策略生命周期": doc/user_guide/04_lifecycle.md
+          - "§5 资金管理": doc/user_guide/05_capital_position.md
+          - "§6 交易 API": doc/user_guide/06_trading_api.md
+          - "§7 数据拉取": doc/user_guide/07_data.md
+          - "§8 计算工具库": doc/user_guide/08_utils.md
+          - "§9 运行回测": doc/user_guide/09_backtest.md
+          - "§10 报告与图表": doc/user_guide/10_reports.md
+          - "§11 风险与归因": doc/user_guide/11_risk_attribution.md
+          - "§12 模拟盘": doc/user_guide/12_paper_trading.md
+          - "§13 参数优化与审计": doc/user_guide/13_optimization.md
+          - "§14 常见问题": doc/user_guide/14_faq.md
       - Web 策略工作室（Design Spec）: doc/design_spec_web_strategy_studio.md
       - reports 目录说明: reports/README.md
       - 报告与指标解读: doc/reports_and_metrics.md

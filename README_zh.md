@@ -3,7 +3,7 @@
 <p><strong>EasyQuant</strong> - 面向 <strong>中国 A 股市场</strong> 的量化策略与回测工具。</p>
 <p>核心 Python 包为 <code>eqlib</code>：事件驱动回测引擎、数据 API 与分析工具。</p>
 <p>
-<a href="https://github.com/AlanFokCo/EasyQuant/blob/main/README.md">English</a> · <a href="https://AlanFokCo.github.io/EasyQuant/">在线文档站</a> · <a href="tutorials/README.md">新手教程</a> · <a href="doc/README.md"><b>文档中心</b></a> · <a href="doc/user_guide.md">用户手册</a> · <a href="doc/api_index.md">API 速查</a> · <a href="doc/api_reference.md">API 参考</a> · <a href="examples/Examples.md">示例</a>
+<a href="https://github.com/AlanFokCo/EasyQuant/blob/main/README.md">English</a> · <a href="https://AlanFokCo.github.io/EasyQuant/">在线文档站</a> · <a href="tutorials/README.md">新手教程</a> · <a href="doc/README.md"><b>文档中心</b></a> · <a href="doc/user_guide/index.md">用户手册</a> · <a href="doc/api_index.md">API 速查</a> · <a href="doc/api_reference.md">API 参考</a> · <a href="examples/Examples.md">示例</a>
 </p>
 </div>
 
@@ -191,8 +191,8 @@ python my_first_strategy.py
 
 ## 文档
 
-- [**新手教程**](tutorials/) — 从零基础到实盘部署的入门指南，以及参数调优（教程 10）
-- [**用户手册**](doc/user_guide.md) — 教程：编写策略、运行回测、解读报告
+- [**新手教程**](tutorials/README.md) — 从零基础到实盘部署，5 篇系列教程
+- [**用户手册**](doc/user_guide/index.md) — 教程：编写策略、运行回测、解读报告
 - [**API 参考**](doc/api_reference.md) — 完整 API：结构体、参数说明、用法
 - [**工具库参考**](doc/utils_reference.md) — 计算工具：技术指标、统计分析、资金管理、支撑阻力位
 - [**PTrade/QMT 适配器**](doc/ptrade_adapter.md) — 将 EasyQuant 策略导出为 PTrade/QMT 平台格式

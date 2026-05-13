@@ -113,7 +113,7 @@ result = run_strategy(
 
 更多接口说明见：
 
-- [用户手册 7.11：下载与加载本地 CSV](../doc/user_guide.md#711-下载与加载本地-csv)
+- [用户手册 7.11：下载与加载本地 CSV](../doc/user_guide/07_data.md#711-下载与加载本地-csv)
 - [API 参考 8：缓存 API](../doc/api_reference.md#8-缓存-api)
 - [FAQ：首次回测慢或卡住](../doc/FAQ.md#q-首次回测很慢或卡住)
 

@@ -8,7 +8,89 @@
 
 !!! abstract "文档说明"
 
-    本文按 **章节** 列出 `eqlib` 全部公开 API 的签名、参数与注意事项。**新手**请先完成 [用户手册](user_guide.md) 再按需跳转本章；函数名检索也可用文档站 **搜索** 或浏览器页内查找（`Ctrl+F` / `⌘F`）。
+    本文按 **章节** 列出 `eqlib` 全部公开 API 的签名、参数与注意事项。**新手**请先完成 [用户手册 · §0～§3](user_guide/index.md) 再按需跳转本章；函数名检索也可用文档站 **搜索** 或浏览器页内查找（`Ctrl+F` / `⌘F`）。
+
+---
+
+## 章节目录
+
+以下卡片跳转到 **本页** 对应章节锚点。
+
+<div class="grid cards eq-cards" markdown>
+
+-   :material-sitemap: **§1** 结构体
+
+    ---
+
+    [:octicons-arrow-right-24: Context / Portfolio](#1-策略生命周期结构体){ .md-button }
+
+-   :material-swap-horizontal: **§2** 交易
+
+    ---
+
+    [:octicons-arrow-right-24: order / order_value](#2-交易-api){ .md-button }
+
+-   :material-database: **§3** 数据
+
+    ---
+
+    [:octicons-arrow-right-24: get_price / history](#3-数据-api){ .md-button }
+
+-   :material-play-speed: **§4** 回测引擎
+
+    ---
+
+    [:octicons-arrow-right-24: run_backtest](#4-回测与模拟盘引擎){ .md-button }
+
+-   :material-tune: **§5** 配置
+
+    ---
+
+    [:octicons-arrow-right-24: set_benchmark](#5-配置-api){ .md-button }
+
+-   :material-chart-line: **§6** 报告
+
+    ---
+
+    [:octicons-arrow-right-24: generate_html_report](#6-报告与分析-api){ .md-button }
+
+-   :material-chart-scatter-plot: **§7** 组合优化
+
+    ---
+
+    [:octicons-arrow-right-24: portfolio_optimizer](#7-组合优化-api){ .md-button }
+
+-   :material-harddisk: **§8** 缓存
+
+    ---
+
+    [:octicons-arrow-right-24: set_cache_dir](#8-缓存-api){ .md-button }
+
+-   :material-text-box: **§9** 日志
+
+    ---
+
+    [:octicons-arrow-right-24: log.info](#9-日志-api){ .md-button }
+
+-   :material-tools: **§10** 辅助工具
+
+    ---
+
+    [:octicons-arrow-right-24: get_session](#10-辅助工具-api){ .md-button }
+
+-   :material-filter-variant: **§11** 选股
+
+    ---
+
+    [:octicons-arrow-right-24: run_selection](#11-选股策略-api){ .md-button }
+
+-   :material-cog-outline: **§12** 参数化约定
+
+    ---
+
+    [:octicons-arrow-right-24: 优化与审计](#12-参数化与优化相关-api-约定){ .md-button }
+
+</div>
 
 ---
 
@@ -1131,7 +1213,7 @@ result = run_strategy(
 ### 8.6 相关文档
 
 - [Tutorial 00：先下载目标股票到本地，再回测](../tutorials/00_environment_and_first_run.md#5-推荐先下载目标股票到本地再做快速回测验证)
-- [用户手册：数据源扩展与可靠性建议（见 7.12 小节）](user_guide.md#712-数据源扩展与可靠性建议)
+- [用户手册：数据源扩展与可靠性建议（见 7.12 小节）](user_guide/07_data.md#712-数据源扩展与可靠性建议)
 - [FAQ：首次回测慢或卡住](FAQ.md#q-首次回测很慢或卡住)
 
 ---
