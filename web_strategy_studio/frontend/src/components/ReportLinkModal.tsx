@@ -6,7 +6,6 @@ import { resolveArtifactUrl } from "../api/client";
 type Props = {
   open: boolean;
   htmlUrl: string | null | undefined;
-  /** When SSE omits URL, derive `/static/reports/{runId}/report.html`. */
   runId?: string | null;
   onClose: () => void;
 };
@@ -26,7 +25,7 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.45)",
+        background: "rgba(0,0,0,0.65)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -37,9 +36,10 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
     >
       <div
         style={{
-          background: "var(--card)",
-          borderRadius: 4,
-          boxShadow: "var(--shadow-card)",
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
           padding: 16,
           width: "min(100vw - 32px, 1100px)",
           maxHeight: "min(92vh, 900px)",
@@ -49,7 +49,7 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 16 }}>回测报告</h3>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>回测报告</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {iframeSrc ? (
               <button
@@ -65,10 +65,6 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
             </button>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
-          通过后端 HTTP 路径 <code style={{ fontSize: 11 }}>/static/reports/…</code> 提供，与开发时代理 / 生产环境
-          <code style={{ fontSize: 11 }}> VITE_API_ORIGIN</code> 一致；无需使用本机 <code style={{ fontSize: 11 }}>file://</code> 路径。
-        </p>
         {iframeSrc ? (
           <iframe
             title="回测 HTML 报告"
@@ -78,14 +74,14 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
               flex: 1,
               minHeight: 420,
               width: "100%",
-              border: "1px solid #e8e8e8",
+              border: "1px solid var(--border)",
               borderRadius: 4,
               background: "#fff",
             }}
           />
         ) : (
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
-            未拿到报告地址。请确认回测已成功结束，并重新安装本仓库后端（参见 README）。
+            未拿到报告地址。请确认回测已成功结束。
           </div>
         )}
       </div>
@@ -96,10 +92,10 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
 const ghost: CSSProperties = {
   padding: "6px 14px",
   borderRadius: 4,
-  border: "1px solid var(--primary)",
-  background: "#fff",
-  color: "var(--primary)",
+  border: "1px solid var(--border)",
+  background: "transparent",
+  color: "var(--text-secondary)",
   textDecoration: "none",
-  fontSize: 14,
+  fontSize: 13,
   cursor: "pointer",
 };

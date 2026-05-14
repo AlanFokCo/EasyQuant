@@ -17,9 +17,9 @@ export function RunProgressBar({ progress, stage, running }: Props) {
         aria-valuemax={100}
         aria-valuenow={pct}
         style={{
-          height: 8,
-          borderRadius: 4,
-          background: "#e8e8e8",
+          height: 4,
+          borderRadius: 2,
+          background: "var(--border)",
           overflow: "hidden",
         }}
       >

@@ -84,25 +84,40 @@ def main() -> int:
 
     html_path = out_dir / "report.html"
     json_path = out_dir / "report.json"
+    reports_ok = True
+    report_err = None
+
+    # Generate HTML report (graceful degradation — if it fails, still return success)
     try:
         generate_html_report(result, str(html_path))
+    except Exception as e:
+        print(f"EQ_WARN: HTML report: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        reports_ok = False
+        report_err = str(e)
+
+    # Generate JSON report (needed for metrics API)
+    try:
         generate_report_json(result, str(json_path))
     except Exception as e:
-        print(f"EQ_ERROR: report: {e}", file=sys.stderr)
+        print(f"EQ_WARN: JSON report: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        _write_result(out_dir, work, ok=False, error=str(e), error_code="REPORT_FAIL")
-        return 6
+        reports_ok = False
+        report_err = report_err or str(e)
 
     _write_result(
         out_dir,
         work,
         ok=True,
-        html=str(html_path.resolve()),
-        report_json=str(json_path.resolve()),
+        html=str(html_path.resolve()) if html_path.is_file() else None,
+        report_json=str(json_path.resolve()) if json_path.is_file() else None,
         error=None,
         error_code=None,
     )
-    print(json.dumps({"ok": True}))
+    if not reports_ok:
+        print(json.dumps({"ok": True, "reports_warning": report_err}))
+    else:
+        print(json.dumps({"ok": True}))
     return 0
 
 

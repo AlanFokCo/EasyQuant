@@ -15,9 +15,9 @@ export function LogConsole({ lines, onClear, onDownload }: Props) {
       style={{
         flex: 1,
         minHeight: 120,
-        background: "var(--card)",
-        borderRadius: 4,
-        boxShadow: "var(--shadow-card)",
+        background: "var(--bg-secondary)",
+        borderRadius: "var(--radius)",
+        border: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -29,12 +29,12 @@ export function LogConsole({ lines, onClear, onDownload }: Props) {
           justifyContent: "space-between",
           alignItems: "center",
           padding: "6px 10px",
-          borderBottom: "1px solid #f0f0f0",
+          borderBottom: "1px solid var(--border)",
           fontSize: 12,
           color: "var(--text-secondary)",
         }}
       >
-        <span>日志</span>
+        <span>运行日志</span>
         <span>
           <button type="button" style={btnStyle} onClick={onClear}>
             清空
@@ -57,8 +57,9 @@ export function LogConsole({ lines, onClear, onDownload }: Props) {
                 fontSize: 12,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-all",
-                color: row.stream === "stderr" ? "var(--error-text)" : "var(--success-text)",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                color: row.stream === "stderr" ? "var(--error)" : "var(--text-dim)",
+                fontFamily: "var(--mono)",
+                lineHeight: 1.6,
               }}
             >
               [{row.stream}] {row.line}
@@ -74,7 +75,8 @@ const btnStyle: CSSProperties = {
   marginLeft: 6,
   padding: "2px 8px",
   fontSize: 12,
-  border: "1px solid #d9d9d9",
+  border: "1px solid var(--border)",
   borderRadius: 4,
-  background: "#fff",
+  background: "transparent",
+  color: "var(--text-secondary)",
 };
