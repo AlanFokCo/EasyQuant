@@ -1,6 +1,6 @@
 # 回测报告怎么看：HTML、PNG、Markdown、JSON 与风险指标
 
-> 配合 [用户手册 — §10 回测报告与图表解读](user_guide/10_reports.md) 阅读。生成报告的推荐入口是 **`run_strategy`**（一次得到 PNG、HTML、MD、JSON）。
+> 配合 [用户手册 — §10 回测报告与图表解读](user_guide.md#10-回测报告与图表解读) 阅读。生成报告的推荐入口是 **`run_strategy`**（一次得到 PNG、HTML、MD、JSON）。
 >
 > **仓库内真实输出样例：** 见根目录 [`reports/README.md`](../reports/README.md)（与 [`examples/`](../examples/Examples.md) 各脚本对应）；教程中的截图与之一致，见 [`tutorials/assets/example_report_html_19_localdata.png`](../tutorials/assets/example_report_html_19_localdata.png)。
 
@@ -284,7 +284,7 @@ if result:
 
 ## 7. 相关文档
 
-- [用户手册](user_guide/index.md)
+- [用户手册](user_guide.md)
 - [示例报告索引（`reports/README.md`）](../reports/README.md)
 - [常见问题 FAQ](FAQ.md)
 - [API 速查索引](api_index.md)

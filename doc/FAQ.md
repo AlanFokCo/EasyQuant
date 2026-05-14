@@ -1,6 +1,6 @@
 # EasyQuant / eqlib 常见问题（FAQ）
 
-> 与 [用户手册](user_guide/index.md)、[报告与指标](reports_and_metrics.md) 配合阅读。若此处未覆盖，可在 [API 参考](api_reference.md) 中按符号名搜索。
+> 与 [用户手册](user_guide.md)、[报告与指标](reports_and_metrics.md) 配合阅读。若此处未覆盖，可在 [API 参考](api_reference.md) 中按符号名搜索。
 
 ### 按主题跳转
 
@@ -81,7 +81,7 @@ pip install .
 
 **常见原因：**`record()` 未在策略中记录 **`total_value`**，或 `recorded_values` 中缺少按日的组合价值，导致 `generate_chart` / HTML 中部分序列无法绘制。
 
-**处理：**在每日逻辑末尾调用框架提供的记录（若使用 `run_daily` 等，引擎通常会记录组合；自定义时请确保与官方示例一致）。可参考 `examples/03_run_backtest.py` 与 [用户手册](user_guide/index.md)。
+**处理：**在每日逻辑末尾调用框架提供的记录（若使用 `run_daily` 等，引擎通常会记录组合；自定义时请确保与官方示例一致）。可参考 `examples/03_run_backtest.py` 与 [用户手册](user_guide.md)。
 
 ### Q: 买入后当天想卖出，提示可卖为 0
 
@@ -133,7 +133,7 @@ pip install .
 
 ### Q: `run_paper_trade` 与回测区别？
 
-模拟盘按设定间隔拉 **实时或最新行情**，循环执行策略，**不结束**直到手动中断（Ctrl+C）。详见 [用户手册 — §12 模拟盘](user_guide/12_paper_trading.md)。
+模拟盘按设定间隔拉 **实时或最新行情**，循环执行策略，**不结束**直到手动中断（Ctrl+C）。详见 [用户手册 — §12 模拟盘](user_guide.md#12-模拟盘交易)。
 
 ### Q: 如何导出到 PTrade / QMT？
 

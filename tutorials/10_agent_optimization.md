@@ -154,5 +154,5 @@ jq 'select(.type=="final")' audit_log/session_*.jsonl
 
 - [Tutorial 04: 策略优化与改进](04_strategy_optimization.md) — 手动分析与改进思路  
 - [Tutorial 09: 全天候 Alpha 综合策略](09_combined_strategy.md) — 多模块组合示例  
-- [用户手册 — 回测与报告](../doc/user_guide/index.md)  
+- [用户手册 — 回测与报告](../doc/user_guide.md)  
 - [API 参考 — 生命周期与归因](../doc/api_reference.md)  
