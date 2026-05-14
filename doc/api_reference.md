@@ -7,6 +7,51 @@
 
     函数名可用浏览器页内查找（`Ctrl+F` / `⌘F`）。新手请先完成 [用户手册](user_guide.md) 再按需跳转本章。
 
+## 如何使用本文档
+
+**按使用场景查找：**
+
+| 场景 | 跳转章节 |
+|------|----------|
+| 写第一个策略 | [策略生命周期结构体](#策略生命周期结构体) → [交易 API](#交易-api) |
+| 拉取行情数据 | [数据 API](#数据-api) |
+| 运行回测 | [回测与模拟盘引擎](#回测与模拟盘引擎) |
+| 设置手续费/滑点 | [配置 API](#配置-api) |
+| 生成报告/计算指标 | [报告与分析 API](#报告与分析-api) |
+| 选股/行业轮动 | [选股策略 API](#选股策略-api) |
+| 优化仓位权重 | [组合优化 API](#组合优化-api) |
+| 本地缓存 | [缓存 API](#缓存-api) |
+
+**命名约定：**
+
+- 股票代码格式为 6 位数字，如 `'601390'`；基准可带交易所后缀，如 `'000300.XSHG'`
+- 日期格式统一为 `'YYYY-MM-DD'` 或 `date` 对象
+- `context` 由框架自动传入，包含当前时间、投资组合、股票池等
+- `g` 为策略级别全局对象，跨交易日持久化
+
+**最小可运行策略：**
+
+```python
+from eqlib import *
+
+def initialize(context):
+    g.security = '601390'
+    set_benchmark('000300.XSHG')
+    run_daily(market_open, time='every_bar')
+
+def market_open(context):
+    hist = attribute_history(g.security, 20, '1d', ['close'])
+    if hist['close'].iloc[-1] > hist['close'].mean() * 1.02:
+        order_value(g.security, context.portfolio.available_cash)
+
+result = run_strategy(
+    initialize,
+    start_date='2024-01-01',
+    end_date='2024-12-31',
+    securities=['601390'],
+)
+```
+
 ---
 
 ## 策略生命周期结构体

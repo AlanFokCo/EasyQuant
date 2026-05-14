@@ -1,5 +1,5 @@
 /* =============================================================================
-   EasyQuant Docs — Dark minimal design
+   EasyQuant Docs — Dark minimal professional theme
    ============================================================================= */
 
 /* ----- Palette ----- */
@@ -9,9 +9,9 @@
   --md-default-fg-color--light: #a1a1a6;
   --md-default-fg-color--lighter: #6e6e73;
   --md-default-fg-color--lightest: #1c1c1e;
-  --md-primary-fg-color: #1c1c1e;
-  --md-primary-fg-color--light: #2c2c2e;
-  --md-primary-fg-color--dark: #1c1c1e;
+  --md-primary-fg-color: #0d0d0d;
+  --md-primary-fg-color--light: #1c1c1e;
+  --md-primary-fg-color--dark: #000000;
   --md-accent-fg-color: #2997ff;
   --md-typeset-a-color: #2997ff;
   --md-code-bg-color: #1c1c1e;
@@ -33,25 +33,30 @@
   --md-code-fg-color: #1d1d1f;
 }
 
-/* Header / nav bar */
+/* ----- Header / Nav bar (frosted glass) ----- */
 .md-header {
-  background-color: var(--md-primary-fg-color);
-  border-bottom: 1px solid var(--md-default-fg-color--lightest);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--md-primary-fg-color);
+  border-bottom: 0.5px solid rgba(128, 128, 128, 0.2);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  transition: background-color 0.3s ease;
 }
 
 [data-md-color-scheme="slate"] .md-header {
-  background-color: rgba(28, 28, 30, 0.85);
+  background: rgba(13, 13, 13, 0.85);
 }
 
 [data-md-color-scheme="default"] .md-header {
-  background-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .md-tabs {
   background-color: var(--md-primary-fg-color);
-  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  border-bottom: 0.5px solid rgba(128, 128, 128, 0.15);
+}
+
+[data-md-color-scheme="slate"] .md-tabs {
+  background: rgba(13, 13, 13, 0.6);
 }
 
 /* ----- Layout ----- */
@@ -69,15 +74,16 @@
 .md-typeset h1 {
   font-size: 2.5rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
   margin: 0 0 0.5rem;
 }
 
 .md-typeset h2 {
   font-size: 1.5rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
   margin-top: 2.5rem;
   padding-bottom: 0;
   border-bottom: none;
@@ -86,12 +92,28 @@
 .md-typeset h3 {
   font-size: 1.125rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
   margin-top: 2rem;
+}
+
+.md-typeset h4 {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-top: 1.5rem;
 }
 
 .md-typeset p {
   margin-bottom: 1.25em;
+  color: var(--md-default-fg-color);
+}
+
+/* ----- Lead text ----- */
+.md-typeset .lead {
+  font-size: 1.125rem;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.6;
 }
 
 /* ----- Links ----- */
@@ -99,7 +121,7 @@
   color: var(--md-typeset-a-color);
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .md-typeset a:hover {
@@ -109,7 +131,7 @@
 /* ----- Hero cards (homepage) ----- */
 .hero-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1px;
   margin: 2rem 0 2.5rem;
   background: var(--md-default-fg-color--lightest);
@@ -124,13 +146,20 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.hero-card:hover {
+  background: var(--md-primary-fg-color--light);
 }
 
 .hero-card h3 {
   font-size: 1.125rem;
   font-weight: 600;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .hero-card p {
@@ -140,18 +169,56 @@
   line-height: 1.6;
 }
 
-.hero-card a {
+.hero-card > span.card-link {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--md-typeset-a-color);
-  border: none;
   margin-top: auto;
   padding-top: 0.5rem;
 }
 
-.hero-card a:hover {
-  border: none;
-  opacity: 0.8;
+/* ----- Capability list ----- */
+.capability-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin: 1.5rem 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.capability-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.938rem;
+  padding: 0.5rem 0;
+  border-bottom: 0.5px solid var(--md-default-fg-color--lightest);
+}
+
+.capability-list li::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--md-accent-fg-color);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ----- Architecture diagram (ASCII block) ----- */
+.arch-diagram {
+  font-family: var(--md-code-font, monospace);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  background: var(--md-code-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--md-code-fg-color);
 }
 
 /* ----- Tables ----- */
@@ -168,6 +235,7 @@
 
 .md-typeset table:not([class]) tr {
   border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  transition: background-color 0.1s ease;
 }
 
 .md-typeset table:not([class]) tr:last-child {
@@ -193,6 +261,12 @@
   border-radius: 0.5rem;
   border: 1px solid var(--md-default-fg-color--lightest);
   font-size: 0.813rem;
+  line-height: 1.7;
+  transition: border-color 0.2s ease;
+}
+
+.md-typeset pre > code:hover {
+  border-color: var(--md-default-fg-color--lighter);
 }
 
 .md-typeset code:not(pre > code) {
@@ -210,6 +284,12 @@
   border: 1px solid var(--md-default-fg-color--lightest);
   background: transparent;
   box-shadow: none;
+  transition: border-color 0.2s ease;
+}
+
+.md-typeset .admonition:hover,
+.md-typeset details:hover {
+  border-color: var(--md-default-fg-color--lighter);
 }
 
 .md-typeset .admonition-title,
@@ -266,6 +346,7 @@
 .md-nav__link {
   color: var(--md-default-fg-color--light);
   font-size: 0.813rem;
+  transition: color 0.15s ease;
 }
 
 .md-nav__link:hover {
@@ -275,7 +356,7 @@
 /* ----- Footer ----- */
 .md-footer {
   background-color: var(--md-default-bg-color);
-  border-top: 1px solid var(--md-default-fg-color--lightest);
+  border-top: 0.5px solid rgba(128, 128, 128, 0.15);
 }
 
 /* ----- Search ----- */
@@ -283,6 +364,11 @@
   background-color: var(--md-default-fg-color--lightest);
   border-radius: 0.5rem;
   font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+}
+
+.md-search__input:focus {
+  background-color: var(--md-primary-fg-color--light);
 }
 
 /* ----- TOC (right sidebar) ----- */
@@ -295,7 +381,12 @@
   font-size: 0.813rem;
   font-weight: 500;
   letter-spacing: 0.01em;
-  opacity: 0.85;
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+}
+
+.md-tabs__link:hover {
+  opacity: 1;
 }
 
 .md-tabs__item--active .md-tabs__link {
@@ -311,7 +402,7 @@
   padding: 0.5rem 1.25rem;
   letter-spacing: 0.01em;
   border: none;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
 
 .md-typeset .md-button--primary {
@@ -321,9 +412,10 @@
 
 .md-typeset .md-button:hover {
   opacity: 0.85;
+  transform: translateY(-1px);
 }
 
-/* ----- Content width ----- */
+/* ----- Content area ----- */
 .md-content__inner {
   padding: 1.6rem 2.4rem 2.4rem;
 }
@@ -342,4 +434,47 @@
 
 .md-typeset li {
   margin-bottom: 0.25em;
+}
+
+/* ----- Smooth scroll & selection ----- */
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: rgba(41, 151, 255, 0.3);
+}
+
+[data-md-color-scheme="default"] ::selection {
+  background: rgba(0, 102, 204, 0.2);
+}
+
+/* ----- Quick-start badge ----- */
+.quick-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25em 0.65em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--md-accent-fg-color);
+  background: var(--md-code-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.25rem;
+}
+
+/* ----- Section anchors ----- */
+.md-typeset .headerlink {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-left: 0.25em;
+  color: var(--md-default-fg-color--lighter);
+}
+
+.md-typeset h1:hover .headerlink,
+.md-typeset h2:hover .headerlink,
+.md-typeset h3:hover .headerlink {
+  opacity: 1;
 }
