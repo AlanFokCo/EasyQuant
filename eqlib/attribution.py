@@ -90,10 +90,11 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     daily_rf = risk_free_rate / ann_factor
     sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor) if std > 0 else 0.0
 
-    # Sortino ratio
-    downside = daily_ret[daily_ret < daily_rf]
-    downside_std = downside.std(ddof=1) if len(downside) >= 2 else 0.0
-    sortino = ((daily_ret.mean() - daily_rf) / downside_std * np.sqrt(ann_factor)
+    # Sortino ratio — semi-deviation against MAR=0 (industry standard)
+    # Using ddof=0 (population std) for consistency with Sharpe above.
+    downside = daily_ret[daily_ret < 0]
+    downside_std = downside.std(ddof=0) if len(downside) >= 2 else 0.0
+    sortino = (daily_ret.mean() / downside_std * np.sqrt(ann_factor)
                if downside_std > 0 else 0.0)
 
     # Max drawdown
@@ -315,10 +316,10 @@ def _calc_excess_metrics(strategy_daily_ret, benchmark_daily_ret, risk_free_rate
     excess_total = float((1 + excess).prod() - 1)
     excess_daily_mean = float(excess.mean()) * ann_factor
 
-    # Excess Sharpe
-    daily_rf = risk_free_rate / ann_factor
+    # Excess Sharpe (= Information Ratio): excess return is already
+    # strategy - benchmark; subtracting rf again would be double-counting.
     exc_std = excess.std()
-    excess_sharpe = (excess.mean() - daily_rf) / exc_std * np.sqrt(ann_factor) if exc_std > 0 else 0.0
+    excess_sharpe = excess.mean() / exc_std * np.sqrt(ann_factor) if exc_std > 0 else 0.0
 
     # Excess return max drawdown
     excess_cum = (1 + excess).cumprod()
@@ -351,8 +352,9 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
             return default
 
         bench_ret = bench_df["close"].pct_change().dropna()
-        bench_ret = bench_ret.reindex(strategy_returns.index).fillna(0)
 
+        # Use the intersection of dates — fillna(0) would treat missing days
+        # as "benchmark returned 0%" which biases beta low and alpha high.
         common = strategy_returns.index.intersection(bench_ret.index)
         strat = strategy_returns.loc[common].values
         bench = bench_ret.loc[common].values
@@ -551,7 +553,7 @@ def fama_french_analysis(result, factors=None):
         bench_df = fetch_stock_data(benchmark, start, end)
         if not bench_df.empty and "close" in bench_df.columns:
             bench_ret = bench_df["close"].pct_change().dropna()
-            bench_ret = bench_ret.reindex(strat_ret.index).fillna(0)
+            # Use intersection — fillna(0) would bias the residual calculation.
             common = strat_ret.index.intersection(bench_ret.index)
             s = strat_ret.loc[common].values
             b = bench_ret.loc[common].values
