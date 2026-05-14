@@ -7,6 +7,7 @@ docs_dir: docs
 copyright: Copyright &copy; AlanFokCo · MIT License
 theme:
   name: material
+  custom_dir: docs/overrides
   logo: assets/logo-icon.svg
   favicon: assets/logo-icon.svg
   language: zh
@@ -15,6 +16,7 @@ theme:
     code: "JetBrains Mono"
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.indexes
     - navigation.top
     - navigation.footer
