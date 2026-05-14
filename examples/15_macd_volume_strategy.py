@@ -7,6 +7,12 @@ Demonstrates a trend-following strategy that combines:
 
 Usage:
     python examples/15_macd_volume_strategy.py
+
+⚠️  RISK DISCLOSURE — TEACHING EXAMPLE ONLY
+    This script is provided for educational purposes to demonstrate the
+    EasyQuant backtesting framework.  Do NOT deploy this strategy to live
+    trading without thorough out-of-sample validation.  Past backtest
+    performance does NOT guarantee future results.
 """
 
 import os

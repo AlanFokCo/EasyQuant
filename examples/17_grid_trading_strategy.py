@@ -10,6 +10,13 @@ Best for low-volatility stocks that trade in a range (e.g. bank stocks).
 
 Usage:
     python examples/17_grid_trading_strategy.py
+
+⚠️  RISK DISCLOSURE — TEACHING EXAMPLE ONLY
+    This script is provided for educational purposes to demonstrate the
+    EasyQuant backtesting framework.  Do NOT deploy this strategy to live
+    trading without thorough out-of-sample validation.  Past backtest
+    performance does NOT guarantee future results.  Grid strategies carry
+    significant gap risk in trending or highly volatile markets.
 """
 
 import os

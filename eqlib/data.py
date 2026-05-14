@@ -1,6 +1,7 @@
 """Data fetching layer using akshare."""
 
 import datetime
+import threading
 from functools import lru_cache
 from typing import Optional, Union
 
@@ -14,14 +15,19 @@ from eqlib.data_cache import _slice_by_date
 # ============================================================
 
 _cache: dict = {}
+_cache_lock = threading.Lock()  # guards _cache for concurrent access (M3)
 _spot_cache: Optional[pd.DataFrame] = None
 _spot_fetch_time: float = 0
+_spot_lock = threading.Lock()  # guards _spot_cache / _spot_fetch_time
 _LOOKBACK_DAYS_FACTOR = 2
 _LOOKBACK_EXTRA_DAYS = 60
 
 
 def _invalidate_spot_cache(max_age_seconds=60):
-    """Invalidate spot data cache if older than max_age_seconds."""
+    """Invalidate spot data cache if older than max_age_seconds.
+
+    Must be called with ``_spot_lock`` held.
+    """
     global _spot_cache, _spot_fetch_time
     import time
     if _spot_cache is not None and (time.time() - _spot_fetch_time) > max_age_seconds:
@@ -34,21 +40,23 @@ def _get_spot_data():
 
     All functions that need real-time market data go through this
     to avoid redundant network calls within the same minute.
+    Thread-safe via ``_spot_lock``.
     """
     global _spot_cache, _spot_fetch_time
     import time
 
-    _invalidate_spot_cache()
-    if _spot_cache is not None:
-        return _spot_cache
+    with _spot_lock:
+        _invalidate_spot_cache()
+        if _spot_cache is not None:
+            return _spot_cache
 
-    try:
-        df = ak.stock_zh_a_spot_em()
-        _spot_cache = df
-        _spot_fetch_time = time.time()
-        return df
-    except Exception:
-        return pd.DataFrame()
+        try:
+            df = ak.stock_zh_a_spot_em()
+            _spot_cache = df
+            _spot_fetch_time = time.time()
+            return df
+        except Exception:
+            return pd.DataFrame()
 
 
 def _code_to_akshare(code: str) -> str:
@@ -139,11 +147,13 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         cache_key = (symbol, str(start_date), str(end_date), adjust)
 
     if cache_key in _cache:
-        df_cached = _cache[cache_key]
-        # For index data cached without date range, slice to the requested window
-        if is_idx and start_date and end_date:
-            return _slice_by_date(df_cached, start_date, end_date)
-        return df_cached
+        with _cache_lock:
+            df_cached = _cache.get(cache_key)
+        if df_cached is not None:
+            # For index data cached without date range, slice to the requested window
+            if is_idx and start_date and end_date:
+                return _slice_by_date(df_cached, start_date, end_date)
+            return df_cached
 
     try:
         if is_idx:
@@ -182,8 +192,9 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         df["date"] = pd.to_datetime(df["date"])
         df.set_index("date", inplace=True)
 
-    # Store the full frame under the canonical key
-    _cache[cache_key] = df
+    # Store the full frame under the canonical key (thread-safe)
+    with _cache_lock:
+        _cache[cache_key] = df
 
     # Slice to the requested window before returning
     if is_idx and start_date and end_date:
@@ -251,7 +262,25 @@ def history(count: int, unit: str = "1d", field: str = "close",
 def attribute_history(security, count: int, unit: str = "1d",
                       fields=("close",), df: bool = True,
                       skip_paused: bool = True, fq: str = "pre"):
-    """Get historical attribute data for a single security."""
+    """Get historical attribute data for a single security.
+
+    Parameters:
+        security: stock code (with or without exchange suffix)
+        count: number of bars to return
+        unit: bar size — only '1d' (daily) is currently supported
+        fields: tuple of field names to fetch (default ``('close',)``)
+        df: if True return a DataFrame, else a Series / dict
+        skip_paused: reserved for future use
+        fq: adjustment mode.  In backtest mode (preloaded panel), only
+            ``'pre'`` (前复权 / qfq) and ``None`` (no adjustment) are supported
+            because the preloaded data is always stored with ``adjust='qfq'``.
+            Requesting ``'post'`` in backtest mode will raise a
+            ``ValueError`` to prevent silent incorrect data.  In live
+            mode all three modes are supported via the fallback path.
+
+    Returns:
+        DataFrame with columns for each requested field, indexed by date.
+    """
     from eqlib._state import _context
     from eqlib.engine import _get_preloaded
 
@@ -260,6 +289,13 @@ def attribute_history(security, count: int, unit: str = "1d",
     if preloaded is not None and preloaded._field_series:
         sec_data = preloaded._field_series.get(security)
         if sec_data is not None:
+            if fq not in ("pre", None):
+                raise ValueError(
+                    f"attribute_history: fq='{fq}' is not supported in backtest mode. "
+                    "The preloaded OHLCV panel is stored with adjust='qfq' (前复权). "
+                    "Use fq='pre' (the default), or switch to the network fallback by "
+                    "not preloading data."
+                )
             available = [f for f in fields if f in sec_data]
             if not available:
                 return pd.DataFrame()
@@ -279,6 +315,11 @@ def attribute_history(security, count: int, unit: str = "1d",
     if preloaded is not None and preloaded.panel is not None:
         sec_df = preloaded.panel.get(security)
         if sec_df is not None and not sec_df.empty:
+            if fq not in ("pre", None):
+                raise ValueError(
+                    f"attribute_history: fq='{fq}' is not supported in backtest mode. "
+                    "The preloaded panel is stored with adjust='qfq'. Use fq='pre'."
+                )
             available = [f for f in fields if f in sec_df.columns]
             if not available:
                 return pd.DataFrame()

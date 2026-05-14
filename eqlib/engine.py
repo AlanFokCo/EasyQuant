@@ -154,6 +154,31 @@ def run_selection(func, rebalance: str = "monthly:1"):
     object.__setattr__(sess, '_selection_rebalance', rebalance)
 
 
+def _is_first_trading_day_ge(day: datetime.date, n: int) -> bool:
+    """Return True if *day* is the first trading day in its month with day.day >= n.
+
+    Uses the active session's preloaded trading calendar when available;
+    falls back to a simple "day.day == n" comparison otherwise (which is
+    correct when the calendar is not loaded, e.g., in tests).
+
+    This fixes the A-share quirk where Jan 1 (and other month-start dates)
+    are always holidays — previously ``monthly:1`` would never fire.
+    """
+    if day.day < n:
+        return False
+    preloaded = _get_preloaded()
+    if preloaded is not None and preloaded._dates is not None and len(preloaded._dates) > 0:
+        # Check whether any earlier trading day in [n, day.day-1] exists this month
+        for d in preloaded._dates:
+            ts = pd.Timestamp(d).date()
+            if ts.year == day.year and ts.month == day.month:
+                if n <= ts.day < day.day:
+                    return False
+        return True
+    # Fallback: simple day-of-month comparison
+    return day.day == n
+
+
 def _should_run_schedule(sched, day) -> bool:
     """Check if a scheduled function should run on the given date."""
     t = sched[0]
@@ -162,7 +187,7 @@ def _should_run_schedule(sched, day) -> bool:
     if t == "weekly":
         return day.weekday() == sched[1]
     if t == "monthly":
-        return day.day == sched[1]
+        return _is_first_trading_day_ge(day, sched[1])
     return False
 
 
@@ -184,7 +209,7 @@ def _should_run_selection(rebalance: str, day) -> bool:
         except ValueError:
             return False
         if kind == "monthly":
-            return day.day == n
+            return _is_first_trading_day_ge(day, n)
         if kind == "weekly":
             return day.weekday() == n
     return False
@@ -277,6 +302,24 @@ def _t1_unlock(sess: BacktestSession):
         pos.closeable_amount = pos.amount
 
 
+def _get_price_limit_ratio(security: str) -> float:
+    """Return the daily price-limit ratio (one-sided) for a security.
+
+    Board classification:
+        688xxx.XSHG  → STAR Market: ±20 %
+        300xxx.XSHE  → ChiNext: ±20 %
+        All others   → Main board / SME: ±10 %
+
+    ST stocks have a ±5 % limit but their current ST status is not reliably
+    known in the preloaded OHLCV panel, so they are treated as main-board here.
+    Users who need precise ST handling should override with ``set_option``.
+    """
+    bare = security.replace(".XSHG", "").replace(".XSHE", "")
+    if bare.startswith("688") or bare.startswith("300"):
+        return 0.20
+    return 0.10
+
+
 def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                          exec_prices: Optional[dict] = None):
     """Fill all pending orders at today's open price.
@@ -365,6 +408,43 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         elif vol == 0:
             log.warn(f"fill_pending: {security} appears suspended on {day} (volume=0) — order skipped")
             continue
+
+        # ── Price-limit check (optional, A-share circuit breaker) ─────────
+        # Enabled via set_option('check_price_limit', True).
+        # Buys at limit-up open are typically unfillable; sells at limit-down
+        # open are also blocked.  Skip for live/paper trading (exec_prices)
+        # where the broker already applies the rule.
+        if exec_prices is None and sess._options.get("check_price_limit", False):
+            prev_day_date = None
+            preloaded = _get_preloaded()
+            if preloaded is not None and preloaded._dates is not None:
+                dates = [pd.Timestamp(d).date() for d in preloaded._dates if pd.Timestamp(d).date() < day]
+                if dates:
+                    prev_day_date = max(dates)
+            if prev_day_date is not None:
+                prev_close = _get_price_fast(security, prev_day_date)
+                if prev_close:
+                    ratio = _get_price_limit_ratio(security)
+                    limit_up = prev_close * (1 + ratio)
+                    limit_down = prev_close * (1 - ratio)
+                    # A small tolerance (0.1%) absorbs floating-point rounding
+                    # in price data (e.g. adjusted-price inaccuracies) so that
+                    # a price of 10.999 is not incorrectly treated as exactly
+                    # limit-up (11.000).  The same tolerance is applied to both
+                    # sides for symmetry.
+                    _LIMIT_TOL = 0.001
+                    if is_buy and base_price >= limit_up * (1 - _LIMIT_TOL):
+                        log.warn(
+                            f"fill_pending BUY {security}: open {base_price:.3f} hit "
+                            f"limit-up ({limit_up:.3f}) on {day} — order skipped"
+                        )
+                        continue
+                    if not is_buy and base_price <= limit_down * (1 + _LIMIT_TOL):
+                        log.warn(
+                            f"fill_pending SELL {security}: open {base_price:.3f} hit "
+                            f"limit-down ({limit_down:.3f}) on {day} — order skipped"
+                        )
+                        continue
 
         if slippage:
             exec_price = slippage.get_execution_price(
@@ -779,7 +859,16 @@ def _run_minute_bars(context: Context, session: BacktestSession,
 
 
 def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datetime.date]:
-    """Get list of trading days between start and end."""
+    """Get list of trading days between start and end.
+
+    Priority:
+    1. Preloaded panel dates (fastest, no network call).
+    2. ``ak.tool_trade_date_hist_sina()`` — the canonical A-share trading
+       calendar, used by data.py:get_trade_days().  This avoids the previous
+       stock-history approach (601390 is listed since 2007, so early dates
+       were incomplete; the stock could also be suspended or delisted).
+    3. Weekday approximation fallback.
+    """
     if preloaded is not None and preloaded._dates is not None and len(preloaded._dates) > 0:
         start_ts = pd.Timestamp(start)
         end_ts = pd.Timestamp(end)
@@ -788,6 +877,22 @@ def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datet
              if start_ts <= pd.Timestamp(d) <= end_ts)
         )
 
+    try:
+        import akshare as ak
+        df = ak.tool_trade_date_hist_sina()
+        if not df.empty:
+            col = df.columns[0]
+            dates = pd.to_datetime(df[col])
+            result = [
+                d.date() for d in dates
+                if start <= d.date() <= end
+            ]
+            if result:
+                return sorted(result)
+    except Exception:
+        pass
+
+    # Legacy fallback: fetch from single stock (less reliable)
     try:
         import akshare as ak
         df = ak.stock_zh_a_hist(symbol="601390", period="daily",
@@ -837,6 +942,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
 
     spot_cache: dict = {}
     prev_day: Optional[datetime.date] = None
+    _warmup_done: bool = False  # True after the first iteration is complete
     try:
         while True:
             context.current_dt = datetime.datetime.now()
@@ -860,9 +966,16 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             live_prices = {k: v for k, v in spot_cache.items() if k != "_ts"}
 
             # On a new calendar day, unlock T+1 shares and fill yesterday's orders.
+            # Skip the fill on the very first iteration — the strategy hasn't
+            # produced any orders yet, and pre-filling an empty queue is
+            # harmless now but would incorrectly fill persisted orders after a
+            # restart (e.g., reloading yesterday's unfilled orders from SQLite).
             if today != prev_day:
-                _t1_unlock(session)
-                _fill_pending_orders(session, today, exec_prices=live_prices)
+                if _warmup_done:
+                    _t1_unlock(session)
+                    _fill_pending_orders(session, today, exec_prices=live_prices)
+                else:
+                    _warmup_done = True
                 prev_day = today
 
             prices = {sec: _resolve_live_price(spot_cache, sec, pos.avg_cost)

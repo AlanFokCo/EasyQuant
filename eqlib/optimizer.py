@@ -52,9 +52,16 @@ def _get_returns(prices, days=250):
 
 
 def _annual_stats(weights, returns, days=252):
-    """Calculate annualized return, volatility, and Sharpe for a weight vector."""
+    """Calculate annualized return, volatility, and Sharpe for a weight vector.
+
+    Annualized return uses the geometric (compound) formula instead of the
+    arithmetic approximation ``mean * days``, which significantly overestimates
+    returns at high volatility.
+    """
     port_ret = returns.dot(weights)
-    ann_ret = port_ret.mean() * days
+    n = len(port_ret)
+    # Geometric annualization: avoids over-estimation at high vol
+    ann_ret = (1 + port_ret).prod() ** (days / n) - 1 if n > 0 else 0.0
     ann_vol = port_ret.std() * np.sqrt(days)
     return ann_ret, ann_vol
 

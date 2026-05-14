@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import secrets
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -139,6 +140,9 @@ async def _process_run_task(run_id: str) -> None:
         run = await session.get(Run, run_id)
         if run is None:
             return
+        # S8: Check cancellation again after execute_backtest returns; the
+        # cancel endpoint may have committed "cancelled" while the subprocess
+        # was still running.  Early-return here avoids a duplicate done event.
         if run.status == "cancelled":
             await session.commit()
             return
@@ -186,8 +190,9 @@ async def create_run(
 ):
     if idempotency_key:
         cache = getattr(request.app.state, "idempotency", {})
-        if idempotency_key in cache:
-            rid = cache[idempotency_key]
+        entry = cache.get(idempotency_key)
+        if entry is not None:
+            rid, _exp = entry
             return CreateRunResponse(
                 run_id=rid,
                 status="queued",
@@ -227,7 +232,9 @@ async def create_run(
     await session.commit()
 
     if idempotency_key:
-        request.app.state.idempotency[idempotency_key] = run_id
+        from studio_api.config import settings
+        expires_at = time.time() + settings.idempotency_ttl_sec
+        request.app.state.idempotency[idempotency_key] = (run_id, expires_at)
 
     background_tasks.add_task(_process_run_task, run_id)
 
@@ -272,9 +279,23 @@ async def cancel_run(run_id: str, session: AsyncSession = Depends(get_session)):
         )
     if run.status in ("succeeded", "failed", "cancelled"):
         return {"ok": True, "status": run.status}
+
+    # S8: Kill the subprocess first, then wait for it to exit (with a 5 s
+    # timeout) before committing "cancelled" to the DB.  Without the wait,
+    # the subprocess may still be writing artifacts when the DB is already
+    # marked "cancelled", causing _process_run_task to emit a duplicate
+    # done/error SSE event.
+    from studio_api.proc_registry import kill as kill_proc_fn, _procs
+    kill_proc_fn(run_id)
+    proc = _procs.get(run_id)
+    if proc is not None:
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pass  # process didn't exit cleanly; proceed with DB update anyway
+
     run.status = "cancelled"
     run.finished_at = datetime.now(timezone.utc)
-    kill_proc(run_id)
     await session.commit()
     await stream_hub.publish(
         run_id,

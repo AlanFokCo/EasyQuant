@@ -44,6 +44,10 @@ class StrategyConfig:
             the first trading day of each week/month; otherwise the portfolio
             is held as-is.  This reduces trading costs and models realistic
             rebalancing schedules.
+        use_local: if True, use locally cached CSV data instead of fetching
+            from akshare.  Requires pre-downloaded data via
+            ``download_stock_data()`` / ``save_stock_local()``.  Default False
+            (fetch from network, then cache).
     """
 
     def __init__(
@@ -58,6 +62,7 @@ class StrategyConfig:
         report_suffix: str = "",
         frequency: str = "daily",
         rebalance_frequency: str = "daily",
+        use_local: bool = False,
     ):
         self.starting_cash = starting_cash
         self.securities = list(securities)
@@ -71,6 +76,7 @@ class StrategyConfig:
         if rebalance_frequency not in ("daily", "weekly", "monthly"):
             raise ValueError("rebalance_frequency must be 'daily', 'weekly', or 'monthly'")
         self.rebalance_frequency = rebalance_frequency
+        self.use_local = use_local
 
     def __repr__(self):
         return (
@@ -145,7 +151,7 @@ def run_portfolio_backtest(config: StrategyConfig, strategy_func,
         benchmark=config.benchmark,
         securities=config.securities,
         frequency=config.frequency,
-        use_local=True,
+        use_local=config.use_local,
     )
 
     if result is None:

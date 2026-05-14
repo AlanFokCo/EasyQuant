@@ -10,6 +10,15 @@ Each Monday, the strategy selects top-N stocks and equal-weights the portfolio.
 
 Usage:
     python examples/16_multi_factor_strategy.py
+
+⚠️  RISK DISCLOSURE — TEACHING EXAMPLE ONLY
+    This script is provided for educational purposes to demonstrate the
+    EasyQuant backtesting framework.  Do NOT deploy this strategy to live
+    trading without thorough out-of-sample validation.  Past backtest
+    performance does NOT guarantee future results.  Single-year or
+    single-parameter backtests are prone to look-ahead bias and overfitting;
+    always validate across multiple time periods and parameter sets before
+    committing real capital.
 """
 
 import os
