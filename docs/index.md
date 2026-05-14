@@ -5,49 +5,70 @@ hide:
 
 # EasyQuant
 
-面向中国 A 股的事件驱动回测与策略开发框架。
+面向中国 A 股的事件驱动回测框架。
 
 <div class="hero-cards">
-<div class="hero-card" markdown>
+<a class="hero-card" href="doc/user_guide.md#0-新手四步">
 ### 快速入门
 
 从安装到运行第一个回测，15 分钟即可上手。
-
-[开始阅读](doc/user_guide.md#0-新手四步)
-</div>
-<div class="hero-card" markdown>
+<span class="card-link">开始 →</span>
+</a>
+<a class="hero-card" href="doc/user_guide.md">
 ### 用户手册
 
 编写策略、运行回测、解读报告的完整指南。
-
-[阅读手册](doc/user_guide.md)
-</div>
-<div class="hero-card" markdown>
+<span class="card-link">阅读 →</span>
+</a>
+<a class="hero-card" href="tutorials/README.md">
 ### 分步教程
 
 从零到实盘的系列教程，含真实策略案例。
-
-[浏览教程](tutorials/README.md)
-</div>
-<div class="hero-card" markdown>
+<span class="card-link">学习 →</span>
+</a>
+<a class="hero-card" href="doc/api_reference.md">
 ### API 参考
 
 `eqlib` 全部公开 API 的参数与示例。
-
-[查看 API](doc/api_reference.md)
+<span class="card-link">查阅 →</span>
+</a>
 </div>
-</div>
 
----
+## 架构概览
 
-## 常用入口
+```
+策略文件 (initialize / handle_data)
+         │
+         ▼
+   ┌─────────────────┐
+   │   回测引擎       │  run_strategy / run_backtest
+   │   Event Loop    │
+   └───────┬─────────┘
+           │
+     ┌─────┴──────┐
+     │            │
+     ▼            ▼
+┌────────┐  ┌──────────┐
+│ AKShare│  │ 仓位管理  │
+│ 数据源  │  │ 订单撮合  │
+└────────┘  └──────────┘
+     │            │
+     ▼            ▼
+┌─────────────────────┐
+│   报告与分析         │
+│   PNG / HTML / MD   │
+│   Sharpe / DD / α   │
+└─────────────────────┘
+```
 
-| 我想… | 建议阅读 |
-|------|----------|
-| 第一次安装并验证环境 | [用户手册 §0](doc/user_guide.md#0-新手四步) |
-| 看懂 HTML 报告里的图表和指标 | [报告与指标](doc/reports_and_metrics.md) |
-| 查 `order` / `run_backtest` 等 API | [API 参考](doc/api_reference.md) |
-| 排查数据下载、无交易等问题 | [常见问题](doc/FAQ.md) |
+## 核心能力
+
+- **事件驱动回测** — `initialize` → `run_daily` → `handle_data`，与 JoinQuant / Zipline 一致的编程模型
+- **A 股数据** — 日线 OHLCV、分钟 K 线、实时行情、财务摘要、资金流向，通过 AKShare 免费获取
+- **仓位管理** — 按股数 / 金额 / 目标值买卖，自动取整到 100 股，自动计算手续费
+- **风险分析** — 夏普 / 索提诺 / 最大回撤 / alpha & beta / Brinson 归因 / Fama-French 因子
+- **模拟盘** — 使用实时行情持续运行策略，实盘前验证
+- **PTrade/QMT 适配** — 策略一键导出为券商平台格式
 
 ## 快速验证
 
