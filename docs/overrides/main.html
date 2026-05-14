@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+<script>
+(function(){
+  var s = localStorage.getItem('__palette');
+  if (!s) {
+    localStorage.setItem('__palette', JSON.stringify({
+      color: { media:'', scheme:'slate', primary:'custom', accent:'custom' }
+    }));
+    document.documentElement.setAttribute('data-md-color-scheme', 'slate');
+  }
+})();
+</script>
+{{ super() }}
+{% endblock %}
