@@ -93,7 +93,7 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     # Sortino ratio — semi-deviation against MAR=0 (industry standard)
     # Using ddof=0 (population std) for consistency with Sharpe above.
     downside = daily_ret[daily_ret < 0]
-    downside_std = downside.std(ddof=0) if len(downside) >= 2 else 0.0
+    downside_std = downside.std(ddof=0) if len(downside) >= 1 else 0.0
     sortino = (daily_ret.mean() / downside_std * np.sqrt(ann_factor)
                if downside_std > 0 else 0.0)
 
