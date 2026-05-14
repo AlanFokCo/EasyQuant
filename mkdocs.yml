@@ -1,5 +1,5 @@
-site_name: EasyQuant 文档
-site_description: EasyQuant / eqlib — 中国 A 股事件驱动回测框架官方文档站
+site_name: EasyQuant
+site_description: EasyQuant / eqlib — 中国 A 股事件驱动回测框架
 site_url: https://AlanFokCo.github.io/EasyQuant
 repo_url: https://github.com/AlanFokCo/EasyQuant
 repo_name: AlanFokCo/EasyQuant
@@ -26,17 +26,15 @@ theme:
     - content.code.copy
     - content.tooltips
   palette:
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: blue
-      accent: blue
+    - scheme: slate
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: 切换浅色模式
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: blue
-      accent: blue
+    - scheme: default
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: 切换深色模式
@@ -45,7 +43,7 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/AlanFokCo/EasyQuant
-      name: GitHub 仓库
+      name: GitHub
 extra_css:
   - assets/stylesheets/extra.css
 plugins:
@@ -85,26 +83,26 @@ nav:
   - Home: index.md
 
   - 快速入门:
-      - 文档中心（索引）: doc/README.md
+      - 文档中心: doc/README.md
       - 环境与第一次运行: tutorials/00_environment_and_first_run.md
 
   - 用户手册:
-      - EasyQuant 用户手册: doc/user_guide/index.md  # M10: use the split-by-chapter version
+      - 用户手册: doc/user_guide.md
       - PTrade/QMT 实盘适配: doc/ptrade_adapter.md
-      - 常见问题 FAQ: doc/FAQ.md
+      - 常见问题: doc/FAQ.md
 
   - API 参考:
       - API 参考: doc/api_reference.md
-      - 工具库参考: doc/utils_reference.md  # E6: was missing from nav
+      - 工具库参考: doc/utils_reference.md
       - 报告与指标: doc/reports_and_metrics.md
 
-  - 分步教程:
+  - 教程:
       - 教程导读: tutorials/README.md
-      - Prerequisites (前置阅读):
-          - 前置知识总览: tutorials/prerequisites/README.md
+      - 前置知识:
+          - 总览: tutorials/prerequisites/README.md
           - Python 基础: tutorials/prerequisites/python_basics.md
-          - 技术分析基础: tutorials/prerequisites/technical_concepts.md
-          - A 股市场基础: tutorials/prerequisites/ashare_knowledge.md
+          - 技术分析: tutorials/prerequisites/technical_concepts.md
+          - A 股市场: tutorials/prerequisites/ashare_knowledge.md
       - "00 · 环境与第一次运行": tutorials/00_environment_and_first_run.md
       - "01 · 量化基础": tutorials/01_quant_basics.md
       - "02 · 首个策略": tutorials/02_first_strategy.md
@@ -117,15 +115,14 @@ nav:
       - "09 · 综合策略": tutorials/09_combined_strategy.md
       - "10 · 参数优化与审计": tutorials/10_agent_optimization.md
 
-  - Examples (示例代码):
+  - 示例:
       - 示例索引: examples/Examples.md
-      - 在 GitHub 上浏览 examples: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
 
-  - 词汇表: glossary.md  # E9: new glossary page
+  - 词汇表: glossary.md
 
-  - 项目动态:  # M11: CHANGELOG / CONTRIBUTING / SECURITY in nav
+  - 项目:
       - 更新日志: CHANGELOG.md
       - 贡献指南: CONTRIBUTING.md
       - 安全政策: SECURITY.md
 
-  - 源码仓库: https://github.com/AlanFokCo/EasyQuant
+  - GitHub: https://github.com/AlanFokCo/EasyQuant
