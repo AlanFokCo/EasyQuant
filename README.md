@@ -26,33 +26,6 @@ Event-driven quantitative backtesting framework for China A-share market.
 
 ---
 
-## Architecture
-
-```
-Strategy (initialize / handle_data)
-         │
-         ▼
-   ┌───────────────────────┐
-   │   Backtest Engine      │  run_strategy / run_backtest
-   │   Event-Driven Loop   │
-   └───────────┬───────────┘
-               │
-         ┌─────┴──────┐
-         │            │
-         ▼            ▼
-  ┌────────────┐ ┌──────────────┐
-  │ AKShare    │ │ Position Mgmt│
-  │ Data Source│ │ Order Matching│
-  └────────────┘ └──────────────┘
-         │            │
-         ▼            ▼
-  ┌──────────────────────────┐
-  │   Reports & Analysis      │
-  │   PNG / HTML / MD / JSON  │
-  │   Sharpe / DD / α / β     │
-  └──────────────────────────┘
-```
-
 ## Features
 
 - **Event-driven backtesting** — `initialize` → `run_daily` → `handle_data`, compatible with JoinQuant / Zipline programming model
