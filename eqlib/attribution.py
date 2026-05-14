@@ -557,7 +557,8 @@ def simple_factor_analysis(result, factors=None):
         bench_df = fetch_stock_data(benchmark, start, end)
         if not bench_df.empty and "close" in bench_df.columns:
             bench_ret = bench_df["close"].pct_change().dropna()
-            # Use intersection — fillna(0) would bias the residual calculation.
+            # Use intersection — fillna(0) would bias beta/covariance here,
+            # which would then propagate to the residual and explained_variance.
             common = strat_ret.index.intersection(bench_ret.index)
             s = strat_ret.loc[common].values
             b = bench_ret.loc[common].values

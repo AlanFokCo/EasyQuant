@@ -301,12 +301,15 @@ def filter_high_pe_stocks(
         from eqlib._state import get_session
         sess = get_session()
         warned_key = "_filter_high_pe_warned"
-        if not getattr(sess, "_options", {}).get(warned_key, False):
+        opts = getattr(sess, "_options", None) or {}
+        if not opts.get(warned_key, False):
             log.warn(
                 "filter_high_pe_stocks: PE data unavailable in backtest mode — "
                 "returning all candidates without PE filtering to avoid look-ahead bias."
             )
-            sess._options[warned_key] = True
+            # Only write back if _options is a real dict (i.e. session is initialized)
+            if isinstance(getattr(sess, "_options", None), dict):
+                sess._options[warned_key] = True
         return list(securities)
 
     # Live mode: use real-time snapshot

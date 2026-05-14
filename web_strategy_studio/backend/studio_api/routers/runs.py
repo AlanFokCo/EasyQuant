@@ -286,7 +286,7 @@ async def cancel_run(run_id: str, session: AsyncSession = Depends(get_session)):
     # marked "cancelled", causing _process_run_task to emit a duplicate
     # done/error SSE event.
     from studio_api.proc_registry import kill as kill_proc_fn, _procs
-    kill_proc(run_id)
+    kill_proc_fn(run_id)
     proc = _procs.get(run_id)
     if proc is not None:
         try:
