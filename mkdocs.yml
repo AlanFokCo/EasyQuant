@@ -89,12 +89,14 @@ nav:
       - 环境与第一次运行: tutorials/00_environment_and_first_run.md
 
   - 用户手册:
-      - EasyQuant 用户手册: doc/user_guide.md
+      - EasyQuant 用户手册: doc/user_guide/index.md  # M10: use the split-by-chapter version
       - PTrade/QMT 实盘适配: doc/ptrade_adapter.md
       - 常见问题 FAQ: doc/FAQ.md
 
   - API 参考:
       - API 参考: doc/api_reference.md
+      - 工具库参考: doc/utils_reference.md  # E6: was missing from nav
+      - 报告与指标: doc/reports_and_metrics.md
 
   - 分步教程:
       - 教程导读: tutorials/README.md
@@ -118,5 +120,12 @@ nav:
   - Examples (示例代码):
       - 示例索引: examples/Examples.md
       - 在 GitHub 上浏览 examples: https://github.com/AlanFokCo/EasyQuant/tree/main/examples
+
+  - 词汇表: glossary.md  # E9: new glossary page
+
+  - 项目动态:  # M11: CHANGELOG / CONTRIBUTING / SECURITY in nav
+      - 更新日志: CHANGELOG.md
+      - 贡献指南: CONTRIBUTING.md
+      - 安全政策: SECURITY.md
 
   - 源码仓库: https://github.com/AlanFokCo/EasyQuant

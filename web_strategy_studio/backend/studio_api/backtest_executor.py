@@ -50,8 +50,20 @@ async def execute_backtest(
     (work / "run_config.json").write_text(json.dumps(run_config), encoding="utf-8")
     (work / "user_strategy.py").write_text(source_code, encoding="utf-8")
 
+    # S3: Filter environment variables to prevent secret leakage.
+    # Only allow an explicit allowlist of safe variables; strip everything else
+    # (OPENAI_API_KEY, AWS_*, database connection strings, etc.).
+    _ALLOWED_ENV_PREFIXES = ("EQ_",)
+    _ALLOWED_ENV_KEYS = frozenset({"PATH", "PYTHONPATH", "HOME", "LANG", "LC_ALL",
+                                    "TZ", "USER", "LOGNAME", "TMPDIR", "TEMP", "TMP"})
+
+    filtered_env: dict[str, str] = {}
+    for k, v in os.environ.items():
+        if k in _ALLOWED_ENV_KEYS or any(k.startswith(p) for p in _ALLOWED_ENV_PREFIXES):
+            filtered_env[k] = v
+
     env = {
-        **os.environ,
+        **filtered_env,
         "PYTHONUNBUFFERED": "1",
         "EQ_ARTIFACT_DIR": str(artifact_sub),
         "EQ_REPO_ROOT": str(settings.repo_root.resolve()),
@@ -91,6 +103,25 @@ async def execute_backtest(
                 break
             line = line_b.decode("utf-8", errors="replace").rstrip()
             log_lines += 1
+
+            # S5: Parse structured progress lines emitted by the engine.
+            # Format: "Backtest progress N/M" where N = days done, M = total.
+            # This gives true progress instead of the crude log_lines//2 heuristic.
+            if line.startswith("Backtest progress ") and "/" in line:
+                try:
+                    parts = line.split()[-1].split("/")
+                    done, total = int(parts[0]), int(parts[1])
+                    if total > 0:
+                        frac = min(0.92, 0.10 + 0.82 * done / total)
+                        await stream_hub.publish(
+                            run_id,
+                            "progress",
+                            {"progress": frac, "stage": "simulate",
+                             "message": f"Day {done}/{total}"},
+                        )
+                except (ValueError, IndexError):
+                    pass
+
             await stream_hub.publish(
                 run_id,
                 "log",

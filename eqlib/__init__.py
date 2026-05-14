@@ -31,7 +31,21 @@ Usage:
                           starting_cash=100000)
 """
 
-# Strategy lifecycle
+# ─── API Stability Legend ───────────────────────────────────────────────────
+#
+# STABLE  : The function/class name and signature will not change in a minor or
+#           patch release.  Breaking changes require a major version bump and a
+#           deprecation notice at least one release in advance.
+#
+# EXPERIMENTAL : The API may change in any release.  Prefer not to build
+#                production code against experimental symbols.
+#
+# DEPRECATED : Will be removed in a future release.  A DeprecationWarning is
+#              emitted at call time.  Use the suggested replacement instead.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Strategy lifecycle  [STABLE]
 from eqlib.engine import (
     run_backtest,
     run_daily,
@@ -43,84 +57,85 @@ from eqlib.engine import (
     run_paper_trade,
 )
 
-# Configuration
+# Configuration  [STABLE]
 from eqlib.engine import set_benchmark, set_option, set_order_cost, set_slippage
 from eqlib.objects import OrderCost
 
-# Slippage models
+# Slippage models  [STABLE]
 from eqlib.slippage import SlippageModel, FixedSlippage, VolumeSlippage
 
-# Session management (for advanced / concurrent usage)
+# Session management (for advanced / concurrent usage)  [EXPERIMENTAL]
 from eqlib._state import BacktestSession, get_session
 
-# Trading
+# Trading  [STABLE]
 from eqlib.trade import order, order_target, order_value, order_target_value
 
-# Data
+# Data  [STABLE]
 from eqlib.data import (
     get_price, history, attribute_history, get_all_securities,
     download_stock_data, load_csv,
     scan_market, check_golden_cross,
     fetch_stock_data, clear_cache,
-    # Financial data
+    # Financial data  [EXPERIMENTAL]
     get_financial_abstract, get_financial_screen,
-    # Index / industry / concept
+    # Index / industry / concept  [STABLE]
     get_index_stocks, get_industry_list, get_industry_stocks,
     get_concept_list, get_concept_stocks, get_industry,
-    # Minute-level data
+    # Minute-level data  [EXPERIMENTAL]
     fetch_minute_data, get_price_minute,
-    # Tick data
+    # Tick data  [EXPERIMENTAL]
     get_tick_data,
-    # P0: Market snapshot, security info, trading calendar
+    # Market snapshot, security info, trading calendar  [STABLE]
     get_current_data, get_security_info, get_trade_days,
-    # P1: Fundamentals, money flow, valuation, extras
+    # Fundamentals, money flow, valuation, extras  [EXPERIMENTAL]
     get_money_flow, get_billboard_list,
     get_valuation, get_index_weights, get_extras,
-    # Universe management
+    # Universe management  [STABLE]
     set_universe, get_universe,
-    # P0: Lifecycle callbacks
+    # Lifecycle callbacks  [STABLE]
     before_trading_start, after_trading_end,
 )
 
-# Logging
+# Logging  [STABLE]
 from eqlib.logger import log
 
-# Global object (user-facing) — always available like EasyQuant's g
+# Global object (user-facing) — always available like EasyQuant's g  [STABLE]
 from eqlib.objects import GlobalObject
 g = GlobalObject()
 
-# Context is provided at runtime
+# Context is provided at runtime  [STABLE]
 from eqlib.context import Context, Portfolio, Position
 
-# Reporting
+# Reporting  [STABLE]
 from eqlib.report import generate_chart, generate_report_md, generate_report_json, generate_html_report
 
-# Engine internals (for internal use)
+# Engine internals (for internal use)  [EXPERIMENTAL]
 from eqlib import engine
 
-# Data cache (disk caching + preloaded data)
+# Data cache (disk caching + preloaded data)  [STABLE]
 from eqlib.data_cache import (
     set_cache_dir, fetch_cached, estimate_memory_mb,
-    # Local CSV data store
+    # Local CSV data store  [STABLE]
     set_local_data_dir, save_stock_local, load_stock_local,
     has_local_data, list_local_stocks, remove_local_data,
     clear_all_local_data,
 )
 
-# Portfolio optimization
+# Portfolio optimization  [EXPERIMENTAL]
 from eqlib.optimizer import (
     portfolio_optimizer,
     Bound, MinVariance, MaxSharpe, RiskParity,
 )
 
-# Attribution analysis
+# Attribution analysis  [STABLE]
 from eqlib.attribution import (
     analyze_returns,
     brinson_attribution,
-    fama_french_analysis,
+    simple_factor_analysis,
+    fama_french_analysis,  # DEPRECATED — use simple_factor_analysis
 )
 
-# Stock selection
+# Stock selection  [STABLE]
 from eqlib.selection import (
     StockSelector,
     TopNSelector,
@@ -132,16 +147,19 @@ from eqlib.selection import (
     fetch_factor_data,
 )
 
-# Stock query API (fluent chainable screening)
+# Stock query API (fluent chainable screening)  [EXPERIMENTAL]
 from eqlib.stock_query import (
     query, valuation, get_fundamentals, get_current_data_object,
 )
 
-# Utilities: indicators, statistics, money management
+# Utilities: indicators, statistics, money management  [STABLE]
 from eqlib import utils
 
-# Portfolio backtest mode
+# Portfolio backtest mode  [STABLE]
 from eqlib.portfolio import StrategyConfig, run_portfolio_backtest
+
+# Walk-forward analysis  [EXPERIMENTAL]
+from eqlib.wfa import walk_forward, WFAResult
 
 # PTrade/QMT adapter — imported as a submodule to avoid shadowing backtest functions:
 #   from eqlib.ptrade_adapter import *
@@ -194,7 +212,9 @@ __all__ = [
     # Portfolio optimization
     "portfolio_optimizer", "Bound", "MinVariance", "MaxSharpe", "RiskParity",
     # Attribution analysis
-    "analyze_returns", "brinson_attribution", "fama_french_analysis",
+    "analyze_returns", "brinson_attribution",
+    "simple_factor_analysis",
+    "fama_french_analysis",  # deprecated — use simple_factor_analysis
     # Stock selection
     "StockSelector", "TopNSelector", "MultiFactorSelector",
     "filter_st_stocks", "filter_paused_stocks",
@@ -210,6 +230,8 @@ __all__ = [
     "utils",
     # Portfolio backtest
     "StrategyConfig", "run_portfolio_backtest",
+    # Walk-forward analysis
+    "walk_forward", "WFAResult",
     # Stock query API
     "query", "valuation", "get_current_data_object",
 ]

@@ -487,8 +487,8 @@ def brinson_attribution(result, sector_data=None, benchmark_returns=None):
     }
 
 
-def fama_french_analysis(result, factors=None):
-    """Simplified factor analysis (not a full Fama-French 3-factor model).
+def simple_factor_analysis(result, factors=None):
+    """Simplified factor analysis.
 
     Decomposes strategy returns into:
     - Market factor (beta vs benchmark)
@@ -499,6 +499,10 @@ def fama_french_analysis(result, factors=None):
     model (Fama & French, 1993), which requires SMB and HML factor data.
     The ``momentum_correlation`` field is a return autocorrelation, not a
     genuine momentum factor exposure.
+
+    .. note::
+        Previously exported as ``fama_french_analysis`` (deprecated alias
+        retained for backward compatibility).
 
     Parameters:
         result: dict from run_backtest
@@ -576,3 +580,30 @@ def fama_french_analysis(result, factors=None):
         "residual_volatility": residual_vol,
         "explained_variance": explained_var,
     }
+
+
+def fama_french_analysis(result, factors=None):
+    """Deprecated alias for :func:`simple_factor_analysis`.
+
+    .. deprecated::
+        Use ``simple_factor_analysis`` instead.  This alias will be removed
+        in a future release.  ``fama_french_analysis`` was a misleading name
+        because the function does not implement the true Fama-French 3-factor
+        model (no SMB/HML factor data).
+
+    Example migration::
+
+        # Before
+        result = fama_french_analysis(backtest_result)
+
+        # After
+        result = simple_factor_analysis(backtest_result)
+    """
+    import warnings
+    warnings.warn(
+        "fama_french_analysis() is deprecated and will be removed in a future release. "
+        "Use simple_factor_analysis() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return simple_factor_analysis(result, factors=factors)
