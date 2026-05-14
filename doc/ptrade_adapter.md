@@ -5,7 +5,7 @@
     | 项目 | 说明 |
     |------|------|
     | **目标** | 理解本地回测与 QMT 实盘之间的差异，以及导入与 API 映射关系 |
-    | **前置** | 已能使用 `eqlib` 跑通回测；参见 [用户手册 — §12 模拟盘](user_guide/12_paper_trading.md) |
+    | **前置** | 已能使用 `eqlib` 跑通回测；参见 [用户手册 — §12 模拟盘](user_guide.md#12-模拟盘交易) |
 
 将 EasyQuant (`eqlib`) 编写的策略转换为 **PTrade / QMT** 平台可运行格式，在尽量保持策略逻辑不变的前提下替换数据源与下单接口。
 
@@ -127,41 +127,7 @@ def handlebar(ContextInfo):
 
 ## 3. 工作原理
 
-### 3.1 架构
-
-```
-┌─────────────────────────────────────────────────┐
-│              QMT Platform                        │
-│                                                   │
-│   init(ContextInfo) ──► start(ContextInfo)       │
-│                            │                     │
-│                            ▼                     │
-│                    initialize(context)           │
-│                    run_daily(func)               │
-│                    run_weekly(func)              │
-│                    run_monthly(func)             │
-│                                                   │
-│   handlebar(ContextInfo) ──► on_bar(ContextInfo) │
-│                                │                 │
-│                                ▼                 │
-│                        handle_data(context)      │
-│                        before_trading_start()    │
-│                        after_trading_end()       │
-└─────────────────────────────────────────────────┘
-         │                          │
-         ▼                          ▼
-┌──────────────────┐    ┌──────────────────────┐
-│ ContextInfo      │    │ Context (simulated)  │
-│ (QMT native)     │───►│ - portfolio          │
-│ - get_market_data│    │ - positions          │
-│ - get_universe   │    │ - current_dt         │
-│ - order_shares   │    │ - recorded_values    │
-│ - order_value    │    └──────────────────────┘
-│ - order_target_* │
-└──────────────────┘
-```
-
-### 3.2 生命周期映射
+### 3.1 生命周期映射
 
 | EasyQuant | QMT | 说明 |
 |-----------|-----|------|
@@ -173,7 +139,7 @@ def handlebar(ContextInfo):
 | `before_trading_start(context)` | 新交易日检测 | 开盘前回调 |
 | `after_trading_end(context)` | `is_last_bar()` 检测 | 收盘后回调 |
 
-### 3.3 数据流
+### 3.2 数据流
 
 ```
 EasyQuant API              QMT Native API

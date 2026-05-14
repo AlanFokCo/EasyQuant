@@ -286,7 +286,11 @@ body,
   font-size: 1.063rem;
   font-weight: 600;
   margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
   color: var(--md-default-fg-color);
+  border: none;
 }
 
 .hero-card p {
@@ -294,6 +298,15 @@ body,
   color: var(--md-default-fg-color--light);
   margin: 0;
   line-height: 1.6;
+}
+
+.hero-card code {
+  background: var(--md-code-bg-color);
+  border-radius: 0.2rem;
+  padding: 0.05em 0.3em;
+  font-size: 0.85em;
+  font-weight: 400;
+  color: var(--md-code-fg-color);
 }
 
 .hero-card > span.card-link {
