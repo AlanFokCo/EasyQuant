@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import secrets
+import shutil
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from sqlalchemy import select
@@ -19,7 +20,17 @@ from studio_api.db import SessionLocal, get_session
 from studio_api.lint_service import lint_source
 from studio_api.models import Run, Strategy
 from studio_api.proc_registry import kill as kill_proc
-from studio_api.schemas import CreateRunBody, CreateRunResponse, RunArtifacts, RunStatusResponse
+from studio_api.schemas import (
+    CompareResponse,
+    CompareRunItem,
+    CreateRunBody,
+    CreateRunResponse,
+    RunArtifacts,
+    RunListItem,
+    RunListResponse,
+    RunMetricsResponse,
+    RunStatusResponse,
+)
 from studio_api.stream_hub import stream_hub
 
 router = APIRouter(prefix="/api/v1", tags=["runs"])
@@ -305,6 +316,29 @@ async def cancel_run(run_id: str, session: AsyncSession = Depends(get_session)):
     return {"ok": True, "status": "cancelled"}
 
 
+@router.delete("/runs/{run_id}")
+async def delete_run(run_id: str, session: AsyncSession = Depends(get_session)):
+    """Delete a run record and its artifacts."""
+    run = await session.get(Run, run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "NOT_FOUND", "message": "Run not found", "details": None}},
+        )
+    # Kill subprocess if still running
+    if run.status in ("queued", "running"):
+        from studio_api.proc_registry import kill as kill_proc_fn
+        kill_proc_fn(run_id)
+    # Delete artifacts
+    if run.html_path:
+        report_dir = Path(run.html_path).parent
+        if report_dir.is_dir():
+            shutil.rmtree(report_dir, ignore_errors=True)
+    await session.delete(run)
+    await session.commit()
+    return {"ok": True}
+
+
 @router.get("/runs/{run_id}/stream")
 async def run_stream(run_id: str):
     from fastapi.responses import StreamingResponse
@@ -327,3 +361,177 @@ async def run_stream(run_id: str):
             stream_hub.unsubscribe(run_id, q)
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# Runs list, metrics, compare (§4.5)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/runs", response_model=RunListResponse)
+async def list_runs(
+    session: AsyncSession = Depends(get_session),
+    strategy_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Return a paginated list of all backtest runs."""
+    q = select(Run).options(selectinload(Run.strategy)).order_by(Run.started_at.desc(), Run.id.desc())
+    if strategy_id:
+        q = q.where(Run.strategy_id == strategy_id)
+    q_count = q  # noqa: F841 — we count via a separate query
+
+    # Total count
+    from sqlalchemy import func as sa_func
+
+    count_q = select(sa_func.count(Run.id))
+    if strategy_id:
+        count_q = count_q.where(Run.strategy_id == strategy_id)
+    total = (await session.execute(count_q)).scalar_one() or 0
+
+    rows = (await session.execute(q.limit(limit).offset(offset))).scalars().all()
+
+    items: list[RunListItem] = []
+    for run in rows:
+        items.append(
+            RunListItem(
+                run_id=run.id,
+                strategy_id=run.strategy_id,
+                strategy_name=run.strategy.name if run.strategy else None,
+                status=run.status,
+                progress=run.progress,
+                stage=run.stage,
+                started_at=run.started_at,
+                finished_at=run.finished_at,
+                error_message=run.error_message,
+            )
+        )
+    return RunListResponse(runs=items, total=total)
+
+
+def _read_metrics_from_json(run: Run) -> dict[str, Any]:
+    """Try to read metrics from the stored report.json artifact."""
+    from studio_api.config import settings
+
+    # Primary: check the static reports directory (where executor always writes)
+    alt = settings.artifact_dir / "reports" / run.id / "report.json"
+    if alt.is_file():
+        try:
+            return json.loads(alt.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Fallback: use the path stored in DB (may be absolute)
+    if run.json_path:
+        p = Path(run.json_path)
+        if p.is_file():
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+    return {}
+
+
+@router.get("/runs/{run_id}/metrics", response_model=RunMetricsResponse)
+async def get_run_metrics(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """Return structured metrics from a completed run's report.json."""
+    run = await session.get(Run, run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "NOT_FOUND", "message": "Run not found", "details": None}},
+        )
+    raw = _read_metrics_from_json(run)
+    # Extract common metric keys from the raw JSON
+    metrics: dict[str, Optional[float]] = {}
+    for key in (
+        "total_return",
+        "annual_return",
+        "annual_volatility",
+        "sharpe_ratio",
+        "sortino_ratio",
+        "max_drawdown",
+        "calmar_ratio",
+        "alpha",
+        "beta",
+        "information_ratio",
+        "win_rate_daily",
+        "win_rate_trade",
+    ):
+        val = raw.get(key)
+        if val is not None:
+            try:
+                metrics[key] = float(val)
+            except (TypeError, ValueError):
+                metrics[key] = None
+        else:
+            metrics[key] = None
+    return RunMetricsResponse(
+        run_id=run.id,
+        status=run.status,
+        metrics=metrics,
+        raw=raw,
+    )
+
+
+@router.post("/runs/compare", response_model=CompareResponse)
+async def compare_runs(
+    body: dict[str, Any],
+    session: AsyncSession = Depends(get_session),
+):
+    """Compare metrics across multiple runs.
+
+    Body: ``{"run_ids": ["run_abc", "run_def"]}``
+    """
+    run_ids: list[str] = body.get("run_ids", [])
+    if not run_ids:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "BAD_REQUEST", "message": "run_ids is required and must be non-empty"}},
+        )
+    runs_items: list[CompareRunItem] = []
+    all_metric_keys: set[str] = set()
+
+    for rid in run_ids:
+        run = await session.get(Run, rid)
+        if run is None:
+            continue
+        raw = _read_metrics_from_json(run)
+        metrics: dict[str, Optional[float]] = {}
+        for key in (
+            "total_return",
+            "annual_return",
+            "annual_volatility",
+            "sharpe_ratio",
+            "sortino_ratio",
+            "max_drawdown",
+            "calmar_ratio",
+            "alpha",
+            "beta",
+            "information_ratio",
+            "win_rate_daily",
+            "win_rate_trade",
+        ):
+            val = raw.get(key)
+            if val is not None:
+                try:
+                    metrics[key] = float(val)
+                except (TypeError, ValueError):
+                    metrics[key] = None
+            else:
+                metrics[key] = None
+        all_metric_keys.update(metrics.keys())
+        runs_items.append(
+            CompareRunItem(
+                run_id=run.id,
+                strategy_name=run.strategy.name if run.strategy else None,
+                status=run.status,
+                started_at=run.started_at,
+                metrics=metrics,
+            )
+        )
+    common = sorted(all_metric_keys)
+    return CompareResponse(runs=runs_items, common_keys=common)

@@ -22,7 +22,7 @@ from studio_api.schemas import (
 
 router = APIRouter(prefix="/api/v1", tags=["strategies"])
 
-STRATEGY_TEMPLATE = '''"""EasyQuant strategy — edit in Web Strategy Studio."""
+STRATEGY_TEMPLATE = '''"""EasyQuant 均线交叉策略 — 在 Web Studio 中编辑并运行回测."""
 from eqlib import *
 
 
@@ -49,7 +49,7 @@ def initialize(context):
 
 
 def market_open(context):
-    """Daily trading logic."""
+    """每日交易逻辑：均线金叉买入，死叉卖出."""
     security = g.security
     close_data = attribute_history(security, 25, "1d", ["close"])
 
@@ -65,12 +65,14 @@ def market_open(context):
 
     cash = context.portfolio.available_cash
 
+    # 金叉买入
     if prev_fast <= prev_slow and fast_ma > slow_ma:
         if security not in context.portfolio.positions \
            or context.portfolio.positions[security].amount == 0:
             order_value(security, cash)
             log.info("Golden cross BUY: %s @ %.3f" % (security, current_price))
 
+    # 死叉卖出
     elif prev_fast >= prev_slow and fast_ma < slow_ma:
         if security in context.portfolio.positions \
            and context.portfolio.positions[security].amount > 0:

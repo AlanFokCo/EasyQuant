@@ -28,3 +28,49 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
+
+// ---------------------------------------------------------------------------
+// Typed helpers for runs
+// ---------------------------------------------------------------------------
+
+export type RunListItem = {
+  run_id: string;
+  strategy_id: string;
+  strategy_name: string | null;
+  status: string;
+  progress: number;
+  stage: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+};
+
+export async function fetchRunsList(
+  strategyId?: string,
+  limit = 100,
+  offset = 0
+): Promise<{ runs: RunListItem[]; total: number }> {
+  const params = new URLSearchParams();
+  if (strategyId) params.set("strategy_id", strategyId);
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+  return apiJson(`/api/v1/runs?${params.toString()}`);
+}
+
+export async function fetchRunMetrics(runId: string): Promise<{
+  run_id: string;
+  status: string;
+  metrics: Record<string, number | null>;
+  raw: Record<string, unknown>;
+}> {
+  return apiJson(`/api/v1/runs/${runId}/metrics`);
+}
+
+export async function compareRunMetrics(
+  runIds: string[]
+): Promise<{ runs: { run_id: string; strategy_name: string | null; status: string; started_at: string | null; metrics: Record<string, number | null> }[]; common_keys: string[] }> {
+  return apiJson("/api/v1/runs/compare", {
+    method: "POST",
+    body: JSON.stringify({ run_ids: runIds }),
+  });
+}

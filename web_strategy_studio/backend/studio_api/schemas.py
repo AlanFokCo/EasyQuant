@@ -141,3 +141,53 @@ class CompletionResponse(BaseModel):
 
 class FormatBody(BaseModel):
     source_code: str
+
+
+# ---------------------------------------------------------------------------
+# Runs list & metrics (§4.5)
+# ---------------------------------------------------------------------------
+
+class RunListItem(BaseModel):
+    """Minimal info for the history list sidebar."""
+    run_id: str
+    strategy_id: str
+    strategy_name: Optional[str] = None
+    status: str
+    progress: float
+    stage: Optional[str] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+
+class RunListResponse(BaseModel):
+    runs: list[RunListItem]
+    total: int
+
+
+class MetricValue(BaseModel):
+    name: str
+    value: Optional[float] = None
+    label: str = ""
+
+
+class RunMetricsResponse(BaseModel):
+    run_id: str
+    status: str
+    metrics: dict[str, Optional[float]]
+    # Raw dict from report.json so the frontend can render any key
+    raw: dict[str, Any] = Field(default_factory=dict)
+
+
+class CompareRunItem(BaseModel):
+    run_id: str
+    strategy_name: Optional[str] = None
+    status: str
+    started_at: Optional[datetime] = None
+    metrics: dict[str, Optional[float]]
+
+
+class CompareResponse(BaseModel):
+    runs: list[CompareRunItem]
+    # Column names shared across all runs
+    common_keys: list[str]

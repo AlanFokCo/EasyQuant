@@ -1,17 +1,32 @@
 :root {
-  --bg: #f0f2f5;
-  --card: #fff;
-  --primary: #1890ff;
-  --text: #262626;
-  --text-secondary: #595959;
-  --text-dim: #8c8c8c;
-  --up: #f5222d;
-  --down: #52c41a;
-  --success-text: #135200;
-  --error-text: #cf1322;
+  --bg: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2333;
+  --card: #161b22;
+  --card-hover: #1c2333;
+  --border: #30363d;
+  --border-light: #21262d;
+  --primary: #58a6ff;
+  --primary-hover: #79b8ff;
+  --primary-bg: rgba(88, 166, 255, 0.1);
+  --text: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-dim: #6e7681;
+  --success: #3fb950;
+  --success-bg: rgba(63, 185, 80, 0.1);
+  --error: #f85149;
+  --error-bg: rgba(248, 81, 73, 0.1);
+  --warning: #d29922;
+  --warning-bg: rgba(210, 153, 34, 0.1);
+  --up: #f85149;
+  --down: #3fb950;
+  --success-text: #3fb950;
+  --error-text: #f85149;
   --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.08);
+  --mono: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.3);
+  --radius: 6px;
 }
 
 * {
@@ -31,4 +46,20 @@ body,
 button {
   font-family: inherit;
   cursor: pointer;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
 }
