@@ -538,7 +538,8 @@ def simple_factor_analysis(result, factors=None):
 
     arr = strat_ret.values
     if len(arr) > 10:
-        momentum_corr = float(np.corrcoef(arr[:-5], arr[5:])[0, 1])
+        with np.errstate(invalid="ignore"):
+            momentum_corr = float(np.corrcoef(arr[:-5], arr[5:])[0, 1])
         if not np.isfinite(momentum_corr):
             momentum_corr = 0.0
     else:
