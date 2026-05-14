@@ -470,7 +470,7 @@ class TestC4PriceLimitEnforcement:
         )
         assert len(trade_log) == 1, "Should fill when check disabled"
 
-    def test_chiNext_limit_is_20_pct(self):
+    def test_chinext_limit_is_20_pct(self):
         """ChiNext (300xxx) stocks have a 20% limit, not 10%."""
         from eqlib.engine import _get_price_limit_ratio
         assert _get_price_limit_ratio("300001") == 0.20
@@ -643,8 +643,11 @@ class TestH1Sortino:
         }
         metrics_pos = analyze_returns(result_pos)
         assert metrics_pos is not None
+        # When all returns are positive there are no negative observations,
+        # so downside_std = 0, and the implementation returns 0.0 as a
+        # safe sentinel (undefined / infinity is not useful as a metric).
         assert metrics_pos["sortino_ratio"] == 0.0, (
-            "When all returns are positive (no downside vs 0), Sortino should be 0"
+            "When all returns are positive (downside_std=0), Sortino returns 0.0 as sentinel"
         )
 
 

@@ -427,13 +427,19 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                     ratio = _get_price_limit_ratio(security)
                     limit_up = prev_close * (1 + ratio)
                     limit_down = prev_close * (1 - ratio)
-                    if is_buy and base_price >= limit_up * 0.999:
+                    # A small tolerance (0.1%) absorbs floating-point rounding
+                    # in price data (e.g. adjusted-price inaccuracies) so that
+                    # a price of 10.999 is not incorrectly treated as exactly
+                    # limit-up (11.000).  The same tolerance is applied to both
+                    # sides for symmetry.
+                    _LIMIT_TOL = 0.001
+                    if is_buy and base_price >= limit_up * (1 - _LIMIT_TOL):
                         log.warn(
                             f"fill_pending BUY {security}: open {base_price:.3f} hit "
                             f"limit-up ({limit_up:.3f}) on {day} — order skipped"
                         )
                         continue
-                    if not is_buy and base_price <= limit_down * 1.001:
+                    if not is_buy and base_price <= limit_down * (1 + _LIMIT_TOL):
                         log.warn(
                             f"fill_pending SELL {security}: open {base_price:.3f} hit "
                             f"limit-down ({limit_down:.3f}) on {day} — order skipped"
