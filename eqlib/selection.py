@@ -106,7 +106,23 @@ def _to_bare_list(codes: list[str]) -> list[str]:
 def filter_st_stocks(securities: list[str]) -> list[str]:
     """Remove ST / *ST stocks from the candidate list.
 
-    Uses ``get_extras('is_st', ...)`` which checks the stock name for 'ST'.
+    Uses ``get_extras('is_st', ...)`` which checks the **current** stock name
+    for 'ST'.
+
+    .. warning:: **Point-in-time limitation.**
+        ``is_st`` data comes from a real-time akshare API call and reflects
+        today's ST designation, **not** the designation at ``context.current_dt``
+        during backtesting.  This means:
+
+        * Stocks that *were* ST in the past but have since recovered will be
+          incorrectly included in historical backtests.
+        * Stocks that *became* ST after the backtest period will be incorrectly
+          excluded.
+
+        For rigorous historical ST filtering, maintain a point-in-time ST list
+        keyed by date and use it inside your strategy callback.  The current
+        implementation is best suited for live and near-real-time screening
+        where staleness is less than one trading day.
 
     Parameters:
         securities: candidate list (bare or exchange-suffixed codes)

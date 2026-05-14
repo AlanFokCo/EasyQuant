@@ -859,7 +859,16 @@ def _run_minute_bars(context: Context, session: BacktestSession,
 
 
 def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datetime.date]:
-    """Get list of trading days between start and end."""
+    """Get list of trading days between start and end.
+
+    Priority:
+    1. Preloaded panel dates (fastest, no network call).
+    2. ``ak.tool_trade_date_hist_sina()`` — the canonical A-share trading
+       calendar, used by data.py:get_trade_days().  This avoids the previous
+       stock-history approach (601390 is listed since 2007, so early dates
+       were incomplete; the stock could also be suspended or delisted).
+    3. Weekday approximation fallback.
+    """
     if preloaded is not None and preloaded._dates is not None and len(preloaded._dates) > 0:
         start_ts = pd.Timestamp(start)
         end_ts = pd.Timestamp(end)
@@ -868,6 +877,22 @@ def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datet
              if start_ts <= pd.Timestamp(d) <= end_ts)
         )
 
+    try:
+        import akshare as ak
+        df = ak.tool_trade_date_hist_sina()
+        if not df.empty:
+            col = df.columns[0]
+            dates = pd.to_datetime(df[col])
+            result = [
+                d.date() for d in dates
+                if start <= d.date() <= end
+            ]
+            if result:
+                return sorted(result)
+    except Exception:
+        pass
+
+    # Legacy fallback: fetch from single stock (less reliable)
     try:
         import akshare as ak
         df = ak.stock_zh_a_hist(symbol="601390", period="daily",
