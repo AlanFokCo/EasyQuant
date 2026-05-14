@@ -1,4 +1,26 @@
-"""AST-based security checks for user strategy source (MVP)."""
+"""AST-based security checks for user strategy source (MVP).
+
+.. warning::
+    **This scanner is a "friendly lint" tool, NOT a security sandbox.**
+
+    The AST denylist approach cannot prevent a determined attacker from
+    executing arbitrary code.  Known bypasses include::
+
+        # String-concatenated names evade name-based checks
+        getattr(__builtins__, "ev"+"al")("__import__('os').system('rm -rf /')")
+
+        # Object subclass traversal finds Popen
+        object.__subclasses__()[...]  # search for subprocess.Popen
+
+        # Split-string imports
+        __import__('o'+'s')
+
+    For real sandboxing use system-level isolation: run each backtest in a
+    dedicated Docker container with ``--network none --read-only
+    --pids-limit=64 --memory=2g --cpus=1 --security-opt seccomp=...`` and a
+    non-root user.  The AST checks here catch *accidental* use of restricted
+    modules by well-meaning users and provide clear error messages, nothing more.
+"""
 
 from __future__ import annotations
 

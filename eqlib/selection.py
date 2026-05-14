@@ -106,7 +106,23 @@ def _to_bare_list(codes: list[str]) -> list[str]:
 def filter_st_stocks(securities: list[str]) -> list[str]:
     """Remove ST / *ST stocks from the candidate list.
 
-    Uses ``get_extras('is_st', ...)`` which checks the stock name for 'ST'.
+    Uses ``get_extras('is_st', ...)`` which checks the **current** stock name
+    for 'ST'.
+
+    .. warning:: **Point-in-time limitation.**
+        ``is_st`` data comes from a real-time akshare API call and reflects
+        today's ST designation, **not** the designation at ``context.current_dt``
+        during backtesting.  This means:
+
+        * Stocks that *were* ST in the past but have since recovered will be
+          incorrectly included in historical backtests.
+        * Stocks that *became* ST after the backtest period will be incorrectly
+          excluded.
+
+        For rigorous historical ST filtering, maintain a point-in-time ST list
+        keyed by date and use it inside your strategy callback.  The current
+        implementation is best suited for live and near-real-time screening
+        where staleness is less than one trading day.
 
     Parameters:
         securities: candidate list (bare or exchange-suffixed codes)
@@ -181,16 +197,52 @@ def filter_paused_stocks(securities: list[str], context=None) -> list[str]:
     return result
 
 
-def filter_low_price_stocks(securities: list[str], min_price: float = 2.0) -> list[str]:
+def filter_low_price_stocks(
+    securities: list[str], min_price: float = 2.0, context=None
+) -> list[str]:
     """Remove stocks below a minimum price threshold.
+
+    In backtest mode the closing price from preloaded data is used for the
+    current trading date (``context.current_dt``).  In live mode the real-time
+    snapshot returned by ``get_current_data()`` is used.
 
     Parameters:
         securities: candidate list
         min_price: minimum stock price (default 2.0)
+        context: optional context object (provides the current date during
+            backtest; when omitted the function still works but defaults to
+            today in live mode)
 
     Returns:
         stocks with price >= min_price
     """
+    from eqlib.engine import _get_preloaded
+
+    preloaded = _get_preloaded()
+    in_backtest = (
+        preloaded is not None
+        and preloaded._dates is not None
+        and len(preloaded._dates) > 0
+    )
+
+    if in_backtest:
+        # Use preloaded close price — no look-ahead bias
+        if context is not None:
+            current_date = context.current_dt.date()
+        else:
+            import datetime
+            current_date = datetime.date.today()
+
+        result = []
+        for s in securities:
+            price = preloaded.get_close(current_date, s)
+            if price is None:
+                price = preloaded.get_close(current_date, _bare(s))
+            if price is not None and price >= min_price:
+                result.append(s)
+        return result
+
+    # Live mode: use real-time snapshot
     from eqlib.data import get_current_data
 
     market = get_current_data()
@@ -209,16 +261,58 @@ def filter_low_price_stocks(securities: list[str], min_price: float = 2.0) -> li
     return result
 
 
-def filter_high_pe_stocks(securities: list[str], max_pe: float = 100.0) -> list[str]:
+def filter_high_pe_stocks(
+    securities: list[str], max_pe: float = 100.0, context=None
+) -> list[str]:
     """Remove stocks with P/E ratio above the threshold.
+
+    .. warning::
+        In backtest mode, historical PE data is not available in the preloaded
+        OHLCV panel.  This function therefore returns *all* candidates unchanged
+        during backtests to avoid introducing look-ahead bias from real-time PE
+        snapshots.  Use fundamental data from ``get_financial_abstract`` with
+        proper disclosure-date filtering if PE screening is needed.
+
+    In live mode the real-time PE from ``get_current_data()`` is used.
 
     Parameters:
         securities: candidate list
         max_pe: maximum P/E ratio (default 100.0)
+        context: optional context object (currently unused; reserved for future
+            backtest-mode PE support)
 
     Returns:
-        stocks with PE <= max_pe
+        stocks with PE <= max_pe (live mode), or all candidates (backtest mode)
     """
+    from eqlib.engine import _get_preloaded
+    from eqlib.logger import log
+
+    preloaded = _get_preloaded()
+    in_backtest = (
+        preloaded is not None
+        and preloaded._dates is not None
+        and len(preloaded._dates) > 0
+    )
+
+    if in_backtest:
+        # PE/PB are not available in preloaded OHLCV data.  Returning all
+        # candidates is the conservative (no-look-ahead) choice.
+        # Warn only once per session to avoid flooding the log.
+        from eqlib._state import get_session
+        sess = get_session()
+        warned_key = "_filter_high_pe_warned"
+        opts = getattr(sess, "_options", None) or {}
+        if not opts.get(warned_key, False):
+            log.warn(
+                "filter_high_pe_stocks: PE data unavailable in backtest mode — "
+                "returning all candidates without PE filtering to avoid look-ahead bias."
+            )
+            # Only write back if _options is a real dict (i.e. session is initialized)
+            if isinstance(getattr(sess, "_options", None), dict):
+                sess._options[warned_key] = True
+        return list(securities)
+
+    # Live mode: use real-time snapshot
     from eqlib.data import get_current_data
 
     market = get_current_data()
@@ -242,80 +336,175 @@ def filter_high_pe_stocks(securities: list[str], max_pe: float = 100.0) -> list[
 # ── Multi-dimensional data fetching ──────────────────────────────────────────
 
 
-def fetch_factor_data(securities: list[str], fields: Optional[list[str]] = None) -> pd.DataFrame:
+def fetch_factor_data(
+    securities: list[str],
+    fields: Optional[list[str]] = None,
+    context=None,
+) -> pd.DataFrame:
     """Fetch multi-dimensional data for a list of securities.
 
-    Combines:
-    - Market snapshot: price, pct_change, total_value, pe, pb, turnover
-    - Technical indicators from preloaded data: ma5, ma10, ma20, rsi14
-    - Valuation: pe, pb from market snapshot
+    **Backtest vs live behaviour**
+
+    In backtest mode (preloaded OHLCV panel is available):
+        - OHLCV fields (``price``, ``open``, ``high``, ``low``, ``close``,
+          ``volume``, ``money``, ``pct_change``, ``turnover``) are sourced from
+          the preloaded panel for ``context.current_dt`` — no look-ahead bias.
+        - Valuation fields (``pe``, ``pb``, ``total_value``) require a
+          real-time snapshot and are therefore returned as ``NaN`` in backtest
+          mode to avoid future-function contamination.
+        - Technical indicators (``ma5``, ``ma10``, ``ma20``, ``rsi14``) are
+          computed from the preloaded history up to ``context.current_dt``.
+
+    In live mode:
+        - All fields are sourced from ``get_current_data()`` (real-time
+          akshare snapshot), which includes PE/PB.
 
     Parameters:
         securities: list of security codes (bare or exchange-suffixed)
         fields: optional list of fields to include.  When None, returns all
             available fields.
+        context: optional context object (provides the current date during
+            backtest for correct data slicing)
 
     Returns:
         DataFrame indexed by security code with columns for each field.
         Securities where data cannot be retrieved are omitted.
+        Missing values are ``NaN`` — never silently replaced with 0.
 
     Available fields:
-        Market: price, pct_change, total_value, pe, pb, turnover,
-                volume, money, high, low, open, prev_close
+        OHLCV: price, pct_change, turnover, volume, money, high, low, open,
+               prev_close
+        Valuation (live only): pe, pb, total_value
         Technical: ma5, ma10, ma20, rsi14
 
     Example::
 
-        df = fetch_factor_data(context.universe, fields=['pe', 'pb', 'rsi14'])
+        df = fetch_factor_data(context.universe, fields=['price', 'rsi14'], context=context)
         for code in df.index:
-            print(code, df.at[code, 'pe'])
+            print(code, df.at[code, 'price'])
     """
-    from eqlib.data import get_current_data
     from eqlib.engine import _get_preloaded
     from eqlib.utils.indicators import rsi
 
-    market = get_current_data()
     preloaded = _get_preloaded()
-    has_preloaded = preloaded is not None and preloaded.panel is not None and len(preloaded._dates or []) > 0
+    in_backtest = (
+        preloaded is not None
+        and preloaded.panel is not None
+        and preloaded._dates is not None
+        and len(preloaded._dates) > 0
+    )
+
+    # Determine the as-of date for backtest slicing
+    if in_backtest:
+        if context is not None:
+            current_date = context.current_dt.date()
+            current_ts = pd.Timestamp(current_date)
+        else:
+            import datetime
+            current_date = datetime.date.today()
+            current_ts = pd.Timestamp(current_date)
 
     rows = []
     for s in securities:
         bare_s = _bare(s)
-        info = market.get(bare_s)
-        if info is None:
-            # Try with exchange suffix
-            info = market.get(s)
+        row: dict = {"security": s}
 
-        row = {"security": s}
-        if info is not None:
-            # Market data
-            for k in ("price", "pct_change", "total_value", "pe", "pb", "turnover",
-                       "volume", "money", "high", "low", "open", "prev_close"):
-                v = info.get(k)
-                try:
-                    row[k] = float(v) if v is not None else None
-                except (ValueError, TypeError):
-                    row[k] = None
+        if in_backtest:
+            # ── Backtest mode: use preloaded OHLCV — no look-ahead bias ──────
+            bar = preloaded.get_bar(current_date, s)
+            if bar is None:
+                bar = preloaded.get_bar(current_date, bare_s)
 
-        # Technical indicators from preloaded daily data (backtest-accurate)
-        if has_preloaded:
+            if bar is not None:
+                row["price"] = bar.get("close")
+                row["open"] = bar.get("open")
+                row["high"] = bar.get("high")
+                row["low"] = bar.get("low")
+                row["close"] = bar.get("close")
+                row["volume"] = bar.get("volume")
+                row["money"] = bar.get("money")
+                # pct_change / turnover from field_series if available
+                sec_series = preloaded._field_series.get(s) or preloaded._field_series.get(bare_s)
+                if sec_series is not None:
+                    for field in ("pct_change", "turnover"):
+                        if field in sec_series:
+                            s_f = sec_series[field].loc[:current_ts]
+                            if not s_f.empty:
+                                row[field] = float(s_f.iloc[-1])
+
+            # PE/PB require a real-time snapshot — return NaN to avoid
+            # look-ahead bias.  Users should use get_financial_abstract with
+            # proper disclosure-date filtering for valuation factors.
+            row["pe"] = float("nan")
+            row["pb"] = float("nan")
+            row["total_value"] = float("nan")
+
+            # Technical indicators from preloaded history up to current_dt
+            sec_df = None
             try:
-                # Look up by original code first, then bare code
-                sec_df = preloaded.panel.get(s) or preloaded.panel.get(bare_s)
-                if sec_df is not None and not sec_df.empty and "close" in sec_df.columns:
-                    closes = sec_df["close"]
-                    if len(closes) >= 5:
-                        row["ma5"] = float(closes.tail(5).mean())
-                    if len(closes) >= 10:
-                        row["ma10"] = float(closes.tail(10).mean())
-                    if len(closes) >= 20:
-                        row["ma20"] = float(closes.tail(20).mean())
-                    if len(closes) >= 15:
-                        rsi_val = rsi(closes, 14)
-                        if not rsi_val.dropna().empty:
-                            row["rsi14"] = float(rsi_val.iloc[-1])
+                sec_df = (preloaded.panel.get(s) if hasattr(preloaded.panel, "get")
+                          else None)
+                if sec_df is None:
+                    # MultiIndex panel: extract sub-DataFrame for this security
+                    if s in preloaded.panel.columns.get_level_values("security"):
+                        sec_df = preloaded.panel.xs(s, axis=1, level="security")
+                    elif bare_s in preloaded.panel.columns.get_level_values("security"):
+                        sec_df = preloaded.panel.xs(bare_s, axis=1, level="security")
             except Exception:
                 pass
+
+            if sec_df is not None and not sec_df.empty and "close" in sec_df.columns:
+                closes = sec_df["close"].loc[:current_ts].dropna()
+                if len(closes) >= 5:
+                    row["ma5"] = float(closes.tail(5).mean())
+                if len(closes) >= 10:
+                    row["ma10"] = float(closes.tail(10).mean())
+                if len(closes) >= 20:
+                    row["ma20"] = float(closes.tail(20).mean())
+                if len(closes) >= 15:
+                    rsi_val = rsi(closes, 14)
+                    if not rsi_val.dropna().empty:
+                        row["rsi14"] = float(rsi_val.iloc[-1])
+
+        else:
+            # ── Live mode: real-time snapshot includes PE/PB ─────────────────
+            from eqlib.data import get_current_data
+
+            market = get_current_data()
+            info = market.get(bare_s) or market.get(s)
+            if info is not None:
+                for k in (
+                    "price", "pct_change", "total_value", "pe", "pb", "turnover",
+                    "volume", "money", "high", "low", "open", "prev_close",
+                ):
+                    v = info.get(k)
+                    try:
+                        row[k] = float(v) if v is not None else float("nan")
+                    except (ValueError, TypeError):
+                        row[k] = float("nan")
+
+            # Technical indicators from preloaded history (if available)
+            if preloaded is not None and preloaded.panel is not None:
+                try:
+                    sec_df = None
+                    if s in preloaded.panel.columns.get_level_values("security"):
+                        sec_df = preloaded.panel.xs(s, axis=1, level="security")
+                    elif bare_s in preloaded.panel.columns.get_level_values("security"):
+                        sec_df = preloaded.panel.xs(bare_s, axis=1, level="security")
+                    if sec_df is not None and not sec_df.empty and "close" in sec_df.columns:
+                        closes = sec_df["close"].dropna()
+                        if len(closes) >= 5:
+                            row["ma5"] = float(closes.tail(5).mean())
+                        if len(closes) >= 10:
+                            row["ma10"] = float(closes.tail(10).mean())
+                        if len(closes) >= 20:
+                            row["ma20"] = float(closes.tail(20).mean())
+                        if len(closes) >= 15:
+                            rsi_val = rsi(closes, 14)
+                            if not rsi_val.dropna().empty:
+                                row["rsi14"] = float(rsi_val.iloc[-1])
+                except Exception:
+                    pass
 
         rows.append(row)
 

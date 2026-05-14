@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     repo_root: Path = _default_repo_root()
     api_host: str = "127.0.0.1"
     api_port: int = 8080
+    # S1: CORS — restrict to localhost by default; override via env for staging/production.
+    # Do NOT use ["*"] together with allow_credentials=True (browser spec disallows it).
+    cors_allowed_origins: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
+    # S6: idempotency key TTL in seconds (default 24 h)
+    idempotency_ttl_sec: int = 86400
 
 
 settings = Settings()

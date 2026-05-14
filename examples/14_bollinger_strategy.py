@@ -7,6 +7,14 @@ Demonstrates a classic mean reversion strategy using Bollinger Bands:
 
 Usage:
     python examples/14_bollinger_strategy.py
+
+⚠️  RISK DISCLOSURE — TEACHING EXAMPLE ONLY
+    This script is provided for educational purposes to demonstrate the
+    EasyQuant backtesting framework.  Do NOT deploy this strategy to live
+    trading without thorough out-of-sample validation.  Past backtest
+    performance does NOT guarantee future results.  All strategies should
+    be tested across multiple time periods and market regimes before any
+    real capital is committed.
 """
 
 import os
