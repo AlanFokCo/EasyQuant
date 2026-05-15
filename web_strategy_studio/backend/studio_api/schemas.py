@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class ErrorDetail(BaseModel):
-    field: Optional[str] = None
+    field: str | None = None
     issue: str
 
 
 class ErrorEnvelope(BaseModel):
     code: str
     message: str
-    details: Optional[list[ErrorDetail]] = None
+    details: list[ErrorDetail] | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -34,16 +34,16 @@ class DefaultBacktestParams(BaseModel):
     starting_cash: float = 100_000
     benchmark: str = "000300.XSHG"
     use_local: bool = False
-    report_dir: Optional[str] = None
-    securities: Optional[list[str]] = None
+    report_dir: str | None = None
+    securities: list[str] | None = None
     max_memory_mb: int = 1024
 
 
 class CreateStrategyBody(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     source_code: str
-    default_params: Optional[DefaultBacktestParams] = None
+    default_params: DefaultBacktestParams | None = None
 
 
 class StrategyCreated(BaseModel):
@@ -56,30 +56,30 @@ class StrategyCreated(BaseModel):
 class StrategyDetail(BaseModel):
     id: str
     name: str
-    description: Optional[str]
+    description: str | None
     source_code: str
     version: int
-    updated_at: Optional[datetime]
-    default_params: Optional[dict] = None
+    updated_at: datetime | None
+    default_params: dict | None = None
 
 
 class StrategyVersionItem(BaseModel):
     """One entry in GET /strategies/{id}/versions."""
 
     version: int
-    label: Optional[str] = None
-    content_hash: Optional[str] = None
+    label: str | None = None
+    content_hash: str | None = None
     created_at: datetime
 
 
 class PatchStrategyBody(BaseModel):
-    source_code: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
+    source_code: str | None = None
+    name: str | None = None
+    description: str | None = None
 
 
 class SnapshotBody(BaseModel):
-    label: Optional[str] = None
+    label: str | None = None
 
 
 class StrategyTemplateResponse(BaseModel):
@@ -105,14 +105,14 @@ class RunParams(BaseModel):
     starting_cash: float = 100_000
     benchmark: str = "000300.XSHG"
     use_local: bool = False
-    report_dir: Optional[str] = None
-    securities: Optional[list[str]] = None
+    report_dir: str | None = None
+    securities: list[str] | None = None
     max_memory_mb: int = 1024
 
 
 class CreateRunBody(BaseModel):
     strategy_id: str
-    source_code: Optional[str] = None
+    source_code: str | None = None
     params: RunParams
 
 
@@ -121,24 +121,24 @@ class CreateRunResponse(BaseModel):
     status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
     poll_url: str
     stream_url: str  # B16: renamed from ws_url
-    queue_position: Optional[int] = None  # B18: 1-based position when queued
+    queue_position: int | None = None  # B18: 1-based position when queued
 
 
 class RunArtifacts(BaseModel):
-    html_report_url: Optional[str] = None
-    json_report_url: Optional[str] = None
+    html_report_url: str | None = None
+    json_report_url: str | None = None
 
 
 class RunStatusResponse(BaseModel):
     run_id: str
     status: str
     progress: float
-    stage: Optional[str] = None
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
+    stage: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
     artifacts: RunArtifacts
-    error: Optional[str] = None
-    queue_position: Optional[int] = None  # B18
+    error: str | None = None
+    queue_position: int | None = None  # B18
 
 
 class CompletionBody(BaseModel):
@@ -173,14 +173,14 @@ class RunListItem(BaseModel):
 
     run_id: str
     strategy_id: str
-    strategy_name: Optional[str] = None
+    strategy_name: str | None = None
     status: str
     progress: float
-    stage: Optional[str] = None
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    error_message: Optional[str] = None
-    queue_position: Optional[int] = None  # B18
+    stage: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error_message: str | None = None
+    queue_position: int | None = None  # B18
 
 
 class RunListResponse(BaseModel):
@@ -190,14 +190,14 @@ class RunListResponse(BaseModel):
 
 class MetricValue(BaseModel):
     name: str
-    value: Optional[float] = None
+    value: float | None = None
     label: str = ""
 
 
 class RunMetricsResponse(BaseModel):
     run_id: str
     status: str
-    metrics: dict[str, Optional[float]]
+    metrics: dict[str, float | None]
     # Raw dict from report.json so the frontend can render any key
     raw: dict[str, Any] = Field(default_factory=dict)
 
@@ -209,10 +209,10 @@ class EquityCurvePoint(BaseModel):
 
 class CompareRunItem(BaseModel):
     run_id: str
-    strategy_name: Optional[str] = None
+    strategy_name: str | None = None
     status: str
-    started_at: Optional[datetime] = None
-    metrics: dict[str, Optional[float]]
+    started_at: datetime | None = None
+    metrics: dict[str, float | None]
     equity_curve: list[EquityCurvePoint] = Field(default_factory=list)  # B22
 
 
