@@ -8,22 +8,22 @@ hide:
 面向中国 A 股的事件驱动回测框架。
 
 <div class="hero-cards">
-<a class="hero-card" href="doc/user_guide.md#0-新手四步">
+<a class="hero-card" href="doc/user_guide/#0-新手四步">
 <h3>快速入门</h3>
 <p>从安装到运行第一个回测，15 分钟即可上手。</p>
 <span class="card-link">开始 →</span>
 </a>
-<a class="hero-card" href="doc/user_guide.md">
+<a class="hero-card" href="doc/user_guide/">
 <h3>用户手册</h3>
 <p>编写策略、运行回测、解读报告的完整指南。</p>
 <span class="card-link">阅读 →</span>
 </a>
-<a class="hero-card" href="tutorials/README.md">
+<a class="hero-card" href="tutorials/">
 <h3>分步教程</h3>
 <p>从零到实盘的系列教程，含真实策略案例。</p>
 <span class="card-link">学习 →</span>
 </a>
-<a class="hero-card" href="doc/api_reference.md">
+<a class="hero-card" href="doc/api_reference/">
 <h3>API 参考</h3>
 <p><code>eqlib</code> 全部公开 API 的参数与示例。</p>
 <span class="card-link">查阅 →</span>
@@ -42,7 +42,7 @@ hide:
 ## 快速验证
 
 ```bash
-pip install .
+pip install easyquant-eqlib
 python -c "from eqlib import *; print('eqlib OK')"
 python examples/03_run_backtest.py
 ```
