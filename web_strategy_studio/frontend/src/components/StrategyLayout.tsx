@@ -2,10 +2,15 @@ import type { editor } from "monaco-editor";
 import { MarkerSeverity } from "monaco-editor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { apiJson, resolveArtifactUrl } from "../api/client";
 import { useRunStream } from "../hooks/useRunStream";
 import { useEditorStore } from "../store/editorStore";
+import { useTheme, monacoThemeName } from "../hooks/useTheme";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { AppShell } from "./AppShell";
+import { CommandPalette } from "./CommandPalette";
 import { EditorToolbar } from "./EditorToolbar";
 import { LogConsole } from "./LogConsole";
 import { MetricsComparison } from "./MetricsComparison";
@@ -69,6 +74,7 @@ function buildMarkers(lint: LintResponse | null): editor.IMarkerData[] {
 
 export function StrategyLayout() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [strategyId, setStrategyId] = useState<string | null>(() => localStorage.getItem(LS_KEY));
   const [source, setSource] = useState("");
   const [fontSize, setFontSize] = useState(14);
@@ -86,8 +92,16 @@ export function StrategyLayout() {
   const showHistory = useEditorStore((s) => s.showHistory);
   const showCompare = useEditorStore((s) => s.showCompare);
   const addToast = useEditorStore((s) => s.addToast);
+  const setShowHistory = useEditorStore((s) => s.setShowHistory);
+  const setShowCompare = useEditorStore((s) => s.setShowCompare);
+  const setCommandPaletteOpen = useEditorStore((s) => s.setCommandPaletteOpen);
+  const commandPaletteOpen = useEditorStore((s) => s.commandPaletteOpen);
   const { logs, progress, stage, artifacts, doneStatus, clearLogs } = useRunStream(runIdStore);
   const [reportOpen, setReportOpen] = useState(false);
+
+  // Theme — apply data-theme + get resolved Monaco theme name
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = monacoThemeName(resolvedTheme);
 
   const markers = useMemo(() => buildMarkers(lint), [lint]);
 
@@ -257,6 +271,22 @@ export function StrategyLayout() {
     return undefined;
   }, [artifacts?.html_report_url, runIdStore]);
 
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useKeyboardShortcuts({
+    onSave: () => lintMut.mutate(),
+    onRun: () => { if (!running) runMut.mutate(); },
+    onFormat: () => formatMut.mutate(),
+    onTogglePalette: () => setCommandPaletteOpen(!commandPaletteOpen),
+    onShowHistory: () => { setShowHistory(true); setShowCompare(false); },
+    onShowCompare: () => { setShowCompare(true); setShowHistory(false); },
+    onEscape: () => {
+      if (commandPaletteOpen) setCommandPaletteOpen(false);
+      else if (reportOpen) setReportOpen(false);
+      else if (showHistory) setShowHistory(false);
+      else if (showCompare) setShowCompare(false);
+    },
+  });
+
   // Determine right panel content
   const rightPanel = (() => {
     if (showHistory) {
@@ -271,15 +301,18 @@ export function StrategyLayout() {
         <div style={{ display: "flex", gap: 8 }}>
           <button
             type="button"
+            aria-label="运行代码检查 (Cmd+S)"
             style={{
               flex: 1,
               padding: "8px 12px",
-              borderRadius: 4,
+              borderRadius: "var(--radius-sm)",
               border: "1px solid var(--primary)",
               background: "transparent",
               color: "var(--primary)",
               fontWeight: 500,
               fontSize: 13,
+              cursor: "pointer",
+              transition: "background var(--motion-fast)",
             }}
             onClick={() => lintMut.mutate()}
           >
@@ -287,15 +320,19 @@ export function StrategyLayout() {
           </button>
           <button
             type="button"
+            aria-label={running ? "回测运行中" : "运行回测 (Cmd+Enter)"}
             style={{
               flex: 1,
               padding: "8px 12px",
-              borderRadius: 4,
+              borderRadius: "var(--radius-sm)",
               border: "none",
-              background: "var(--primary)",
+              background: running ? "var(--text-dim)" : "var(--primary)",
               color: "#fff",
               fontWeight: 500,
               fontSize: 13,
+              cursor: running || !strategyId ? "not-allowed" : "pointer",
+              opacity: !strategyId ? 0.6 : 1,
+              transition: "background var(--motion-fast)",
             }}
             onClick={() => runMut.mutate()}
             disabled={!strategyId || running}
@@ -305,28 +342,30 @@ export function StrategyLayout() {
         </div>
 
         {/* Backtest Params */}
-        <div
+        <fieldset
           style={{
             background: "var(--bg-secondary)",
-            borderRadius: "var(--radius)",
+            borderRadius: "var(--radius-md)",
             border: "1px solid var(--border)",
             padding: 10,
             fontSize: 12,
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>回测参数</div>
+          <legend style={{ fontWeight: 600, padding: "0 4px", fontSize: 12 }}>回测参数</legend>
           {(["start_date", "end_date", "benchmark"] as const).map((k) => (
             <label key={k} style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
               {k}
               <input
+                aria-label={k}
                 style={{
                   width: "100%",
                   marginTop: 2,
                   padding: 4,
                   background: "var(--bg)",
                   border: "1px solid var(--border)",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   color: "var(--text)",
+                  fontSize: 12,
                 }}
                 value={String((params as Record<string, unknown>)[k])}
                 onChange={(e) => setParams((p) => ({ ...p, [k]: e.target.value }))}
@@ -337,68 +376,101 @@ export function StrategyLayout() {
             starting_cash
             <input
               type="number"
+              aria-label="初始资金"
               style={{
                 width: "100%",
                 marginTop: 2,
                 padding: 4,
                 background: "var(--bg)",
                 border: "1px solid var(--border)",
-                borderRadius: 4,
+                borderRadius: "var(--radius-sm)",
                 color: "var(--text)",
+                fontSize: 12,
               }}
               value={params.starting_cash}
               onChange={(e) => setParams((p) => ({ ...p, starting_cash: Number(e.target.value) }))}
             />
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-            <input type="checkbox" checked={params.use_local} onChange={(e) => setParams((p) => ({ ...p, use_local: e.target.checked }))} />
+            <input
+              type="checkbox"
+              aria-label="使用本地 CSV 数据"
+              checked={params.use_local}
+              onChange={(e) => setParams((p) => ({ ...p, use_local: e.target.checked }))}
+            />
             <span>use_local（本地 CSV）</span>
           </label>
-        </div>
+        </fieldset>
 
         <RunProgressBar progress={progress} stage={stage} running={running} />
 
         {/* Success card */}
         {doneStatus === "succeeded" && (runIdStore || artifacts?.html_report_url) ? (
           <div
+            role="status"
+            aria-live="polite"
             style={{
               background: "var(--bg-secondary)",
-              borderRadius: "var(--radius)",
+              borderRadius: "var(--radius-md)",
               border: "1px solid rgba(63,185,80,0.35)",
               padding: 12,
             }}
           >
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "var(--success)" }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "var(--state-success)" }}>
               回测已完成
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <button
                 type="button"
+                aria-label="在浮层中查看 HTML 报告"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   border: "none",
                   background: "var(--primary)",
                   color: "#fff",
                   fontWeight: 600,
                   fontSize: 14,
+                  cursor: "pointer",
                 }}
                 onClick={() => setReportOpen(true)}
               >
                 查看 HTML 报告
               </button>
-              {reportOpenUrl ? (
+              {/* Open in workspace (standalone route) */}
+              {runIdStore && (
                 <button
                   type="button"
+                  aria-label="在独立页面打开报告"
                   style={{
                     width: "100%",
                     padding: "8px 12px",
-                    borderRadius: 4,
+                    borderRadius: "var(--radius-sm)",
                     border: "1px solid var(--border)",
                     background: "transparent",
                     color: "var(--text-secondary)",
                     fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => navigate(`/runs/${runIdStore}/report`)}
+                >
+                  在工作台打开
+                </button>
+              )}
+              {reportOpenUrl ? (
+                <button
+                  type="button"
+                  aria-label="在新标签页打开报告"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border)",
+                    background: "transparent",
+                    color: "var(--text-secondary)",
+                    fontSize: 13,
+                    cursor: "pointer",
                   }}
                   onClick={() => window.open(reportOpenUrl, "_blank", "noopener,noreferrer")}
                 >
@@ -412,12 +484,13 @@ export function StrategyLayout() {
         {/* Failure card */}
         {doneStatus === "failed" ? (
           <div
+            role="alert"
             style={{
               fontSize: 12,
-              color: "var(--error)",
+              color: "var(--state-error)",
               padding: 10,
               background: "var(--bg-secondary)",
-              borderRadius: "var(--radius)",
+              borderRadius: "var(--radius-md)",
               border: "1px solid rgba(248,81,73,0.25)",
             }}
           >
@@ -441,7 +514,10 @@ export function StrategyLayout() {
         />
 
         {lint && (
-          <div style={{ fontSize: 11, color: lint.ok ? "var(--success)" : "var(--error)" }}>
+          <div
+            role="status"
+            style={{ fontSize: 11, color: lint.ok ? "var(--state-success)" : "var(--state-error)" }}
+          >
             检查: {lint.ok ? "通过" : "存在问题（见编辑器波浪线与日志）"}
           </div>
         )}
@@ -449,36 +525,32 @@ export function StrategyLayout() {
     );
   })();
 
-  return (
-    <div style={{ display: "flex", flexDirection: "row", height: "100vh", overflow: "hidden" }}>
-      {/* Editor side */}
-      <div style={{ flex: "0 0 70%", minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <EditorToolbar
+  // Editor panel (left side of split)
+  const editorPanel = (
+    <>
+      <EditorToolbar
+        fontSize={fontSize}
+        onFontDelta={(d) => setFontSize((s) => Math.min(28, Math.max(10, s + d)))}
+        onFormat={() => formatMut.mutate()}
+        onRunBacktest={() => runMut.mutate()}
+        running={running}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+      />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <MonacoStrategyEditor
+          value={source}
+          onChange={onCodeChange}
+          markers={markers}
           fontSize={fontSize}
-          onFontDelta={(d) => setFontSize((s) => Math.min(28, Math.max(10, s + d)))}
-          onFormat={() => formatMut.mutate()}
-          onRunBacktest={() => runMut.mutate()}
-          running={running}
+          monacoTheme={monacoTheme}
         />
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <MonacoStrategyEditor value={source} onChange={onCodeChange} markers={markers} fontSize={fontSize} />
-        </div>
       </div>
+    </>
+  );
 
-      {/* Right panel */}
-      <div
-        style={{
-          flex: "0 0 30%",
-          minWidth: 280,
-          borderLeft: "1px solid var(--border)",
-          background: "var(--bg)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {rightPanel}
-      </div>
+  return (
+    <>
+      <AppShell editor={editorPanel} rightPane={rightPanel} />
 
       <ReportLinkModal
         open={reportOpen}
@@ -486,7 +558,14 @@ export function StrategyLayout() {
         runId={runIdStore}
         onClose={() => setReportOpen(false)}
       />
+
+      <CommandPalette
+        onRun={() => { if (!running) runMut.mutate(); }}
+        onFormat={() => formatMut.mutate()}
+        onClearLogs={clearLogs}
+      />
+
       <ToastContainer />
-    </div>
+    </>
   );
 }

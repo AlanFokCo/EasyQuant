@@ -8,6 +8,8 @@ export type Toast = {
   message: string;
 };
 
+export type Theme = "dark" | "light" | "system";
+
 type EditorState = {
   dirty: boolean;
   runId: string | null;
@@ -16,6 +18,8 @@ type EditorState = {
   showCompare: boolean;
   compareIds: string[];
   toasts: Toast[];
+  theme: Theme;
+  commandPaletteOpen: boolean;
   setDirty: (v: boolean) => void;
   setRunId: (id: string | null) => void;
   setSseConnected: (v: boolean) => void;
@@ -24,9 +28,13 @@ type EditorState = {
   setCompareIds: (ids: string[]) => void;
   addToast: (type: ToastType, message: string) => void;
   dismissToast: (id: string) => void;
+  setTheme: (theme: Theme) => void;
+  setCommandPaletteOpen: (open: boolean) => void;
 };
 
 let _toastCounter = 0;
+
+const _storedTheme = (localStorage.getItem("eq_theme") as Theme | null) ?? "system";
 
 export const useEditorStore = create<EditorState>((set) => ({
   dirty: false,
@@ -36,6 +44,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   showCompare: false,
   compareIds: [],
   toasts: [],
+  theme: _storedTheme,
+  commandPaletteOpen: false,
   setDirty: (dirty) => set({ dirty }),
   setRunId: (runId) => set({ runId }),
   setSseConnected: (sseConnected) => set({ sseConnected }),
@@ -49,4 +59,9 @@ export const useEditorStore = create<EditorState>((set) => ({
     }),
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  setTheme: (theme) => {
+    localStorage.setItem("eq_theme", theme);
+    set({ theme });
+  },
+  setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
 }));

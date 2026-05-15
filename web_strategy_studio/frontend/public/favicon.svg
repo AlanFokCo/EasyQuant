@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="6" fill="#0d1117"/>
+  <!-- "E" letterform -->
+  <rect x="6" y="6" width="3" height="20" rx="1" fill="#58a6ff"/>
+  <rect x="6" y="6" width="14" height="3" rx="1" fill="#58a6ff"/>
+  <rect x="6" y="14.5" width="10" height="3" rx="1" fill="#58a6ff"/>
+  <rect x="6" y="23" width="14" height="3" rx="1" fill="#58a6ff"/>
+  <!-- sparkline accent line -->
+  <polyline points="21,22 23,16 25,19 27,11 29,14" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

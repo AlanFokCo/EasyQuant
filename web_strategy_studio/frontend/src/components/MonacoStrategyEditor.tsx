@@ -9,6 +9,7 @@ type Props = {
   onChange: (v: string) => void;
   markers?: editor.IMarkerData[];
   fontSize: number;
+  monacoTheme?: string;
 };
 
 // Trigger characters: dot, underscore, and all ASCII letters
@@ -32,7 +33,7 @@ function _makeDebounced(fn: (sourceCode: string, cursorLine: number, cursorCol: 
     });
 }
 
-export function MonacoStrategyEditor({ value, onChange, markers, fontSize }: Props) {
+export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monacoTheme }: Props) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const completionDisposable = useRef<{ dispose(): void } | null>(null);
@@ -62,7 +63,7 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize }: Pro
   const onMount = useCallback((ed: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
     editorRef.current = ed;
     monacoRef.current = monaco;
-    monaco.editor.setTheme("eq-dark");
+    monaco.editor.setTheme(monacoTheme ?? "eq-dark");
 
     // B20: Register eqlib completion provider backed by /api/v1/completion.
     // Dispose any previous registration first (handles HMR / double-mount).
@@ -138,6 +139,13 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize }: Pro
     };
   }, []);
 
+  // Sync Monaco editor theme whenever resolvedTheme changes
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco || !monacoTheme) return;
+    monaco.editor.setTheme(monacoTheme);
+  }, [monacoTheme]);
+
   useEffect(() => {
     const ed = editorRef.current;
     const monaco = monacoRef.current;
@@ -157,7 +165,7 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize }: Pro
     <Editor
       height="100%"
       defaultLanguage="python"
-      theme="eq-dark"
+      theme={monacoTheme ?? "eq-dark"}
       value={value}
       onChange={handleChange}
       beforeMount={beforeMount}
