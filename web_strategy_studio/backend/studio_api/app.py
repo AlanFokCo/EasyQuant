@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,12 +18,22 @@ from studio_api.config import settings
 from studio_api.db import init_db
 from studio_api.routers import completion, format as fmt, health, lint as lint_r, runs, strategies
 
+logger = logging.getLogger(__name__)
+
+_SYMBOLS_FILE = Path(__file__).resolve().parent / "data" / "eqlib_symbols.json"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.artifact_dir.mkdir(parents=True, exist_ok=True)
     (settings.artifact_dir / "reports").mkdir(parents=True, exist_ok=True)
     await init_db()
+    if not _SYMBOLS_FILE.is_file():
+        logger.warning(
+            "⚠️  eqlib_symbols.json not found at %s — Monaco autocomplete will be empty. "
+            "Run: python web_strategy_studio/scripts/build_symbols.py",
+            _SYMBOLS_FILE,
+        )
     # S6: idempotency map stores (run_id, expires_at) pairs; expired entries
     # are cleaned up by _idempotency_cleanup_task.
     app.state.idempotency = {}  # {key: (run_id, expires_at)}

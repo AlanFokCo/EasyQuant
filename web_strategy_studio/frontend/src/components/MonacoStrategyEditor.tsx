@@ -2,6 +2,8 @@ import type { editor } from "monaco-editor";
 import Editor from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
 
+import { apiOrigin } from "../api/client";
+
 type Props = {
   value: string;
   onChange: (v: string) => void;
@@ -9,9 +11,28 @@ type Props = {
   fontSize: number;
 };
 
+// Trigger characters: dot, underscore, and all ASCII letters
+const _TRIGGER_CHARS = Array.from(
+  "._abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+);
+
+// Debounce helper for the async completion fetch
+function _makeDebounced(fn: (sourceCode: string, cursorLine: number, cursorCol: number) => Promise<unknown>, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return (sourceCode: string, cursorLine: number, cursorCol: number) =>
+    new Promise<unknown>((resolve, reject) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        fn(sourceCode, cursorLine, cursorCol).then(resolve, reject);
+      }, ms);
+    });
+}
+
 export function MonacoStrategyEditor({ value, onChange, markers, fontSize }: Props) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
+  const completionDisposable = useRef<{ dispose(): void } | null>(null);
 
   const beforeMount = useCallback((monaco: typeof import("monaco-editor")) => {
     monaco.editor.defineTheme("eq-dark", {
@@ -39,6 +60,79 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize }: Pro
     editorRef.current = ed;
     monacoRef.current = monaco;
     monaco.editor.setTheme("eq-dark");
+
+    // B20: Register eqlib completion provider backed by /api/v1/completion.
+    // Dispose any previous registration first (handles HMR / double-mount).
+    completionDisposable.current?.dispose();
+
+    const kindMap: Record<string, number> = {
+      Function: monaco.languages.CompletionItemKind.Function,
+      Method: monaco.languages.CompletionItemKind.Method,
+      Class: monaco.languages.CompletionItemKind.Class,
+      Variable: monaco.languages.CompletionItemKind.Variable,
+      Keyword: monaco.languages.CompletionItemKind.Keyword,
+    };
+
+    type RawSuggestion = {
+      label: string;
+      kind: string;
+      insert_text: string;
+      documentation?: string;
+    };
+
+    const fetchSuggestions = _makeDebounced(
+      async (sourceCode: string, cursorLine: number, cursorCol: number) => {
+        const res = await fetch(`${apiOrigin}/api/v1/completion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source_code: sourceCode,
+            cursor_line: cursorLine,
+            cursor_col: cursorCol,
+          }),
+        });
+        if (!res.ok) return [];
+        const data = await res.json() as { suggestions: RawSuggestion[] };
+        return data.suggestions ?? [];
+      },
+      200,
+    );
+
+    completionDisposable.current = monaco.languages.registerCompletionItemProvider("python", {
+      triggerCharacters: _TRIGGER_CHARS,
+      provideCompletionItems: async (model, position) => {
+        const sourceCode = model.getValue();
+        const suggestions = await fetchSuggestions(
+          sourceCode,
+          position.lineNumber,
+          position.column,
+        ) as RawSuggestion[];
+
+        const range = {
+          startLineNumber: position.lineNumber,
+          startColumn: position.column,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column,
+        };
+
+        return {
+          suggestions: suggestions.map((s) => ({
+            label: s.label,
+            kind: kindMap[s.kind] ?? monaco.languages.CompletionItemKind.Text,
+            insertText: s.insert_text,
+            documentation: s.documentation,
+            range,
+          })),
+        };
+      },
+    });
+  }, []);
+
+  // Dispose the completion provider when the component unmounts.
+  useEffect(() => {
+    return () => {
+      completionDisposable.current?.dispose();
+    };
   }, []);
 
   useEffect(() => {

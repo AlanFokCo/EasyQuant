@@ -1,6 +1,18 @@
 export const apiOrigin = import.meta.env.VITE_API_ORIGIN || "";
 export const apiV1 = `${apiOrigin}/api/v1`;
 
+/** Structured API error carrying the backend {error:{code,message,details}} envelope. */
+export class ApiError extends Error {
+  readonly code: string;
+  readonly details: unknown;
+  constructor(code: string, message: string, details: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
 /** Absolute URL for opening / embedding reports (iframe, window.open). */
 export function resolveArtifactUrl(path: string | undefined | null): string | undefined {
   if (!path?.trim()) return undefined;
@@ -22,8 +34,20 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${text}`);
+    let body: { error?: { code?: string; message?: string; details?: unknown } } | null = null;
+    try {
+      body = await res.json();
+    } catch {
+      /* ignore parse failure */
+    }
+    if (body?.error?.message) {
+      throw new ApiError(
+        body.error.code ?? "ERROR",
+        body.error.message,
+        body.error.details ?? null,
+      );
+    }
+    throw new ApiError("HTTP_ERROR", `${res.status} ${res.statusText}`, null);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

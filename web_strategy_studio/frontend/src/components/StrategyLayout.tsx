@@ -93,6 +93,7 @@ export function StrategyLayout() {
 
   const bootRef = useRef(false);
   const hydrated = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bootstrap = useMutation({
     mutationFn: async () => {
@@ -137,26 +138,39 @@ export function StrategyLayout() {
     bootstrap.mutate();
   }, [strategyId, bootstrap]);
 
-  const debouncedSave = useMemo(() => {
-    let t: ReturnType<typeof setTimeout> | null = null;
-    return (code: string) => {
+  const debouncedSave = useCallback(
+    (code: string) => {
       setDirty(true);
-      if (t) clearTimeout(t);
-      t = setTimeout(async () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
         if (!strategyId) return;
-        try {
-          await apiJson(`/api/v1/strategies/${strategyId}`, {
-            method: "PATCH",
-            body: JSON.stringify({ source_code: code }),
+        apiJson(`/api/v1/strategies/${strategyId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ source_code: code }),
+        })
+          .then(() => {
+            setDirty(false);
+            qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+          })
+          .catch((e: unknown) => {
+            addToast("error", e instanceof Error ? e.message : "保存失败");
           });
-          setDirty(false);
-          qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
-        } catch {
-          /* ignore */
-        }
       }, 400);
+    },
+    [strategyId, qc, setDirty, addToast],
+  );
+
+  // Clear any pending debounced-save when strategyId changes to prevent
+  // a late PATCH firing against the wrong strategy (B11).
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
     };
-  }, [strategyId, qc, setDirty]);
+  }, [strategyId]);
 
   const onCodeChange = useCallback(
     (v: string) => {
@@ -178,6 +192,9 @@ export function StrategyLayout() {
       setLint(r);
       addToast(r.ok ? "success" : "error", r.ok ? "代码检查通过" : "代码检查存在问题");
     },
+    onError: (e: unknown) => {
+      addToast("error", e instanceof Error ? e.message : "代码检查失败");
+    },
   });
 
   const formatMut = useMutation({
@@ -190,6 +207,9 @@ export function StrategyLayout() {
     },
     onSuccess: (r) => {
       if (r.ok) setSource(r.formatted_source);
+    },
+    onError: (e: unknown) => {
+      addToast("error", e instanceof Error ? e.message : "格式化失败");
     },
   });
 
@@ -211,6 +231,9 @@ export function StrategyLayout() {
     onSuccess: (rid) => {
       setRunId(rid);
       addToast("info", "回测已开始运行");
+    },
+    onError: (e: unknown) => {
+      addToast("error", e instanceof Error ? e.message : "启动回测失败");
     },
   });
 
