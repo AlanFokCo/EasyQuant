@@ -30,11 +30,15 @@ pip install -e ".[dev]"
 
 ### Q: 只装了 `akshare` 等依赖，`import eqlib` 仍失败
 
-**原因：**`eqlib` 是本项目包，需从仓库根目录安装。
+**原因：**`eqlib` 是本项目包，需从 PyPI 或仓库安装。
 
 **处理：**
 
 ```bash
+# 方式一：PyPI 安装（推荐，无需克隆仓库）
+pip install easyquant-eqlib
+
+# 方式二：从源码安装（在仓库根目录）
 cd /path/to/EasyQuant
 pip install .
 ```
@@ -43,7 +47,7 @@ pip install .
 
 ### Q: 需要安装哪些依赖？
 
-**最小集（已由 `pip install .` 安装）：**`akshare`、`pandas`、`numpy`、`matplotlib`、`scipy`。
+**最小集（已由 `pip install .` 或 `pip install easyquant-eqlib` 安装）：**`akshare`、`pandas`、`numpy`、`matplotlib`、`scipy`。
 
 **可选：**`pip install pyarrow` 以提升部分磁盘缓存性能（见 `pyproject.toml` 的 `[project.optional-dependencies]`）。
 

@@ -71,7 +71,8 @@ source .venv/bin/activate
 
 # 验证：激活后命令提示符前会显示 (.venv)
 # 安装 eqlib 及其所有依赖
-pip install .
+pip install easyquant-eqlib  # PyPI（推荐）
+# 或在仓库根目录执行：pip install .
 ```
 
 激活后所有 `python` 和 `pip` 命令都在虚拟环境中运行，不影响系统 Python。
@@ -94,7 +95,7 @@ deactivate
 | `pyarrow` | 更快的磁盘缓存 | 可选 |
 | `pytest` | 运行单元测试 | 开发时 |
 
-执行 `pip install .` 会自动安装前 5 个。
+执行 `pip install easyquant-eqlib`（或 `pip install .`）会自动安装前 5 个。
 
 ---
 

@@ -56,7 +56,10 @@ tutorials/
 
 1. 安装并验证：
    ```bash
-   pip install .
+   # PyPI 安装（推荐）
+   pip install easyquant-eqlib
+   # 或从源码安装（仓库根目录）
+   # pip install .
    python -c "from eqlib import *; print('eqlib OK')"
    ```
 2. 跑第一份完整报告：
@@ -197,7 +200,7 @@ tutorials/
 ## 前置要求
 
 - Python **3.10+**（见 [Tutorial 00](00_environment_and_first_run.md)）
-- 已在仓库根目录执行 **`pip install .`** 或 **`pip install -e .`**
+- 已安装 eqlib：`pip install easyquant-eqlib`（PyPI）或 `pip install .` / `pip install -e .`（源码）
 - Python 基础（变量、函数、循环、条件判断） → 没有基础？见 [Python 基础与环境配置](prerequisites/python_basics.md)
 - 技术指标基础（均线、RSI 等） → 没有基础？见 [技术分析基础概念](prerequisites/technical_concepts.md)
 - A 股市场常识（T+1、涨跌停、股票代码等） → 没有基础？见 [A 股市场基础知识](prerequisites/ashare_knowledge.md)
