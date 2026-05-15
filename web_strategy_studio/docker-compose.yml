@@ -1,18 +1,43 @@
 # Web Strategy Studio — Docker Compose (optional)
 
 services:
-  studio-api:
+  api:
     build:
       context: ..
       dockerfile: web_strategy_studio/Dockerfile
-    ports:
-      - "8080:8080"
+      target: api
+    expose:
+      - "8080"
     environment:
       EQ_STUDIO_DATABASE_URL: sqlite+aiosqlite:////data/studio.sqlite3
       EQ_STUDIO_ARTIFACT_DIR: /data/artifacts
       EQ_STUDIO_REPO_ROOT: /app
     volumes:
       - studio-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/healthz')",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: web_strategy_studio/Dockerfile
+      target: nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: on-failure
 
 volumes:
   studio-data: {}

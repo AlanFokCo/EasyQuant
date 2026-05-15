@@ -184,7 +184,6 @@ docker compose -f web_strategy_studio/docker-compose.yml up -d
 
 ## 已知限制 / 后续工作
 
-- **进度**：未改 `eqlib` 引擎；进度为日历启发式 + 日志行粗估（见规格 §7.4）。
 - **沙箱**：MVP 为子进程 + 静态 AST 黑名单 + 超时；生产级 cgroup / `network: none` / 每任务容器见规格 §7.5。
 - **Redis / PostgreSQL**：配置项已预留；当前默认 SQLite + 进程内 `BackgroundTasks`。
 - **严格模式 mypy**：`lint` 的 `profile=strict` 尚未接 mypy。

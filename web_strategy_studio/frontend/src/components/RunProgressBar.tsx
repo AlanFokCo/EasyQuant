@@ -13,12 +13,13 @@ export function RunProgressBar({ progress, stage, running }: Props) {
       </div>
       <div
         role="progressbar"
+        aria-label="回测进度"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
         style={{
-          height: 4,
-          borderRadius: 2,
+          height: 6, /* spec: ≥6px */
+          borderRadius: 3,
           background: "var(--border)",
           overflow: "hidden",
         }}
@@ -29,9 +30,15 @@ export function RunProgressBar({ progress, stage, running }: Props) {
             height: "100%",
             background: "var(--primary)",
             transition: "width 0.3s ease",
+            borderRadius: 3,
           }}
         />
       </div>
+      {running && (
+        <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 3, textAlign: "right" }}>
+          {pct}%
+        </div>
+      )}
     </div>
   );
 }
