@@ -5,12 +5,15 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Optional
+
+import pandas as pd
 
 from studio_api.config import settings
 from studio_api.proc_registry import register as register_proc, unregister as unregister_proc
@@ -21,9 +24,15 @@ def _parse_iso(d: str) -> date:
     return datetime.strptime(d[:10], "%Y-%m-%d").date()
 
 
+# Matches "📍 Backtest progress: 47/250 (18.8%)" and "Backtest progress 47/250"
+_PROGRESS_RE = re.compile(r"Backtest progress[:\s]+(\d+)\s*/\s*(\d+)")
+
+
 def _estimate_trading_fraction(done_days: int, start: date, end: date) -> float:
-    """Rough progress from calendar span when bar-level hooks are unavailable."""
-    total = max((end - start).days, 1)
+    """Rough progress from trading-day span when bar-level hooks are unavailable."""
+    # Use pandas bdate_range (Mon-Fri) as a proxy for trading days (~250/yr)
+    # instead of calendar days (~365/yr) to avoid ~1.5× overestimate.
+    total = max(len(pd.bdate_range(start=start, end=end)), 1)
     return min(0.95, 0.15 + 0.75 * (done_days / total))
 
 
@@ -105,12 +114,12 @@ async def execute_backtest(
             log_lines += 1
 
             # S5: Parse structured progress lines emitted by the engine.
-            # Format: "Backtest progress N/M" where N = days done, M = total.
-            # This gives true progress instead of the crude log_lines//2 heuristic.
-            if line.startswith("Backtest progress ") and "/" in line:
+            # Format: "📍 Backtest progress: N/M (pct%)" or "Backtest progress N/M"
+            # The regex handles optional emoji prefix, colon, and trailing percentage.
+            m = _PROGRESS_RE.search(line)
+            if m:
                 try:
-                    parts = line.split()[-1].split("/")
-                    done, total = int(parts[0]), int(parts[1])
+                    done, total = int(m.group(1)), int(m.group(2))
                     if total > 0:
                         frac = min(0.92, 0.10 + 0.82 * done / total)
                         await stream_hub.publish(

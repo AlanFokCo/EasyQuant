@@ -74,8 +74,6 @@ ptrade_strategy.py
 
 # Node.js (leftover from docs tooling)
 node_modules/
-package.json
-package-lock.json
 
 # Testing
 .pytest_cache/

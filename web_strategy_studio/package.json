@@ -1,0 +1,15 @@
+{
+  "name": "eq-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EasyQuant Web Strategy Studio — monorepo root",
+  "scripts": {
+    "predev:all": "node frontend/scripts/check-node.mjs",
+    "dev:all": "concurrently --names \"api,web\" --prefix-colors \"cyan,magenta\" \"bash scripts/run-backend.sh\" \"npm run dev --prefix ./frontend\"",
+    "install:all": "npm install && npm install --prefix ./frontend && python scripts/build_symbols.py",
+    "build": "npm run build --prefix ./frontend"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

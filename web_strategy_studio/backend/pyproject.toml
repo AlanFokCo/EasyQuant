@@ -29,3 +29,7 @@ include = ["studio_api*"]
 
 [tool.setuptools.package-data]
 studio_api = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
