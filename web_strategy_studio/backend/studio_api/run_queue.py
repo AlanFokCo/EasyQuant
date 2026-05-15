@@ -13,8 +13,8 @@ so that:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
 
 import structlog
 
@@ -24,7 +24,7 @@ log = structlog.get_logger(__name__)
 
 # Queue of (run_id, coroutine_factory) pairs.
 # A coroutine_factory is a zero-argument async callable that runs the task.
-type _TaskCoro = Callable[[], Awaitable[None]]
+_TaskCoro = Callable[[], Awaitable[None]]
 
 # Module-level state — re-initialised by start_worker() on each lifespan start
 # so tests using different event loops work correctly.
@@ -117,14 +117,13 @@ async def mark_orphan_runs_failed() -> None:
     These are orphans left over from a prior server process that was killed
     (B17: kill -9 recovery).
     """
-    from studio_api.db import SessionLocal
-    from studio_api.models import Run
     from sqlalchemy import select
 
+    from studio_api.db import SessionLocal
+    from studio_api.models import Run
+
     async with SessionLocal() as session:
-        result = await session.execute(
-            select(Run).where(Run.status.in_(["running", "queued"]))
-        )
+        result = await session.execute(select(Run).where(Run.status.in_(["running", "queued"])))
         orphans: list[Run] = result.scalars().all()
         if not orphans:
             return
@@ -146,6 +145,7 @@ async def mark_orphan_runs_failed() -> None:
 # Rate limiter (per-IP, in-memory sliding-window counter)
 # ---------------------------------------------------------------------------
 
+
 class _RateLimiter:
     """Simple in-process sliding-window rate limiter.
 
@@ -161,6 +161,7 @@ class _RateLimiter:
     def is_allowed(self, key: str) -> tuple[bool, int]:
         """Return (allowed, remaining_hits). Updates the sliding window."""
         import time
+
         now = time.monotonic()
         window_start = now - self._window
         hits = self._hits.get(key, [])

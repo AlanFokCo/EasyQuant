@@ -13,10 +13,12 @@ pytest_plugins = ("anyio",)
 def hub():
     """Fresh StreamHub for each test, with a 5-second buffer TTL."""
     from studio_api.stream_hub import StreamHub
+
     return StreamHub(max_queued=100, buffer_ttl_sec=5)
 
 
 # ── Basic ring buffer ────────────────────────────────────────────────────────
+
 
 def test_buffer_created_on_publish(hub):
     asyncio.get_event_loop().run_until_complete(_test_buffer_created(hub))
@@ -36,6 +38,7 @@ def test_ring_buffer_max_size(hub):
 
 async def _test_ring_size(hub):
     from studio_api.stream_hub import _RING_SIZE
+
     for i in range(_RING_SIZE + 10):
         await hub.publish("run_r", "log", {"line": f"line {i}"})
     buf = hub.get_buffer("run_r")
@@ -63,7 +66,9 @@ def test_buffer_expiry(hub):
 
 async def _test_expiry(hub):
     import time
+
     from studio_api.stream_hub import StreamHub
+
     short_hub = StreamHub(max_queued=100, buffer_ttl_sec=0)  # expires immediately
     await short_hub.publish("run_e", "done", {"status": "succeeded"})
     # Manually set expires_at to the past
@@ -73,6 +78,7 @@ async def _test_expiry(hub):
 
 
 # ── missed_since replay ──────────────────────────────────────────────────────
+
 
 def test_missed_since_returns_correct_events(hub):
     asyncio.get_event_loop().run_until_complete(_test_missed_since(hub))
@@ -107,13 +113,16 @@ async def _test_no_missed(hub):
 
 # ── SSE endpoint: terminal run → immediate done ──────────────────────────────
 
+
 def test_stream_terminal_run_immediate_done():
     """GET /runs/{id}/stream on a terminal run returns done without waiting."""
     import os
+
     os.environ.setdefault("EQ_STUDIO_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
     os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_stream_test")
 
     from fastapi.testclient import TestClient
+
     from studio_api.app import app
 
     with TestClient(app, raise_server_exceptions=True) as client:
@@ -121,7 +130,11 @@ def test_stream_terminal_run_immediate_done():
         tpl = client.get("/api/v1/strategies/_new/template")
         strat = client.post(
             "/api/v1/strategies",
-            json={"name": "stream-test", "description": "", "source_code": tpl.json()["source_code"]},
+            json={
+                "name": "stream-test",
+                "description": "",
+                "source_code": tpl.json()["source_code"],
+            },
         )
         assert strat.status_code in (200, 201)
 
@@ -132,6 +145,7 @@ def test_stream_terminal_run_immediate_done():
         # We simulate this by directly creating a Run record in the DB.
         import asyncio
         from datetime import datetime, timezone
+
         from studio_api.db import SessionLocal
         from studio_api.models import Run
 
@@ -165,12 +179,14 @@ def test_stream_terminal_run_immediate_done():
 
 # ── evict_expired ────────────────────────────────────────────────────────────
 
+
 def test_evict_expired_removes_stale_buffer(hub):
     asyncio.get_event_loop().run_until_complete(_test_evict(hub))
 
 
 async def _test_evict(hub):
     import time
+
     await hub.publish("run_ev", "done", {"status": "succeeded"})
     buf = hub._buffers["run_ev"]
     buf._expires_at = time.monotonic() - 1  # force expired

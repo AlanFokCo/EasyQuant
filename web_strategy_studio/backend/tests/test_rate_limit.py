@@ -13,6 +13,7 @@ os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_ratelimit_test")
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
+
     from studio_api.app import app
 
     with TestClient(app, raise_server_exceptions=False) as c:
@@ -56,6 +57,7 @@ def test_rate_limiter_unit():
 def test_rate_limiter_window_expiry():
     """Hits outside the window are not counted."""
     import time
+
     from studio_api.run_queue import _RateLimiter
 
     rl = _RateLimiter(limit=2, window_sec=1)  # 1-second window

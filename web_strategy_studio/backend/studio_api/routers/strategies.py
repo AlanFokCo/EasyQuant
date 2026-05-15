@@ -181,7 +181,10 @@ async def patch_strategy(
             # Check if the current version was created recently (draft window).
             coalesce = False
             if current_sv.created_at:
-                age_sec = (now.replace(tzinfo=timezone.utc) - current_sv.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+                age_sec = (
+                    now.replace(tzinfo=timezone.utc)
+                    - current_sv.created_at.replace(tzinfo=timezone.utc)
+                ).total_seconds()
                 coalesce = (age_sec < settings.version_coalesce_sec) and (current_sv.label is None)
             if coalesce:
                 # Reuse the current version row (update in place).

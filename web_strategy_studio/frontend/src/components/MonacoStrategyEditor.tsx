@@ -63,6 +63,8 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monac
   const onMount = useCallback((ed: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
     editorRef.current = ed;
     monacoRef.current = monaco;
+    // Set theme at mount time only; subsequent theme changes are handled by
+    // the monacoTheme useEffect below.
     monaco.editor.setTheme(monacoTheme ?? "eq-dark");
 
     // B20: Register eqlib completion provider backed by /api/v1/completion.
@@ -130,6 +132,7 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monac
         };
       },
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- monacoTheme used for initial mount only; theme sync handled by dedicated useEffect
   }, []);
 
   // Dispose the completion provider when the component unmounts.

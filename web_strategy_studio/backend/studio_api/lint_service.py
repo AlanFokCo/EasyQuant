@@ -74,9 +74,7 @@ def lint_source(source: str, profile: str = PROFILE_FAST) -> dict:
     sec = scanner.scan(source)
     sec.extend(require_initialize_function(source))
 
-    security_notes = [
-        {"code": n.code, "line": n.line, "message": n.message} for n in sec
-    ]
+    security_notes = [{"code": n.code, "line": n.line, "message": n.message} for n in sec]
 
     lint_issues: list[dict] = []
     if not syntax_errors:
@@ -85,9 +83,7 @@ def lint_source(source: str, profile: str = PROFILE_FAST) -> dict:
     # B23: ok=False only for syntax errors and EQ-BANNED-* security notes.
     # EQ-IMPORT-WARN and ruff codes are warnings: ok stays True but they
     # appear in lint_issues / security_notes for the frontend to display.
-    blocking_security = any(
-        n["code"].startswith("EQ-BANNED") for n in security_notes
-    )
+    blocking_security = any(n["code"].startswith("EQ-BANNED") for n in security_notes)
     ok = not syntax_errors and not blocking_security
 
     return {

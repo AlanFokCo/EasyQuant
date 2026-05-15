@@ -12,7 +12,6 @@ import runpy
 import sys
 import traceback
 from pathlib import Path
-from typing import Optional
 
 
 def main() -> int:
@@ -126,10 +125,10 @@ def _write_result(
     work: Path,
     *,
     ok: bool,
-    html: Optional[str] = None,
-    report_json: Optional[str] = None,
-    error: Optional[str] = None,
-    error_code: Optional[str] = None,
+    html: str | None = None,
+    report_json: str | None = None,
+    error: str | None = None,
+    error_code: str | None = None,
 ) -> None:
     # Local import: avoid any accidental shadowing of the stdlib `json` module.
     import json as json_stdlib

@@ -133,7 +133,11 @@ class SecurityScanner:
                             )
                         )
             elif isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec", "__import__"):
+                if isinstance(node.func, ast.Name) and node.func.id in (
+                    "eval",
+                    "exec",
+                    "__import__",
+                ):
                     notes.append(
                         SecurityNote(
                             code="EQ-BANNED-CALL",

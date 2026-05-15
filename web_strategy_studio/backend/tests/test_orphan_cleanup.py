@@ -23,7 +23,6 @@ def test_orphan_runs_marked_failed(event_loop):
     """Runs in running/queued state at startup must be marked failed: SERVER_RESTART."""
 
     async def _run():
-        from datetime import datetime, timezone
         from studio_api.db import SessionLocal, init_db
         from studio_api.models import Run
         from studio_api.run_queue import mark_orphan_runs_failed
@@ -61,9 +60,9 @@ def test_orphan_runs_marked_failed(event_loop):
             ]:
                 run = await session.get(Run, run_id)
                 assert run is not None, f"Run {run_id} not found"
-                assert run.status == expected_status, (
-                    f"Run {run_id}: expected {expected_status}, got {run.status}"
-                )
+                assert (
+                    run.status == expected_status
+                ), f"Run {run_id}: expected {expected_status}, got {run.status}"
                 if expected_status == "failed":
                     assert run.error_code == "SERVER_RESTART"
                     assert run.finished_at is not None
@@ -75,7 +74,6 @@ def test_orphan_cleanup_idempotent(event_loop):
     """Running orphan cleanup twice must not raise or double-modify runs."""
 
     async def _run():
-        from datetime import datetime, timezone
         from studio_api.db import SessionLocal, init_db
         from studio_api.models import Run
         from studio_api.run_queue import mark_orphan_runs_failed

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,7 +16,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "sqlite+aiosqlite:///./studio.sqlite3"
-    redis_url: Optional[str] = None  # reserved for future queue split
+    redis_url: str | None = None  # reserved for future queue split
     artifact_dir: Path = Path("./artifacts")
     public_base_url: str = ""  # optional absolute prefix for generated URLs
     run_timeout_sec: int = 900
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
     api_port: int = 8080
     # S1: CORS — restrict to localhost by default; override via env for staging/production.
     # Do NOT use ["*"] together with allow_credentials=True (browser spec disallows it).
-    cors_allowed_origins: List[str] = [
+    cors_allowed_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8080",
