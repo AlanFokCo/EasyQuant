@@ -1,0 +1,72 @@
+repos:
+  # -------------------------------------------------------------------------
+  # General hooks
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: "^web_strategy_studio/frontend/"
+      - id: end-of-file-fixer
+        exclude: "^web_strategy_studio/frontend/"
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # -------------------------------------------------------------------------
+  # Backend: ruff (lint + import sort), black (format), mypy (type check)
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^web_strategy_studio/backend/
+      - id: ruff-format
+        files: ^web_strategy_studio/backend/
+
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        files: ^web_strategy_studio/backend/
+        language_version: python3
+
+  - repo: local
+    hooks:
+      - id: mypy-studio
+        name: mypy (studio backend)
+        entry: mypy
+        language: system
+        types: [python]
+        files: ^web_strategy_studio/backend/studio_api/
+        args:
+          [
+            "--ignore-missing-imports",
+            "--no-strict-optional",
+            "--check-untyped-defs",
+            "false",
+          ]
+        pass_filenames: false
+
+  # -------------------------------------------------------------------------
+  # Frontend: ESLint + Prettier
+  # -------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: eslint-frontend
+        name: ESLint (frontend)
+        entry: bash -c 'cd web_strategy_studio/frontend && npx eslint src --max-warnings 0'
+        language: system
+        files: ^web_strategy_studio/frontend/src/
+        types_or: [ts, tsx]
+        pass_filenames: false
+
+      - id: prettier-frontend
+        name: Prettier (frontend)
+        entry: bash -c 'cd web_strategy_studio/frontend && npx prettier --write'
+        language: system
+        files: ^web_strategy_studio/frontend/src/
+        types_or: [ts, tsx, json, css]

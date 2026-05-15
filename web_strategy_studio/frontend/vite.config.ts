@@ -14,4 +14,8 @@ export default defineConfig({
       "/static": { target: backendTarget, changeOrigin: true },
     },
   },
+  test: {
+    environment: "jsdom",
+    passWithNoTests: true,
+  },
 });

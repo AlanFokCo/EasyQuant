@@ -1,7 +1,8 @@
-"""Strategy CRUD (§4.2)."""
+"""Strategy CRUD (§4.2) — with versioning correctness (B4/B15)."""
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 from datetime import datetime, timezone
 
@@ -10,14 +11,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from studio_api.config import settings
 from studio_api.db import get_session
 from studio_api.models import Strategy, StrategyVersion
 from studio_api.schemas import (
     CreateStrategyBody,
     PatchStrategyBody,
+    SnapshotBody,
     StrategyCreated,
     StrategyDetail,
     StrategyTemplateResponse,
+    StrategyVersionItem,
+    api_error,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["strategies"])
@@ -67,14 +72,14 @@ def market_open(context):
 
     # 金叉买入
     if prev_fast <= prev_slow and fast_ma > slow_ma:
-        if security not in context.portfolio.positions \
+        if security not in context.portfolio.positions \\
            or context.portfolio.positions[security].amount == 0:
             order_value(security, cash)
             log.info("Golden cross BUY: %s @ %.3f" % (security, current_price))
 
     # 死叉卖出
     elif prev_fast >= prev_slow and fast_ma < slow_ma:
-        if security in context.portfolio.positions \
+        if security in context.portfolio.positions \\
            and context.portfolio.positions[security].amount > 0:
             order_target(security, 0)
             log.info("Death cross SELL: %s @ %.3f" % (security, current_price))
@@ -85,6 +90,19 @@ def market_open(context):
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{secrets.token_hex(8)}"
+
+
+def _hash(source_code: str) -> str:
+    return hashlib.sha256(source_code.encode("utf-8")).hexdigest()
+
+
+def _get_current_version(strat: Strategy) -> StrategyVersion:
+    """Return the StrategyVersion row that matches strat.current_version (B15)."""
+    for v in strat.versions:
+        if v.version == strat.current_version:
+            return v
+    # Fallback: max version (shouldn't happen in a consistent DB)
+    return max(strat.versions, key=lambda v: v.version)
 
 
 @router.post("/strategies", response_model=StrategyCreated, status_code=201)
@@ -106,6 +124,7 @@ async def create_strategy(body: CreateStrategyBody, session: AsyncSession = Depe
         strategy_id=sid,
         version=1,
         source_code=body.source_code,
+        content_hash=_hash(body.source_code),
     )
     session.add(strat)
     session.add(sv)
@@ -120,16 +139,14 @@ async def get_strategy(strategy_id: str, session: AsyncSession = Depends(get_ses
     )
     strat = res.scalar_one_or_none()
     if strat is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"error": {"code": "NOT_FOUND", "message": "Strategy not found", "details": None}},
-        )
-    latest = max(strat.versions, key=lambda v: v.version)
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+    # B15: look up by current_version PK, not max(versions)
+    sv = _get_current_version(strat)
     return StrategyDetail(
         id=strat.id,
         name=strat.name,
         description=strat.description,
-        source_code=latest.source_code,
+        source_code=sv.source_code,
         version=strat.current_version,
         updated_at=strat.updated_at,
         default_params=strat.default_params,
@@ -147,27 +164,47 @@ async def patch_strategy(
     )
     strat = res.scalar_one_or_none()
     if strat is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"error": {"code": "NOT_FOUND", "message": "Strategy not found", "details": None}},
-        )
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
     now = datetime.now(timezone.utc)
     if body.name is not None:
         strat.name = body.name
     if body.description is not None:
         strat.description = body.description
-    new_ver = strat.current_version + 1
     if body.source_code is not None:
-        strat.current_version = new_ver
-        strat.updated_at = now
-        session.add(
-            StrategyVersion(
-                id=_new_id("sv"),
-                strategy_id=strategy_id,
-                version=new_ver,
-                source_code=body.source_code,
-            )
-        )
+        new_hash = _hash(body.source_code)
+        current_sv = _get_current_version(strat)
+        # B4: only create a new version row when content actually changed.
+        if current_sv.content_hash == new_hash or current_sv.source_code == body.source_code:
+            # Identical content: no new version, just touch updated_at.
+            strat.updated_at = now
+        else:
+            # Check if the current version was created recently (draft window).
+            coalesce = False
+            if current_sv.created_at:
+                age_sec = (
+                    now.replace(tzinfo=timezone.utc)
+                    - current_sv.created_at.replace(tzinfo=timezone.utc)
+                ).total_seconds()
+                coalesce = (age_sec < settings.version_coalesce_sec) and (current_sv.label is None)
+            if coalesce:
+                # Reuse the current version row (update in place).
+                current_sv.source_code = body.source_code
+                current_sv.content_hash = new_hash
+                strat.updated_at = now
+            else:
+                # Create a proper new version.
+                new_ver = strat.current_version + 1
+                strat.current_version = new_ver
+                strat.updated_at = now
+                session.add(
+                    StrategyVersion(
+                        id=_new_id("sv"),
+                        strategy_id=strategy_id,
+                        version=new_ver,
+                        source_code=body.source_code,
+                        content_hash=new_hash,
+                    )
+                )
     else:
         strat.updated_at = now
     await session.commit()
@@ -177,6 +214,138 @@ async def patch_strategy(
         name=strat.name,
         version=strat.current_version,
         created_at=strat.updated_at or now,
+    )
+
+
+@router.post("/strategies/{strategy_id}/snapshot", response_model=StrategyCreated, status_code=201)
+async def create_snapshot(
+    strategy_id: str,
+    body: SnapshotBody,
+    session: AsyncSession = Depends(get_session),
+):
+    """Force-create a new named version (Cmd+S).
+
+    Unlike PATCH, this always creates a new version row with the current
+    source code, optionally tagging it with a human-readable label.
+    """
+    res = await session.execute(
+        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+    )
+    strat = res.scalar_one_or_none()
+    if strat is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+    current_sv = _get_current_version(strat)
+    now = datetime.now(timezone.utc)
+    new_ver = strat.current_version + 1
+    strat.current_version = new_ver
+    strat.updated_at = now
+    session.add(
+        StrategyVersion(
+            id=_new_id("sv"),
+            strategy_id=strategy_id,
+            version=new_ver,
+            source_code=current_sv.source_code,
+            content_hash=current_sv.content_hash or _hash(current_sv.source_code),
+            label=body.label,
+        )
+    )
+    await session.commit()
+    await session.refresh(strat)
+    return StrategyCreated(
+        id=strat.id,
+        name=strat.name,
+        version=strat.current_version,
+        created_at=now,
+    )
+
+
+@router.get("/strategies/{strategy_id}/versions", response_model=list[StrategyVersionItem])
+async def list_strategy_versions(
+    strategy_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """List all versions of a strategy in ascending order."""
+    res = await session.execute(
+        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+    )
+    strat = res.scalar_one_or_none()
+    if strat is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+    return [
+        StrategyVersionItem(
+            version=v.version,
+            label=v.label,
+            content_hash=v.content_hash,
+            created_at=v.created_at,
+        )
+        for v in sorted(strat.versions, key=lambda v: v.version)
+    ]
+
+
+@router.get("/strategies/{strategy_id}/versions/{version}", response_model=StrategyDetail)
+async def get_strategy_version(
+    strategy_id: str,
+    version: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Fetch a specific version's source code."""
+    res = await session.execute(
+        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+    )
+    strat = res.scalar_one_or_none()
+    if strat is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+    sv = next((v for v in strat.versions if v.version == version), None)
+    if sv is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Version not found"))
+    return StrategyDetail(
+        id=strat.id,
+        name=strat.name,
+        description=strat.description,
+        source_code=sv.source_code,
+        version=sv.version,
+        updated_at=sv.created_at,
+        default_params=strat.default_params,
+    )
+
+
+@router.post("/strategies/{strategy_id}/versions/{version}/restore", response_model=StrategyCreated)
+async def restore_strategy_version(
+    strategy_id: str,
+    version: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Restore a previous version by branching it as the new current version."""
+    res = await session.execute(
+        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+    )
+    strat = res.scalar_one_or_none()
+    if strat is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+    sv = next((v for v in strat.versions if v.version == version), None)
+    if sv is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Version not found"))
+    now = datetime.now(timezone.utc)
+    new_ver = strat.current_version + 1
+    strat.current_version = new_ver
+    strat.updated_at = now
+    session.add(
+        StrategyVersion(
+            id=_new_id("sv"),
+            strategy_id=strategy_id,
+            version=new_ver,
+            source_code=sv.source_code,
+            content_hash=sv.content_hash or _hash(sv.source_code),
+            label=f"restore from v{version}",
+        )
+    )
+    await session.commit()
+    await session.refresh(strat)
+    return StrategyCreated(
+        id=strat.id,
+        name=strat.name,
+        version=strat.current_version,
+        created_at=now,
     )
 
 

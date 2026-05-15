@@ -1,6 +1,18 @@
 export const apiOrigin = import.meta.env.VITE_API_ORIGIN || "";
 export const apiV1 = `${apiOrigin}/api/v1`;
 
+/** Structured API error carrying the backend {error:{code,message,details}} envelope. */
+export class ApiError extends Error {
+  readonly code: string;
+  readonly details: unknown;
+  constructor(code: string, message: string, details: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
 /** Absolute URL for opening / embedding reports (iframe, window.open). */
 export function resolveArtifactUrl(path: string | undefined | null): string | undefined {
   if (!path?.trim()) return undefined;
@@ -22,8 +34,25 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${text}`);
+    let body: {
+      error?: { code?: string; message?: string; details?: unknown };
+      detail?: { error?: { code?: string; message?: string; details?: unknown } };
+    } | null = null;
+    try {
+      body = await res.json();
+    } catch {
+      /* ignore parse failure */
+    }
+    // Support both top-level error and FastAPI's nested detail.error envelope
+    const err = body?.error ?? body?.detail?.error;
+    if (err?.message) {
+      throw new ApiError(
+        err.code ?? "ERROR",
+        err.message,
+        err.details ?? null,
+      );
+    }
+    throw new ApiError("HTTP_ERROR", `${res.status} ${res.statusText}`, null);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -43,6 +72,7 @@ export type RunListItem = {
   started_at: string | null;
   finished_at: string | null;
   error_message: string | null;
+  queue_position: number | null; // B18
 };
 
 export async function fetchRunsList(
@@ -66,9 +96,20 @@ export async function fetchRunMetrics(runId: string): Promise<{
   return apiJson(`/api/v1/runs/${runId}/metrics`);
 }
 
-export async function compareRunMetrics(
-  runIds: string[]
-): Promise<{ runs: { run_id: string; strategy_name: string | null; status: string; started_at: string | null; metrics: Record<string, number | null> }[]; common_keys: string[] }> {
+// B22: equity curve point
+export type EquityCurvePoint = { date: string; value: number };
+
+export async function compareRunMetrics(runIds: string[]): Promise<{
+  runs: {
+    run_id: string;
+    strategy_name: string | null;
+    status: string;
+    started_at: string | null;
+    metrics: Record<string, number | null>;
+    equity_curve: EquityCurvePoint[]; // B22
+  }[];
+  common_keys: string[];
+}> {
   return apiJson("/api/v1/runs/compare", {
     method: "POST",
     body: JSON.stringify({ run_ids: runIds }),

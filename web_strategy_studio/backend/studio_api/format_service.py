@@ -6,12 +6,11 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 
 def format_python(source: str, timeout: float = 30.0) -> dict:
     proc = None
-    tmp_path: Optional[str] = None
+    tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
             f.write(source)

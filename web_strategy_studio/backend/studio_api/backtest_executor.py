@@ -5,15 +5,19 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+
+import pandas as pd
 
 from studio_api.config import settings
-from studio_api.proc_registry import register as register_proc, unregister as unregister_proc
+from studio_api.proc_registry import register as register_proc
+from studio_api.proc_registry import unregister as unregister_proc
 from studio_api.stream_hub import stream_hub
 
 
@@ -21,9 +25,15 @@ def _parse_iso(d: str) -> date:
     return datetime.strptime(d[:10], "%Y-%m-%d").date()
 
 
+# Matches "📍 Backtest progress: 47/250 (18.8%)" and "Backtest progress 47/250"
+_PROGRESS_RE = re.compile(r"Backtest progress[:\s]+(\d+)\s*/\s*(\d+)")
+
+
 def _estimate_trading_fraction(done_days: int, start: date, end: date) -> float:
-    """Rough progress from calendar span when bar-level hooks are unavailable."""
-    total = max((end - start).days, 1)
+    """Rough progress from trading-day span when bar-level hooks are unavailable."""
+    # Use pandas bdate_range (Mon-Fri) as a proxy for trading days (~250/yr)
+    # instead of calendar days (~365/yr) to avoid the ~1.46× overestimate.
+    total = max(len(pd.bdate_range(start=start, end=end)), 1)
     return min(0.95, 0.15 + 0.75 * (done_days / total))
 
 
@@ -54,8 +64,21 @@ async def execute_backtest(
     # Only allow an explicit allowlist of safe variables; strip everything else
     # (OPENAI_API_KEY, AWS_*, database connection strings, etc.).
     _ALLOWED_ENV_PREFIXES = ("EQ_",)
-    _ALLOWED_ENV_KEYS = frozenset({"PATH", "PYTHONPATH", "HOME", "LANG", "LC_ALL",
-                                    "TZ", "USER", "LOGNAME", "TMPDIR", "TEMP", "TMP"})
+    _ALLOWED_ENV_KEYS = frozenset(
+        {
+            "PATH",
+            "PYTHONPATH",
+            "HOME",
+            "LANG",
+            "LC_ALL",
+            "TZ",
+            "USER",
+            "LOGNAME",
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+        }
+    )
 
     filtered_env: dict[str, str] = {}
     for k, v in os.environ.items():
@@ -105,19 +128,22 @@ async def execute_backtest(
             log_lines += 1
 
             # S5: Parse structured progress lines emitted by the engine.
-            # Format: "Backtest progress N/M" where N = days done, M = total.
-            # This gives true progress instead of the crude log_lines//2 heuristic.
-            if line.startswith("Backtest progress ") and "/" in line:
+            # Format: "📍 Backtest progress: N/M (pct%)" or "Backtest progress N/M"
+            # The regex handles optional emoji prefix, colon, and trailing percentage.
+            m = _PROGRESS_RE.search(line)
+            if m:
                 try:
-                    parts = line.split()[-1].split("/")
-                    done, total = int(parts[0]), int(parts[1])
+                    done, total = int(m.group(1)), int(m.group(2))
                     if total > 0:
                         frac = min(0.92, 0.10 + 0.82 * done / total)
                         await stream_hub.publish(
                             run_id,
                             "progress",
-                            {"progress": frac, "stage": "simulate",
-                             "message": f"Day {done}/{total}"},
+                            {
+                                "progress": frac,
+                                "stage": "simulate",
+                                "message": f"Day {done}/{total}",
+                            },
                         )
                 except (ValueError, IndexError):
                     pass
@@ -125,7 +151,11 @@ async def execute_backtest(
             await stream_hub.publish(
                 run_id,
                 "log",
-                {"ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "stream": name, "line": line},
+                {
+                    "ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "stream": name,
+                    "line": line,
+                },
             )
 
     async def progress_tick() -> None:
@@ -147,7 +177,7 @@ async def execute_backtest(
     t_err = asyncio.create_task(pump_stream(proc.stderr, "stderr"))  # type: ignore[arg-type]
     t_prog = asyncio.create_task(progress_tick())
 
-    timeout_payload: Optional[dict[str, Any]] = None
+    timeout_payload: dict[str, Any] | None = None
     try:
         await asyncio.wait_for(proc.wait(), timeout=settings.run_timeout_sec)
     except asyncio.TimeoutError:

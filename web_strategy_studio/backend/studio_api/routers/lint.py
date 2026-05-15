@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from studio_api.db import get_session
 from studio_api.lint_service import lint_source
-from studio_api.models import Strategy, StrategyVersion
+from studio_api.models import Strategy
 from studio_api.schemas import LintBody, LintResponse
 
 router = APIRouter(prefix="/api/v1", tags=["lint"])
@@ -36,7 +36,9 @@ async def lint_strategy(
 
             raise HTTPException(
                 status_code=404,
-                detail={"error": {"code": "NOT_FOUND", "message": "Strategy not found", "details": None}},
+                detail={
+                    "error": {"code": "NOT_FOUND", "message": "Strategy not found", "details": None}
+                },
             )
         latest = max(strat.versions, key=lambda v: v.version)
         code = latest.source_code

@@ -1,0 +1,506 @@
+[
+  {
+    "label": "initialize",
+    "kind": "Function",
+    "insert_text": "def initialize(context):\n    \"\"\"Called once before backtest starts.\"\"\"\n    pass",
+    "documentation": "eqlib lifecycle callback: initialize"
+  },
+  {
+    "label": "handle_data",
+    "kind": "Function",
+    "insert_text": "def handle_data(context, data):\n    \"\"\"Called on every bar (if set_handle_data is used).\"\"\"\n    pass",
+    "documentation": "eqlib lifecycle callback: handle_data"
+  },
+  {
+    "label": "before_trading_start",
+    "kind": "Function",
+    "insert_text": "def before_trading_start(context, data):\n    \"\"\"Called each day before market open.\"\"\"\n    pass",
+    "documentation": "eqlib lifecycle callback: before_trading_start"
+  },
+  {
+    "label": "after_trading_end",
+    "kind": "Function",
+    "insert_text": "def after_trading_end(context, data):\n    \"\"\"Called each day after market close.\"\"\"\n    pass",
+    "documentation": "eqlib lifecycle callback: after_trading_end"
+  },
+  {
+    "label": "run_daily",
+    "kind": "Function",
+    "insert_text": "run_daily(func, time='every_bar')",
+    "documentation": "Schedule a function to run every trading day."
+  },
+  {
+    "label": "run_weekly",
+    "kind": "Function",
+    "insert_text": "run_weekly(func, day_of_week: int = 1, time='09:30')",
+    "documentation": "Schedule a function to run weekly."
+  },
+  {
+    "label": "run_monthly",
+    "kind": "Function",
+    "insert_text": "run_monthly(func, day_of_month: int = 1, time='09:30')",
+    "documentation": "Schedule a function to run monthly."
+  },
+  {
+    "label": "run_selection",
+    "kind": "Function",
+    "insert_text": "run_selection(func, rebalance: str = 'monthly:1')",
+    "documentation": "Register a stock selection function to run periodically."
+  },
+  {
+    "label": "run_backtest",
+    "kind": "Function",
+    "insert_text": "run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency: str = 'daily', benchmark: str = '000300.XSHG', securities=None, use_local: bool = False, max_memory_mb: int = 1024, selection_func=None, selection_rebalance: str = 'monthly:1')",
+    "documentation": "Main backtest runner."
+  },
+  {
+    "label": "order",
+    "kind": "Function",
+    "insert_text": "order(security, amount, style=None)",
+    "documentation": "Buy or sell a fixed number of shares (mirrors EasyQuant's order)."
+  },
+  {
+    "label": "order_target",
+    "kind": "Function",
+    "insert_text": "order_target(security, amount, style=None)",
+    "documentation": "Adjust position to a target share count (mirrors EasyQuant's order_target)."
+  },
+  {
+    "label": "order_value",
+    "kind": "Function",
+    "insert_text": "order_value(security, value, style=None)",
+    "documentation": "Buy or sell a target monetary value (mirrors EasyQuant's order_value)."
+  },
+  {
+    "label": "order_target_value",
+    "kind": "Function",
+    "insert_text": "order_target_value(security, value, style=None)",
+    "documentation": "Adjust position to a target monetary value (mirrors EasyQuant's order_target_value)."
+  },
+  {
+    "label": "get_price",
+    "kind": "Function",
+    "insert_text": "get_price(security, start_date=None, end_date=None, frequency: str = 'daily', fields=None, count=None)",
+    "documentation": "Get historical price data."
+  },
+  {
+    "label": "attribute_history",
+    "kind": "Function",
+    "insert_text": "attribute_history(security, count: int, unit: str = '1d', fields=('close',), df: bool = True, skip_paused: bool = True, fq: str = 'pre')",
+    "documentation": "Get historical attribute data for a single security."
+  },
+  {
+    "label": "history",
+    "kind": "Function",
+    "insert_text": "history(count: int, unit: str = '1d', field: str = 'close', security=None, df: bool = False)",
+    "documentation": "Get the most recent `count` bars ending at current_dt."
+  },
+  {
+    "label": "get_all_securities",
+    "kind": "Function",
+    "insert_text": "get_all_securities(types=None, date=None) -> pandas.DataFrame",
+    "documentation": "Get list of all A-share stocks."
+  },
+  {
+    "label": "get_index_stocks",
+    "kind": "Function",
+    "insert_text": "get_index_stocks(index_code) -> pandas.DataFrame",
+    "documentation": "Get constituent stocks of an index."
+  },
+  {
+    "label": "get_current_data",
+    "kind": "Function",
+    "insert_text": "get_current_data() -> dict",
+    "documentation": "Get current market snapshot for all A-shares."
+  },
+  {
+    "label": "get_security_info",
+    "kind": "Function",
+    "insert_text": "get_security_info(code)",
+    "documentation": "Get basic information for a single security."
+  },
+  {
+    "label": "get_trade_days",
+    "kind": "Function",
+    "insert_text": "get_trade_days(start_date=None, end_date=None, count=None) -> list[datetime.date]",
+    "documentation": "Get list of trading days."
+  },
+  {
+    "label": "get_fundamentals",
+    "kind": "Function",
+    "insert_text": "get_fundamentals(query_or_code, date=None)",
+    "documentation": "Get fundamentals data."
+  },
+  {
+    "label": "get_valuation",
+    "kind": "Function",
+    "insert_text": "get_valuation(code) -> Optional[dict]",
+    "documentation": "Get valuation data for a stock (uses cached spot data)."
+  },
+  {
+    "label": "get_industry_list",
+    "kind": "Function",
+    "insert_text": "get_industry_list() -> list[str]",
+    "documentation": "Get list of all industry board names."
+  },
+  {
+    "label": "get_industry_stocks",
+    "kind": "Function",
+    "insert_text": "get_industry_stocks(industry_name) -> pandas.DataFrame",
+    "documentation": "Get constituent stocks of an industry board."
+  },
+  {
+    "label": "get_concept_list",
+    "kind": "Function",
+    "insert_text": "get_concept_list() -> list[str]",
+    "documentation": "Get list of all concept/theme board names."
+  },
+  {
+    "label": "get_concept_stocks",
+    "kind": "Function",
+    "insert_text": "get_concept_stocks(concept_name) -> pandas.DataFrame",
+    "documentation": "Get constituent stocks of a concept/theme board."
+  },
+  {
+    "label": "fetch_stock_data",
+    "kind": "Function",
+    "insert_text": "fetch_stock_data(code: str, start_date, end_date, adjust: str = 'qfq') -> pandas.DataFrame",
+    "documentation": "Fetch daily OHLCV data from akshare for a single stock, ETF, or index."
+  },
+  {
+    "label": "download_stock_data",
+    "kind": "Function",
+    "insert_text": "download_stock_data(code, start_date, end_date, adjust: str = 'qfq', output_dir=None, filename=None) -> Optional[str]",
+    "documentation": "Download daily OHLCV data and save to CSV."
+  },
+  {
+    "label": "set_universe",
+    "kind": "Function",
+    "insert_text": "set_universe(security_list)",
+    "documentation": "Set the current stock universe for the strategy."
+  },
+  {
+    "label": "get_universe",
+    "kind": "Function",
+    "insert_text": "get_universe() -> list",
+    "documentation": "Get the current strategy's stock universe."
+  },
+  {
+    "label": "set_benchmark",
+    "kind": "Function",
+    "insert_text": "set_benchmark(security)",
+    "documentation": "Set benchmark security."
+  },
+  {
+    "label": "set_order_cost",
+    "kind": "Function",
+    "insert_text": "set_order_cost(cost, type: str = 'stock', ref=None)",
+    "documentation": "Set order cost parameters."
+  },
+  {
+    "label": "set_slippage",
+    "kind": "Function",
+    "insert_text": "set_slippage(model)",
+    "documentation": "Set the slippage model for the current session."
+  },
+  {
+    "label": "set_option",
+    "kind": "Function",
+    "insert_text": "set_option(name, value)",
+    "documentation": "Set strategy option."
+  },
+  {
+    "label": "record",
+    "kind": "Function",
+    "insert_text": "record(**kwargs)",
+    "documentation": "Record a data point for charting."
+  },
+  {
+    "label": "OrderCost",
+    "kind": "Class",
+    "insert_text": "OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003, close_commission=0.0003, close_today_commission=0, min_commission=5)",
+    "documentation": "Transaction cost specification (mirrors EasyQuant's OrderCost)."
+  },
+  {
+    "label": "SlippageModel",
+    "kind": "Class",
+    "insert_text": "SlippageModel(/, *args, **kwargs)",
+    "documentation": "Base slippage model — no slippage (pass-through)."
+  },
+  {
+    "label": "FixedSlippage",
+    "kind": "Class",
+    "insert_text": "FixedSlippage(pct: float = 0.001)",
+    "documentation": "Fixed-percentage slippage applied uniformly to every trade."
+  },
+  {
+    "label": "VolumeSlippage",
+    "kind": "Class",
+    "insert_text": "VolumeSlippage(impact: float = 0.05)",
+    "documentation": "Volume-proportional slippage (similar to Zipline's VolumeShareSlippage)."
+  },
+  {
+    "label": "StockSelector",
+    "kind": "Class",
+    "insert_text": "StockSelector(/, *args, **kwargs)",
+    "documentation": "Base class for stock selection strategies."
+  },
+  {
+    "label": "TopNSelector",
+    "kind": "Class",
+    "insert_text": "TopNSelector(factor: str = 'pe', top_n: int = 5, ascending: bool = True)",
+    "documentation": "Select Top-N stocks ranked by a single factor."
+  },
+  {
+    "label": "MultiFactorSelector",
+    "kind": "Class",
+    "insert_text": "MultiFactorSelector(factors: Optional[dict] = None, top_n: int = 5)",
+    "documentation": "Rank stocks by a weighted composite score of multiple factors."
+  },
+  {
+    "label": "BacktestSession",
+    "kind": "Class",
+    "insert_text": "BacktestSession()",
+    "documentation": "Encapsulates all mutable state for a single backtest run."
+  },
+  {
+    "label": "StrategyConfig",
+    "kind": "Class",
+    "insert_text": "StrategyConfig(securities: list[str], start_date, end_date, starting_cash: float = 100000.0, benchmark: str = '000300.XSHG', position_pct: float = 0.33, position_amount: int = 0, report_suffix: str = '', frequency: str = 'daily', rebalance_frequency: str = 'daily', use_local: bool = False)",
+    "documentation": "Configuration for a portfolio backtest."
+  },
+  {
+    "label": "g",
+    "kind": "Variable",
+    "insert_text": "g",
+    "documentation": "Global object for storing user-defined state across bars. Access as g.my_var = ..."
+  },
+  {
+    "label": "context",
+    "kind": "Variable",
+    "insert_text": "context",
+    "documentation": "Passed to every lifecycle callback. Holds portfolio, current_dt, universe, etc."
+  },
+  {
+    "label": "context.portfolio",
+    "kind": "Variable",
+    "insert_text": "context.portfolio",
+    "documentation": "Portfolio object: available_cash, total_value, positions, etc."
+  },
+  {
+    "label": "context.portfolio.positions",
+    "kind": "Variable",
+    "insert_text": "context.portfolio.positions",
+    "documentation": "Dict[security, Position] of current positions."
+  },
+  {
+    "label": "context.portfolio.available_cash",
+    "kind": "Variable",
+    "insert_text": "context.portfolio.available_cash",
+    "documentation": "Current available cash balance (float)."
+  },
+  {
+    "label": "log.info",
+    "kind": "Method",
+    "insert_text": "log.info",
+    "documentation": "eqlib log.info"
+  },
+  {
+    "label": "log.warn",
+    "kind": "Method",
+    "insert_text": "log.warn",
+    "documentation": "Log a warning.  Alias: ``warning``."
+  },
+  {
+    "label": "log.error",
+    "kind": "Method",
+    "insert_text": "log.error",
+    "documentation": "eqlib log.error"
+  },
+  {
+    "label": "log.debug",
+    "kind": "Method",
+    "insert_text": "log.debug",
+    "documentation": "eqlib log.debug"
+  },
+  {
+    "label": "ma",
+    "kind": "Function",
+    "insert_text": "ma(series: pandas.Series, period: int) -> pandas.Series",
+    "documentation": "Indicator: Simple Moving Average."
+  },
+  {
+    "label": "ema",
+    "kind": "Function",
+    "insert_text": "ema(series: pandas.Series, period: int) -> pandas.Series",
+    "documentation": "Indicator: Exponential Moving Average."
+  },
+  {
+    "label": "sma",
+    "kind": "Function",
+    "insert_text": "sma(series: pandas.Series, period: int) -> pandas.Series",
+    "documentation": "Indicator: Simple Moving Average (identical to ``ma``; alias kept for compatibility)."
+  },
+  {
+    "label": "smma",
+    "kind": "Function",
+    "insert_text": "smma(series: pandas.Series, period: int, weight: float = 1.0) -> pandas.Series",
+    "documentation": "Indicator: Smoothed Moving Average (SMMA / RMA / Wilder MA)."
+  },
+  {
+    "label": "wma",
+    "kind": "Function",
+    "insert_text": "wma(series: pandas.Series, period: int) -> pandas.Series",
+    "documentation": "Indicator: Weighted Moving Average (linear weights)."
+  },
+  {
+    "label": "macd",
+    "kind": "Function",
+    "insert_text": "macd(close: pandas.Series, fast: int = 12, slow: int = 26, signal: int = 9)",
+    "documentation": "Indicator: Moving Average Convergence Divergence."
+  },
+  {
+    "label": "rsi",
+    "kind": "Function",
+    "insert_text": "rsi(close: pandas.Series, period: int = 14) -> pandas.Series",
+    "documentation": "Indicator: Relative Strength Index."
+  },
+  {
+    "label": "kdj",
+    "kind": "Function",
+    "insert_text": "kdj(high: pandas.Series, low: pandas.Series, close: pandas.Series, period: int = 9, smooth: int = 3)",
+    "documentation": "Indicator: Stochastic Oscillator (KDJ)."
+  },
+  {
+    "label": "boll",
+    "kind": "Function",
+    "insert_text": "boll(close: pandas.Series, period: int = 20, num_std: float = 2.0)",
+    "documentation": "Indicator: Bollinger Bands."
+  },
+  {
+    "label": "atr",
+    "kind": "Function",
+    "insert_text": "atr(high: pandas.Series, low: pandas.Series, close: pandas.Series, period: int = 14) -> pandas.Series",
+    "documentation": "Indicator: Average True Range."
+  },
+  {
+    "label": "cci",
+    "kind": "Function",
+    "insert_text": "cci(high: pandas.Series, low: pandas.Series, close: pandas.Series, period: int = 14) -> pandas.Series",
+    "documentation": "Indicator: Commodity Channel Index."
+  },
+  {
+    "label": "roc",
+    "kind": "Function",
+    "insert_text": "roc(close: pandas.Series, period: int = 12) -> pandas.Series",
+    "documentation": "Indicator: Rate of Change."
+  },
+  {
+    "label": "obv",
+    "kind": "Function",
+    "insert_text": "obv(close: pandas.Series, volume: pandas.Series) -> pandas.Series",
+    "documentation": "Indicator: On Balance Volume."
+  },
+  {
+    "label": "vwap",
+    "kind": "Function",
+    "insert_text": "vwap(high, low, close, volume, window: int = None) -> pandas.Series",
+    "documentation": "Indicator: Volume Weighted Average Price."
+  },
+  {
+    "label": "golden_cross",
+    "kind": "Function",
+    "insert_text": "golden_cross(fast_ma: pandas.Series, slow_ma: pandas.Series) -> pandas.Series",
+    "documentation": "Indicator: Detect golden cross: fast MA crosses above slow MA."
+  },
+  {
+    "label": "death_cross",
+    "kind": "Function",
+    "insert_text": "death_cross(fast_ma: pandas.Series, slow_ma: pandas.Series) -> pandas.Series",
+    "documentation": "Indicator: Detect death cross: fast MA crosses below slow MA."
+  },
+  {
+    "label": "filter_st_stocks",
+    "kind": "Function",
+    "insert_text": "filter_st_stocks(securities: list[str]) -> list[str]",
+    "documentation": "Remove ST / *ST stocks from the candidate list."
+  },
+  {
+    "label": "filter_paused_stocks",
+    "kind": "Function",
+    "insert_text": "filter_paused_stocks(securities: list[str], context=None) -> list[str]",
+    "documentation": "Remove paused/suspended stocks (volume == 0)."
+  },
+  {
+    "label": "filter_low_price_stocks",
+    "kind": "Function",
+    "insert_text": "filter_low_price_stocks(securities: list[str], min_price: float = 2.0, context=None) -> list[str]",
+    "documentation": "Remove stocks below a minimum price threshold."
+  },
+  {
+    "label": "filter_high_pe_stocks",
+    "kind": "Function",
+    "insert_text": "filter_high_pe_stocks(securities: list[str], max_pe: float = 100.0, context=None) -> list[str]",
+    "documentation": "Remove stocks with P/E ratio above the threshold."
+  },
+  {
+    "label": "fetch_factor_data",
+    "kind": "Function",
+    "insert_text": "fetch_factor_data(securities: list[str], fields: Optional[list[str]] = None, context=None) -> pandas.DataFrame",
+    "documentation": "Fetch multi-dimensional data for a list of securities."
+  },
+  {
+    "label": "analyze_returns",
+    "kind": "Function",
+    "insert_text": "analyze_returns(result, risk_free_rate=0.03, trading_days=252)",
+    "documentation": "Calculate comprehensive risk and return metrics from a backtest result."
+  },
+  {
+    "label": "brinson_attribution",
+    "kind": "Function",
+    "insert_text": "brinson_attribution(result, sector_data=None, benchmark_returns=None)",
+    "documentation": "Brinson attribution: allocation + selection + interaction effects."
+  },
+  {
+    "label": "simple_factor_analysis",
+    "kind": "Function",
+    "insert_text": "simple_factor_analysis(result, factors=None)",
+    "documentation": "Simplified factor analysis."
+  },
+  {
+    "label": "portfolio_optimizer",
+    "kind": "Function",
+    "insert_text": "portfolio_optimizer(securities, prices, target=None, constraints=None, bounds=None, default_range=(0.0, 1.0), ftol=1e-09, return_none_if_fail=True)",
+    "documentation": "Optimize portfolio weights under given constraints."
+  },
+  {
+    "label": "walk_forward",
+    "kind": "Function",
+    "insert_text": "walk_forward(make_initialize: 'Callable', optimize_fn: 'Optional[Callable]' = None, start_date: 'str | datetime.date' = '2020-01-01', end_date: 'str | datetime.date' = '2023-12-31', train_months: 'int' = 12, test_months: 'int' = 3, step_months: 'int' = 3, starting_cash: 'float' = 100000, benchmark: 'str' = '000300.XSHG', securities: 'Optional[list[str]]' = None, use_local: 'bool' = False, **backtest_kwargs) -> 'WFAResult'",
+    "documentation": "Run a walk-forward analysis."
+  },
+  {
+    "label": "generate_html_report",
+    "kind": "Function",
+    "insert_text": "generate_html_report(result, out_path)",
+    "documentation": "Generate interactive HTML report with TradingView lightweight-charts."
+  },
+  {
+    "label": "generate_report_json",
+    "kind": "Function",
+    "insert_text": "generate_report_json(result, out_path)",
+    "documentation": "Generate machine-readable JSON report with risk metrics, benchmark comparison, and full trade/position data."
+  },
+  {
+    "label": "generate_report_md",
+    "kind": "Function",
+    "insert_text": "generate_report_md(result, out_path)",
+    "documentation": "Generate professional Markdown report with risk metrics, trade analysis, benchmark comparison, and per-stock breakdown."
+  },
+  {
+    "label": "generate_chart",
+    "kind": "Function",
+    "insert_text": "generate_chart(result, out_path)",
+    "documentation": "Generate professional backtest chart: - Top: strategy cumulative return (%) vs benchmark (%) - Bottom: portfolio drawdown (%) - Key metrics annotation box"
+  }
+]
