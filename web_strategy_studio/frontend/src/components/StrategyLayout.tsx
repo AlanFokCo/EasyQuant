@@ -158,6 +158,12 @@ export function StrategyLayout() {
       if (!strategyId) return;
       setDirty(true);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      // NOTE: strategyId is captured in this closure.  A potential race
+      // (timer fires after strategyId changes) is prevented by the cleanup
+      // effect below, which cancels any pending timer whenever strategyId
+      // changes — React runs cleanup synchronously before applying the new
+      // dependency value, so the timer is always cancelled before the new
+      // strategy becomes active.
       saveTimerRef.current = setTimeout(() => {
         saveTimerRef.current = null;
         apiJson(`/api/v1/strategies/${strategyId}`, {

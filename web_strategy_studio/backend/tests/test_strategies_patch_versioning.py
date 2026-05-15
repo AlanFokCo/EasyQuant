@@ -25,16 +25,42 @@ def client():
         yield c
 
 
-def test_patch_always_bumps_version():
-    """B4 — PATCH with source_code must NOT always bump version (Phase 2 fix).
+def test_patch_always_bumps_version(client):
+    """B4 — PATCH with the same source_code must NOT create a duplicate version.
 
     This test is EXPECTED TO FAIL in Phase 0.  Rapid debounced saves currently
     create a new StrategyVersion row on every PATCH, regardless of whether the
-    content changed.  Phase 2 will deduplicate identical-content versions.
+    content changed.  Phase 2 will deduplicate identical-content versions via
+    content-hash comparison.
+
+    When Phase 2 is implemented, remove the xfail mark and the test will pass.
     """
     pytest.xfail(
         "B4 not fixed yet — PATCH always creates a new version row. "
         "Fixed in Phase 2 by content-hash deduplication."
+    )
+
+    # ── Assertions that will hold after Phase 2 ──────────────────────────────
+    tpl = client.get("/api/v1/strategies/_new/template")
+    create_resp = client.post(
+        "/api/v1/strategies",
+        json={
+            "name": "version-bump test",
+            "description": "",
+            "source_code": tpl.json()["source_code"],
+        },
+    )
+    assert create_resp.status_code in (200, 201)
+    sid = create_resp.json()["id"]
+    v0 = create_resp.json()["version"]
+
+    # PATCH with identical source code twice — version must stay the same
+    same_code = tpl.json()["source_code"]
+    client.patch(f"/api/v1/strategies/{sid}", json={"source_code": same_code})
+    resp2 = client.patch(f"/api/v1/strategies/{sid}", json={"source_code": same_code})
+    assert resp2.status_code == 200
+    assert resp2.json()["version"] == v0, (
+        "Identical-content PATCH must not increment version (B4)"
     )
 
 
