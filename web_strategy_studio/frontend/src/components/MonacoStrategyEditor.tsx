@@ -16,7 +16,10 @@ const _TRIGGER_CHARS = Array.from(
   "._abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 );
 
-// Debounce helper for the async completion fetch
+// Last-call-wins debounce for the async completion fetch.
+// Promises from earlier calls within the debounce window are intentionally
+// never resolved — Monaco only needs the result for the most recent keystroke,
+// and the provider is called again on the next trigger anyway.
 function _makeDebounced(fn: (sourceCode: string, cursorLine: number, cursorCol: number) => Promise<unknown>, ms: number) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   return (sourceCode: string, cursorLine: number, cursorCol: number) =>

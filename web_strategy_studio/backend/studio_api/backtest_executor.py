@@ -31,7 +31,7 @@ _PROGRESS_RE = re.compile(r"Backtest progress[:\s]+(\d+)\s*/\s*(\d+)")
 def _estimate_trading_fraction(done_days: int, start: date, end: date) -> float:
     """Rough progress from trading-day span when bar-level hooks are unavailable."""
     # Use pandas bdate_range (Mon-Fri) as a proxy for trading days (~250/yr)
-    # instead of calendar days (~365/yr) to avoid ~1.5× overestimate.
+    # instead of calendar days (~365/yr) to avoid the ~1.46× overestimate.
     total = max(len(pd.bdate_range(start=start, end=end)), 1)
     return min(0.95, 0.15 + 0.75 * (done_days / total))
 

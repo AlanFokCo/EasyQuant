@@ -140,11 +140,12 @@ export function StrategyLayout() {
 
   const debouncedSave = useCallback(
     (code: string) => {
+      // Guard early: if no strategy is loaded yet, there's nothing to save.
+      if (!strategyId) return;
       setDirty(true);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         saveTimerRef.current = null;
-        if (!strategyId) return;
         apiJson(`/api/v1/strategies/${strategyId}`, {
           method: "PATCH",
           body: JSON.stringify({ source_code: code }),
