@@ -9,7 +9,7 @@ import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -220,7 +220,7 @@ async def create_run(
     request: Request,
     body: CreateRunBody,
     session: AsyncSession = Depends(get_session),
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ):
     # B18: per-IP rate limit
     client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
@@ -374,7 +374,7 @@ async def delete_run(run_id: str, session: AsyncSession = Depends(get_session)):
 async def run_stream(
     run_id: str,
     session: AsyncSession = Depends(get_session),
-    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+    last_event_id: str | None = Header(None, alias="Last-Event-ID"),
 ):
     """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13)."""
     # Resolve last_event_id to an int (default -1 = send everything).
@@ -460,7 +460,7 @@ async def get_queue():
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
     session: AsyncSession = Depends(get_session),
-    strategy_id: Optional[str] = None,
+    strategy_id: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ):
@@ -554,9 +554,9 @@ _METRIC_KEYS = (
 )
 
 
-def _extract_metrics(raw: dict[str, Any]) -> dict[str, Optional[float]]:
+def _extract_metrics(raw: dict[str, Any]) -> dict[str, float | None]:
     risk = raw.get("risk_metrics", raw)
-    metrics: dict[str, Optional[float]] = {}
+    metrics: dict[str, float | None] = {}
     for key in _METRIC_KEYS:
         val = risk.get(key)
         if val is not None:
