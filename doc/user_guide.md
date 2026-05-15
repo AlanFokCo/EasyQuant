@@ -42,7 +42,10 @@
 
 1. 安装：
    ```bash
-   pip install .
+   # PyPI 安装（推荐）
+   pip install easyquant-eqlib
+   # 或从源码安装（在仓库根目录）
+   # pip install .
    ```
 2. 验证导入：
    ```bash
@@ -86,9 +89,9 @@ python -m pytest tests/
 **环境要求：Python 3.10 及以上**。
 
 ```bash
-cd EasyQuant
-pip install .
-# 开发时可选用：pip install -e .
+# PyPI 安装（推荐）
+pip install easyquant-eqlib
+# 开发时可选用（在仓库根目录）：pip install -e .
 ```
 
 确认安装成功：

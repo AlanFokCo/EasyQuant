@@ -46,7 +46,7 @@ Event-driven quantitative backtesting framework for China A-share market.
 ## Quick Start
 
 ```bash
-pip install .
+pip install easyquant-eqlib   # or: pip install -e .  (from source)
 python -c "from eqlib import *; print('eqlib OK')"
 python examples/03_run_backtest.py
 ```
@@ -183,15 +183,18 @@ Full index at [`examples/Examples.md`](examples/Examples.md).
 
 ## Installation
 
+### PyPI (recommended for users)
+
+```bash
+pip install easyquant-eqlib
+python -c "from eqlib import *; print('eqlib OK')"
+```
+
+### From source (for contributors / editable install)
+
 ```bash
 git clone https://github.com/AlanFokCo/EasyQuant.git
 cd EasyQuant
-pip install .
-```
-
-Editable install for development:
-
-```bash
 pip install -e ".[dev]"
 python -m pytest tests/
 ```

@@ -40,8 +40,12 @@
 ## 快速验证
 
 ```bash
-cd EasyQuant
-pip install .
+# PyPI 安装（推荐）
+pip install easyquant-eqlib
+
+# 或从源码安装（仓库根目录执行）
+# pip install -e .
+
 python -c "from eqlib import *; print('eqlib OK')"
 python examples/03_run_backtest.py
 ```

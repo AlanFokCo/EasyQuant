@@ -23,7 +23,7 @@ npm run dev:all
 |------|------|------|
 | Python | **3.9+**（推荐 3.11） | 与 eqlib 的 `requires-python` 一致 |
 | Node | **18+**（推荐 20 LTS） | Vite 5 不兼容 Node 16 及以下 |
-| pip 包 | `eqlib` | 在 EasyQuant 仓库根目录执行 `pip install -e .` |
+| pip 包 | `eqlib` | `pip install easyquant-eqlib`（PyPI）或在仓库根目录执行 `pip install -e .`（源码） |
 
 若使用 nvm 管理 Node 版本，可在工作室目录执行 `nvm install && nvm use`（读取 `.nvmrc` 中的 `20`）。
 

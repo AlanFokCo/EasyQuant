@@ -34,8 +34,13 @@
 cd EasyQuant
 python3 -m venv .venv          # 可选，但强烈推荐
 source .venv/bin/activate    # Windows: .venv\Scripts\activate
+
+# 方式一：从源码安装（在仓库根目录）
 pip install .
 # 开发调试可选用：pip install -e .
+
+# 方式二：PyPI 安装（无需克隆仓库）
+# pip install easyquant-eqlib
 ```
 
 验证：

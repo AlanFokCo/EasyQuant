@@ -758,8 +758,10 @@ position_pct = min(kelly_f * 0.5, g.max_single_pct)
 ```bash
 # 克隆项目后，在项目根目录执行：
 
-# 安装依赖
-pip install akshare pandas numpy matplotlib scipy
+# 安装依赖（PyPI）
+pip install easyquant-eqlib
+# 或从源码安装
+# pip install .
 
 # 运行回测（约 60 秒）
 python examples/21_combined_strategy/run_backtest.py

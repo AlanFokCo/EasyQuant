@@ -28,15 +28,18 @@
 
 ### 1.1 安装 eqlib
 
-**要求：Python 3.10 及以上。** 在仓库根目录执行：
+**要求：Python 3.10 及以上。**
 
 ```bash
-cd EasyQuant
-pip install .
-# 或：pip install -e .
+# 方式一：PyPI 安装（推荐，无需克隆仓库）
+pip install easyquant-eqlib
+
+# 方式二：从源码安装（在仓库根目录）
+# cd EasyQuant
+# pip install .   # 或：pip install -e .
 ```
 
-若仅安装 `akshare` 等依赖而未执行 `pip install .`，`import eqlib` 会失败。更详细的说明与排错见 [Tutorial 00](00_environment_and_first_run.md) 与 [FAQ](../doc/FAQ.md)。
+若未正确安装 `eqlib`，`import eqlib` 会失败。更详细的说明与排错见 [Tutorial 00](00_environment_and_first_run.md) 与 [FAQ](../doc/FAQ.md)。
 
 ### 1.2 验证安装
 
