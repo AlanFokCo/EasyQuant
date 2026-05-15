@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "eqlib"
+name = "easyquant-eqlib"
 version = "1.0.0"
 description = "Event-driven quantitative trading framework for China A-share backtesting and research"
 readme = "README.md"
