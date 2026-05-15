@@ -11,12 +11,13 @@ import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 
 from studio_api.config import settings
-from studio_api.proc_registry import register as register_proc, unregister as unregister_proc
+from studio_api.proc_registry import register as register_proc
+from studio_api.proc_registry import unregister as unregister_proc
 from studio_api.stream_hub import stream_hub
 
 
@@ -63,8 +64,21 @@ async def execute_backtest(
     # Only allow an explicit allowlist of safe variables; strip everything else
     # (OPENAI_API_KEY, AWS_*, database connection strings, etc.).
     _ALLOWED_ENV_PREFIXES = ("EQ_",)
-    _ALLOWED_ENV_KEYS = frozenset({"PATH", "PYTHONPATH", "HOME", "LANG", "LC_ALL",
-                                    "TZ", "USER", "LOGNAME", "TMPDIR", "TEMP", "TMP"})
+    _ALLOWED_ENV_KEYS = frozenset(
+        {
+            "PATH",
+            "PYTHONPATH",
+            "HOME",
+            "LANG",
+            "LC_ALL",
+            "TZ",
+            "USER",
+            "LOGNAME",
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+        }
+    )
 
     filtered_env: dict[str, str] = {}
     for k, v in os.environ.items():
@@ -125,8 +139,11 @@ async def execute_backtest(
                         await stream_hub.publish(
                             run_id,
                             "progress",
-                            {"progress": frac, "stage": "simulate",
-                             "message": f"Day {done}/{total}"},
+                            {
+                                "progress": frac,
+                                "stage": "simulate",
+                                "message": f"Day {done}/{total}",
+                            },
                         )
                 except (ValueError, IndexError):
                     pass
@@ -134,7 +151,11 @@ async def execute_backtest(
             await stream_hub.publish(
                 run_id,
                 "log",
-                {"ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "stream": name, "line": line},
+                {
+                    "ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "stream": name,
+                    "line": line,
+                },
             )
 
     async def progress_tick() -> None:
@@ -156,7 +177,7 @@ async def execute_backtest(
     t_err = asyncio.create_task(pump_stream(proc.stderr, "stderr"))  # type: ignore[arg-type]
     t_prog = asyncio.create_task(progress_tick())
 
-    timeout_payload: Optional[dict[str, Any]] = None
+    timeout_payload: dict[str, Any] | None = None
     try:
         await asyncio.wait_for(proc.wait(), timeout=settings.run_timeout_sec)
     except asyncio.TimeoutError:

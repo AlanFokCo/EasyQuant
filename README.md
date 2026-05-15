@@ -7,6 +7,7 @@
 Event-driven quantitative backtesting framework for China A-share market.
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/test.yml?label=Tests)](https://github.com/AlanFokCo/EasyQuant/actions/workflows/test.yml)
+[![Studio CI](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/studio-test.yml?label=Studio%20CI)](https://github.com/AlanFokCo/EasyQuant/actions/workflows/studio-test.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/deploy-docs.yml?label=Docs)](https://AlanFokCo.github.io/EasyQuant/)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/AlanFokCo/EasyQuant/blob/main/LICENSE)
@@ -125,6 +126,12 @@ EasyQuant/
 ├── docs/                  # GitHub Pages site source (MkDocs Material)
 ├── tests/                 # Test suite
 ├── assets/                # Brand assets (logo, icons)
+├── web_strategy_studio/   # Web Strategy Studio (FastAPI + React)
+│   ├── backend/           # FastAPI backend + Alembic migrations
+│   ├── frontend/          # React + Vite + TypeScript frontend
+│   ├── Dockerfile         # Multi-stage: frontend-builder → api → nginx
+│   ├── docker-compose.yml
+│   └── CONTRIBUTING.md    # Studio-specific contributor guide
 ├── CLAUDE.md              # AI agent configuration & optimization workflow
 └── mkdocs.yml             # Documentation site configuration
 ```
@@ -205,6 +212,8 @@ python -m pytest tests/
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+For contributions to the **Web Strategy Studio**, see [`web_strategy_studio/CONTRIBUTING.md`](web_strategy_studio/CONTRIBUTING.md).
+
 ### Development Setup
 
 ```bash
@@ -212,11 +221,27 @@ pip install -e ".[dev,docs]"
 python -m pytest tests/ -v
 ```
 
+### Studio — Quick Dev Start
+
+```bash
+cd web_strategy_studio
+npm run install:all          # installs deps + builds symbol manifest
+npm run dev:all              # API on :8080, frontend on :5173
+```
+
+Or with Docker:
+
+```bash
+cd web_strategy_studio
+docker compose up --build    # full stack on http://localhost:8080
+```
+
 ### CI/CD
 
 | Pipeline | Trigger | Description |
 |----------|---------|-------------|
-| [Tests](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/test.yml) | Push / PR to `main` | Runs test suite on Python 3.10, 3.11, 3.12 |
+| [Tests](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/test.yml) | Push / PR to `main` | Runs eqlib test suite on Python 3.10, 3.11, 3.12 |
+| [Studio Tests](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/studio-test.yml) | Push / PR to `main` (studio paths) | Backend pytest + ruff/black + frontend typecheck/ESLint/vitest |
 | [Deploy Docs](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/deploy-docs.yml) | Push to `main` (docs paths) | Builds and deploys MkDocs site to GitHub Pages |
 
 ---

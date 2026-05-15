@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from studio_api.lint_service import lint_source
 
 

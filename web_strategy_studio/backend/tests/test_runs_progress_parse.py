@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import re
 from datetime import date
-
-import pytest
 
 from studio_api.backtest_executor import _PROGRESS_RE, _estimate_trading_fraction
 
@@ -88,6 +85,7 @@ class TestEstimateTradingFraction:
     def test_trading_days_less_than_calendar_days(self):
         """Verify that bdate_range gives ~250 not ~365 for a full year."""
         import pandas as pd
+
         start = date(2024, 1, 1)
         end = date(2024, 12, 31)
         trading_days = len(pd.bdate_range(start=start, end=end))

@@ -20,8 +20,10 @@ os.environ.setdefault("EQ_STUDIO_VERSION_COALESCE_SEC", "0")
 def client():
     """Synchronous TestClient — triggers FastAPI lifespan (DB init)."""
     from fastapi.testclient import TestClient
-    from studio_api.app import app
+
     import studio_api.config as _cfg
+    from studio_api.app import app
+
     _cfg.settings.version_coalesce_sec = 0
 
     with TestClient(app, raise_server_exceptions=True) as c:
@@ -48,9 +50,7 @@ def test_patch_same_code_no_version_bump(client):
     client.patch(f"/api/v1/strategies/{sid}", json={"source_code": same_code})
     resp2 = client.patch(f"/api/v1/strategies/{sid}", json={"source_code": same_code})
     assert resp2.status_code == 200
-    assert resp2.json()["version"] == v0, (
-        "Identical-content PATCH must not increment version (B4)"
-    )
+    assert resp2.json()["version"] == v0, "Identical-content PATCH must not increment version (B4)"
 
 
 def test_patch_updates_source_code(client):
@@ -107,6 +107,4 @@ def test_patch_name_only_no_version_bump(client):
     v_after = patch_resp.json()["version"]
 
     # Version must NOT have changed
-    assert v_after == v_before, (
-        f"Name-only PATCH should not bump version: {v_before} → {v_after}"
-    )
+    assert v_after == v_before, f"Name-only PATCH should not bump version: {v_before} → {v_after}"

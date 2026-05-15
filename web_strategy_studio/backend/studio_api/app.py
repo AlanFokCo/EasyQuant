@@ -18,7 +18,9 @@ from fastapi.staticfiles import StaticFiles
 
 from studio_api.config import settings
 from studio_api.db import init_db
-from studio_api.routers import completion, format as fmt, health, lint as lint_r, runs, strategies
+from studio_api.routers import completion, health, runs, strategies
+from studio_api.routers import format as fmt
+from studio_api.routers import lint as lint_r
 
 # ---------------------------------------------------------------------------
 # Structured logging (stdlib JSON + structlog)
@@ -32,8 +34,11 @@ structlog.configure(
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
-        structlog.dev.ConsoleRenderer() if settings.api_host == "127.0.0.1"
-        else structlog.processors.JSONRenderer(),
+        (
+            structlog.dev.ConsoleRenderer()
+            if settings.api_host == "127.0.0.1"
+            else structlog.processors.JSONRenderer()
+        ),
     ],
     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
     context_class=dict,
@@ -59,10 +64,12 @@ async def lifespan(app: FastAPI):
 
     # B17: Mark orphan runs from previous server process as failed.
     from studio_api.run_queue import mark_orphan_runs_failed
+
     await mark_orphan_runs_failed()
 
     # B17/B18: Start the asyncio queue worker.
     from studio_api.run_queue import start_worker
+
     start_worker()
 
     # S6: idempotency map stores (run_id, expires_at) pairs.
@@ -97,6 +104,7 @@ async def _idempotency_cleanup_task(app: FastAPI) -> None:
 async def _sse_evict_task() -> None:
     """Periodically evict expired SSE ring buffers (B6)."""
     from studio_api.stream_hub import stream_hub
+
     while True:
         await asyncio.sleep(300)
         stream_hub.evict_expired()

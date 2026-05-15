@@ -14,6 +14,7 @@ os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_queue_test")
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
+
     from studio_api.app import app
 
     with TestClient(app, raise_server_exceptions=True) as c:
@@ -22,8 +23,9 @@ def client():
 
 # ── queue module unit tests ───────────────────────────────────────────────────
 
+
 def test_enqueue_adds_to_pending():
-    from studio_api.run_queue import enqueue, pending_run_ids, _pending
+    from studio_api.run_queue import _pending, enqueue, pending_run_ids
 
     _pending.clear()
 
@@ -36,7 +38,7 @@ def test_enqueue_adds_to_pending():
 
 
 def test_queue_position():
-    from studio_api.run_queue import enqueue, queue_position, _pending
+    from studio_api.run_queue import _pending, enqueue, queue_position
 
     _pending.clear()
 
@@ -79,6 +81,7 @@ def test_rate_limiter_different_ips_independent():
 
 # ── GET /api/v1/queue endpoint ────────────────────────────────────────────────
 
+
 def test_queue_endpoint_returns_structure(client):
     r = client.get("/api/v1/queue")
     assert r.status_code == 200
@@ -99,6 +102,7 @@ def test_queue_max_concurrent_from_settings(client):
 
 # ── Rate limit response ───────────────────────────────────────────────────────
 
+
 def test_rate_limit_endpoint_returns_429(client):
     """Exhaust the per-IP rate limit and verify 429 is returned."""
     from studio_api.config import settings
@@ -108,12 +112,16 @@ def test_rate_limit_endpoint_returns_429(client):
     tpl = client.get("/api/v1/strategies/_new/template")
     strat = client.post(
         "/api/v1/strategies",
-        json={"name": "rate-limit-test", "description": "", "source_code": tpl.json()["source_code"]},
+        json={
+            "name": "rate-limit-test",
+            "description": "",
+            "source_code": tpl.json()["source_code"],
+        },
     )
     assert strat.status_code in (200, 201)
     sid = strat.json()["id"]
 
-    run_body = {
+    _run_body = {
         "strategy_id": sid,
         "params": {
             "start_date": "2024-01-01",
