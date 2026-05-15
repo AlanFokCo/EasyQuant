@@ -339,7 +339,7 @@ def generate_chart(result, out_path):
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
-    pnl_pct = (pnl / initial) * 100
+    pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
     pf_dates = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in pf_records])
     pf_values = pd.Series([r["total_value"] for r in pf_records], index=pf_dates)
@@ -387,12 +387,14 @@ def generate_chart(result, out_path):
     sells = [t for t in trade_log if t["type"] == "SELL"]
     if len(buys) <= 50:
         for b in buys:
-            ret_at_buy = (pf_values.reindex([pd.Timestamp(b["date"])], method="nearest").iloc[0] / initial - 1) * 100
+            idx = pf_values.index.get_indexer([pd.Timestamp(b["date"])], method="nearest")[0]
+            ret_at_buy = (pf_values.iloc[idx] / initial - 1) * 100
             ax.plot(b["date"], ret_at_buy, marker="^", color="#2E7D32",
                     markersize=5, zorder=3)
     if len(sells) <= 50:
         for s in sells:
-            ret_at_sell = (pf_values.reindex([pd.Timestamp(s["date"])], method="nearest").iloc[0] / initial - 1) * 100
+            idx = pf_values.index.get_indexer([pd.Timestamp(s["date"])], method="nearest")[0]
+            ret_at_sell = (pf_values.iloc[idx] / initial - 1) * 100
             ax.plot(s["date"], ret_at_sell, marker="v", color="#C62828",
                     markersize=5, zorder=3)
 
@@ -456,7 +458,7 @@ def generate_html_report(result, out_path):
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
-    pnl_pct = (pnl / initial) * 100
+    pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
     # Collect traded securities
     securities = set()
@@ -2073,7 +2075,7 @@ def generate_report_md(result, out_path):
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
-    pnl_pct = (pnl / initial) * 100
+    pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
     analytics = analyze_returns(result)
     bench_data = {}
@@ -2309,7 +2311,7 @@ def generate_report_json(result, out_path):
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
     pnl = final - initial
-    pnl_pct = (pnl / initial) * 100
+    pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
     analytics = analyze_returns(result)
 
@@ -2334,7 +2336,7 @@ def generate_report_json(result, out_path):
             cumulative_returns.append({
                 "date": str(r["date"]),
                 "total_value": round(r["total_value"], 2),
-                "cumulative_return": round(r["total_value"] / initial - 1, 6),
+                "cumulative_return": round(r["total_value"] / initial - 1, 6) if initial > 0 else 0.0,
             })
 
     report = {

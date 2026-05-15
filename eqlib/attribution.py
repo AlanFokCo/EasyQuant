@@ -68,6 +68,8 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
 
     initial = ctx.portfolio.starting_cash
     final = ctx.portfolio.total_value
+    if initial <= 0:
+        return None
     total_return = (final - initial) / initial
 
     # Daily returns

@@ -115,7 +115,7 @@ def market_open(context):
     grid_idx = _find_level(price)
 
     # Price dropped to a new lower grid level -> BUY one batch
-    if grid_idx < g.last_grid_idx:
+    if grid_idx < g.last_grid_idx and not g.grid_holding.get(grid_idx):
         order_value(security, TRADE_VALUE)
         g.grid_holding[grid_idx] = True
         g.trade_count += 1
@@ -123,10 +123,11 @@ def market_open(context):
         g.last_grid_idx = grid_idx
 
     # Price rose to a new higher grid level -> SELL one batch
-    elif grid_idx > g.last_grid_idx:
+    elif grid_idx > g.last_grid_idx and g.grid_holding.get(grid_idx - 1):
         if security in context.portfolio.positions and \
            context.portfolio.positions[security].amount >= 100:
             order(security, -100)
+            g.grid_holding[grid_idx - 1] = False
             g.trade_count += 1
             log.info("Grid SELL level %d: %s @ %.3f" % (grid_idx, security, price))
             g.last_grid_idx = grid_idx

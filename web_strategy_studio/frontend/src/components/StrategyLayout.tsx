@@ -96,7 +96,7 @@ export function StrategyLayout() {
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
   const setCommandPaletteOpen = useEditorStore((s) => s.setCommandPaletteOpen);
   const commandPaletteOpen = useEditorStore((s) => s.commandPaletteOpen);
-  const { logs, progress, stage, artifacts, doneStatus, clearLogs } = useRunStream(runIdStore);
+  const { logs, progress, stage, artifacts, doneStatus, doneError, clearLogs } = useRunStream(runIdStore);
   const [reportOpen, setReportOpen] = useState(false);
 
   // Theme — apply data-theme + get resolved Monaco theme name
@@ -129,11 +129,22 @@ export function StrategyLayout() {
     },
   });
 
-  const { data: strategy } = useQuery({
+  const { data: strategy, error } = useQuery({
     queryKey: ["strategy", strategyId],
     enabled: !!strategyId,
     queryFn: () => apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`),
+    retry: false,
   });
+
+  // If the stored strategy ID no longer exists (e.g. database was reset),
+  // clear it so the bootstrap effect creates a fresh strategy.
+  useEffect(() => {
+    if (error && strategyId) {
+      localStorage.removeItem(LS_KEY);
+      bootRef.current = false; // allow bootstrap to re-run
+      setStrategyId(null);
+    }
+  }, [error, strategyId]);
 
   useEffect(() => {
     hydrated.current = false;
@@ -500,7 +511,16 @@ export function StrategyLayout() {
               border: "1px solid rgba(248,81,73,0.25)",
             }}
           >
-            回测未成功，请查看下方日志中的报错信息。
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              回测失败
+              {doneError && ` (${doneError.code})`}
+            </div>
+            {doneError && (
+              <div style={{ color: "var(--text)", marginBottom: 4 }}>
+                {doneError.message}
+              </div>
+            )}
+            <div>请查看下方日志中的详细报错信息。</div>
           </div>
         ) : null}
 

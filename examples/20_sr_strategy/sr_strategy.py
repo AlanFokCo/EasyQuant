@@ -11,13 +11,13 @@ Strategy logic:
 
 Stock pool:
     601390  China Railway 中国中铁 (infrastructure)
-    600916  China Gold 中国黄金 (gold)
+    518880  Gold ETF 黄金ETF
     002594  BYD 比亚迪 (EV/new energy)
     601088  China Shenhua 中国神华 (coal)
     601857  PetroChina 中国石油 (oil)
     600536  China Soft 中国软件 (technology)
-    601398  ICBC 工商银行 (banking)
-    518880  Gold ETF 黄金ETF
+    601111  Air China 中国国航 (aviation)
+    000630  Tongling Nonferrous 铜陵有色 (metals)
 
 Usage:
     from sr_strategy import initialize
