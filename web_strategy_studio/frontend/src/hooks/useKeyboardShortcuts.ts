@@ -20,7 +20,9 @@ type ShortcutMap = {
   onEscape?: () => void;
 };
 
-const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+const isMac = typeof navigator !== "undefined" &&
+  // navigator.platform is deprecated in newer browsers; fall back to userAgent
+  (/Mac/.test(navigator.userAgent) || /Mac|iPod|iPhone|iPad/.test(navigator.platform));
 
 function isMod(e: KeyboardEvent): boolean {
   return isMac ? e.metaKey : e.ctrlKey;

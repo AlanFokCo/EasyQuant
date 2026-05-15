@@ -83,8 +83,6 @@ export function AppShell({ editor, rightPane }: Props) {
   );
 
   // ── Responsive helpers ───────────────────────────────────────────────────
-  // Reserved: wide >= 1280 may have additional chrome in future
-  void (viewportWidth >= 1280);
   const isMid   = viewportWidth >= 768 && viewportWidth < 1280;
   const isNarrow = viewportWidth < 768;
 

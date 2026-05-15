@@ -8,7 +8,8 @@ export function StatusBar() {
   const sseConnected = useEditorStore((s) => s.sseConnected);
   const runId = useEditorStore((s) => s.runId);
 
-  const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+  const isMac = typeof navigator !== "undefined" &&
+    (/Mac/.test(navigator.userAgent) || /Mac|iPod|iPhone|iPad/.test(navigator.platform));
   const mod = isMac ? "⌘" : "Ctrl+";
 
   return (
