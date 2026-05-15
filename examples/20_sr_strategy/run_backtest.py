@@ -47,13 +47,8 @@ _here = os.path.dirname(os.path.abspath(__file__))
 if _here not in sys.path:
     sys.path.insert(0, _here)
 
-from sr_strategy import initialize
+from sr_strategy import initialize, STOCK_POOL
 from eqlib import *
-
-STOCK_POOL = [
-    "601390", "600916", "002594", "601088",
-    "601857", "600536", "601398", "518880",
-]
 
 if __name__ == "__main__":
     print("=" * 60)

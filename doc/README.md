@@ -13,6 +13,7 @@
 | 你的情况 | 建议从这里开始 |
 |----------|----------------|
 | 第一次克隆仓库，想尽快跑通 | [用户手册](user_guide.md)（从 §0 新手四步起） |
+| 想通过浏览器界面操作（无需安装 Python） | [Web 策略工作室](web_studio.md) |
 | 跟着教程系统学 | [Tutorial 00](../tutorials/00_environment_and_first_run.md) → [教程导读](../tutorials/README.md) |
 | 查函数签名、参数、返回值 | [API 参考](api_reference.md) |
 | 报告 / JSON 里指标看不懂 | [报告与指标](reports_and_metrics.md) |
@@ -25,6 +26,7 @@
 | 顺序 | 文档 | 说明 |
 |------|------|------|
 | 1 | [用户手册](user_guide.md) | 安装、策略骨架、回测与报告概览 |
+| 1 | [Web 策略工作室](web_studio.md) | 浏览器中编写策略、运行回测、查看报告和对比指标 |
 | 2 | [报告与指标详解](reports_and_metrics.md) | HTML 报告逐屏解读 |
 | 3 | [API 参考](api_reference.md) | 全部公开 API 的参数与示例 |
 | 4 | [常见问题 FAQ](FAQ.md) | 安装、数据、性能与排错 |

@@ -601,23 +601,7 @@ def run_backtest(initialize_func, start_date, end_date,
     )
     session._benchmark = benchmark
 
-    # ── Preload OHLCV data ─────────────────────────────────────────────────
-    if securities:
-        log.step("Preloading market data", status="RUN",
-                 securities=len(securities),
-                 source="local" if use_local else "akshare")
-        warmup_start = (start_date - datetime.timedelta(days=365)
-                        if isinstance(start_date, datetime.date) else start_date)
-        preloaded.load(securities, warmup_start, end_date, adjust="qfq",
-                       use_local=use_local, max_memory_mb=max_memory_mb)
-        log.step("Market data preloaded", status="OK", securities=len(securities))
-
-    trading_days = _get_trading_days(start_date, end_date, preloaded)
-    if not trading_days:
-        log.error("No trading days found")
-        _clear_session()
-        return None
-
+    # ── Create context & call initialize first ──────────────────────────────
     context = Context(start_date, end_date, frequency, starting_cash)
     session._context = context
 
@@ -628,6 +612,24 @@ def run_backtest(initialize_func, start_date, end_date,
     session._g = _g
 
     initialize_func(context)
+
+    # ── Preload OHLCV data (after initialize so we can use context.universe) ─
+    _securities = securities or getattr(context, 'universe', None) or []
+    if _securities:
+        log.step("Preloading market data", status="RUN",
+                 securities=len(_securities),
+                 source="local" if use_local else "akshare")
+        warmup_start = (start_date - datetime.timedelta(days=365)
+                        if isinstance(start_date, datetime.date) else start_date)
+        preloaded.load(_securities, warmup_start, end_date, adjust="qfq",
+                       use_local=use_local, max_memory_mb=max_memory_mb)
+        log.step("Market data preloaded", status="OK", securities=len(_securities))
+
+    trading_days = _get_trading_days(start_date, end_date, preloaded)
+    if not trading_days:
+        log.error("No trading days found")
+        _clear_session()
+        return None
 
     # Pick up selection config from session (set via run_selection in initialize)
     # Parameter takes precedence over session-level config
@@ -777,7 +779,7 @@ def run_backtest(initialize_func, start_date, end_date,
 
     # Export preloaded OHLCV data for report generation
     if preloaded.panel is not None and not preloaded.panel.empty:
-        for sec in securities:
+        for sec in _securities:
             if sec in preloaded.panel.columns.get_level_values(0).unique():
                 sec_df = preloaded.panel[sec]
                 if not sec_df.empty:
@@ -992,7 +994,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             context.portfolio._sync_total_value(prices)
             total = context.portfolio.total_value
             pnl = total - starting_cash
-            pnl_pct = pnl / starting_cash * 100 if starting_cash else 0
+            pnl_pct = (pnl / starting_cash * 100) if starting_cash > 0 else 0.0
             log.info(f"[{context.current_dt:%H:%M:%S}] total={total:,.2f} "
                      f"PnL={pnl:+,.2f} ({pnl_pct:+.2f}%)")
 

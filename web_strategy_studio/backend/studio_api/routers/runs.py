@@ -9,7 +9,7 @@ import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -205,11 +205,14 @@ async def _process_run_task(run_id: str) -> None:
             "message": "finished",
         },
     )
-    await stream_hub.publish(
-        run_id,
-        "done",
-        {"status": "succeeded" if exec_result.get("ok") else "failed", "artifacts": arts},
-    )
+    done_payload: dict[str, Any] = {
+        "status": "succeeded" if exec_result.get("ok") else "failed",
+        "artifacts": arts,
+    }
+    if not exec_result.get("ok"):
+        done_payload["error_code"] = exec_result.get("error_code")
+        done_payload["error_message"] = exec_result.get("error")
+    await stream_hub.publish(run_id, "done", done_payload)
 
 
 @router.post("/runs", status_code=202, response_model=CreateRunResponse)
@@ -217,7 +220,7 @@ async def create_run(
     request: Request,
     body: CreateRunBody,
     session: AsyncSession = Depends(get_session),
-    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     # B18: per-IP rate limit
     client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
@@ -371,7 +374,7 @@ async def delete_run(run_id: str, session: AsyncSession = Depends(get_session)):
 async def run_stream(
     run_id: str,
     session: AsyncSession = Depends(get_session),
-    last_event_id: str | None = Header(None, alias="Last-Event-ID"),
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
 ):
     """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13)."""
     # Resolve last_event_id to an int (default -1 = send everything).
@@ -457,7 +460,7 @@ async def get_queue():
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
     session: AsyncSession = Depends(get_session),
-    strategy_id: str | None = None,
+    strategy_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ):
@@ -551,9 +554,9 @@ _METRIC_KEYS = (
 )
 
 
-def _extract_metrics(raw: dict[str, Any]) -> dict[str, float | None]:
+def _extract_metrics(raw: dict[str, Any]) -> dict[str, Optional[float]]:
     risk = raw.get("risk_metrics", raw)
-    metrics: dict[str, float | None] = {}
+    metrics: dict[str, Optional[float]] = {}
     for key in _METRIC_KEYS:
         val = risk.get(key)
         if val is not None:
@@ -592,20 +595,23 @@ async def compare_runs(
             status_code=400,
             detail=api_error("BAD_REQUEST", "run_ids is required and must be non-empty"),
         )
+
+    # Eager-load strategy to avoid lazy-load in async context.
+    stmt = select(Run).options(selectinload(Run.strategy)).where(Run.id.in_(run_ids))
+    rows = (await session.execute(stmt)).scalars().all()
+    runs_by_id = {r.id: r for r in rows}
+
     runs_items: list[CompareRunItem] = []
     all_metric_keys: set[str] = set()
 
     for rid in run_ids:
-        run = await session.get(Run, rid)
+        run = runs_by_id.get(rid)
         if run is None:
             continue
         raw = _read_metrics_from_json(run)
         metrics = _extract_metrics(raw)
         all_metric_keys.update(metrics.keys())
         equity_curve = _extract_equity_curve(raw)
-        # Eager-load strategy for name
-        if run.strategy is None:
-            await session.refresh(run, ["strategy"])
         runs_items.append(
             CompareRunItem(
                 run_id=run.id,

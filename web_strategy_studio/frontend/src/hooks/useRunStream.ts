@@ -22,6 +22,7 @@ export function useRunStream(runId: string | null) {
     json_report_url?: string | null;
   } | null>(null);
   const [doneStatus, setDoneStatus] = useState<string | null>(null);
+  const [doneError, setDoneError] = useState<{ code: string; message: string } | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const buffer = useRef<LogLine[]>([]);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,6 +58,7 @@ export function useRunStream(runId: string | null) {
     setStage(null);
     setArtifacts(null);
     setDoneStatus(null);
+    setDoneError(null);
     buffer.current = [];
     lastEventId.current = -1;
     done.current = false;
@@ -111,6 +113,11 @@ export function useRunStream(runId: string | null) {
           const d = JSON.parse(raw.data);
           setDoneStatus(d.status || "done");
           setArtifacts(d.artifacts || null);
+          if (d.status === "failed") {
+            setDoneError({ code: d.error_code || "UNKNOWN", message: d.error_message || "Unknown error" });
+          } else {
+            setDoneError(null);
+          }
           flush();
         } catch { /* ignore */ }
         done.current = true;
@@ -164,6 +171,7 @@ export function useRunStream(runId: string | null) {
     stage,
     artifacts,
     doneStatus,
+    doneError,
     reconnecting,
     clearLogs: () => setLogs([]),
   };

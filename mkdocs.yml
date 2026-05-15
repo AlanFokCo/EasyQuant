@@ -90,6 +90,7 @@ nav:
 
   - 用户手册:
       - 用户手册: doc/user_guide.md
+      - Web 策略工作室: doc/web_studio.md
       - PTrade/QMT 实盘适配: doc/ptrade_adapter.md
       - 常见问题: doc/FAQ.md
 
