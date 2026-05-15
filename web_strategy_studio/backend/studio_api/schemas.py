@@ -23,6 +23,11 @@ class ErrorResponse(BaseModel):
     error: ErrorEnvelope
 
 
+def api_error(code: str, message: str, details: Any = None) -> dict:
+    """Build a standardised error envelope dict for HTTPException detail."""
+    return {"error": {"code": code, "message": message, "details": details}}
+
+
 class DefaultBacktestParams(BaseModel):
     start_date: str = "2024-01-01"
     end_date: str = "2024-12-31"
@@ -58,10 +63,22 @@ class StrategyDetail(BaseModel):
     default_params: Optional[dict] = None
 
 
+class StrategyVersionItem(BaseModel):
+    """One entry in GET /strategies/{id}/versions."""
+    version: int
+    label: Optional[str] = None
+    content_hash: Optional[str] = None
+    created_at: datetime
+
+
 class PatchStrategyBody(BaseModel):
     source_code: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
+
+
+class SnapshotBody(BaseModel):
+    label: Optional[str] = None
 
 
 class StrategyTemplateResponse(BaseModel):
@@ -102,7 +119,8 @@ class CreateRunResponse(BaseModel):
     run_id: str
     status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
     poll_url: str
-    ws_url: str  # spec name; MVP uses SSE at same path pattern
+    stream_url: str  # B16: renamed from ws_url
+    queue_position: Optional[int] = None  # B18: 1-based position when queued
 
 
 class RunArtifacts(BaseModel):
@@ -119,6 +137,7 @@ class RunStatusResponse(BaseModel):
     finished_at: Optional[datetime] = None
     artifacts: RunArtifacts
     error: Optional[str] = None
+    queue_position: Optional[int] = None  # B18
 
 
 class CompletionBody(BaseModel):
@@ -158,6 +177,7 @@ class RunListItem(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    queue_position: Optional[int] = None  # B18
 
 
 class RunListResponse(BaseModel):
@@ -179,15 +199,37 @@ class RunMetricsResponse(BaseModel):
     raw: dict[str, Any] = Field(default_factory=dict)
 
 
+class EquityCurvePoint(BaseModel):
+    date: str
+    value: float
+
+
 class CompareRunItem(BaseModel):
     run_id: str
     strategy_name: Optional[str] = None
     status: str
     started_at: Optional[datetime] = None
     metrics: dict[str, Optional[float]]
+    equity_curve: list[EquityCurvePoint] = Field(default_factory=list)  # B22
 
 
 class CompareResponse(BaseModel):
     runs: list[CompareRunItem]
     # Column names shared across all runs
     common_keys: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Queue status (B17/B18)
+# ---------------------------------------------------------------------------
+
+class QueueRunItem(BaseModel):
+    run_id: str
+    queue_position: int
+
+
+class QueueStatusResponse(BaseModel):
+    queue_length: int
+    active_count: int
+    max_concurrent: int
+    queued_runs: list[QueueRunItem]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     pass
@@ -17,6 +17,11 @@ def register(run_id: str, proc: asyncio.subprocess.Process) -> None:
 
 def unregister(run_id: str) -> None:
     _procs.pop(run_id, None)
+
+
+def get_proc(run_id: str) -> Optional[asyncio.subprocess.Process]:
+    """Public accessor for a live subprocess handle (B21)."""
+    return _procs.get(run_id)
 
 
 def kill(run_id: str) -> bool:

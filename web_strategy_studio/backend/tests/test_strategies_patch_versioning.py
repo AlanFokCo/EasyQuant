@@ -1,7 +1,6 @@
-"""Tests for strategy PATCH versioning behaviour (Phase 0).
+"""Tests for strategy PATCH versioning behaviour (Phase 0 → Phase 2).
 
-B4 (always bumping version on every PATCH) is intentionally NOT fixed in Phase 0.
-The test_patch_always_bumps_version test is expected to FAIL until Phase 2.
+B4 is fixed in Phase 2 — the xfail mark is removed.
 """
 
 from __future__ import annotations
@@ -13,6 +12,8 @@ import pytest
 # Point at an in-memory DB before importing any studio_api module.
 os.environ.setdefault("EQ_STUDIO_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_test_artifacts")
+# Disable coalescing so tests see true dedup behaviour without draft-mode noise
+os.environ.setdefault("EQ_STUDIO_VERSION_COALESCE_SEC", "0")
 
 
 @pytest.fixture(scope="module")
@@ -20,27 +21,15 @@ def client():
     """Synchronous TestClient — triggers FastAPI lifespan (DB init)."""
     from fastapi.testclient import TestClient
     from studio_api.app import app
+    import studio_api.config as _cfg
+    _cfg.settings.version_coalesce_sec = 0
 
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
 
 
-def test_patch_always_bumps_version(client):
-    """B4 — PATCH with the same source_code must NOT create a duplicate version.
-
-    This test is EXPECTED TO FAIL in Phase 0.  Rapid debounced saves currently
-    create a new StrategyVersion row on every PATCH, regardless of whether the
-    content changed.  Phase 2 will deduplicate identical-content versions via
-    content-hash comparison.
-
-    When Phase 2 is implemented, remove the xfail mark and the test will pass.
-    """
-    pytest.xfail(
-        "B4 not fixed yet — PATCH always creates a new version row. "
-        "Fixed in Phase 2 by content-hash deduplication."
-    )
-
-    # ── Assertions that will hold after Phase 2 ──────────────────────────────
+def test_patch_same_code_no_version_bump(client):
+    """B4 — PATCH with the same source_code must NOT create a duplicate version."""
     tpl = client.get("/api/v1/strategies/_new/template")
     create_resp = client.post(
         "/api/v1/strategies",
