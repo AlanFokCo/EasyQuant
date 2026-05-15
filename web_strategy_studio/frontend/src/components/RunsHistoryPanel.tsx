@@ -29,6 +29,8 @@ export function RunsHistoryPanel({ strategyId }: { strategyId: string | null }) 
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
   const compareIds = useEditorStore((s) => s.compareIds);
   const setCompareIds = useEditorStore((s) => s.setCompareIds);
+  const setRunId = useEditorStore((s) => s.setRunId);
+  const currentRunId = useEditorStore((s) => s.runId);
 
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
@@ -113,6 +115,7 @@ export function RunsHistoryPanel({ strategyId }: { strategyId: string | null }) 
               key={run.run_id}
               run={run}
               selected={compareIds.includes(run.run_id)}
+              isAttached={currentRunId === run.run_id}
               onToggleCompare={() => {
                 setCompareIds(
                   compareIds.includes(run.run_id)
@@ -123,6 +126,7 @@ export function RunsHistoryPanel({ strategyId }: { strategyId: string | null }) 
                 );
               }}
               onOpenReport={() => setSelectedRunId(run.run_id)}
+              onReattach={() => setRunId(run.run_id)}
             />
           ))}
         </div>
@@ -141,16 +145,21 @@ export function RunsHistoryPanel({ strategyId }: { strategyId: string | null }) 
 function RunRow({
   run,
   selected,
+  isAttached,
   onToggleCompare,
   onOpenReport,
+  onReattach,
 }: {
   run: RunListItem;
   selected: boolean;
+  isAttached: boolean;
   onToggleCompare: () => void;
   onOpenReport: () => void;
+  onReattach: () => void;
 }) {
   const badge = STATUS_BADGE[run.status] ?? STATUS_BADGE.queued;
   const pct = Math.round(run.progress * 100);
+  const canReattach = (run.status === "queued" || run.status === "running") && !isAttached;
 
   return (
     <div
@@ -185,18 +194,25 @@ function RunRow({
         >
           {run.run_id.slice(0, 16)}
         </span>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            padding: "2px 8px",
-            borderRadius: 10,
-            background: badge.bg,
-            color: badge.color,
-          }}
-        >
-          {badge.label}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {run.queue_position != null && (
+            <span style={{ fontSize: 10, color: "var(--warning)", fontFamily: "var(--mono)" }}>
+              #{run.queue_position}
+            </span>
+          )}
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 10,
+              background: badge.bg,
+              color: badge.color,
+            }}
+          >
+            {badge.label}
+          </span>
+        </div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
@@ -229,46 +245,76 @@ function RunRow({
           {run.error_message}
         </div>
       )}
-      {run.status === "succeeded" && (
-        <div style={{ display: "flex", gap: 6 }}>
+      {/* Action buttons */}
+      <div style={{ display: "flex", gap: 6 }}>
+        {/* B7: Reattach button for queued/running runs */}
+        {canReattach && (
           <button
             type="button"
             style={{
               flex: 1,
               padding: "4px 8px",
               borderRadius: 4,
-              border: "none",
-              background: "var(--primary)",
-              color: "#fff",
+              border: "1px solid var(--primary)",
+              background: "var(--primary-bg)",
+              color: "var(--primary)",
               fontSize: 11,
               fontWeight: 500,
             }}
             onClick={(e) => {
               e.stopPropagation();
-              onOpenReport();
+              onReattach();
             }}
           >
-            查看报告
+            重新附加
           </button>
-          <button
-            type="button"
-            style={{
-              padding: "4px 8px",
-              borderRadius: 4,
-              border: "1px solid var(--border)",
-              background: "transparent",
-              color: selected ? "var(--primary)" : "var(--text-dim)",
-              fontSize: 11,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCompare();
-            }}
-          >
-            {selected ? "✓ 已选" : "对比"}
-          </button>
-        </div>
-      )}
+        )}
+        {isAttached && (run.status === "queued" || run.status === "running") && (
+          <span style={{ flex: 1, textAlign: "center", fontSize: 11, color: "var(--primary)", padding: "4px 0" }}>
+            ✓ 已附加
+          </span>
+        )}
+        {run.status === "succeeded" && (
+          <>
+            <button
+              type="button"
+              style={{
+                flex: 1,
+                padding: "4px 8px",
+                borderRadius: 4,
+                border: "none",
+                background: "var(--primary)",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 500,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenReport();
+              }}
+            >
+              查看报告
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: "4px 8px",
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: selected ? "var(--primary)" : "var(--text-dim)",
+                fontSize: 11,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCompare();
+              }}
+            >
+              {selected ? "✓ 已选" : "对比"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

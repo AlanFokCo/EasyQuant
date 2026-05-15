@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     ]
     # S6: idempotency key TTL in seconds (default 24 h)
     idempotency_ttl_sec: int = 86400
+    # B17/B18: concurrency cap (max simultaneous backtest subprocesses)
+    max_concurrent_runs: int = 2
+    # B18: per-IP rate limit for POST /runs
+    rate_limit_runs_per_window: int = 10
+    rate_limit_window_sec: int = 300  # 5 minutes
+    # B6: SSE ring buffer retention (seconds) after a run reaches terminal state
+    sse_buffer_ttl_sec: int = 1800  # 30 minutes
+    # B4: coalescing window — edits within this many seconds reuse the current version row
+    version_coalesce_sec: int = 60  # 1 minute
 
 
 settings = Settings()

@@ -6,11 +6,29 @@ import { useEditorStore } from "../store/editorStore";
 export function StatusBar() {
   const dirty = useEditorStore((s) => s.dirty);
   const sseConnected = useEditorStore((s) => s.sseConnected);
+  const sseReconnecting = useEditorStore((s) => s.sseReconnecting);
   const runId = useEditorStore((s) => s.runId);
 
   const isMac = typeof navigator !== "undefined" &&
     (/Mac/.test(navigator.userAgent) || /Mac|iPod|iPhone|iPad/.test(navigator.platform));
   const mod = isMac ? "⌘" : "Ctrl+";
+
+  let connLabel: string;
+  let connColor: string;
+  let connDot: string;
+  if (sseReconnecting) {
+    connLabel = "重连中…";
+    connColor = "var(--state-warning)";
+    connDot = "◌";
+  } else if (sseConnected) {
+    connLabel = runId ? "运行中" : "已连接";
+    connColor = "var(--state-success)";
+    connDot = "●";
+  } else {
+    connLabel = "空闲";
+    connColor = "var(--text-dim)";
+    connDot = "○";
+  }
 
   return (
     <footer
@@ -34,18 +52,18 @@ export function StatusBar() {
     >
       {/* Connection indicator */}
       <span
-        aria-label={sseConnected ? "SSE 已连接" : "SSE 未连接"}
+        aria-label={sseReconnecting ? "SSE 重连中" : sseConnected ? "SSE 已连接" : "SSE 未连接"}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 4,
-          color: sseConnected ? "var(--state-success)" : "var(--text-dim)",
+          color: connColor,
         }}
       >
         <span aria-hidden="true" style={{ fontSize: 8 }}>
-          {sseConnected ? "●" : "○"}
+          {connDot}
         </span>
-        {sseConnected ? (runId ? "运行中" : "已连接") : "空闲"}
+        {connLabel}
       </span>
 
       {/* Dirty flag */}

@@ -1,22 +1,72 @@
-"""Per-run SSE / broadcast queues."""
+"""Per-run SSE / broadcast queues with ring-buffer replay (B6/B13)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
-from collections import defaultdict
+import time
+from collections import defaultdict, deque
 from typing import Any
 
-# Events that signal the end of a run — on these, the hub cleans up the
-# entire run_id entry to prevent unbounded memory growth (S4).
+import structlog
+
+log = structlog.get_logger(__name__)
+
+# Events that signal the end of a run.
 _TERMINAL_EVENTS = frozenset({"done", "error"})
+
+# Maximum events stored in the ring buffer per run.
+_RING_SIZE = 256
+
+
+class _RunBuffer:
+    """Ring buffer of recent events for a single run.
+
+    Stores up to _RING_SIZE events (each as ``{"id": int, "event": str, "data": dict}``).
+    Also caches the last terminal event for immediate replay on reconnect.
+    Expires `ttl_sec` seconds after the first terminal event is received.
+    """
+
+    __slots__ = ("events", "terminal", "_expires_at", "_seq")
+
+    def __init__(self) -> None:
+        self.events: deque[dict[str, Any]] = deque(maxlen=_RING_SIZE)
+        self.terminal: dict[str, Any] | None = None
+        self._expires_at: float | None = None
+        self._seq: int = 0
+
+    def push(self, event: str, data: dict[str, Any], ttl_sec: int) -> dict[str, Any]:
+        self._seq += 1
+        entry = {"id": self._seq, "event": event, "data": data}
+        self.events.append(entry)
+        if event in _TERMINAL_EVENTS and self.terminal is None:
+            self.terminal = entry
+            self._expires_at = time.monotonic() + ttl_sec
+        return entry
+
+    def is_expired(self, now: float) -> bool:
+        if self._expires_at is None:
+            return False
+        return now > self._expires_at
+
+    def missed_since(self, last_event_id: int) -> list[dict[str, Any]]:
+        """Return all buffered events with id > last_event_id."""
+        return [e for e in self.events if e["id"] > last_event_id]
 
 
 class StreamHub:
-    def __init__(self, max_queued: int = 2000) -> None:
+    """Fan-out hub with per-run ring buffers and Last-Event-ID replay."""
+
+    def __init__(self, max_queued: int = 2000, buffer_ttl_sec: int = 1800) -> None:
         self._queues: dict[str, list[asyncio.Queue]] = defaultdict(list)
+        self._buffers: dict[str, _RunBuffer] = {}
         self._max = max_queued
+        self._ttl = buffer_ttl_sec
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
 
     def subscribe(self, run_id: str) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=self._max)
@@ -29,14 +79,26 @@ class StreamHub:
                 self._queues[run_id].remove(q)
             except ValueError:
                 pass
-            # S4: Remove the dict key when the list is empty to free memory.
             if not self._queues[run_id]:
                 del self._queues[run_id]
-                # Also clean up the associated lock if it exists.
                 self._locks.pop(run_id, None)
 
+    def get_buffer(self, run_id: str) -> _RunBuffer | None:
+        """Return the ring buffer for `run_id` if it exists and hasn't expired."""
+        buf = self._buffers.get(run_id)
+        if buf is None:
+            return None
+        if buf.is_expired(time.monotonic()):
+            self._buffers.pop(run_id, None)
+            return None
+        return buf
+
     async def publish(self, run_id: str, event: str, data: dict[str, Any]) -> None:
-        line = {"event": event, "data": data}
+        # Store in ring buffer first (so late subscribers can replay).
+        buf = self._buffers.setdefault(run_id, _RunBuffer())
+        entry = buf.push(event, data, self._ttl)
+        line = {"id": entry["id"], "event": event, "data": data}
+
         dead: list[asyncio.Queue] = []
         for q in list(self._queues.get(run_id, [])):
             try:
@@ -53,14 +115,24 @@ class StreamHub:
         for q in dead:
             self.unsubscribe(run_id, q)
 
-        # S4: On terminal events, clean up the entire run_id entry after all
-        # subscribers have received the final message.
-        if event in _TERMINAL_EVENTS and run_id in self._queues:
-            del self._queues[run_id]
-            self._locks.pop(run_id, None)
+    def format_sse(self, event_id: int, event: str, data: dict[str, Any]) -> str:
+        return (
+            f"id: {event_id}\n"
+            f"event: {event}\n"
+            f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+        )
 
-    def format_sse(self, event: str, data: dict[str, Any]) -> str:
-        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+    # ------------------------------------------------------------------
+    # Maintenance
+    # ------------------------------------------------------------------
+
+    def evict_expired(self) -> None:
+        """Remove expired ring buffers. Call periodically."""
+        now = time.monotonic()
+        expired = [rid for rid, buf in list(self._buffers.items()) if buf.is_expired(now)]
+        for rid in expired:
+            self._buffers.pop(rid, None)
+            log.debug("stream_hub.evict", run_id=rid)
 
 
 stream_hub = StreamHub()

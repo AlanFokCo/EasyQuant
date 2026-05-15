@@ -34,17 +34,22 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    let body: { error?: { code?: string; message?: string; details?: unknown } } | null = null;
+    let body: {
+      error?: { code?: string; message?: string; details?: unknown };
+      detail?: { error?: { code?: string; message?: string; details?: unknown } };
+    } | null = null;
     try {
       body = await res.json();
     } catch {
       /* ignore parse failure */
     }
-    if (body?.error?.message) {
+    // Support both top-level error and FastAPI's nested detail.error envelope
+    const err = body?.error ?? body?.detail?.error;
+    if (err?.message) {
       throw new ApiError(
-        body.error.code ?? "ERROR",
-        body.error.message,
-        body.error.details ?? null,
+        err.code ?? "ERROR",
+        err.message,
+        err.details ?? null,
       );
     }
     throw new ApiError("HTTP_ERROR", `${res.status} ${res.statusText}`, null);
@@ -67,6 +72,7 @@ export type RunListItem = {
   started_at: string | null;
   finished_at: string | null;
   error_message: string | null;
+  queue_position: number | null; // B18
 };
 
 export async function fetchRunsList(
@@ -90,9 +96,20 @@ export async function fetchRunMetrics(runId: string): Promise<{
   return apiJson(`/api/v1/runs/${runId}/metrics`);
 }
 
-export async function compareRunMetrics(
-  runIds: string[]
-): Promise<{ runs: { run_id: string; strategy_name: string | null; status: string; started_at: string | null; metrics: Record<string, number | null> }[]; common_keys: string[] }> {
+// B22: equity curve point
+export type EquityCurvePoint = { date: string; value: number };
+
+export async function compareRunMetrics(runIds: string[]): Promise<{
+  runs: {
+    run_id: string;
+    strategy_name: string | null;
+    status: string;
+    started_at: string | null;
+    metrics: Record<string, number | null>;
+    equity_curve: EquityCurvePoint[]; // B22
+  }[];
+  common_keys: string[];
+}> {
   return apiJson("/api/v1/runs/compare", {
     method: "POST",
     body: JSON.stringify({ run_ids: runIds }),

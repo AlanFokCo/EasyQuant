@@ -54,13 +54,15 @@ def _ruff_issues(source: str, timeout: float = 15.0) -> list[dict]:
         return []
     issues = []
     for item in raw:
+        code = item.get("code", "RUFF")
         issues.append(
             {
-                "code": item.get("code", "RUFF"),
+                "code": code,
                 "line": item.get("location", {}).get("row", 1),
                 "col": item.get("location", {}).get("column", 1),
                 "message": item.get("message", ""),
-                "severity": "warning" if item.get("code", "").startswith("F") else "warning",
+                # B23: ruff F/W codes are warnings, not errors.
+                "severity": "warning",
             }
         )
     return issues
@@ -80,7 +82,13 @@ def lint_source(source: str, profile: str = PROFILE_FAST) -> dict:
     if not syntax_errors:
         lint_issues = _ruff_issues(source)
 
-    ok = not syntax_errors and not any(n["code"].startswith("EQ-BANNED") for n in security_notes)
+    # B23: ok=False only for syntax errors and EQ-BANNED-* security notes.
+    # EQ-IMPORT-WARN and ruff codes are warnings: ok stays True but they
+    # appear in lint_issues / security_notes for the frontend to display.
+    blocking_security = any(
+        n["code"].startswith("EQ-BANNED") for n in security_notes
+    )
+    ok = not syntax_errors and not blocking_security
 
     return {
         "ok": ok,

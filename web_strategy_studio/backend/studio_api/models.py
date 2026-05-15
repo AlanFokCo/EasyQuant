@@ -42,6 +42,10 @@ class StrategyVersion(Base):
     strategy_id: Mapped[str] = mapped_column(String(64), ForeignKey("strategies.id", ondelete="CASCADE"))
     version: Mapped[int] = mapped_column(Integer)
     source_code: Mapped[str] = mapped_column(Text)
+    # B4/B15: content hash for dedup; sha256 hex (64 chars) or NULL for legacy rows
+    content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Named snapshot label (set by POST /snapshot)
+    label: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     strategy: Mapped["Strategy"] = relationship(back_populates="versions")
