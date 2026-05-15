@@ -114,6 +114,9 @@ class StreamHub:
                     dead.append(q)
         for q in dead:
             self.unsubscribe(run_id, q)
+        if event in _TERMINAL_EVENTS:
+            self._queues.pop(run_id, None)
+            self._locks.pop(run_id, None)
 
     def format_sse(self, event_id: int, event: str, data: dict[str, Any]) -> str:
         return (
