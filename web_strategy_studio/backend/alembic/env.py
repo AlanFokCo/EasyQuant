@@ -6,6 +6,7 @@ from alembic import context
 
 # Load the FastAPI settings to get the DB URL
 from studio_api.config import settings
+from studio_api.models import Base
 
 config = context.config
 
@@ -21,7 +22,6 @@ config.set_main_option("sqlalchemy.url", db_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from studio_api.models import Base
 target_metadata = Base.metadata
 
 
