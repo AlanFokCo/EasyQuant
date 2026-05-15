@@ -54,6 +54,7 @@ async def _test_terminal(hub):
     assert buf.terminal is not None
     assert buf.terminal["event"] == "done"
     assert buf._expires_at is not None
+    assert "run_t" not in hub._queues
 
 
 def test_buffer_expiry(hub):
