@@ -42,6 +42,10 @@ data/
 *.feather
 *.pkl
 
+# Allow checked-in data files for studio backend
+!web_strategy_studio/backend/studio_api/data/
+!web_strategy_studio/backend/studio_api/data/*.json
+
 # Backtest / strategy output
 backtest_results/
 strategy_results/
