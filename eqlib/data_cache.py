@@ -274,24 +274,37 @@ class PreloadedData:
         total = len(securities)
 
         def _load_one(sec: str) -> tuple:
-            df = None
             if use_local:
                 df = load_stock_local(sec, start_str, end_str, adjust)
                 if df is not None:
                     return (sec, df)
+                # Local file missing, try network download first then save to local
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
                     _save_to_disk(df, sec, adjust)
                     save_stock_local(sec, start_date, end_date, adjust)
+                    if progress:
+                        print(f"  Downloaded {sec} from network and saved to local")
+                    return (sec, df)
+                else:
+                    if progress:
+                        print(f"  WARNING: No data for {sec}: local file not found and network fetch failed")
+                    return (sec, None)
             else:
                 df = _load_from_disk(sec, start_str, end_str, adjust)
-                if df is None:
-                    from eqlib.data import fetch_stock_data
-                    df = fetch_stock_data(sec, start_date, end_date, adjust)
-                    if not df.empty:
-                        _save_to_disk(df, sec, adjust)
-            return (sec, df)
+                if df is not None:
+                    return (sec, df)
+                # Disk cache miss, try network fetch
+                from eqlib.data import fetch_stock_data
+                df = fetch_stock_data(sec, start_date, end_date, adjust)
+                if not df.empty:
+                    _save_to_disk(df, sec, adjust)
+                    return (sec, df)
+                else:
+                    if progress:
+                        print(f"  WARNING: No data for {sec}: disk cache miss and network fetch failed")
+                    return (sec, None)
 
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=min(8, total)
@@ -316,8 +329,19 @@ class PreloadedData:
             print()  # newline after progress
 
         if not frames:
-            self.panel = pd.DataFrame()
-            return
+            missing = ', '.join(securities)
+            if use_local:
+                raise RuntimeError(
+                    f"No market data available for {missing}. "
+                    f"use_local=True but local CSV files not found and network fetch failed. "
+                    f"Either: (1) download data first via download_stock_data(), "
+                    f"(2) set use_local=False, or (3) uncheck 'use_local' in the web console."
+                )
+            raise RuntimeError(
+                f"No market data available for {missing}. "
+                f"All data sources (disk cache and network) failed. "
+                f"Check network connectivity or try with use_local=True after downloading data."
+            )
 
         # Build panel: columns = MultiIndex (security, field)
         self.panel = pd.concat(frames, axis=1)

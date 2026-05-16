@@ -63,7 +63,7 @@ async def execute_backtest(
     # S3: Filter environment variables to prevent secret leakage.
     # Only allow an explicit allowlist of safe variables; strip everything else
     # (OPENAI_API_KEY, AWS_*, database connection strings, etc.).
-    _ALLOWED_ENV_PREFIXES = ("EQ_",)
+    _ALLOWED_ENV_PREFIXES = ("EQ_", "EQLIB_")
     _ALLOWED_ENV_KEYS = frozenset(
         {
             "PATH",
