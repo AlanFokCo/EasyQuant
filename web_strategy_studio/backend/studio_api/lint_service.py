@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any, Dict, List
 
 from studio_api.security_scanner import SecurityScanner, require_initialize_function
 
@@ -15,8 +16,8 @@ PROFILE_FAST = "fast"
 PROFILE_STRICT = "strict"
 
 
-def _syntax_errors(source: str) -> list[dict]:
-    out: list[dict] = []
+def _syntax_errors(source: str) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
     try:
         compile(source, "<strategy>", "exec", ast.PyCF_ONLY_AST)
     except SyntaxError as e:
@@ -31,7 +32,7 @@ def _syntax_errors(source: str) -> list[dict]:
     return out
 
 
-def _ruff_issues(source: str, timeout: float = 15.0) -> list[dict]:
+def _ruff_issues(source: str, timeout: float = 15.0) -> List[Dict[str, Any]]:
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
         f.write(source)
         tmp = f.name
@@ -68,7 +69,7 @@ def _ruff_issues(source: str, timeout: float = 15.0) -> list[dict]:
     return issues
 
 
-def lint_source(source: str, profile: str = PROFILE_FAST) -> dict:
+def lint_source(source: str, profile: str = PROFILE_FAST) -> Dict[str, Any]:
     syntax_errors = _syntax_errors(source)
     scanner = SecurityScanner()
     sec = scanner.scan(source)
@@ -76,7 +77,7 @@ def lint_source(source: str, profile: str = PROFILE_FAST) -> dict:
 
     security_notes = [{"code": n.code, "line": n.line, "message": n.message} for n in sec]
 
-    lint_issues: list[dict] = []
+    lint_issues: List[Dict[str, Any]] = []
     if not syntax_errors:
         lint_issues = _ruff_issues(source)
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
+from typing import Dict, List, Optional, Set, Tuple
 
 import structlog
 
@@ -23,22 +24,22 @@ from studio_api.config import settings
 log = structlog.get_logger(__name__)
 
 # Queue of (run_id, coroutine_factory) pairs.
-# A coroutine_factory is a zero-argument async callable that runs the task.
+# A coroutine_factory is a zero-arg async callable that runs the task.
 _TaskCoro = Callable[[], Awaitable[None]]
 
 # Module-level state — re-initialised by start_worker() on each lifespan start
 # so tests using different event loops work correctly.
-_queue: asyncio.Queue | None = None
-_worker_task: asyncio.Task | None = None
+_queue: Optional[asyncio.Queue] = None
+_worker_task: Optional[asyncio.Task] = None
 # Ordered list of run_ids currently sitting in the queue (not yet started).
-_pending: list[str] = []
+_pending: List[str] = []
 # Set of run_ids currently executing.
-_active: set[str] = set()
+_active: Set[str] = set()
 # Semaphore limiting simultaneous executions (created in _worker()).
-_semaphore: asyncio.Semaphore | None = None
+_semaphore: Optional[asyncio.Semaphore] = None
 
 
-def queue_position(run_id: str) -> int | None:
+def queue_position(run_id: str) -> Optional[int]:
     """Return 1-based queue position of run_id, or None if not in queue."""
     try:
         return _pending.index(run_id) + 1
@@ -46,11 +47,11 @@ def queue_position(run_id: str) -> int | None:
         return None
 
 
-def active_run_ids() -> list[str]:
+def active_run_ids() -> List[str]:
     return list(_active)
 
 
-def pending_run_ids() -> list[str]:
+def pending_run_ids() -> List[str]:
     return list(_pending)
 
 
@@ -124,7 +125,7 @@ async def mark_orphan_runs_failed() -> None:
 
     async with SessionLocal() as session:
         result = await session.execute(select(Run).where(Run.status.in_(["running", "queued"])))
-        orphans: list[Run] = result.scalars().all()
+        orphans: List[Run] = result.scalars().all()
         if not orphans:
             return
         now = datetime.now(timezone.utc)
@@ -156,9 +157,9 @@ class _RateLimiter:
     def __init__(self, limit: int, window_sec: int) -> None:
         self._limit = limit
         self._window = window_sec
-        self._hits: dict[str, list[float]] = {}
+        self._hits: Dict[str, List[float]] = {}
 
-    def is_allowed(self, key: str) -> tuple[bool, int]:
+    def is_allowed(self, key: str) -> Tuple[bool, int]:
         """Return (allowed, remaining_hits). Updates the sliding window."""
         import time
 

@@ -6,7 +6,7 @@ import asyncio
 import json
 import time
 from collections import defaultdict, deque
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import structlog
 
@@ -30,12 +30,12 @@ class _RunBuffer:
     __slots__ = ("events", "terminal", "_expires_at", "_seq")
 
     def __init__(self) -> None:
-        self.events: deque[dict[str, Any]] = deque(maxlen=_RING_SIZE)
-        self.terminal: dict[str, Any] | None = None
-        self._expires_at: float | None = None
+        self.events: deque[Dict[str, Any]] = deque(maxlen=_RING_SIZE)
+        self.terminal: Optional[Dict[str, Any]] = None
+        self._expires_at: Optional[float] = None
         self._seq: int = 0
 
-    def push(self, event: str, data: dict[str, Any], ttl_sec: int) -> dict[str, Any]:
+    def push(self, event: str, data: Dict[str, Any], ttl_sec: int) -> Dict[str, Any]:
         self._seq += 1
         entry = {"id": self._seq, "event": event, "data": data}
         self.events.append(entry)
@@ -49,7 +49,7 @@ class _RunBuffer:
             return False
         return now > self._expires_at
 
-    def missed_since(self, last_event_id: int) -> list[dict[str, Any]]:
+    def missed_since(self, last_event_id: int) -> List[Dict[str, Any]]:
         """Return all buffered events with id > last_event_id."""
         return [e for e in self.events if e["id"] > last_event_id]
 
@@ -58,11 +58,11 @@ class StreamHub:
     """Fan-out hub with per-run ring buffers and Last-Event-ID replay."""
 
     def __init__(self, max_queued: int = 2000, buffer_ttl_sec: int = 1800) -> None:
-        self._queues: dict[str, list[asyncio.Queue]] = defaultdict(list)
-        self._buffers: dict[str, _RunBuffer] = {}
+        self._queues: Dict[str, List[asyncio.Queue]] = defaultdict(list)
+        self._buffers: Dict[str, _RunBuffer] = {}
         self._max = max_queued
         self._ttl = buffer_ttl_sec
-        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     # ------------------------------------------------------------------
     # Public interface
@@ -83,7 +83,7 @@ class StreamHub:
                 del self._queues[run_id]
                 self._locks.pop(run_id, None)
 
-    def get_buffer(self, run_id: str) -> _RunBuffer | None:
+    def get_buffer(self, run_id: str) -> Optional[_RunBuffer]:
         """Return the ring buffer for `run_id` if it exists and hasn't expired."""
         buf = self._buffers.get(run_id)
         if buf is None:
@@ -93,13 +93,13 @@ class StreamHub:
             return None
         return buf
 
-    async def publish(self, run_id: str, event: str, data: dict[str, Any]) -> None:
+    async def publish(self, run_id: str, event: str, data: Dict[str, Any]) -> None:
         # Store in ring buffer first (so late subscribers can replay).
         buf = self._buffers.setdefault(run_id, _RunBuffer())
         entry = buf.push(event, data, self._ttl)
         line = {"id": entry["id"], "event": event, "data": data}
 
-        dead: list[asyncio.Queue] = []
+        dead: List[asyncio.Queue] = []
         for q in list(self._queues.get(run_id, [])):
             try:
                 q.put_nowait(line)
@@ -118,7 +118,7 @@ class StreamHub:
             self._queues.pop(run_id, None)
             self._locks.pop(run_id, None)
 
-    def format_sse(self, event_id: int, event: str, data: dict[str, Any]) -> str:
+    def format_sse(self, event_id: int, event: str, data: Dict[str, Any]) -> str:
         return (
             f"id: {event_id}\n"
             f"event: {event}\n"
