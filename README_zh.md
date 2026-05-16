@@ -105,7 +105,11 @@ result = run_strategy(
 | **−25.69%** · 52 笔 | **−33.28%** · 16 笔 |
 | [![组合](tutorials/assets/example_report_portfolio.png)](tutorials/assets/example_report_portfolio.png) | [![本地](tutorials/assets/example_report_19_localdata.png)](tutorials/assets/example_report_19_localdata.png) |
 
-> **如何阅读报告：** 页面依次展示：头部摘要 → 指标卡片（夏普、最大回撤、alpha）→ K 线图 → 累计收益 vs 基准 → 回撤曲线 → 每日盈亏 → 交易/持仓标签页。完整指南：[报告与指标详解](doc/reports_and_metrics.md)。
+### HTML 报告（交互式）
+
+![HTML 报告 — MACD+成交量](tutorials/assets/example_report_html_macd_volume.png)
+
+> **如何阅读报告：** 页面依次展示：头部摘要 → 指标卡片（夏普、最大回撤、alpha）→ K 线图（含 MA/RSI/MACD/布林带）→ 累计收益 vs 基准 → 回撤曲线 → 每日盈亏 → 交易/持仓标签页。完整指南：[报告与指标详解](doc/reports_and_metrics.md)。
 
 ---
 
