@@ -37,5 +37,14 @@ export default tsEslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
     },
-  }
+  },
+
+  // Lightweight Charts v4 requires `as any` casts for series options —
+  // its types are stricter than the actual runtime API accepts.
+  {
+    files: ["src/components/ReportViewer.tsx", "src/components/MetricsComparison.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 );

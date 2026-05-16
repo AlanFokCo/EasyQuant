@@ -633,8 +633,12 @@ async def get_run_report_data(run_id: str, session: AsyncSession = Depends(get_s
     if run is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     if run.status != "succeeded":
-        raise HTTPException(status_code=400, detail=api_error("RUN_NOT_SUCCEEDED", "Run has not completed"))
+        raise HTTPException(
+            status_code=400, detail=api_error("RUN_NOT_SUCCEEDED", "Run has not completed")
+        )
     raw = _read_metrics_from_json(run)
     if not raw:
-        raise HTTPException(status_code=404, detail=api_error("REPORT_NOT_FOUND", "Report data not found"))
+        raise HTTPException(
+            status_code=404, detail=api_error("REPORT_NOT_FOUND", "Report data not found")
+        )
     return JSONResponse(content=raw)
