@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useMemo } from "react";
 
 import { resolveArtifactUrl } from "../api/client";
+import ReportViewer from "./ReportViewer";
 
 type Props = {
   open: boolean;
@@ -11,10 +12,10 @@ type Props = {
 };
 
 export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
-  const iframeSrc = useMemo(() => {
-    const fromApi = resolveArtifactUrl(htmlUrl ?? undefined);
-    if (fromApi) return fromApi;
-    if (runId) return resolveArtifactUrl(`/static/reports/${runId}/report.html`);
+  const jsonUrl = useMemo(() => {
+    if (runId) return `/static/reports/${runId}/report.json`;
+    // Derive from htmlUrl if available
+    if (htmlUrl) return htmlUrl.replace(/\.html$/, ".json");
     return undefined;
   }, [htmlUrl, runId]);
 
@@ -51,11 +52,11 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>回测报告</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {iframeSrc ? (
+            {htmlUrl ? (
               <button
                 type="button"
                 style={ghost}
-                onClick={() => window.open(iframeSrc, "_blank", "noopener,noreferrer")}
+                onClick={() => window.open(resolveArtifactUrl(htmlUrl), "_blank", "noopener,noreferrer")}
               >
                 新标签打开
               </button>
@@ -65,20 +66,10 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
             </button>
           </div>
         </div>
-        {iframeSrc ? (
-          <iframe
-            title="回测 HTML 报告"
-            src={iframeSrc}
-            sandbox="allow-scripts allow-same-origin allow-downloads"
-            style={{
-              flex: 1,
-              minHeight: 420,
-              width: "100%",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              background: "#fff",
-            }}
-          />
+        {runId ? (
+          <div style={{ flex: 1, minHeight: 420, overflow: "auto" }}>
+            <ReportViewer runId={runId} jsonUrl={jsonUrl} />
+          </div>
         ) : (
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
             未拿到报告地址。请确认回测已成功结束。
