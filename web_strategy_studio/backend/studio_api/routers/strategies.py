@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from typing import List
 
 from studio_api.config import settings
 from studio_api.db import get_session
@@ -259,7 +260,7 @@ async def create_snapshot(
     )
 
 
-@router.get("/strategies/{strategy_id}/versions", response_model=list[StrategyVersionItem])
+@router.get("/strategies/{strategy_id}/versions", response_model=List[StrategyVersionItem])
 async def list_strategy_versions(
     strategy_id: str,
     session: AsyncSession = Depends(get_session),

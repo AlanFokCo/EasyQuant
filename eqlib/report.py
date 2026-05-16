@@ -441,6 +441,197 @@ def generate_chart(result, out_path):
     print(f"Chart saved: {out_path}")
 
 
+def _compute_chart_data(result):
+    """Compute all chart data arrays from a backtest result dict.
+
+    Returns a dict with: candlestick_data, volume_data, ma5/20/60_data,
+    support_data, resistance_data, rsi_data, macd_data, macd_signal_data,
+    macd_hist_data, bb_upper/middle/lower_data, markers, cum_return_data,
+    ret_hs300_data, ret_sse_data, drawdown_data, pnl_bar_data,
+    daily_returns_data, symbol.
+    """
+    ctx = result["context"]
+    trade_log = result["trade_log"]
+    recorded = result["recorded_values"]
+    initial = ctx.portfolio.starting_cash
+    start = ctx.start_date
+    end = ctx.end_date
+
+    # Collect traded securities
+    securities = set()
+    for t in trade_log:
+        securities.add(t["security"])
+    if not securities and ctx.universe:
+        securities.add(ctx.universe[0])
+    if not securities:
+        securities.add("601390")
+    symbol = list(securities)[0]
+
+    # K-line + technical indicators
+    candlestick_data, ma5_data, ma20_data, ma60_data = [], [], [], []
+    volume_data, support_data, resistance_data = [], [], []
+
+    ohlcv_data = result.get("ohlcv_data", {})
+    df = ohlcv_data.get(symbol, pd.DataFrame())
+    if df.empty:
+        try:
+            from eqlib.data import fetch_stock_data
+            df = fetch_stock_data(symbol, start, end)
+        except Exception:
+            pass
+
+    if not df.empty:
+        start_ts, end_ts = pd.Timestamp(start), pd.Timestamp(end)
+        df_sorted = df.sort_index().loc[start_ts:end_ts]
+        if df_sorted.empty:
+            df_sorted = df.sort_index()
+        closes, highs, lows = df_sorted["close"], df_sorted["high"], df_sorted["low"]
+        ma5, ma20, ma60 = closes.rolling(5).mean(), closes.rolling(20).mean(), closes.rolling(60).mean()
+        support, resistance = _compute_support_resistance(closes, highs, lows, window=20)
+
+        for (date, row), m5, m20, m60, sup, res in zip(
+                df_sorted.iterrows(), ma5, ma20, ma60, support, resistance):
+            d = _to_tv_date(date)
+            o, h, l, c, v = float(row.get("open", 0)), float(row.get("high", 0)), float(row.get("low", 0)), float(row.get("close", 0)), float(row.get("volume", 0))
+            candlestick_data.append({"time": d, "open": round(o, 3), "high": round(h, 3), "low": round(l, 3), "close": round(c, 3)})
+            volume_data.append({"time": d, "value": round(v, 0), "color": "#26a69a" if c >= o else "#ef5350"})
+            if not pd.isna(m5): ma5_data.append({"time": d, "value": round(float(m5), 3)})
+            if not pd.isna(m20): ma20_data.append({"time": d, "value": round(float(m20), 3)})
+            if not pd.isna(m60): ma60_data.append({"time": d, "value": round(float(m60), 3)})
+            if not pd.isna(sup): support_data.append({"time": d, "value": round(float(sup), 3)})
+            if not pd.isna(res): resistance_data.append({"time": d, "value": round(float(res), 3)})
+
+    # RSI(14), MACD(12,26,9), Bollinger Bands(20,2)
+    rsi_data, macd_data, macd_signal_data, macd_hist_data = [], [], [], []
+    bb_upper_data, bb_middle_data, bb_lower_data = [], [], []
+
+    if not df.empty and len(df_sorted) >= 26:
+        closes = df_sorted["close"]
+        delta = closes.diff()
+        gain, loss = delta.clip(lower=0), (-delta.clip(upper=0))
+        avg_gain = gain.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+        rs = avg_gain / avg_loss.replace(0, np.nan)
+        rsi_series = 100 - (100 / (1 + rs))
+
+        ema_fast = closes.ewm(span=12, adjust=False).mean()
+        ema_slow = closes.ewm(span=26, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=9, adjust=False).mean()
+        histogram = macd_line - signal_line
+
+        bb_middle_series = closes.rolling(20).mean()
+        bb_std = closes.rolling(20).std()
+        bb_upper_series, bb_lower_series = bb_middle_series + 2 * bb_std, bb_middle_series - 2 * bb_std
+
+        for (date, row), rsi_v, macd_v, sig_v, hist_v, bb_u, bb_m, bb_l in zip(
+                df_sorted.iterrows(), rsi_series, macd_line, signal_line,
+                histogram, bb_upper_series, bb_middle_series, bb_lower_series):
+            d = _to_tv_date(date)
+            if not pd.isna(rsi_v): rsi_data.append({"time": d, "value": round(float(rsi_v), 3)})
+            if not pd.isna(macd_v): macd_data.append({"time": d, "value": round(float(macd_v), 4)})
+            if not pd.isna(sig_v): macd_signal_data.append({"time": d, "value": round(float(sig_v), 4)})
+            if not pd.isna(hist_v):
+                hv = round(float(hist_v), 4)
+                macd_hist_data.append({"time": d, "value": hv, "color": "rgba(245,34,45,0.6)" if hv >= 0 else "rgba(82,196,26,0.6)"})
+            if not pd.isna(bb_u): bb_upper_data.append({"time": d, "value": round(float(bb_u), 3)})
+            if not pd.isna(bb_m): bb_middle_data.append({"time": d, "value": round(float(bb_m), 3)})
+            if not pd.isna(bb_l): bb_lower_data.append({"time": d, "value": round(float(bb_l), 3)})
+
+    # Buy/sell markers
+    markers = []
+    for t in trade_log:
+        markers.append({
+            "time": _to_tv_date(t["date"]),
+            "position": "belowBar" if t["type"] == "BUY" else "aboveBar",
+            "color": "#26a69a" if t["type"] == "BUY" else "#ef5350",
+            "shape": "arrowUp" if t["type"] == "BUY" else "arrowDown",
+            "text": f"{'买' if t['type'] == 'BUY' else '卖'} {t['amount']}",
+        })
+    markers.sort(key=lambda x: x["time"])
+
+    # Cumulative return, daily P&L, daily return
+    cum_return_data = _build_return_series(recorded, initial)
+    pnl_bar_data, daily_returns_data = _build_daily_pnl(recorded, initial)
+
+    # Benchmark cumulative returns
+    ret_hs300 = result.get("chart_index_hs300") if isinstance(result.get("chart_index_hs300"), list) else None
+    if not ret_hs300:
+        ret_hs300 = _fetch_index_returns("sh000300", start, end, recorded)
+    ret_sse = result.get("chart_index_sse") if isinstance(result.get("chart_index_sse"), list) else None
+    if not ret_sse:
+        ret_sse = _fetch_index_returns("sh000001", start, end, recorded)
+
+    # Drawdown series
+    drawdown_data = []
+    if cum_return_data:
+        peak = cum_return_data[0]["value"]
+        for d in cum_return_data:
+            if d["value"] > peak: peak = d["value"]
+            drawdown_data.append({"time": d["time"], "value": round(d["value"] - peak, 3)})
+
+    # Technical summary stats for HTML report
+    tech_stats = {}
+    if not df.empty:
+        df_s = df.sort_index()
+        c = float(df_s["close"].iloc[-1])
+        ma5_last = float(df_s["close"].rolling(5).mean().iloc[-1])
+        ma20_last = float(df_s["close"].rolling(20).mean().iloc[-1])
+        ma60_ser = df_s["close"].rolling(60).mean().dropna()
+        ma60_v = round(float(ma60_ser.iloc[-1]), 3) if len(ma60_ser) > 0 else None
+        atr14 = _compute_atr(df_s["high"], df_s["low"], df_s["close"], 14)
+        vol20 = df_s["volume"].rolling(20).mean().iloc[-1]
+        vol_ratio = round(float(df_s["volume"].iloc[-1] / vol20), 2) if vol20 > 0 else None
+
+        rsi_last = rsi_data[-1]["value"] if rsi_data else None
+        macd_last = macd_data[-1]["value"] if macd_data else None
+        macd_sig_last = macd_signal_data[-1]["value"] if macd_signal_data else None
+        macd_hist_last = macd_hist_data[-1]["value"] if macd_hist_data else None
+        bb_u_last = bb_upper_data[-1]["value"] if bb_upper_data else None
+        bb_m_last = bb_middle_data[-1]["value"] if bb_middle_data else None
+        bb_l_last = bb_lower_data[-1]["value"] if bb_lower_data else None
+        bb_width = round((bb_u_last - bb_l_last) / bb_m_last * 100, 3) if bb_u_last is not None and bb_m_last and bb_m_last != 0 else None
+
+        tech_stats = {
+            "latest_price": round(c, 3),
+            "ma5": round(ma5_last, 3),
+            "ma20": round(ma20_last, 3),
+            "ma60": ma60_v,
+            "atr14": round(float(atr14), 3) if atr14 else None,
+            "vol_ratio": vol_ratio,
+            "period_high": round(float(df_s["high"].max()), 3),
+            "period_low": round(float(df_s["low"].min()), 3),
+            "rsi14": rsi_last,
+            "macd": macd_last,
+            "macd_signal": macd_sig_last,
+            "macd_hist": macd_hist_last,
+            "bb_upper": bb_u_last,
+            "bb_middle": bb_m_last,
+            "bb_lower": bb_l_last,
+            "bb_width": bb_width,
+        }
+
+    return {
+        "symbol": symbol,
+        "candlestick_data": candlestick_data,
+        "volume_data": volume_data,
+        "ma5_data": ma5_data, "ma20_data": ma20_data, "ma60_data": ma60_data,
+        "support_data": support_data, "resistance_data": resistance_data,
+        "rsi_data": rsi_data, "macd_data": macd_data,
+        "macd_signal_data": macd_signal_data, "macd_hist_data": macd_hist_data,
+        "bb_upper_data": bb_upper_data, "bb_middle_data": bb_middle_data,
+        "bb_lower_data": bb_lower_data,
+        "markers": markers,
+        "cum_return_data": cum_return_data,
+        "ret_hs300_data": ret_hs300 if ret_hs300 else [],
+        "ret_sse_data": ret_sse if ret_sse else [],
+        "drawdown_data": drawdown_data,
+        "pnl_bar_data": pnl_bar_data,
+        "daily_returns_data": daily_returns_data,
+        "tech_stats": tech_stats,
+    }
+
+
 def generate_html_report(result, out_path):
     """Generate interactive HTML report with TradingView lightweight-charts.
 
@@ -460,131 +651,33 @@ def generate_html_report(result, out_path):
     pnl = final - initial
     pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
-    # Collect traded securities
-    securities = set()
-    for t in trade_log:
-        securities.add(t["security"])
-    if not securities and ctx.universe:
-        securities.add(ctx.universe[0])
-    if not securities:
-        securities.add("601390")
-
-    symbol = list(securities)[0]
-
-    # ============================================================
-    # K-line + technical indicators (use preloaded OHLCV first)
-    # ============================================================
-    candlestick_data = []
-    ma5_data = []
-    ma20_data = []
-    ma60_data = []
-    volume_data = []
-    support_data = []
-    resistance_data = []
-
-    ohlcv_data = result.get("ohlcv_data", {})
-    if symbol in ohlcv_data:
-        df = ohlcv_data[symbol]
-    else:
-        df = pd.DataFrame()
-        try:
-            df = fetch_stock_data(symbol, start, end)
-        except Exception:
-            pass
-    if not df.empty:
-        # Trim OHLCV to backtest period so K-line aligns with return charts
-        start_ts = pd.Timestamp(start)
-        end_ts = pd.Timestamp(end)
-        df_sorted = df.sort_index()
-        df_sorted = df_sorted.loc[start_ts:end_ts]
-        if df_sorted.empty:
-            df_sorted = df.sort_index()
-        closes = df_sorted["close"]
-        highs = df_sorted["high"]
-        lows = df_sorted["low"]
-        ma5 = closes.rolling(5).mean()
-        ma20 = closes.rolling(20).mean()
-        ma60 = closes.rolling(60).mean()
-        support, resistance = _compute_support_resistance(closes, highs, lows, window=20)
-
-        for (date, row), m5, m20, m60, sup, res in zip(
-                df_sorted.iterrows(), ma5, ma20, ma60, support, resistance):
-            d = _to_tv_date(date)
-            o = float(row.get("open", 0))
-            h = float(row.get("high", 0))
-            l = float(row.get("low", 0))
-            c = float(row.get("close", 0))
-            v = float(row.get("volume", 0))
-
-            candlestick_data.append({
-                "time": d, "open": round(o, 3), "high": round(h, 3),
-                "low": round(l, 3), "close": round(c, 3),
-            })
-            volume_data.append({
-                "time": d, "value": round(v, 0),
-                "color": "#26a69a" if c >= o else "#ef5350",
-            })
-            if not pd.isna(m5):
-                ma5_data.append({"time": d, "value": round(float(m5), 3)})
-            if not pd.isna(m20):
-                ma20_data.append({"time": d, "value": round(float(m20), 3)})
-            if not pd.isna(m60):
-                ma60_data.append({"time": d, "value": round(float(m60), 3)})
-            if not pd.isna(sup):
-                support_data.append({"time": d, "value": round(float(sup), 3)})
-            if not pd.isna(res):
-                resistance_data.append({"time": d, "value": round(float(res), 3)})
-
-    # ============================================================
-    # Buy/sell markers
-    # ============================================================
-    markers = []
-    for t in trade_log:
-        markers.append({
-            "time": _to_tv_date(t["date"]),
-            "position": "belowBar" if t["type"] == "BUY" else "aboveBar",
-            "color": "#26a69a" if t["type"] == "BUY" else "#ef5350",
-            "shape": "arrowUp" if t["type"] == "BUY" else "arrowDown",
-            "text": f"{'买' if t['type'] == 'BUY' else '卖'} {t['amount']}",
-        })
-    markers.sort(key=lambda x: x["time"])
-
-    # ============================================================
-    # Cumulative return series (strategy)
-    # ============================================================
-    cum_return_data = _build_return_series(recorded, initial)
-
-    # ============================================================
-    # Daily P&L and daily return
-    # ============================================================
-    pnl_bar_data, daily_returns_data = _build_daily_pnl(recorded, initial)
-
-    # ============================================================
-    # Benchmark cumulative returns: 沪深300 + 上证指数（图表双线）；
-    # bench_data 为 set_benchmark 配置的指数，用于 _calc_metrics 等
-    # ============================================================
-    bench_data = _fetch_benchmark_returns(benchmark, start, end, recorded)
-    ret_hs300 = result.get("chart_index_hs300") if isinstance(result.get("chart_index_hs300"), list) else None
-    if not ret_hs300:
-        ret_hs300 = _fetch_index_returns("sh000300", start, end, recorded)
-    ret_sse = result.get("chart_index_sse") if isinstance(result.get("chart_index_sse"), list) else None
-    if not ret_sse:
-        ret_sse = _fetch_index_returns("sh000001", start, end, recorded)
-
-    # ============================================================
-    # Drawdown series
-    # ============================================================
-    drawdown_data = []
-    if cum_return_data:
-        peak = cum_return_data[0]["value"]
-        for d in cum_return_data:
-            if d["value"] > peak:
-                peak = d["value"]
-            dd = round(d["value"] - peak, 3)
-            drawdown_data.append({"time": d["time"], "value": dd})
+    # Compute all chart data arrays (shared with generate_report_json)
+    chart = _compute_chart_data(result)
+    symbol = chart["symbol"]
+    candlestick_data = chart["candlestick_data"]
+    ma5_data, ma20_data, ma60_data = chart["ma5_data"], chart["ma20_data"], chart["ma60_data"]
+    volume_data = chart["volume_data"]
+    support_data, resistance_data = chart["support_data"], chart["resistance_data"]
+    rsi_data = chart["rsi_data"]
+    macd_data = chart["macd_data"]
+    macd_signal_data = chart["macd_signal_data"]
+    macd_hist_data = chart["macd_hist_data"]
+    bb_upper_data = chart["bb_upper_data"]
+    bb_middle_data = chart["bb_middle_data"]
+    bb_lower_data = chart["bb_lower_data"]
+    markers = chart["markers"]
+    cum_return_data = chart["cum_return_data"]
+    ret_hs300 = chart["ret_hs300_data"]
+    ret_sse = chart["ret_sse_data"]
+    drawdown_data = chart["drawdown_data"]
+    pnl_bar_data = chart["pnl_bar_data"]
+    daily_returns_data = chart["daily_returns_data"]
 
     dd_hs300 = _build_drawdown_from_cumulative_pct(ret_hs300)
     dd_sse = _build_drawdown_from_cumulative_pct(ret_sse)
+
+    # Benchmark data for metrics calculation
+    bench_data = _fetch_benchmark_returns(benchmark, start, end, recorded)
 
     # ============================================================
     # Performance metrics
@@ -675,30 +768,9 @@ def generate_html_report(result, out_path):
     sell_count = sum(1 for t in trade_log if t["type"] == "SELL")
 
     # ============================================================
-    # Technical summary stats
+    # Technical summary stats (computed by _compute_chart_data)
     # ============================================================
-    tech_stats = {}
-    if not df.empty:
-        df_s = df.sort_index()
-        c = df_s["close"].iloc[-1]
-        ma5_last = df_s["close"].rolling(5).mean().iloc[-1]
-        ma20_last = df_s["close"].rolling(20).mean().iloc[-1]
-        ma60_last = df_s["close"].rolling(60).mean().dropna()
-        ma60_v = round(float(ma60_last.iloc[-1]), 3) if len(ma60_last) > 0 else None
-        atr14 = _compute_atr(df_s["high"], df_s["low"], df_s["close"], 14)
-        vol20 = df_s["volume"].rolling(20).mean().iloc[-1]
-        vol_ratio = round(float(df_s["volume"].iloc[-1] / vol20), 2) if vol20 > 0 else None
-
-        tech_stats = {
-            "latest_price": round(c, 3),
-            "ma5": round(float(ma5_last), 3),
-            "ma20": round(float(ma20_last), 3),
-            "ma60": ma60_v,
-            "atr14": round(float(atr14), 3) if atr14 else None,
-            "vol_ratio": vol_ratio,
-            "period_high": round(float(df_s["high"].max()), 3),
-            "period_low": round(float(df_s["low"].min()), 3),
-        }
+    tech_stats = chart.get("tech_stats", {})
 
     # ============================================================
     # Build HTML
@@ -729,6 +801,13 @@ def generate_html_report(result, out_path):
         markers_json=json.dumps(markers),
         support_json=json.dumps(support_data),
         resistance_json=json.dumps(resistance_data),
+        rsi_json=json.dumps(rsi_data),
+        macd_json=json.dumps(macd_data),
+        macd_signal_json=json.dumps(macd_signal_data),
+        macd_hist_json=json.dumps(macd_hist_data),
+        bb_upper_json=json.dumps(bb_upper_data),
+        bb_middle_json=json.dumps(bb_middle_data),
+        bb_lower_json=json.dumps(bb_lower_data),
         cum_return_json=json.dumps(cum_return_data),
         ret_hs300_json=json.dumps(ret_hs300),
         ret_sse_json=json.dumps(ret_sse),
@@ -1024,6 +1103,38 @@ if (typeof LightweightCharts === 'undefined') {{
   #drawdown {{ width: 100%; height: 160px; }}
   #pnlbar   {{ width: 100%; height: 160px; }}
   #dailyret {{ width: 100%; height: 160px; }}
+  #rsichart  {{ width: 100%; height: 160px; }}
+  #macdchart {{ width: 100%; height: 160px; }}
+  /* Indicator toggle panel */
+  .indicator-panel {{
+    position: absolute; top: 8px; left: 8px; z-index: 10;
+    display: flex; gap: 4px;
+  }}
+  .ind-btn {{
+    padding: 4px 10px; font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 3px;
+    background: rgba(255,255,255,.85); color: var(--text-dim);
+    cursor: pointer; transition: all .15s; backdrop-filter: blur(4px);
+  }}
+  .ind-btn.active {{ background: var(--primary); color: #fff; border-color: var(--primary); }}
+  .ind-btn:hover:not(.active) {{ background: #fafafa; }}
+  /* Crosshair legend */
+  .chart-legend {{
+    position: absolute; top: 8px; right: 70px; z-index: 10;
+    background: rgba(255,255,255,.92); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 10px; font-size: 11px;
+    font-family: "SF Mono", "Menlo", monospace; line-height: 1.6;
+    color: var(--text-secondary); pointer-events: none;
+    backdrop-filter: blur(4px); min-width: 200px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    display: none;
+  }}
+  .chart-legend.visible {{ display: block; }}
+  .chart-legend .leg-date {{ font-weight: 600; color: var(--text); margin-bottom: 2px; }}
+  .chart-legend .leg-row {{ display: flex; justify-content: space-between; gap: 12px; }}
+  .chart-legend .leg-label {{ color: var(--text-dim); }}
+  .chart-legend .leg-val {{ font-variant-numeric: tabular-nums; }}
+  .leg-dot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }}
   /* Legend */
   .legend {{ display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); align-items: center; }}
   .legend span {{ display: flex; align-items: center; gap: 4px; }}
@@ -1315,11 +1426,11 @@ if (typeof LightweightCharts === 'undefined') {{
   </div>
 
   <!-- K-line chart -->
-  <div class="chart-panel">
+  <div class="chart-panel" style="position:relative">
     <div class="chart-panel-head">
       <div>
         <h2>K 线图 &middot; 技术指标</h2>
-        <div class="chart-desc">日 K 线含 MA5/MA20/MA60 均线、20日动态支撑/压力位、成交量柱，以及买卖信号标记。<span style="color:var(--primary);font-weight:500">&middot; 使用前复权价格（含分红调整）</span></div>
+        <div class="chart-desc">日 K 线含 MA5/MA20/MA60 均线、布林带(20,2)、20日动态支撑/压力位、成交量柱，以及买卖信号标记。<span style="color:var(--primary);font-weight:500">&middot; 使用前复权价格（含分红调整）</span></div>
       </div>
       <div class="legend">
         <span><span class="dot" style="background:#f5222d"></span>MA5</span>
@@ -1329,7 +1440,39 @@ if (typeof LightweightCharts === 'undefined') {{
         <span><span class="dot" style="background:#52c41a"></span>卖出</span>
       </div>
     </div>
+    <div class="indicator-panel" id="indPanel">
+      <button class="ind-btn active" data-ind="ma" onclick="toggleInd('ma',this)">MA</button>
+      <button class="ind-btn" data-ind="bb" onclick="toggleInd('bb',this)">BB</button>
+      <button class="ind-btn active" data-ind="vol" onclick="toggleInd('vol',this)">VOL</button>
+      <button class="ind-btn" data-ind="sr" onclick="toggleInd('sr',this)">S/R</button>
+    </div>
+    <div class="chart-legend" id="klineLegend"></div>
     <div id="kline"></div>
+  </div>
+
+  <!-- RSI chart -->
+  <div class="chart-panel">
+    <div class="chart-panel-head">
+      <h2>RSI(14) 相对强弱指标</h2>
+      <div class="legend">
+        <span><span class="ln" style="background:#722ed1"></span>RSI(14)</span>
+        <span style="font-size:11px;color:var(--text-dim)">超卖区 &lt;30 / 超买区 &gt;70</span>
+      </div>
+    </div>
+    <div id="rsichart"></div>
+  </div>
+
+  <!-- MACD chart -->
+  <div class="chart-panel">
+    <div class="chart-panel-head">
+      <h2>MACD(12,26,9) 指数平滑异同移动平均</h2>
+      <div class="legend">
+        <span><span class="ln" style="background:#1890ff"></span>MACD</span>
+        <span><span class="ln" style="background:#fa8c16"></span>Signal</span>
+        <span><span class="dot" style="background:#26a69a"></span>柱状图</span>
+      </div>
+    </div>
+    <div id="macdchart"></div>
   </div>
 
   <!-- Cumulative returns comparison -->
@@ -1836,11 +1979,30 @@ if (typeof LightweightCharts === 'undefined') {{
     }});
     cSeries.setData({candlestick_json});
     cSeries.setMarkers({markers_json});
-    kChart.addLineSeries({{ color: '#f5222d', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }}).setData({ma5_json});
-    kChart.addLineSeries({{ color: '#1890ff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }}).setData({ma20_json});
-    kChart.addLineSeries({{ color: '#722ed1', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }}).setData({ma60_json});
-    kChart.addLineSeries({{ color: 'rgba(82,196,26,0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData({support_json});
-    kChart.addLineSeries({{ color: 'rgba(245,34,45,0.55)',  lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData({resistance_json});
+
+    // MA series (group: 'ma')
+    const ma5S = kChart.addLineSeries({{ color: '#f5222d', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    ma5S.setData({ma5_json});
+    const ma20S = kChart.addLineSeries({{ color: '#1890ff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    ma20S.setData({ma20_json});
+    const ma60S = kChart.addLineSeries({{ color: '#722ed1', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    ma60S.setData({ma60_json});
+
+    // Bollinger Bands (group: 'bb')
+    const bbUpperS = kChart.addLineSeries({{ color: 'rgba(24,144,255,0.5)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    bbUpperS.setData({bb_upper_json});
+    const bbMiddleS = kChart.addLineSeries({{ color: 'rgba(24,144,255,0.7)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    bbMiddleS.setData({bb_middle_json});
+    const bbLowerS = kChart.addLineSeries({{ color: 'rgba(24,144,255,0.5)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    bbLowerS.setData({bb_lower_json});
+
+    // Support/Resistance (group: 'sr')
+    const supS = kChart.addLineSeries({{ color: 'rgba(82,196,26,0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    supS.setData({support_json});
+    const resS = kChart.addLineSeries({{ color: 'rgba(245,34,45,0.55)',  lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    resS.setData({resistance_json});
+
+    // Volume (group: 'vol')
     const volS = kChart.addHistogramSeries({{
       priceFormat: {{ type: 'volume' }},
       priceScaleId: 'vol',
@@ -1909,6 +2071,61 @@ if (typeof LightweightCharts === 'undefined') {{
       sseLine.applyOptions({{ visible: retVis.sse }});
       excessLine.applyOptions({{ visible: retVis.excess }});
     }};
+
+    /* RSI(14) chart */
+    const rsiEl = document.getElementById('rsichart');
+    const rsiChart = LightweightCharts.createChart(rsiEl, {{
+      ...cmn, width: rsiEl.clientWidth, height: 160,
+      rightPriceScale: {{ scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
+    }});
+    const rsiLine = rsiChart.addLineSeries({{
+      color: '#722ed1', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+    }});
+    rsiLine.setData({rsi_json});
+    // Overbought line (70)
+    const rsiOB = rsiChart.addLineSeries({{
+      color: 'rgba(245,34,45,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    }});
+    rsiOB.setData({rsi_json}.length > 0 ? {rsi_json}.map(d => ({{ time: d.time, value: 70 }})) : []);
+    // Oversold line (30)
+    const rsiOS = rsiChart.addLineSeries({{
+      color: 'rgba(82,196,26,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    }});
+    rsiOS.setData({rsi_json}.length > 0 ? {rsi_json}.map(d => ({{ time: d.time, value: 30 }})) : []);
+    // Middle line (50)
+    const rsiMid = rsiChart.addLineSeries({{
+      color: 'rgba(140,140,140,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    }});
+    rsiMid.setData({rsi_json}.length > 0 ? {rsi_json}.map(d => ({{ time: d.time, value: 50 }})) : []);
+    rsiChart.timeScale().fitContent();
+
+    /* MACD(12,26,9) chart */
+    const macdEl = document.getElementById('macdchart');
+    const macdChart = LightweightCharts.createChart(macdEl, {{
+      ...cmn, width: macdEl.clientWidth, height: 160,
+      rightPriceScale: {{ scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
+    }});
+    // Histogram
+    const macdHist = macdChart.addHistogramSeries({{
+      priceFormat: {{ type: 'price' }},
+    }});
+    macdHist.setData({macd_hist_json});
+    // MACD line
+    const macdLineS = macdChart.addLineSeries({{
+      color: '#1890ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+    }});
+    macdLineS.setData({macd_json});
+    // Signal line
+    const macdSigS = macdChart.addLineSeries({{
+      color: '#fa8c16', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+    }});
+    macdSigS.setData({macd_signal_json});
+    // Zero line
+    const macdZeroData = {macd_json}.length > 0 ? [{{ time: {macd_json}[0].time, value: 0 }}, {{ time: {macd_json}[{macd_json}.length - 1].time, value: 0 }}] : [];
+    macdChart.addLineSeries({{
+      color: '#d9d9d9', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    }}).setData(macdZeroData);
+    macdChart.timeScale().fitContent();
 
     /* Drawdown — strategy area + HS300 + SSE lines */
     const ddEl = document.getElementById('drawdown');
@@ -1980,7 +2197,7 @@ if (typeof LightweightCharts === 'undefined') {{
     drChart.timeScale().fitContent();
 
     /* Sync all time scales */
-    const allCharts = [kChart, rChart, ddChart, pChart, drChart];
+    const allCharts = [kChart, rChart, ddChart, pChart, drChart, rsiChart, macdChart];
     allCharts.forEach(src => {{
       src.timeScale().subscribeVisibleLogicalRangeChange(range => {{
         if (!range) return;
@@ -1993,9 +2210,87 @@ if (typeof LightweightCharts === 'undefined') {{
     window.addEventListener('resize', () => {{
       clearTimeout(rTimer);
       rTimer = setTimeout(() => {{
-        [[kChart, kEl], [rChart, rEl], [ddChart, ddEl], [pChart, pEl], [drChart, drEl]]
+        [[kChart, kEl], [rChart, rEl], [ddChart, ddEl], [pChart, pEl], [drChart, drEl], [rsiChart, rsiEl], [macdChart, macdEl]]
           .forEach(([c, el]) => c.applyOptions({{ width: el.clientWidth }}));
       }}, 150);
+    }});
+
+    /* =================================================================
+       INDICATOR TOGGLE
+       ================================================================= */
+    const indGroups = {{
+      ma:   [ma5S, ma20S, ma60S],
+      bb:   [bbUpperS, bbMiddleS, bbLowerS],
+      vol:  [volS],
+      sr:   [supS, resS],
+    }};
+    window.toggleInd = function(group, btn) {{
+      const show = !btn.classList.contains('active');
+      btn.classList.toggle('active');
+      (indGroups[group] || []).forEach(s => s.applyOptions({{ visible: show }}));
+    }};
+
+    /* =================================================================
+       CROSSHAIR-LINKED DYNAMIC LEGEND
+       ================================================================= */
+    const legendEl = document.getElementById('klineLegend');
+    // Build lookup maps for indicator data
+    function buildMap(arr) {{
+      const m = {{}};
+      arr.forEach(d => {{ m[d.time] = d.value; }});
+      return m;
+    }}
+    const ma5Map   = buildMap({ma5_json});
+    const ma20Map  = buildMap({ma20_json});
+    const ma60Map  = buildMap({ma60_json});
+    const rsiMap   = buildMap({rsi_json});
+    const macdMap  = buildMap({macd_json});
+    const sigMap   = buildMap({macd_signal_json});
+    const histMap  = buildMap({macd_hist_json});
+    const bbUpMap  = buildMap({bb_upper_json});
+    const bbMidMap = buildMap({bb_middle_json});
+    const bbLoMap  = buildMap({bb_lower_json});
+    const volMap   = buildMap({volume_json});
+
+    function fmt(v, d) {{
+      if (v === undefined || v === null || isNaN(v)) return '—';
+      return Number(v).toFixed(d || 2);
+    }}
+    function fmtVol(v) {{
+      if (v === undefined || v === null || isNaN(v)) return '—';
+      const n = Number(v);
+      if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
+      if (n >= 1e4) return (n / 1e4).toFixed(2) + '万';
+      return n.toLocaleString();
+    }}
+
+    kChart.subscribeCrosshairMove(param => {{
+      if (!param || !param.time) {{
+        legendEl.classList.remove('visible');
+        return;
+      }}
+      legendEl.classList.add('visible');
+      const t = param.time;
+      const sd = param.seriesData.get(cSeries);
+      const o = sd ? fmt(sd.open, 3) : '—';
+      const h = sd ? fmt(sd.high, 3) : '—';
+      const l = sd ? fmt(sd.low, 3) : '—';
+      const c = sd ? fmt(sd.close, 3) : '—';
+
+      let html = `<div class="leg-date">${{t}}</div>`;
+      html += `<div class="leg-row"><span class="leg-label">O/H/L/C</span><span class="leg-val">${{o}} / ${{h}} / ${{l}} / ${{c}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#f5222d"></span>MA5</span><span class="leg-val">${{fmt(ma5Map[t])}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#1890ff"></span>MA20</span><span class="leg-val">${{fmt(ma20Map[t])}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#722ed1"></span>MA60</span><span class="leg-val">${{fmt(ma60Map[t])}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#722ed1"></span>RSI(14)</span><span class="leg-val">${{fmt(rsiMap[t])}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#1890ff"></span>MACD</span><span class="leg-val">${{fmt(macdMap[t], 4)}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#fa8c16"></span>Signal</span><span class="leg-val">${{fmt(sigMap[t], 4)}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#26a69a"></span>MACD Hist</span><span class="leg-val" style="color:${{parseFloat(histMap[t]) >= 0 ? '#f5222d' : '#52c41a'}}">${{fmt(histMap[t], 4)}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:rgba(24,144,255,.7)"></span>BB Upper</span><span class="leg-val">${{fmt(bbUpMap[t], 3)}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:rgba(24,144,255,.7)"></span>BB Middle</span><span class="leg-val">${{fmt(bbMidMap[t], 3)}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:rgba(24,144,255,.7)"></span>BB Lower</span><span class="leg-val">${{fmt(bbLoMap[t], 3)}}</span></div>`;
+      html += `<div class="leg-row"><span class="leg-label">VOL</span><span class="leg-val">${{fmtVol(volMap[t])}}</span></div>`;
+      legendEl.innerHTML = html;
     }});
   }} catch(e) {{
     chartError = true;
@@ -2025,6 +2320,14 @@ if (typeof LightweightCharts === 'undefined') {{
       ['MA20',     tech.ma20],
       ['MA60',     tech.ma60],
       ['ATR(14)',  tech.atr14],
+      ['RSI(14)',  tech.rsi14],
+      ['MACD',     tech.macd],
+      ['MACD Signal', tech.macd_signal],
+      ['MACD Hist',   tech.macd_hist],
+      ['BB Upper', tech.bb_upper],
+      ['BB Middle',tech.bb_middle],
+      ['BB Lower', tech.bb_lower],
+      ['BB Width(%)', tech.bb_width],
       ['量比',     tech.vol_ratio],
       ['期间最高', tech.period_high],
       ['期间最低', tech.period_low],
@@ -2339,6 +2642,9 @@ def generate_report_json(result, out_path):
                 "cumulative_return": round(r["total_value"] / initial - 1, 6) if initial > 0 else 0.0,
             })
 
+    # Chart data arrays for native Lightweight Charts rendering
+    chart = _compute_chart_data(result)
+
     report = {
         "metadata": {
             "generated_at": str(datetime.datetime.now().replace(microsecond=0)),
@@ -2393,6 +2699,28 @@ def generate_report_json(result, out_path):
             if pos.amount > 0
         },
         "cumulative_returns": cumulative_returns,
+        # Chart data arrays for native Lightweight Charts rendering (ReportViewer)
+        "candlestick_data": chart["candlestick_data"],
+        "volume_data": chart["volume_data"],
+        "ma5_data": chart["ma5_data"],
+        "ma20_data": chart["ma20_data"],
+        "ma60_data": chart["ma60_data"],
+        "rsi_data": chart["rsi_data"],
+        "macd_data": chart["macd_data"],
+        "macd_signal_data": chart["macd_signal_data"],
+        "macd_hist_data": chart["macd_hist_data"],
+        "bb_upper_data": chart["bb_upper_data"],
+        "bb_middle_data": chart["bb_middle_data"],
+        "bb_lower_data": chart["bb_lower_data"],
+        "support_data": chart["support_data"],
+        "resistance_data": chart["resistance_data"],
+        "markers": chart["markers"],
+        "cum_return_data": chart["cum_return_data"],
+        "ret_hs300_data": chart["ret_hs300_data"],
+        "ret_sse_data": chart["ret_sse_data"],
+        "drawdown_data": chart["drawdown_data"],
+        "pnl_bar_data": chart["pnl_bar_data"],
+        "daily_returns_data": chart["daily_returns_data"],
     }
 
     # Add risk metrics

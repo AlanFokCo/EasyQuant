@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, Dict, List
 
 
 @lru_cache
@@ -13,14 +14,14 @@ def _symbols_path() -> Path:
 
 
 @lru_cache
-def _load_symbols() -> list[dict]:
+def _load_symbols() -> List[Dict[str, Any]]:
     p = _symbols_path()
     if not p.is_file():
         return []
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def suggest(source: str, cursor_line: int, cursor_col: int) -> list[dict]:
+def suggest(source: str, cursor_line: int, cursor_col: int) -> List[Dict[str, Any]]:
     lines = source.splitlines()
     if cursor_line < 1 or cursor_line > len(lines):
         line = ""

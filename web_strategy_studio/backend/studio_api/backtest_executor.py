@@ -11,7 +11,7 @@ import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
@@ -32,7 +32,7 @@ _PROGRESS_RE = re.compile(r"Backtest progress[:\s]+(\d+)\s*/\s*(\d+)")
 def _estimate_trading_fraction(done_days: int, start: date, end: date) -> float:
     """Rough progress from trading-day span when bar-level hooks are unavailable."""
     # Use pandas bdate_range (Mon-Fri) as a proxy for trading days (~250/yr)
-    # instead of calendar days (~365/yr) to avoid the ~1.46× overestimate.
+    # instead of calendar days (~365/yr) to avoid the ~1.46x overestimate.
     total = max(len(pd.bdate_range(start=start, end=end)), 1)
     return min(0.95, 0.15 + 0.75 * (done_days / total))
 
@@ -40,9 +40,9 @@ def _estimate_trading_fraction(done_days: int, start: date, end: date) -> float:
 async def execute_backtest(
     run_id: str,
     source_code: str,
-    params: dict[str, Any],
+    params: Dict[str, Any],
     on_log: Any = None,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Run isolated subprocess; stream logs; return artifact paths or error."""
     work = Path(tempfile.mkdtemp(prefix=f"eqrun_{run_id}_"))
     artifact_sub = settings.artifact_dir / "reports" / run_id
@@ -80,7 +80,7 @@ async def execute_backtest(
         }
     )
 
-    filtered_env: dict[str, str] = {}
+    filtered_env: Dict[str, str] = {}
     for k, v in os.environ.items():
         if k in _ALLOWED_ENV_KEYS or any(k.startswith(p) for p in _ALLOWED_ENV_PREFIXES):
             filtered_env[k] = v
@@ -128,7 +128,7 @@ async def execute_backtest(
             log_lines += 1
 
             # S5: Parse structured progress lines emitted by the engine.
-            # Format: "📍 Backtest progress: N/M (pct%)" or "Backtest progress N/M"
+            # Format: "Backtest progress: N/M (pct%)" or "Backtest progress N/M"
             # The regex handles optional emoji prefix, colon, and trailing percentage.
             m = _PROGRESS_RE.search(line)
             if m:
@@ -177,7 +177,7 @@ async def execute_backtest(
     t_err = asyncio.create_task(pump_stream(proc.stderr, "stderr"))  # type: ignore[arg-type]
     t_prog = asyncio.create_task(progress_tick())
 
-    timeout_payload: dict[str, Any] | None = None
+    timeout_payload: Optional[Dict[str, Any]] = None
     try:
         await asyncio.wait_for(proc.wait(), timeout=settings.run_timeout_sec)
     except asyncio.TimeoutError:
@@ -198,7 +198,7 @@ async def execute_backtest(
         return timeout_payload
 
     result_path = work / "result.json"
-    payload: dict[str, Any] = {"ok": False, "error": "No result.json", "error_code": "NO_RESULT"}
+    payload: Dict[str, Any] = {"ok": False, "error": "No result.json", "error_code": "NO_RESULT"}
     if result_path.is_file():
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
