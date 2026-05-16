@@ -106,7 +106,11 @@ result = run_strategy(
 | **−25.69%** · 52 trades | **−33.28%** · 16 trades |
 | [![Portfolio](tutorials/assets/example_report_portfolio.png)](tutorials/assets/example_report_portfolio.png) | [![Local](tutorials/assets/example_report_19_localdata.png)](tutorials/assets/example_report_19_localdata.png) |
 
-> **How to read reports:** header summary → metric cards (Sharpe, max drawdown, alpha) → K-line chart → cumulative returns vs benchmark → drawdown curve → daily P&L → trade/position tabs. Full guide: [Report & Metrics](doc/reports_and_metrics.md).
+### HTML Report (Interactive)
+
+![HTML Report — MACD+Volume](tutorials/assets/example_report_html_macd_volume.png)
+
+> **How to read reports:** header summary → metric cards (Sharpe, max drawdown, alpha) → K-line chart with MA/RSI/MACD/Bollinger Bands → cumulative returns vs benchmark → drawdown curve → daily P&L → trade/position tabs. Full guide: [Report & Metrics](doc/reports_and_metrics.md).
 
 ---
 

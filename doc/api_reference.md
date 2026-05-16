@@ -520,11 +520,11 @@ generate_chart(result, out_path)
 
 ### generate_report_json
 
-生成 JSON 格式报告。
+生成 JSON 格式报告。返回的 JSON 包含：`metadata`（生成信息）、`summary`（资金盈亏）、`risk_metrics`（风险指标）、`excess_return_metrics`（超额收益指标）、`brinson_attribution`（Brinson 归因）、`factor_analysis`（因子分析）、`trades`（成交列表）、`positions`（持仓）、`cumulative_returns`（净值序列），以及全部 **图表数据数组**：`candlestick_data`、`volume_data`、`ma5/20/60_data`、`rsi_data`、`macd_data`/`macd_signal_data`/`macd_hist_data`、`bb_upper/middle/lower_data`、`support_data`、`resistance_data`、`markers`、`cum_return_data`、`ret_hs300_data`、`ret_sse_data`、`drawdown_data`、`pnl_bar_data`、`daily_returns_data`。
 
 ### generate_html_report
 
-生成交互式 HTML 报告。
+生成交互式 HTML 报告。HTML 报告内含 K 线图（含 MA 均线、成交量、买卖信号）、RSI(14)、MACD(12,26,9)、Bollinger Bands(20,2)、累计收益、回撤、每日盈亏、成交记录。K 线图支持指标切换面板和十字光标联动图例。
 
 ### analyze_returns
 
@@ -620,6 +620,20 @@ log.error(msg)
 | `engine.get_g()` | 获取全局对象 |
 | `engine.get_trade_log()` | 获取交易记录 |
 | `engine.get_recorded_values()` | 获取 record() 记录 |
+
+---
+
+## Web Studio API 端点
+
+### `GET /api/v1/runs/{run_id}/report/data`
+
+返回完整的回测报告 JSON 数据（包含所有图表数据数组），用于 Web 控制台中的原生 Lightweight Charts 渲染。
+
+```bash
+curl http://localhost:8081/api/v1/runs/<run_id>/report/data
+```
+
+返回结构与 `generate_report_json()` 输出的 JSON 一致，包含 `summary`、`risk_metrics`、`cumulative_returns`、`candlestick_data`、`volume_data`、`ma5/20/60_data`、`rsi_data`、`macd_data`、`bb_upper/middle/lower_data`、`drawdown_data`、`pnl_bar_data`、`daily_returns_data` 等全部字段。
 
 ---
 

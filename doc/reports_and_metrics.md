@@ -92,7 +92,38 @@ result = run_strategy(
 
 ### 2.3 K 线与技术图区（若有）
 
-标题一般为 **「K 线图 · 技术指标」**：主图价格与成交量，叠加均线、买卖点等（依赖回测数据与记录）。
+标题一般为 **「K 线图 · 技术指标」**：主图显示 OHLCV K 线、成交量柱、MA 均线叠加，以及买卖信号标记。
+
+#### 技术指标
+
+| 指标 | 说明 |
+|------|------|
+| **MA 均线** | MA5（红色）、MA20（蓝色）、MA60（紫色）三条移动平均线叠加在 K 线主图上 |
+| **RSI(14)** | 独立图表，含 70 超买线（红色虚线）、30 超卖线（绿色虚线）和中位 50 线（灰色虚线） |
+| **MACD(12,26,9)** | 独立图表，含 MACD 线（蓝色）、Signal 线（橙色）、柱状图（红绿）和零轴参考线 |
+| **Bollinger Bands(20,2)** | 可选叠加在 K 线图上：上轨、中轨、下轨 |
+
+#### 指标切换面板
+
+K 线图左上角有浮动按钮组，可独立开关以下指标：
+
+| 按钮 | 默认状态 | 功能 |
+|------|---------|------|
+| **MA** | 开启 | 显示/隐藏 MA5/MA20/MA60 三条均线 |
+| **BB** | 关闭 | 显示/隐藏 Bollinger Bands 上下轨 |
+| **VOL** | 开启 | 显示/隐藏成交量柱 |
+| **S/R** | 关闭 | 显示/隐藏支撑/阻力线 |
+
+#### 十字光标联动图例
+
+鼠标在 K 线图上移动时，左上角会实时显示当前光标位置的：
+
+- OHLC 价格
+- MA5/MA20/MA60 值
+- RSI 值
+- MACD / Signal / Histogram 值
+- BB 上轨/中轨/下轨
+- 成交量
 
 ### 2.4 累计收益率
 
@@ -209,7 +240,34 @@ m = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
 - **Markdown**：适合贴到笔记或版本库，快速浏览摘要与成交表。
 - **JSON**：适合写脚本批量对比多组参数、画自定义图、接入仪表板。
 
-JSON 顶层字段随版本可能扩展，以生成文件为准；核心通常包含盈亏比例、交易列表、记录序列等。
+### JSON 顶层字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `metadata` | `object` | 生成时间、数据源、方法论、免责声明 |
+| `summary` | `object` | 回测区间、资金、盈亏、交易次数、基准 |
+| `risk_metrics` | `object` | 夏普、索提诺、最大回撤、Alpha/Beta 等 |
+| `excess_return_metrics` | `object` | 超额收益、超额回撤、超额夏普 |
+| `brinson_attribution` | `object` | Brinson 归因（配置/选股/交互效应） |
+| `factor_analysis` | `object` | Fama-French 因子暴露 |
+| `trades` | `array` | 每笔成交记录 |
+| `positions` | `object` | 期末持仓 |
+| `cumulative_returns` | `array` | 每日净值序列 |
+| `candlestick_data` | `array` | K 线数据（TradingView 格式） |
+| `volume_data` | `array` | 成交量柱数据 |
+| `ma5_data` / `ma20_data` / `ma60_data` | `array` | 均线数据 |
+| `rsi_data` | `array` | RSI(14) 数据 |
+| `macd_data` / `macd_signal_data` / `macd_hist_data` | `array` | MACD 线/信号/柱状图 |
+| `bb_upper_data` / `bb_middle_data` / `bb_lower_data` | `array` | Bollinger Bands |
+| `support_data` / `resistance_data` | `array` | 支撑/阻力 |
+| `markers` | `array` | 买卖信号标记 |
+| `cum_return_data` | `array` | 策略累计收益率 |
+| `ret_hs300_data` / `ret_sse_data` | `array` | 沪深300/上证指数累计收益 |
+| `drawdown_data` | `array` | 回撤序列 |
+| `pnl_bar_data` | `array` | 每日盈亏柱 |
+| `daily_returns_data` | `array` | 每日收益率 |
+
+JSON 顶层字段随版本可能扩展，以生成文件为准。
 
 **读 JSON 时注意：**`summary.num_trades` 多为单边成交条数，与「配对交易笔数」不同，见 [FAQ](FAQ.md#faq-json-num-trades)。
 

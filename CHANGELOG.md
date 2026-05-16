@@ -59,6 +59,18 @@ in practice.
 - `tools/profiling/` directory for performance benchmarking scripts (moved
   from `examples/21_combined_strategy/`).
 
+### HTML Report — TradingView-Style Indicators
+
+- **RSI(14)** — Welles Wilder EMA-based RSI oscillator with 70/30/50 reference
+  lines and 30/70 overbought/oversold zones.
+- **MACD(12,26,9)** — MACD line, signal line, and histogram with zero-line
+  reference.
+- **Bollinger Bands(20,2)** — Upper/middle/lower bands overlay on the K-line chart.
+- **Indicator Toggle Panel** — Floating buttons on the K-line chart to
+  show/hide MA, BB, Volume, and Support/Resistance independently.
+- **Crosshair-Linked Legend** — Real-time overlay showing OHLC, MA values,
+  RSI, MACD/Signal/Hist, BB bands, and volume at the current cursor position.
+
 ### Changed
 
 - `attribute_history(..., fq='post')` now raises `ValueError` in backtest mode
@@ -104,6 +116,19 @@ in practice.
   container orchestrators.
 - **S8:** `cancel_run` now awaits subprocess exit (up to 5 s) before
   committing "cancelled" to the DB, eliminating duplicate SSE `done` events.
+- **S9:** Backtest report modal now uses **native Lightweight Charts**
+  rendering (replacing the iframe approach). The new `ReportViewer` component
+  renders all chart types — K-line, cumulative returns, drawdown, daily P&L,
+  RSI, MACD — with synchronized time scales and responsive resizing.
+- **S10:** Metrics comparison table now uses **real LTVC mini area charts**
+  for equity curve sparklines instead of SVG approximations, with green/red
+  coloring based on cumulative direction.
+- **S11:** New backend endpoint `GET /api/v1/runs/{run_id}/report/data`
+  serves the full report.json with all chart data arrays for native rendering.
+- **S12:** Python 3.9 compatibility — all `str | None` / `list[T]` / `dict[K, V]`
+  type annotations converted to `Optional[T]` / `List[T]` / `Dict[K, V]`
+  across the entire backend codebase, with ruff rules adjusted to accept
+  the legacy typing syntax.
 
 ### Documentation
 
