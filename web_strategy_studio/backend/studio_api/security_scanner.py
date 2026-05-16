@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+from typing import List
 
 
 @dataclass
@@ -91,8 +92,8 @@ ALLOWED_TOP_LEVEL = frozenset(
 
 
 class SecurityScanner:
-    def scan(self, source: str) -> list[SecurityNote]:
-        notes: list[SecurityNote] = []
+    def scan(self, source: str) -> List[SecurityNote]:
+        notes: List[SecurityNote] = []
         try:
             tree = ast.parse(source)
         except SyntaxError:
@@ -149,8 +150,8 @@ class SecurityScanner:
         return notes
 
 
-def require_initialize_function(source: str) -> list[SecurityNote]:
-    notes: list[SecurityNote] = []
+def require_initialize_function(source: str) -> List[SecurityNote]:
+    notes: List[SecurityNote] = []
     try:
         tree = ast.parse(source)
     except SyntaxError:

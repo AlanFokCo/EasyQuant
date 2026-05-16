@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { useMemo } from "react";
 
 import { compareRunMetrics, EquityCurvePoint } from "../api/client";
 import { useEditorStore } from "../store/editorStore";
+import { createChart } from "lightweight-charts";
+import type { IChartApi } from "lightweight-charts";
 
 const METRIC_LABELS: Record<string, string> = {
   total_return: "总收益率",
@@ -41,30 +44,82 @@ function isGood(metric: string, val: number | null | undefined): boolean {
   return false;
 }
 
-/** Minimal sparkline for the equity curve (SVG). */
+/** Lightweight Charts mini area chart for equity curve (60x24). */
 function EquitySpark({ points }: { points: EquityCurvePoint[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    // Cleanup previous chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+    if (!points.length) return;
+
+    const chart = createChart(containerRef.current, {
+      width: 60,
+      height: 24,
+      layout: {
+        background: { type: "solid", color: "transparent" },
+        textColor: "transparent",
+        fontSize: 0,
+      },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+      timeScale: { visible: false },
+      rightPriceScale: { visible: false },
+      crosshair: { mode: 0 },
+    } as any);
+    chartRef.current = chart;
+
+    const area = chart.addAreaSeries({
+      lineColor: "transparent",
+      topColor: "rgba(34,197,94,0.3)",
+      bottomColor: "rgba(34,197,94,0)",
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
+    const values = points.map((p) => p.value);
+    const lastVal = values[values.length - 1];
+    const firstVal = values[0];
+    const pct = ((lastVal - firstVal) / Math.abs(firstVal || 1)) * 100;
+    const positive = pct >= 0;
+
+    // Reconfigure colors based on direction
+    area.applyOptions({
+      lineColor: positive ? "rgba(34,197,94,0.8)" : "rgba(239,68,68,0.8)",
+      topColor: positive ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+      bottomColor: positive ? "rgba(34,197,94,0)" : "rgba(239,68,68,0)",
+    });
+
+    area.setData(
+      points.map((p) => ({
+        time: p.date as unknown as string,
+        value: p.value,
+      })) as any
+    );
+    chart.timeScale().fitContent();
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [points]);
+
   if (!points.length) return <span style={{ color: "var(--text-dim)", fontSize: 10 }}>—</span>;
+
   const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const w = 80;
-  const h = 24;
-  const path = points
-    .map((p, i) => {
-      const x = (i / Math.max(points.length - 1, 1)) * w;
-      const y = h - ((p.value - min) / range) * h;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
   const lastVal = values[values.length - 1];
   const pct = ((lastVal - values[0]) / Math.abs(values[0] || 1)) * 100;
   const color = pct >= 0 ? "var(--success)" : "var(--error)";
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
-      <svg width={w} height={h} style={{ display: "block" }}>
-        <path d={path} stroke={color} strokeWidth={1.5} fill="none" />
-      </svg>
+      <div ref={containerRef} style={{ width: 60, height: 24 }} />
       <span style={{ fontSize: 10, fontFamily: "var(--mono)", color }}>
         {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
       </span>

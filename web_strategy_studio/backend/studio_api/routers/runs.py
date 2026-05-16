@@ -9,11 +9,11 @@ import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Set
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -205,7 +205,7 @@ async def _process_run_task(run_id: str) -> None:
             "message": "finished",
         },
     )
-    done_payload: dict[str, Any] = {
+    done_payload: Dict[str, Any] = {
         "status": "succeeded" if exec_result.get("ok") else "failed",
         "artifacts": arts,
     }
@@ -220,7 +220,7 @@ async def create_run(
     request: Request,
     body: CreateRunBody,
     session: AsyncSession = Depends(get_session),
-    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     # B18: per-IP rate limit
     client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
@@ -374,7 +374,7 @@ async def delete_run(run_id: str, session: AsyncSession = Depends(get_session)):
 async def run_stream(
     run_id: str,
     session: AsyncSession = Depends(get_session),
-    last_event_id: str | None = Header(None, alias="Last-Event-ID"),
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
 ):
     """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13)."""
     # Resolve last_event_id to an int (default -1 = send everything).
@@ -460,7 +460,7 @@ async def get_queue():
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
     session: AsyncSession = Depends(get_session),
-    strategy_id: str | None = None,
+    strategy_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ):
@@ -481,7 +481,7 @@ async def list_runs(
     total = (await session.execute(count_q)).scalar_one() or 0
 
     rows = (await session.execute(q.limit(limit).offset(offset))).scalars().all()
-    items: list[RunListItem] = []
+    items: List[RunListItem] = []
     for run in rows:
         items.append(
             RunListItem(
@@ -500,7 +500,7 @@ async def list_runs(
     return RunListResponse(runs=items, total=total)
 
 
-def _read_metrics_from_json(run: Run) -> dict[str, Any]:
+def _read_metrics_from_json(run: Run) -> Dict[str, Any]:
     """Try to read metrics from the stored report.json artifact."""
     alt = settings.artifact_dir / "reports" / run.id / "report.json"
     if alt.is_file():
@@ -518,7 +518,7 @@ def _read_metrics_from_json(run: Run) -> dict[str, Any]:
     return {}
 
 
-def _extract_equity_curve(raw: dict[str, Any]) -> list[EquityCurvePoint]:
+def _extract_equity_curve(raw: Dict[str, Any]) -> List[EquityCurvePoint]:
     """Extract equity curve from report.json.
 
     eqlib uses ``cumulative_returns`` as a list of
@@ -526,7 +526,7 @@ def _extract_equity_curve(raw: dict[str, Any]) -> list[EquityCurvePoint]:
     We expose it as ``{"date": str, "value": float}`` (portfolio value).
     """
     points = raw.get("cumulative_returns", [])
-    result: list[EquityCurvePoint] = []
+    result: List[EquityCurvePoint] = []
     for p in points:
         date = p.get("date")
         value = p.get("total_value")
@@ -554,9 +554,9 @@ _METRIC_KEYS = (
 )
 
 
-def _extract_metrics(raw: dict[str, Any]) -> dict[str, float | None]:
+def _extract_metrics(raw: Dict[str, Any]) -> Dict[str, Optional[float]]:
     risk = raw.get("risk_metrics", raw)
-    metrics: dict[str, float | None] = {}
+    metrics: Dict[str, Optional[float]] = {}
     for key in _METRIC_KEYS:
         val = risk.get(key)
         if val is not None:
@@ -585,11 +585,11 @@ async def get_run_metrics(run_id: str, session: AsyncSession = Depends(get_sessi
 
 @router.post("/runs/compare", response_model=CompareResponse)
 async def compare_runs(
-    body: dict[str, Any],
+    body: Dict[str, Any],
     session: AsyncSession = Depends(get_session),
 ):
     """Compare metrics + equity curves across multiple runs (B22)."""
-    run_ids: list[str] = body.get("run_ids", [])
+    run_ids: List[str] = body.get("run_ids", [])
     if not run_ids:
         raise HTTPException(
             status_code=400,
@@ -601,8 +601,8 @@ async def compare_runs(
     rows = (await session.execute(stmt)).scalars().all()
     runs_by_id = {r.id: r for r in rows}
 
-    runs_items: list[CompareRunItem] = []
-    all_metric_keys: set[str] = set()
+    runs_items: List[CompareRunItem] = []
+    all_metric_keys: Set[str] = set()
 
     for rid in run_ids:
         run = runs_by_id.get(rid)
@@ -624,3 +624,21 @@ async def compare_runs(
         )
     common = sorted(all_metric_keys)
     return CompareResponse(runs=runs_items, common_keys=common)
+
+
+@router.get("/runs/{run_id}/report/data")
+async def get_run_report_data(run_id: str, session: AsyncSession = Depends(get_session)):
+    """Return the full report.json contents for native frontend rendering."""
+    run = await session.get(Run, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+    if run.status != "succeeded":
+        raise HTTPException(
+            status_code=400, detail=api_error("RUN_NOT_SUCCEEDED", "Run has not completed")
+        )
+    raw = _read_metrics_from_json(run)
+    if not raw:
+        raise HTTPException(
+            status_code=404, detail=api_error("REPORT_NOT_FOUND", "Report data not found")
+        )
+    return JSONResponse(content=raw)

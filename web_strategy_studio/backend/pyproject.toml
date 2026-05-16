@@ -45,6 +45,11 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "UP"]
 ignore = [
     "E501",  # line-too-long — black handles this
+    # Python 3.9 compatibility: keep Optional[T], List[T], Dict[K, V]
+    # instead of T | None, list[T], dict[K, V] (3.10+ syntax)
+    "UP006",
+    "UP035",
+    "UP045",
 ]
 
 [tool.ruff.lint.isort]

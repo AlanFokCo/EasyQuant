@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timezone
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -259,7 +260,7 @@ async def create_snapshot(
     )
 
 
-@router.get("/strategies/{strategy_id}/versions", response_model=list[StrategyVersionItem])
+@router.get("/strategies/{strategy_id}/versions", response_model=List[StrategyVersionItem])
 async def list_strategy_versions(
     strategy_id: str,
     session: AsyncSession = Depends(get_session),
