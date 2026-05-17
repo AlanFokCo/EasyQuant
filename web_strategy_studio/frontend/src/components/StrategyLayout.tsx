@@ -20,12 +20,16 @@ import { ReportLinkModal } from "./ReportLinkModal";
 import { RunsHistoryPanel } from "./RunsHistoryPanel";
 import { RunProgressBar } from "./RunProgressBar";
 import { ToastContainer } from "./ToastNotification";
+import { StockPicker } from "./StockPicker";
+
+type ParamDef = { name: string; type: string; default: string | number | boolean };
 
 type LintResponse = {
   ok: boolean;
   syntax_errors: { line: number; col: number; message: string; severity: string }[];
   lint_issues: { code: string; line: number; col: number; message: string; severity: string }[];
   security_notes: { code: string; line: number; message: string }[];
+  params?: ParamDef[];
 };
 
 type StrategyDetail = {
@@ -80,6 +84,8 @@ export function StrategyLayout() {
   const [source, setSource] = useState("");
   const [fontSize, setFontSize] = useState(14);
   const [lint, setLint] = useState<LintResponse | null>(null);
+  const [lintParams, setLintParams] = useState<ParamDef[]>([]);
+  const [paramValues, setParamValues] = useState<Record<string, string | number | boolean>>({});
   const [params, setParams] = useState({
     start_date: "2024-01-01",
     end_date: "2024-03-31",
@@ -231,6 +237,17 @@ export function StrategyLayout() {
     },
     onSuccess: (r) => {
       setLint(r);
+      // HIGH-21: Extract # @param declarations for dynamic param panel
+      if (r.params && r.params.length > 0) {
+        setLintParams(r.params);
+        const defaults: Record<string, string | number | boolean> = {};
+        for (const p of r.params) {
+          defaults[p.name] = p.default;
+        }
+        setParamValues((prev) => ({ ...defaults, ...prev }));
+      } else {
+        setLintParams([]);
+      }
       addToast(r.ok ? "success" : "error", r.ok ? "代码检查通过" : "代码检查存在问题");
     },
     onError: (e: unknown) => {
@@ -264,7 +281,10 @@ export function StrategyLayout() {
         body: JSON.stringify({
           strategy_id: strategyId,
           source_code: source,
-          params,
+          params: {
+            ...params,
+            strategy_params: lintParams.length > 0 ? { ...paramValues } : undefined,
+          },
         }),
       });
       return res.run_id;
@@ -382,26 +402,57 @@ export function StrategyLayout() {
           }}
         >
           <legend style={{ fontWeight: 600, padding: "0 4px", fontSize: 12 }}>回测参数</legend>
-          {(["start_date", "end_date", "benchmark"] as const).map((k) => (
-            <label key={k} style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
-              {k}
-              <input
-                aria-label={k}
-                style={{
-                  width: "100%",
-                  marginTop: 2,
-                  padding: 4,
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-sm)",
-                  color: "var(--text)",
-                  fontSize: 12,
-                }}
-                value={String((params as Record<string, unknown>)[k])}
-                onChange={(e) => setParams((p) => ({ ...p, [k]: e.target.value }))}
-              />
-            </label>
-          ))}
+
+          {/* HIGH-21: Date pickers */}
+          <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
+            开始日期
+            <input
+              type="date"
+              aria-label="开始日期"
+              style={{
+                width: "100%",
+                marginTop: 2,
+                padding: 4,
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--text)",
+                fontSize: 12,
+              }}
+              value={params.start_date}
+              onChange={(e) => setParams((p) => ({ ...p, start_date: e.target.value }))}
+            />
+          </label>
+          <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
+            结束日期
+            <input
+              type="date"
+              aria-label="结束日期"
+              style={{
+                width: "100%",
+                marginTop: 2,
+                padding: 4,
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--text)",
+                fontSize: 12,
+              }}
+              value={params.end_date}
+              onChange={(e) => setParams((p) => ({ ...p, end_date: e.target.value }))}
+            />
+          </label>
+
+          {/* HIGH-21: Stock picker */}
+          <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
+            股票代码
+            <StockPicker
+              value={params.benchmark}
+              onChange={(code) => setParams((p) => ({ ...p, benchmark: code }))}
+              placeholder="搜索股票代码/名称"
+            />
+          </label>
+
           <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
             starting_cash
             <input
@@ -421,6 +472,45 @@ export function StrategyLayout() {
               onChange={(e) => setParams((p) => ({ ...p, starting_cash: Number(e.target.value) }))}
             />
           </label>
+
+          {/* HIGH-21: Dynamic @param inputs */}
+          {lintParams.length > 0 && (
+            <>
+              <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>策略参数（# @param）</div>
+              {lintParams.map((p) => (
+                <label key={p.name} style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
+                  {p.name}
+                  {p.type === "checkbox" ? (
+                    <input
+                      type="checkbox"
+                      checked={Boolean(paramValues[p.name])}
+                      onChange={(e) => setParamValues((v) => ({ ...v, [p.name]: e.target.checked }))}
+                      style={{ marginLeft: 6 }}
+                    />
+                  ) : (
+                    <input
+                      type={p.type === "number" ? "number" : "text"}
+                      aria-label={p.name}
+                      style={{
+                        width: "100%",
+                        marginTop: 2,
+                        padding: 4,
+                        background: "var(--bg)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        color: "var(--text)",
+                        fontSize: 12,
+                      }}
+                      value={String(paramValues[p.name] ?? p.default)}
+                      onChange={(e) => setParamValues((v) => ({ ...v, [p.name]: p.type === "number" ? Number(e.target.value) : e.target.value }))}
+                    />
+                  )}
+                </label>
+              ))}
+            </>
+          )}
+
           <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
             <input
               type="checkbox"

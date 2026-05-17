@@ -1,9 +1,10 @@
-"""Lint: syntax, ruff, security scanner."""
+"""Lint: syntax, ruff, security scanner + @param extraction."""
 
 from __future__ import annotations
 
 import ast
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,53 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from studio_api.security_scanner import SecurityScanner, require_initialize_function
+
+# @param name: type = default
+# e.g.  # @param security: str = "601390"
+_PARAM_RE = re.compile(r"#\s*@param\s+(\w+)\s*:\s*(\w+)\s*=\s*(.+)")
+
+
+def _parse_params(source: str) -> List[Dict[str, Any]]:
+    """Extract # @param declarations from source comments.
+
+    Syntax:  # @param name: type = default
+    Supported types: str, int, float, bool, list
+    """
+    params: List[Dict[str, Any]] = []
+    for line in source.splitlines():
+        m = _PARAM_RE.search(line)
+        if not m:
+            continue
+        name, type_str, default_raw = m.group(1), m.group(2), m.group(3).strip()
+        # Parse default value
+        try:
+            default = ast.literal_eval(default_raw)
+        except (ValueError, SyntaxError):
+            default = default_raw.strip('"').strip("'")
+        # Determine UI type
+        ui_type = "text"
+        if type_str == "int":
+            ui_type = "number"
+            if isinstance(default, (int, float)):
+                default = int(default)
+        elif type_str == "float":
+            ui_type = "number"
+            if isinstance(default, str):
+                try:
+                    default = float(default)
+                except ValueError:
+                    pass
+        elif type_str == "bool":
+            ui_type = "checkbox"
+            if isinstance(default, str):
+                default = default.lower() in ("true", "1", "yes")
+        elif type_str == "list":
+            ui_type = "text"
+            if isinstance(default, list):
+                default = ",".join(str(x) for x in default)
+        params.append({"name": name, "type": ui_type, "default": default})
+    return params
+
 
 PROFILE_FAST = "fast"
 PROFILE_STRICT = "strict"
@@ -92,4 +140,5 @@ def lint_source(source: str, profile: str = PROFILE_FAST) -> Dict[str, Any]:
         "syntax_errors": syntax_errors,
         "lint_issues": lint_issues,
         "security_notes": security_notes,
+        "params": _parse_params(source),
     }

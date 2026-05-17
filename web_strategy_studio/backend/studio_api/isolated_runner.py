@@ -60,6 +60,22 @@ def main() -> int:
     if isinstance(securities, list) and not securities:
         securities = None
 
+    # HIGH-21: inject @param values from frontend into strategy's PARAMS dict
+    strategy_params = cfg.get("strategy_params")
+    if isinstance(strategy_params, dict):
+        user_params = ns.get("PARAMS")
+        if isinstance(user_params, dict):
+            for k, v in strategy_params.items():
+                if k in user_params:
+                    old = user_params[k]
+                    try:
+                        user_params[k] = type(old)(v) if v is not None else old
+                    except (TypeError, ValueError):
+                        user_params[k] = v
+                else:
+                    user_params[k] = v
+            print(f"EQ_INFO: injected {len(strategy_params)} strategy params")
+
     try:
         result = run_backtest(
             initialize,
