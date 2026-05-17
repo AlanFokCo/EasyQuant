@@ -1,10 +1,8 @@
 """AST-based security checks for user strategy source (MVP).
 
 .. warning::
-    **This scanner is a "friendly lint" tool, NOT a security sandbox.**
-
-    The AST denylist approach cannot prevent a determined attacker from
-    executing arbitrary code.  Known bypasses include::
+    **This scanner is NOT a security sandbox.  It cannot prevent a determined
+    attacker from executing arbitrary code.**  Known bypasses include::
 
         # String-concatenated names evade name-based checks
         getattr(__builtins__, "ev"+"al")("__import__('os').system('rm -rf /')")
@@ -15,11 +13,14 @@
         # Split-string imports
         __import__('o'+'s')
 
-    For real sandboxing use system-level isolation: run each backtest in a
-    dedicated Docker container with ``--network none --read-only
-    --pids-limit=64 --memory=2g --cpus=1 --security-opt seccomp=...`` and a
-    non-root user.  The AST checks here catch *accidental* use of restricted
-    modules by well-meaning users and provide clear error messages, nothing more.
+    The AST checks here catch *accidental* use of restricted modules by
+    well-meaning users and provide clear error messages — nothing more.
+
+    **DO NOT expose the Studio API to a public network.**  Bind to
+    ``127.0.0.1`` only (the default).  For shared / multi-user deployments,
+    set ``EQ_STUDIO_RUNNER=docker`` so each backtest runs inside a Docker
+    container with ``--network none --read-only --memory=2g --pids-limit=64
+    --user 65534:65534 --security-opt no-new-privileges``.
 """
 
 from __future__ import annotations
