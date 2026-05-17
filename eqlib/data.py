@@ -779,6 +779,8 @@ def _iter_days(start, end):
         current += datetime.timedelta(days=1)
 
 
+# MED-23: wrap to normalize date/datetime/Timestamp inputs to string before cache lookup
+@lru_cache(maxsize=64)
 def _get_trading_days_range_raw(start_str: str, end_str: str) -> tuple:
     """Return trading days between start and end using local holiday fallback."""
     start_date = pd.Timestamp(start_str).date()
