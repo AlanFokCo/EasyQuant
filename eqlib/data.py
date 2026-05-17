@@ -546,8 +546,11 @@ def attribute_history(security, count: int, unit: str = "1d",
             current = _context.current_dt
             if current is not None:
                 ts = pd.Timestamp(current)
+                # Strict less-than: exclude any bar on the current day to prevent
+                # look-ahead bias (e.g., getting today's close in a 09:30 callback).
+                cutoff = ts.normalize()  # midnight of the current day
                 result = pd.DataFrame(
-                    {f: sec_data[f].loc[:ts] for f in available}
+                    {f: sec_data[f][sec_data[f].index < cutoff] for f in available}
                 )
             else:
                 result = pd.DataFrame(
@@ -567,10 +570,11 @@ def attribute_history(security, count: int, unit: str = "1d",
             available = [f for f in fields if f in sec_df.columns]
             if not available:
                 return pd.DataFrame()
-            # Filter up to current date (avoid future data leakage)
+            # Filter to bars strictly before the current day (avoid look-ahead).
             current = _context.current_dt
             if current is not None:
-                sec_df = sec_df[sec_df.index <= current]
+                cutoff = pd.Timestamp(current).normalize()
+                sec_df = sec_df[sec_df.index < cutoff]
             result = sec_df[available].tail(count)
             return result
 
