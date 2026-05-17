@@ -452,6 +452,12 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         except Exception:
             continue
 
+    # MED-32: bare 000xxx codes may actually be Shanghai indices.
+    # If stock lookup fails, auto-retry as index with .XSHG suffix.
+    if ".XSHG" not in code and ".XSHE" not in code and symbol.startswith("000"):
+        idx_code = f"{symbol}.XSHG"
+        return fetch_stock_data(idx_code, start_date, end_date, adjust)
+
     return pd.DataFrame()
 
 

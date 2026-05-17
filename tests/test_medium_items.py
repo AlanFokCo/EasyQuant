@@ -108,3 +108,37 @@ class TestFetchLivePricesSmallUniverse:
 
             mock_bulk.assert_not_called()
             assert mock_hist.call_count == 2
+
+
+class TestBareIndexCodeRetry:
+    """MED-32: bare 000xxx codes should auto-retry as Shanghai indices."""
+
+    def test_bare_000_code_retries_as_index(self):
+        """When stock lookup fails for 000xxx, should retry as 000xxx.XSHG."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        # Create a properly formatted index DataFrame with DatetimeIndex
+        def make_idx_df(*a, **kw):
+            df = pd.DataFrame({
+                "open": [3.8, 3.85], "high": [3.9, 3.95],
+                "low": [3.7, 3.75], "close": [3.85, 3.90],
+                "volume": [100, 110], "money": [385, 396],
+                "pct_change": [1.0, 1.3], "price_change": [0.05, 0.10],
+                "turnover": [0.01, 0.02],
+            }, index=pd.DatetimeIndex(["2024-01-02", "2024-01-03"]))
+            return df
+
+        # Mock all stock-side fetchers to return empty, and index em to raise.
+        # Also mock sina index to return data with proper DatetimeIndex so
+        # _slice_by_date works correctly.
+        with patch("eqlib.data._fetch_from_em", return_value=pd.DataFrame()), \
+             patch("eqlib.data._fetch_from_tencent", return_value=pd.DataFrame()), \
+             patch("eqlib.data._fetch_from_sina", return_value=pd.DataFrame()), \
+             patch("eqlib.data._fetch_from_baostock", return_value=pd.DataFrame()), \
+             patch("eqlib.data.ak.stock_zh_index_daily_em", return_value=make_idx_df()):
+            from eqlib.data import fetch_stock_data
+            result = fetch_stock_data("000300", "2024-01-01", "2024-01-05")
+            # Index retry path should succeed
+            assert not result.empty, "Should have retrieved index data via retry"
+            assert "close" in result.columns
