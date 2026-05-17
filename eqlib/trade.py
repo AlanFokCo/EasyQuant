@@ -39,13 +39,42 @@ def _get_pending_price(security):
     return _get_preloaded().get_close(day, security)
 
 
+# Order type categories: "absolute" orders specify a fixed change,
+# while "target" orders specify a desired end state.  Mixing both
+# for the same security in one callback produces silently wrong results.
+_ABSOLUTE_ACTIONS = {"ORDER"}
+_TARGET_ACTIONS = {"ORDER_TARGET", "ORDER_VALUE", "ORDER_TARGET_VALUE"}
+
+
 def _buffer_order(action: str, **kwargs) -> str:
-    """Add an order request to the pending queue for next-day execution."""
+    """Add an order request to the pending queue for next-day execution.
+
+    Raises ValueError if an absolute order type (ORDER) is mixed with a
+    target order type (ORDER_TARGET / ORDER_VALUE / ORDER_TARGET_VALUE)
+    for the same security within a single callback.
+    """
     sess = st.get_session()
     if sess._context is None:
         log.warn(f"_buffer_order: no active context (order ignored)")
         return None
-    req = {"action": action, "security": kwargs.pop("security"), **kwargs}
+
+    security = kwargs.pop("security")
+
+    # ── BLOCKER-5: detect mixed absolute / target order types ─────────
+    if action in _ABSOLUTE_ACTIONS:
+        conflicting = _TARGET_ACTIONS
+    else:
+        conflicting = _ABSOLUTE_ACTIONS
+
+    for existing in sess._pending_orders:
+        if existing["security"] == security and existing["action"] in conflicting:
+            raise ValueError(
+                f"Cannot mix order/order_target/order_value/order_target_value "
+                f"on same security '{security}' in one callback "
+                f"(existing={existing['action']}, new={action})"
+            )
+
+    req = {"action": action, "security": security, **kwargs}
     sess._pending_orders.append(req)
     log.debug("order buffered: action=%s security=%s queue_size=%s",
               action, req["security"], len(sess._pending_orders))
@@ -83,14 +112,9 @@ def order_target(security, amount, style=None):
         amount: target number of shares (0 = close entire position)
         style: order style (reserved)
 
-    .. note::
-        The target delta is computed at *queue time* from the current position.
-        If multiple orders for the same security are queued in a single callback
-        (e.g., ``order('X', 100)`` followed by ``order_target('X', 200)``), the
-        target delta will not account for the earlier queued order, and the final
-        filled position may differ from the intended target.  To avoid this,
-        avoid mixing ``order`` and ``order_target`` calls for the same security
-        within a single callback execution.
+    Raises:
+        ValueError: if mixed with ``order`` / ``order_value`` /
+        ``order_target_value`` for the same security in one callback.
 
     Returns:
         Pending order ID string, or None.
