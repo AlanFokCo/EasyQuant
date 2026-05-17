@@ -117,6 +117,10 @@ class TestBareIndexCodeRetry:
         """When stock lookup fails for 000xxx, should retry as 000xxx.XSHG."""
         from unittest.mock import patch
         import pandas as pd
+        import eqlib.data as data_mod
+
+        # Clear in-memory cache to avoid test interference
+        data_mod._cache.clear()
 
         # Create a properly formatted index DataFrame with DatetimeIndex
         def make_idx_df(*a, **kw):
@@ -129,14 +133,12 @@ class TestBareIndexCodeRetry:
             }, index=pd.DatetimeIndex(["2024-01-02", "2024-01-03"]))
             return df
 
-        # Mock all stock-side fetchers to return empty, and index em to raise.
-        # Also mock sina index to return data with proper DatetimeIndex so
-        # _slice_by_date works correctly.
-        with patch("eqlib.data._fetch_from_em", return_value=pd.DataFrame()), \
-             patch("eqlib.data._fetch_from_tencent", return_value=pd.DataFrame()), \
-             patch("eqlib.data._fetch_from_sina", return_value=pd.DataFrame()), \
-             patch("eqlib.data._fetch_from_baostock", return_value=pd.DataFrame()), \
-             patch("eqlib.data.ak.stock_zh_index_daily_em", return_value=make_idx_df()):
+        # Mock all stock-side fetchers to return empty, and index em to succeed.
+        with patch.object(data_mod, "_fetch_from_em", return_value=pd.DataFrame()), \
+             patch.object(data_mod, "_fetch_from_tencent", return_value=pd.DataFrame()), \
+             patch.object(data_mod, "_fetch_from_sina", return_value=pd.DataFrame()), \
+             patch.object(data_mod, "_fetch_from_baostock", return_value=pd.DataFrame()), \
+             patch.object(data_mod.ak, "stock_zh_index_daily_em", return_value=make_idx_df()):
             from eqlib.data import fetch_stock_data
             result = fetch_stock_data("000300", "2024-01-01", "2024-01-05")
             # Index retry path should succeed
