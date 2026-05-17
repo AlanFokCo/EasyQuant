@@ -7,9 +7,11 @@ from typing import Any, Dict, List, Optional
 
 import re
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from eqlib import data_cache as dc
+from studio_api.models import User
+from studio_api import auth as auth_mod
 
 router = APIRouter(prefix="/api/v1", tags=["data"])
 
@@ -40,7 +42,9 @@ class DownloadResponse(BaseModel):
 
 
 @router.get("/data/local")
-async def list_local_data() -> List[LocalStockInfo]:
+async def list_local_data(
+    current_user: User = Depends(auth_mod.get_current_user),
+) -> List[LocalStockInfo]:
     """List all stocks that have local CSV data with date range and file size."""
     stocks = dc.list_local_stocks(adjust="qfq")
     result = []
@@ -60,7 +64,10 @@ async def list_local_data() -> List[LocalStockInfo]:
 
 
 @router.get("/data/local/{code}")
-async def get_local_stock_detail(code: str) -> Dict[str, Any]:
+async def get_local_stock_detail(
+    code: str,
+    current_user: User = Depends(auth_mod.get_current_user),
+) -> Dict[str, Any]:
     """Get detailed info for a single stock's local data."""
     full_code = _normalize_code(code)
     info = dc.get_local_file_info(full_code, adjust="qfq")
@@ -70,7 +77,10 @@ async def get_local_stock_detail(code: str) -> Dict[str, Any]:
 
 
 @router.post("/data/local/download")
-async def download_local_data(body: DownloadRequestBody) -> DownloadResponse:
+async def download_local_data(
+    body: DownloadRequestBody,
+    current_user: User = Depends(auth_mod.get_current_user),
+) -> DownloadResponse:
     """Download stock data and save to local CSV (merges with existing data)."""
     result = DownloadResponse(ok=True)
 
@@ -94,7 +104,10 @@ async def download_local_data(body: DownloadRequestBody) -> DownloadResponse:
 
 
 @router.delete("/data/local/{code}")
-async def delete_local_stock(code: str) -> Dict[str, Any]:
+async def delete_local_stock(
+    code: str,
+    current_user: User = Depends(auth_mod.get_current_user),
+) -> Dict[str, Any]:
     """Delete local CSV data for a single stock."""
     full_code = _normalize_code(code)
     removed = dc.remove_local_data(full_code, adjust="qfq")

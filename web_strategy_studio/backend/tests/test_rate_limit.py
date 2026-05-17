@@ -21,9 +21,27 @@ def client():
 
 
 @pytest.fixture(scope="module")
-def strategy_id(client):
+def auth_token(client):
+    """Register and login to get an auth token."""
+    reg = client.post("/api/v1/auth/register", json={
+        "username": "ratelimit_user",
+        "password": "testpass",
+    })
+    if reg.status_code == 409:
+        # Already registered, login instead
+        resp = client.post("/api/v1/auth/login", json={
+            "username": "ratelimit_user",
+            "password": "testpass",
+        })
+        return resp.json()["access_token"]
+    return reg.json()["access_token"]
+
+
+@pytest.fixture(scope="module")
+def strategy_id(client, auth_token):
     """Create a strategy to use for run requests."""
-    tpl = client.get("/api/v1/strategies/_new/template")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    tpl = client.get("/api/v1/strategies/_new/template", headers=headers)
     assert tpl.status_code == 200
     resp = client.post(
         "/api/v1/strategies",
@@ -32,6 +50,7 @@ def strategy_id(client):
             "description": "",
             "source_code": tpl.json()["source_code"],
         },
+        headers=headers,
     )
     assert resp.status_code in (200, 201)
     return resp.json()["id"]
@@ -76,9 +95,11 @@ def test_rate_limiter_window_expiry():
     assert allowed
 
 
-def test_429_response_has_correct_envelope(client, strategy_id):
+def test_429_response_has_correct_envelope(client, strategy_id, auth_token):
     """When rate-limited, the response must follow the error envelope format."""
     from studio_api.run_queue import rate_limiter
+
+    headers = {"Authorization": f"Bearer {auth_token}"}
 
     # Directly exhaust the rate limit for testclient's IP
     for _ in range(100):
@@ -88,7 +109,7 @@ def test_429_response_has_correct_envelope(client, strategy_id):
         "strategy_id": strategy_id,
         "params": {"start_date": "2024-01-01", "end_date": "2024-01-31"},
     }
-    resp = client.post("/api/v1/runs", json=run_body)
+    resp = client.post("/api/v1/runs", json=run_body, headers=headers)
     assert resp.status_code == 429
     body = resp.json()
     # FastAPI wraps HTTPException detail under "detail" key

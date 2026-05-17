@@ -21,6 +21,8 @@ dependencies = [
     "structlog>=24.1.0",
     "slowapi>=0.1.9",
     "alembic>=1.13.0",
+    "pyjwt>=2.8.0",
+    "passlib[bcrypt]>=1.7.4",
 ]
 
 [project.optional-dependencies]

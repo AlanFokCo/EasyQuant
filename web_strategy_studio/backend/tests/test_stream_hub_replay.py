@@ -126,8 +126,23 @@ def test_stream_terminal_run_immediate_done():
     from studio_api.app import app
 
     with TestClient(app, raise_server_exceptions=True) as client:
+        # Auth
+        reg = client.post("/api/v1/auth/register", json={
+            "username": "stream_user",
+            "password": "testpass",
+        })
+        if reg.status_code == 409:
+            resp = client.post("/api/v1/auth/login", json={
+                "username": "stream_user",
+                "password": "testpass",
+            })
+        else:
+            resp = reg
+        token = resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
         # Create a strategy + run
-        tpl = client.get("/api/v1/strategies/_new/template")
+        tpl = client.get("/api/v1/strategies/_new/template", headers=headers)
         strat = client.post(
             "/api/v1/strategies",
             json={
@@ -135,6 +150,7 @@ def test_stream_terminal_run_immediate_done():
                 "description": "",
                 "source_code": tpl.json()["source_code"],
             },
+            headers=headers,
         )
         assert strat.status_code in (200, 201)
 
@@ -171,7 +187,7 @@ def test_stream_terminal_run_immediate_done():
 
         # Hitting the stream endpoint for a terminal run with no buffer
         # must return a synthesised done event and close.
-        with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as resp:
+        with client.stream("GET", f"/api/v1/runs/{run_id}/stream", headers=headers) as resp:
             assert resp.status_code == 200
             body = resp.read().decode()
         assert "done" in body

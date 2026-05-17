@@ -21,6 +21,22 @@ def client():
         yield c
 
 
+@pytest.fixture(scope="module")
+def auth_token(client):
+    """Register and login to get an auth token."""
+    reg = client.post("/api/v1/auth/register", json={
+        "username": "queue_user",
+        "password": "testpass",
+    })
+    if reg.status_code == 409:
+        resp = client.post("/api/v1/auth/login", json={
+            "username": "queue_user",
+            "password": "testpass",
+        })
+        return resp.json()["access_token"]
+    return reg.json()["access_token"]
+
+
 # ── queue module unit tests ───────────────────────────────────────────────────
 
 
@@ -82,34 +98,41 @@ def test_rate_limiter_different_ips_independent():
 # ── GET /api/v1/queue endpoint ────────────────────────────────────────────────
 
 
-def test_queue_endpoint_returns_structure(client):
-    r = client.get("/api/v1/queue")
+def test_queue_endpoint_returns_ok(client, auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    r = client.get("/api/v1/queue", headers=headers)
     assert r.status_code == 200
     body = r.json()
     assert "queue_length" in body
     assert "active_count" in body
     assert "max_concurrent" in body
+    r = client.get("/api/v1/queue", headers=headers)
+    assert r.status_code == 200
+    body = r.json()
     assert "queued_runs" in body
     assert isinstance(body["queued_runs"], list)
 
 
-def test_queue_max_concurrent_from_settings(client):
+def test_queue_max_concurrent_from_settings(client, auth_token):
     from studio_api.config import settings
 
-    r = client.get("/api/v1/queue")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    r = client.get("/api/v1/queue", headers=headers)
     assert r.json()["max_concurrent"] == settings.max_concurrent_runs
 
 
 # ── Rate limit response ───────────────────────────────────────────────────────
 
 
-def test_rate_limit_endpoint_returns_429(client):
+def test_rate_limit_endpoint_returns_429(client, auth_token):
     """Exhaust the per-IP rate limit and verify 429 is returned."""
     from studio_api.config import settings
     from studio_api.run_queue import rate_limiter
 
+    headers = {"Authorization": f"Bearer {auth_token}"}
+
     # Create a strategy first
-    tpl = client.get("/api/v1/strategies/_new/template")
+    tpl = client.get("/api/v1/strategies/_new/template", headers=headers)
     strat = client.post(
         "/api/v1/strategies",
         json={
@@ -117,6 +140,7 @@ def test_rate_limit_endpoint_returns_429(client):
             "description": "",
             "source_code": tpl.json()["source_code"],
         },
+        headers=headers,
     )
     assert strat.status_code in (200, 201)
     sid = strat.json()["id"]

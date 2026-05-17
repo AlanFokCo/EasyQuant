@@ -13,11 +13,26 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base):
+    """Authentication user (BLOCKER-7)."""
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    username: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    strategies: Mapped[List["Strategy"]] = relationship(back_populates="owner")
+
+
 class Strategy(Base):
     __tablename__ = "strategies"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    owner_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    owner_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("users.id"), nullable=True
+    )
     name: Mapped[str] = mapped_column(Text)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -27,6 +42,7 @@ class Strategy(Base):
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     default_params: Mapped[Optional[Dict]] = mapped_column(JSON, nullable=True)
 
+    owner: Mapped["User"] = relationship(back_populates="strategies")
     versions: Mapped[List["StrategyVersion"]] = relationship(
         back_populates="strategy",
         cascade="all, delete-orphan",

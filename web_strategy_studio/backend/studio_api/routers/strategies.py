@@ -14,7 +14,8 @@ from sqlalchemy.orm import selectinload
 
 from studio_api.config import settings
 from studio_api.db import get_session
-from studio_api.models import Strategy, StrategyVersion
+from studio_api.models import Strategy, StrategyVersion, User
+from studio_api import auth as auth_mod
 from studio_api.schemas import (
     CreateStrategyBody,
     PatchStrategyBody,
@@ -107,7 +108,11 @@ def _get_current_version(strat: Strategy) -> StrategyVersion:
 
 
 @router.post("/strategies", response_model=StrategyCreated, status_code=201)
-async def create_strategy(body: CreateStrategyBody, session: AsyncSession = Depends(get_session)):
+async def create_strategy(
+    body: CreateStrategyBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     sid = _new_id("strat")
     now = datetime.now(timezone.utc)
     dp = body.default_params.model_dump() if body.default_params else None
@@ -115,6 +120,7 @@ async def create_strategy(body: CreateStrategyBody, session: AsyncSession = Depe
         id=sid,
         name=body.name,
         description=body.description,
+        owner_id=current_user.id,
         current_version=1,
         default_params=dp,
         created_at=now,
@@ -134,9 +140,15 @@ async def create_strategy(body: CreateStrategyBody, session: AsyncSession = Depe
 
 
 @router.get("/strategies/{strategy_id}", response_model=StrategyDetail)
-async def get_strategy(strategy_id: str, session: AsyncSession = Depends(get_session)):
+async def get_strategy(
+    strategy_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     res = await session.execute(
-        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+        select(Strategy).options(selectinload(Strategy.versions)).where(
+            Strategy.id == strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     strat = res.scalar_one_or_none()
     if strat is None:
@@ -159,9 +171,12 @@ async def patch_strategy(
     strategy_id: str,
     body: PatchStrategyBody,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     res = await session.execute(
-        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+        select(Strategy).options(selectinload(Strategy.versions)).where(
+            Strategy.id == strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     strat = res.scalar_one_or_none()
     if strat is None:
@@ -223,6 +238,7 @@ async def create_snapshot(
     strategy_id: str,
     body: SnapshotBody,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     """Force-create a new named version (Cmd+S).
 
@@ -230,7 +246,9 @@ async def create_snapshot(
     source code, optionally tagging it with a human-readable label.
     """
     res = await session.execute(
-        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+        select(Strategy).options(selectinload(Strategy.versions)).where(
+            Strategy.id == strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     strat = res.scalar_one_or_none()
     if strat is None:
@@ -264,10 +282,13 @@ async def create_snapshot(
 async def list_strategy_versions(
     strategy_id: str,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     """List all versions of a strategy in ascending order."""
     res = await session.execute(
-        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+        select(Strategy).options(selectinload(Strategy.versions)).where(
+            Strategy.id == strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     strat = res.scalar_one_or_none()
     if strat is None:
@@ -288,10 +309,13 @@ async def get_strategy_version(
     strategy_id: str,
     version: int,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     """Fetch a specific version's source code."""
     res = await session.execute(
-        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+        select(Strategy).options(selectinload(Strategy.versions)).where(
+            Strategy.id == strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     strat = res.scalar_one_or_none()
     if strat is None:
@@ -315,10 +339,13 @@ async def restore_strategy_version(
     strategy_id: str,
     version: int,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     """Restore a previous version by branching it as the new current version."""
     res = await session.execute(
-        select(Strategy).options(selectinload(Strategy.versions)).where(Strategy.id == strategy_id)
+        select(Strategy).options(selectinload(Strategy.versions)).where(
+            Strategy.id == strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     strat = res.scalar_one_or_none()
     if strat is None:
