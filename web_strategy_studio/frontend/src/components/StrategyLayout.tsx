@@ -108,6 +108,9 @@ export function StrategyLayout() {
 
   const markers = useMemo(() => buildMarkers(lint), [lint]);
 
+  // HIGH-19: Track server-side version to detect concurrent edits
+  const [serverVersion, setServerVersion] = useState<number | null>(strategy?.version ?? null);
+
   const bootRef = useRef(false);
   const hydrated = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,6 +159,7 @@ export function StrategyLayout() {
   useEffect(() => {
     if (!strategy || hydrated.current) return;
     setSource(strategy.source_code);
+    setServerVersion(strategy.version);
     hydrated.current = true;
   }, [strategy]);
 
@@ -172,28 +176,30 @@ export function StrategyLayout() {
       if (!strategyId) return;
       setDirty(true);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      // NOTE: strategyId is captured in this closure.  A potential race
-      // (timer fires after strategyId changes) is prevented by the cleanup
-      // effect below, which cancels any pending timer whenever strategyId
-      // changes — React runs cleanup synchronously before applying the new
-      // dependency value, so the timer is always cancelled before the new
-      // strategy becomes active.
-      saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = setTimeout(async () => {
         saveTimerRef.current = null;
-        apiJson(`/api/v1/strategies/${strategyId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ source_code: code }),
-        })
-          .then(() => {
+        try {
+          // HIGH-19: Check for concurrent edit conflict before saving
+          const current = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`);
+          if (serverVersion !== null && current.version !== serverVersion) {
+            addToast("error", `版本冲突：该策略已在服务器端更新到 v${current.version}，你的本地版本（v${serverVersion}）已过时。请刷新后重试。`);
             setDirty(false);
-            qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
-          })
-          .catch((e: unknown) => {
-            addToast("error", e instanceof Error ? e.message : "保存失败");
+            setServerVersion(current.version);
+            return;
+          }
+          const result = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ source_code: code }),
           });
+          setDirty(false);
+          setServerVersion(result.version);
+          qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+        } catch (e) {
+          addToast("error", e instanceof Error ? e.message : "保存失败");
+        }
       }, 400);
     },
-    [strategyId, qc, setDirty, addToast],
+    [strategyId, serverVersion, qc, setDirty, addToast],
   );
 
   // Clear any pending debounced-save when strategyId changes to prevent
@@ -426,7 +432,7 @@ export function StrategyLayout() {
           </label>
         </fieldset>
 
-        <RunProgressBar progress={progress} stage={stage} running={running} />
+        <RunProgressBar progress={progress} stage={stage} running={running} runId={runIdStore} />
 
         {/* Success card */}
         {doneStatus === "succeeded" && (runIdStore || artifacts?.html_report_url) ? (

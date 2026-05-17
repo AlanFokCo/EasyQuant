@@ -10,8 +10,6 @@ export type Toast = {
 
 export type Theme = "dark" | "light" | "system";
 
-const LS_RUN_KEY = "eq_studio_run_id";
-
 type EditorState = {
   dirty: boolean;
   runId: string | null;
@@ -41,8 +39,8 @@ type EditorState = {
 let _toastCounter = 0;
 
 const _storedTheme = (localStorage.getItem("eq_theme") as Theme | null) ?? "system";
-// B7: restore runId from localStorage on page load
-const _storedRunId = localStorage.getItem(LS_RUN_KEY) ?? null;
+// HIGH-20: per-tab runId via sessionStorage (not global localStorage)
+const _storedRunId = sessionStorage.getItem("eq_studio_run_id") ?? null;
 
 export const useEditorStore = create<EditorState>((set) => ({
   dirty: false,
@@ -58,11 +56,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   commandPaletteOpen: false,
   setDirty: (dirty) => set({ dirty }),
   setRunId: (runId) => {
-    // Persist to localStorage so reattach-after-refresh works (B7)
+    // HIGH-20: Persist to sessionStorage (per-tab) for reattach-after-refresh
     if (runId) {
-      localStorage.setItem(LS_RUN_KEY, runId);
+      sessionStorage.setItem("eq_studio_run_id", runId);
     } else {
-      localStorage.removeItem(LS_RUN_KEY);
+      sessionStorage.removeItem("eq_studio_run_id");
     }
     set({ runId });
   },

@@ -6,7 +6,8 @@ import { useEditorStore } from "../store/editorStore";
 export type LogLine = { stream: string; line: string; ts?: string };
 
 const FLUSH_MS = 50;
-const LS_RUN_KEY = "eq_studio_run_id";
+// HIGH-20: per-tab runId via sessionStorage (not global localStorage)
+const SS_RUN_KEY = "eq_studio_run_id";
 
 // Exponential backoff: 1s → 2s → 4s → … → 30s max.
 function nextBackoff(prev: number): number {
@@ -45,13 +46,13 @@ export function useRunStream(runId: string | null) {
 
   useEffect(() => {
     if (!runId) {
-      // Clear localStorage when run is cleared
-      localStorage.removeItem(LS_RUN_KEY);
+      // HIGH-20: use sessionStorage (per-tab)
+      sessionStorage.removeItem(SS_RUN_KEY);
       return;
     }
 
-    // Persist to localStorage for reattach-after-refresh (B7)
-    localStorage.setItem(LS_RUN_KEY, runId);
+    // Persist to sessionStorage for reattach (HIGH-20)
+    sessionStorage.setItem(SS_RUN_KEY, runId);
 
     setLogs([]);
     setProgress(0);
@@ -125,8 +126,8 @@ export function useRunStream(runId: string | null) {
         setSseConnected(false);
         setSseReconnecting(false);
         setReconnecting(false);
-        // Remove from localStorage once done
-        localStorage.removeItem(LS_RUN_KEY);
+        // Remove from sessionStorage once done
+        sessionStorage.removeItem(SS_RUN_KEY);
       });
 
       es.addEventListener("error", (_e) => {
@@ -177,7 +178,7 @@ export function useRunStream(runId: string | null) {
   };
 }
 
-/** Read the persisted runId from localStorage (for reattach-after-refresh). */
+/** HIGH-20: Read the per-tab persisted runId from sessionStorage. */
 export function getPersistedRunId(): string | null {
-  return localStorage.getItem(LS_RUN_KEY);
+  return sessionStorage.getItem(SS_RUN_KEY);
 }
