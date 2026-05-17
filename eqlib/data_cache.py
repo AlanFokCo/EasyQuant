@@ -605,9 +605,20 @@ def set_local_data_dir(path: str):
 
 
 def _local_csv_path(security: str, adjust: str = "qfq") -> Path:
-    """Generate a local CSV file path for a security."""
+    """Generate a local CSV file path for a security.
+
+    Raises ValueError if the resolved path escapes the data directory
+    (e.g., via ``..`` or absolute paths in *security*).
+    """
     code = security.replace(".XSHG", "").replace(".XSHE", "")
-    return _get_local_data_dir() / f"{code}_daily_{adjust}.csv"
+    data_dir = _get_local_data_dir()
+    resolved = (data_dir / f"{code}_daily_{adjust}.csv").resolve()
+    if not resolved.is_relative_to(data_dir.resolve()):
+        raise ValueError(
+            f"Security code '{security}' would write outside of data directory "
+            f"'{data_dir}'; resolved to '{resolved}'"
+        )
+    return resolved
 
 
 def save_stock_local(security: str, start_date=None, end_date=None,
