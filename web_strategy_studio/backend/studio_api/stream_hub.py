@@ -57,12 +57,19 @@ class _RunBuffer:
 class StreamHub:
     """Fan-out hub with per-run ring buffers and Last-Event-ID replay."""
 
-    def __init__(self, max_queued: int = 2000, buffer_ttl_sec: int = 1800) -> None:
+    def __init__(
+        self,
+        max_queued: int = 2000,
+        buffer_ttl_sec: int = 1800,
+        max_buffers: int = 1000,
+    ) -> None:
         self._queues: Dict[str, List[asyncio.Queue]] = defaultdict(list)
         self._buffers: Dict[str, _RunBuffer] = {}
         self._max = max_queued
         self._ttl = buffer_ttl_sec
+        self._max_buffers = max_buffers
         self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._insert_order: List[str] = []  # LRU eviction tracking
 
     # ------------------------------------------------------------------
     # Public interface
@@ -95,9 +102,16 @@ class StreamHub:
 
     async def publish(self, run_id: str, event: str, data: Dict[str, Any]) -> None:
         # Store in ring buffer first (so late subscribers can replay).
-        buf = self._buffers.setdefault(run_id, _RunBuffer())
+        if run_id not in self._buffers:
+            self._buffers[run_id] = _RunBuffer()
+            self._insert_order.append(run_id)
+        buf = self._buffers[run_id]
         entry = buf.push(event, data, self._ttl)
         line = {"id": entry["id"], "event": event, "data": data}
+
+        # MED-26: evict oldest non-terminal buffers when cap exceeded
+        if len(self._buffers) > self._max_buffers:
+            self._evict_oldest()
 
         dead: List[asyncio.Queue] = []
         for q in list(self._queues.get(run_id, [])):
@@ -117,6 +131,15 @@ class StreamHub:
         if event in _TERMINAL_EVENTS:
             self._queues.pop(run_id, None)
             self._locks.pop(run_id, None)
+
+    def _evict_oldest(self) -> None:
+        """Remove oldest non-terminal buffers to stay under max_buffers."""
+        while len(self._buffers) > self._max_buffers and self._insert_order:
+            oldest = self._insert_order.pop(0)
+            buf = self._buffers.get(oldest)
+            if buf is not None and buf.terminal is None:
+                self._buffers.pop(oldest, None)
+                log.debug("stream_hub.evict_oldest", run_id=oldest)
 
     def format_sse(self, event_id: int, event: str, data: Dict[str, Any]) -> str:
         return (
