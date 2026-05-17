@@ -110,16 +110,20 @@ async def _pump_and_collect(
     end,
 ) -> int:
     """Read stdout/stderr, publish log + progress events. Returns log line count."""
+    import time as _time
+
     log_lines = 0
+    last_activity_ts = _time.monotonic()
 
     async def pump_stream(stream, name: str) -> None:
-        nonlocal log_lines
+        nonlocal log_lines, last_activity_ts
         while True:
             line_b = await stream.readline()
             if not line_b:
                 break
             line = line_b.decode("utf-8", errors="replace").rstrip()
             log_lines += 1
+            last_activity_ts = _time.monotonic()  # MED-27: track activity
 
             m = _PROGRESS_RE.search(line)
             if m:
@@ -141,10 +145,18 @@ async def _pump_and_collect(
 
     async def progress_tick() -> None:
         stage = "fetch_data"
+        tick_start = _time.monotonic()
         while proc.returncode is None:
             await asyncio.sleep(2.0)
+            # MED-27: use elapsed time as fallback when log_lines is stale
+            elapsed = _time.monotonic() - tick_start
+            active = _time.monotonic() - last_activity_ts < 30
             try:
-                frac = _estimate_trading_fraction(log_lines // 2 + 1, start, end)
+                if active:
+                    frac = _estimate_trading_fraction(log_lines // 2 + 1, start, end)
+                else:
+                    # Stale output — estimate progress by elapsed time (cap at 90%)
+                    frac = min(0.90, 0.10 + 0.80 * (elapsed / max(settings.run_timeout_sec, 1)))
             except Exception:
                 frac = 0.3
             await stream_hub.publish(
