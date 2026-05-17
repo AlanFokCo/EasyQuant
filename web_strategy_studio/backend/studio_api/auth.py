@@ -53,12 +53,25 @@ def decode_access_token(token: str) -> dict:
 
 # ── FastAPI dependency ───────────────────────────────────────────────────────
 async def get_current_user(
-    creds: HTTPAuthorizationCredentials = Depends(security),
     session: AsyncSession = Depends(get_session),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(description="JWT bearer token", auto_error=False)
+    ),
+    token: Optional[str] = None,
 ) -> User:
-    """Extract and verify JWT, return the authenticated User."""
+    """Extract and verify JWT, return the authenticated User.
+
+    Supports both Bearer header (via ``credentials``) and ``?token=`` query
+    parameter — the latter needed by SSE/EventSource which can't set headers.
+    """
+    raw_token = credentials.credentials if credentials else token
+    if raw_token is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "TOKEN_MISSING", "message": "Authentication required"},
+        )
     try:
-        payload = decode_access_token(creds.credentials)
+        payload = decode_access_token(raw_token)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail={"code": "TOKEN_EXPIRED", "message": "Token expired"})
     except jwt.InvalidTokenError:

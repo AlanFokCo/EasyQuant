@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { apiOrigin } from "../api/client";
+import { apiOrigin, getToken } from "../api/client";
 import { useEditorStore } from "../store/editorStore";
 
 export type LogLine = { stream: string; line: string; ts?: string };
@@ -72,10 +72,12 @@ export function useRunStream(runId: string | null) {
     const connect = () => {
       if (cancelled || done.current) return;
 
-      const params = lastEventId.current >= 0
-        ? `?last_event_id=${lastEventId.current}`
-        : "";
-      const url = `${apiOrigin}/api/v1/runs/${runId}/stream${params}`;
+      const token = getToken();
+      const parts: string[] = [];
+      if (token) parts.push(`token=${encodeURIComponent(token)}`);
+      if (lastEventId.current >= 0) parts.push(`last_event_id=${lastEventId.current}`);
+      const qs = parts.length > 0 ? `?${parts.join("&")}` : "";
+      const url = `${apiOrigin}/api/v1/runs/${runId}/stream${qs}`;
 
       es = new EventSource(url);
 
