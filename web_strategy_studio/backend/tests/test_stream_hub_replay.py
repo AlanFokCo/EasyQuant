@@ -207,4 +207,42 @@ async def _test_evict(hub):
     buf = hub._buffers["run_ev"]
     buf._expires_at = time.monotonic() - 1  # force expired
     hub.evict_expired()
+
+
+# ── MED-26: max_buffers LRU cap ──────────────────────────────────────────────
+
+
+def test_max_buffers_cap():
+    """StreamHub should evict oldest non-terminal buffer when cap exceeded."""
+    import asyncio
+    from studio_api.stream_hub import StreamHub
+
+    hub = StreamHub(max_buffers=3)
+    loop = asyncio.get_event_loop()
+
+    # Create 4 non-terminal buffers — oldest should be evicted
+    for i in range(4):
+        loop.run_until_complete(hub.publish(f"run_{i}", "log", {"line": "test"}))
+
+    assert len(hub._buffers) <= 3
+    assert "run_0" not in hub._buffers  # oldest evicted
+
+
+def test_terminal_buffers_not_evicted():
+    """Buffers with terminal events should not be evicted."""
+    import asyncio
+    from studio_api.stream_hub import StreamHub
+
+    hub = StreamHub(max_buffers=3)
+    loop = asyncio.get_event_loop()
+
+    # Create 2 terminal + 2 non-terminal
+    loop.run_until_complete(hub.publish("run_done1", "done", {"status": "succeeded"}))
+    loop.run_until_complete(hub.publish("run_done2", "error", {"msg": "fail"}))
+    loop.run_until_complete(hub.publish("run_active1", "log", {"line": "x"}))
+    loop.run_until_complete(hub.publish("run_active2", "log", {"line": "y"}))
+
+    # Terminal buffers should survive
+    assert "run_done1" in hub._buffers
+    assert "run_done2" in hub._buffers
     assert "run_ev" not in hub._buffers
