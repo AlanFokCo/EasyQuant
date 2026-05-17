@@ -338,10 +338,24 @@ async def get_run(
 
 
 @router.post("/runs/{run_id}/cancel")
-async def cancel_run(run_id: str, session: AsyncSession = Depends(get_session)):
-    run = await session.get(Run, run_id)
-    if run is None:
+async def cancel_run(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
+    """Cancel a running run (HIGH-18). Requires auth + ownership verification."""
+    from sqlalchemy import select
+
+    result = await session.execute(
+        select(Run, Strategy.owner_id)
+        .join(Strategy, Run.strategy_id == Strategy.id)
+        .where(Run.id == run_id)
+    )
+    row = result.first()
+    if row is None or row.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+
+    run = row[0]
     if run.status in ("succeeded", "failed", "cancelled"):
         return {"ok": True, "status": run.status}
 
