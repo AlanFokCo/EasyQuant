@@ -779,18 +779,26 @@ def _iter_days(start, end):
         current += datetime.timedelta(days=1)
 
 
+def _get_trading_days_range_raw(start_str: str, end_str: str) -> tuple:
+    """Return trading days between start and end using local holiday fallback."""
+    start_date = pd.Timestamp(start_str).date()
+    end_date = pd.Timestamp(end_str).date()
+    return tuple(
+        d for d in _iter_days(start_date, end_date)
+        if d.weekday() < 5 and not _is_ashare_holiday(d)
+    )
+
+
+# MED-23: wrap to normalize date/datetime/Timestamp inputs to string before cache lookup
 @lru_cache(maxsize=64)
 def _get_trading_days_range(
     start: Union[datetime.date, datetime.datetime, pd.Timestamp],
     end: Union[datetime.date, datetime.datetime, pd.Timestamp],
 ) -> tuple:
     """Return trading days between start and end using local holiday fallback."""
-    start_date = pd.Timestamp(start).date()
-    end_date = pd.Timestamp(end).date()
-    return tuple(
-        d for d in _iter_days(start_date, end_date)
-        if d.weekday() < 5 and not _is_ashare_holiday(d)
-    )
+    s = pd.Timestamp(start).date().isoformat()
+    e = pd.Timestamp(end).date().isoformat()
+    return _get_trading_days_range_raw(s, e)
 
 
 # ============================================================
