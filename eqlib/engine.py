@@ -592,6 +592,18 @@ def run_backtest(initialize_func, start_date, end_date,
     )
     session._benchmark = benchmark
 
+    # ── Minute mode warning (intraday fill not yet implemented) ────────────
+    if frequency == "minute":
+        import warnings
+        warnings.warn(
+            "minute mode currently routes orders to next-day open; "
+            "intraday execution is not implemented. "
+            "Orders placed during minute bars are buffered and filled at the "
+            "next trading day's open price.",
+            UserWarning,
+            stacklevel=2,
+        )
+
     # ── Create context & call initialize first ──────────────────────────────
     context = Context(start_date, end_date, frequency, starting_cash)
     session._context = context
