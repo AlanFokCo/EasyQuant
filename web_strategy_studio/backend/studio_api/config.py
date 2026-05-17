@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     sse_buffer_ttl_sec: int = 1800  # 30 minutes
     # B4: coalescing window — edits within this many seconds reuse the current version row
     version_coalesce_sec: int = 60  # 1 minute
+    # BLOCKER-8: runner backend — "local" (subprocess, no sandbox) or "docker"
+    # (container with --network none --read-only --memory --pids-limit)
+    runner: str = "local"
 
 
 settings = Settings()
