@@ -25,13 +25,32 @@ export function resolveArtifactUrl(path: string | undefined | null): string | un
   return p;
 }
 
+/** Get stored JWT token from localStorage. */
+export function getToken(): string | null {
+  return localStorage.getItem("eq_studio_token");
+}
+
+/** Store or clear JWT token. */
+export function setToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem("eq_studio_token", token);
+  } else {
+    localStorage.removeItem("eq_studio_token");
+  }
+}
+
 export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> || {}),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(`${apiOrigin}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers,
   });
   if (!res.ok) {
     let body: {
