@@ -27,6 +27,7 @@ from studio_api.routers import format as fmt
 from studio_api.routers import lint as lint_r
 from studio_api.routers import data_mgmt as data_r
 from studio_api.routers import auth as auth_r
+from studio_api.routers import symbols as symbols_r
 
 # ---------------------------------------------------------------------------
 # Structured logging (stdlib JSON + structlog)
@@ -225,3 +226,4 @@ app.include_router(completion.router)
 app.include_router(health.router)
 app.include_router(data_r.router)
 app.include_router(auth_r.router)
+app.include_router(symbols_r.router)

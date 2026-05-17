@@ -98,6 +98,8 @@ def _make_run_config(params: Dict[str, Any]) -> Dict[str, Any]:
         "use_local": bool(params.get("use_local", True)),
         "securities": params.get("securities"),
         "max_memory_mb": int(params.get("max_memory_mb", 1024)),
+        # HIGH-21: pass through @param values to isolated runner
+        "strategy_params": params.get("strategy_params"),
     }
 
 

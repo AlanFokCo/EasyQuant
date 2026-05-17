@@ -106,6 +106,8 @@ class RunParams(BaseModel):
     report_dir: Optional[str] = None
     securities: Optional[List[str]] = None
     max_memory_mb: int = 1024
+    # HIGH-21: arbitrary @param values from frontend dynamic param panel
+    strategy_params: Optional[Dict[str, Any]] = None
 
 
 class CreateRunBody(BaseModel):
