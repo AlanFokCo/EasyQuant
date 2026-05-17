@@ -99,9 +99,81 @@ from eqlib.data import (
 # Logging  [STABLE]
 from eqlib.logger import log
 
-# Global object (user-facing) — always available like EasyQuant's g  [STABLE]
+# Global object (user-facing) — session-scoped proxy for concurrent backtests.
+# Each BacktestSession has its own GlobalObject; this proxy delegates
+# attribute access to the active session's _g, making concurrent backtests
+# thread-safe without changing user code.  [STABLE]
 from eqlib.objects import GlobalObject
-g = GlobalObject()
+import eqlib._state as _st
+
+# Fallback GlobalObject used before any session is active.  run_backtest
+# clears this and assigns it to session._g on each invocation.
+_g_fallback = GlobalObject()
+
+
+class _GProxy:
+    """Proxy that delegates attribute access to the active session's _g.
+
+    This makes ``eqlib.g`` thread-safe: each concurrent backtest has its own
+    ``GlobalObject`` via ``session._g``, and ``g.attr`` reads/writes are
+    routed to the current thread's session.  For compatibility with user code
+    that does ``isinstance(g, GlobalObject)``, the proxy's ``__class__``
+    property reports ``GlobalObject``.
+    """
+
+    __slots__ = ()
+
+    @property
+    def __class__(self):
+        return GlobalObject
+
+    def _target(self):
+        """Return the underlying GlobalObject to delegate to.
+
+        Handles the case where run_backtest stores the proxy itself in
+        session._g (via ``session._g = eqlib.g``).  In that case we must
+        fall back to _g_fallback to avoid infinite recursion.
+        """
+        sess = _st.get_session()
+        g_obj = sess._g
+        if g_obj is None or g_obj is self:
+            return _g_fallback
+        return g_obj
+
+    @property
+    def __dict__(self):
+        return self._target().__dict__
+
+    def __getattr__(self, name: str):
+        return getattr(self._target(), name)
+
+    def __setattr__(self, name: str, value):
+        if name in ("__slots__",):
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._target(), name, value)
+
+    def __delattr__(self, name: str):
+        delattr(self._target(), name)
+
+    def __contains__(self, name: str) -> bool:
+        return hasattr(self._target(), name)
+
+    def __dir__(self):
+        return dir(self._target())
+
+    def keys(self):
+        return self._target().__dict__.keys()
+
+    def items(self):
+        return self._target().__dict__.items()
+
+    def __repr__(self):
+        return repr(self._target())
+
+
+# Single proxy instance — all `import eqlib; eqlib.g` references get this.
+g = _GProxy()
 
 # Context is provided at runtime  [STABLE]
 from eqlib.context import Context, Portfolio, Position
