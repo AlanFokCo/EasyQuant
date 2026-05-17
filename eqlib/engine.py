@@ -1032,6 +1032,11 @@ def _fetch_live_prices(cache: dict, max_age: int = 30,
                        securities: Optional[set] = None) -> dict:
     """Fetch A-share spot quotes and update the cache.
 
+    For small universes (< 100 securities) fetches individual daily bars
+    via ``ak.stock_zh_a_hist`` to avoid downloading the full A-share list
+    (~5000 rows, ~1 MB).  For larger universes falls back to the bulk
+    endpoint ``ak.stock_zh_a_spot_em``.
+
     Parameters:
         cache: previous cache dict (returned unchanged if still fresh).
         max_age: cache TTL in seconds (default 30).
@@ -1045,10 +1050,35 @@ def _fetch_live_prices(cache: dict, max_age: int = 30,
         return cache
     try:
         import akshare as ak
+        import datetime
+        new_cache = {"_ts": _time.time()}
+
+        if securities and len(securities) < 100:
+            # MED-24: small universe — fetch individual daily bars to avoid
+            # downloading the full 5000+ row A-share list.
+            today = datetime.date.today().strftime("%Y%m%d")
+            for code in securities:
+                if code in cache and cache.get("_ts", 0) > _time.time() - max_age:
+                    new_cache[code] = cache[code]
+                    continue
+                try:
+                    # Fetch latest 5 days of daily data; use last bar's close
+                    df = ak.stock_zh_a_hist(
+                        symbol=code, period="daily",
+                        start_date=today, end_date=today,
+                        adjust=""
+                    )
+                    if df is not None and not df.empty:
+                        price = float(df.iloc[-1]["收盘"])
+                        new_cache[code] = price
+                except Exception:
+                    pass
+            return new_cache
+
+        # Large universe or no filter — use bulk endpoint
         df = ak.stock_zh_a_spot_em()
         if df.empty:
             return cache
-        new_cache = {"_ts": _time.time()}
         for _, row in df.iterrows():
             code = row.get("代码")
             price = row.get("最新价")

@@ -81,3 +81,30 @@ class TestTradingDaysRangeCacheKey:
 
         info = _get_trading_days_range_raw.cache_info()
         assert info.hits >= 1, f"Expected cache hit but got {info}"
+
+
+class TestFetchLivePricesSmallUniverse:
+    """MED-24: _fetch_live_prices should avoid full A-share download for small universes."""
+
+    def test_small_universe_no_bulk_download(self):
+        """For <100 securities, should use individual hist endpoint, not bulk."""
+        from unittest.mock import patch, MagicMock
+        from eqlib.engine import _fetch_live_prices
+
+        # With a small universe, bulk endpoint should NOT be called
+        with patch("akshare.stock_zh_a_spot_em") as mock_bulk, \
+             patch("akshare.stock_zh_a_hist") as mock_hist:
+            mock_bulk.return_value = MagicMock()
+            mock_bulk.side_effect = AssertionError("bulk endpoint should not be called")
+
+            mock_df = MagicMock()
+            mock_df.empty = False
+            mock_df.iloc = MagicMock()
+            mock_df.iloc.__getitem__ = MagicMock(return_value=MagicMock())
+            mock_df.iloc[-1].__getitem__ = MagicMock(return_value=10.5)
+            mock_hist.return_value = mock_df
+
+            cache = _fetch_live_prices({}, securities={"601390", "000001"})
+
+            mock_bulk.assert_not_called()
+            assert mock_hist.call_count == 2
