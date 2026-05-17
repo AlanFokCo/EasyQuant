@@ -2,6 +2,7 @@
 
 import os
 import json
+import html
 import datetime
 import matplotlib
 matplotlib.use("Agg")
@@ -694,9 +695,9 @@ def generate_html_report(result, out_path):
         trade_rows += (
             f'<tr>'
             f'<td>{i}</td>'
-            f'<td>{t["date"]}</td>'
+            f'<td>{html.escape(str(t["date"]))}</td>'
             f'<td style="color:{action_color};font-weight:bold">{action_text}</td>'
-            f'<td>{t["security"]}</td>'
+            f'<td>{html.escape(str(t["security"]))}</td>'
             f'<td>{t["price"]:.3f}</td>'
             f'<td>{t["amount"]:,}</td>'
             f'<td>{t.get("commission", 0):.2f}</td>'
@@ -712,7 +713,7 @@ def generate_html_report(result, out_path):
         if d not in trade_map:
             trade_map[d] = []
         action_text = "买入" if t["type"] == "BUY" else "卖出"
-        trade_map[d].append(f"{action_text} {t['security']} {t['amount']}股 @{t['price']:.3f}")
+        trade_map[d].append(f"{action_text} {html.escape(str(t['security']))} {t['amount']}股 @{t['price']:.3f}")
 
     calendar_rows = ""
     if cum_return_data:
@@ -724,7 +725,7 @@ def generate_html_report(result, out_path):
                 op_parts = []
                 for o in ops:
                     op_color = "#26a69a" if "买入" in o else "#ef5350"
-                    op_parts.append(f'<span style="color:{op_color}">{o}</span>')
+                    op_parts.append(f'<span style="color:{op_color}">{html.escape(o)}</span>')
                 op_html = "<br>".join(op_parts)
                 bg = "#1a2332"
             else:
@@ -755,7 +756,7 @@ def generate_html_report(result, out_path):
         for sec, pos in ctx.portfolio.positions.items():
             if pos.amount > 0:
                 positions_html += (
-                    f'<li><b>{sec}</b>: {pos.amount} 股, 均价={pos.avg_cost:.3f}</li>'
+                    f'<li><b>{html.escape(sec)}</b>: {pos.amount} 股, 均价={pos.avg_cost:.3f}</li>'
                 )
     if not positions_html:
         positions_html = "<li>空仓（无持仓）</li>"
@@ -779,10 +780,10 @@ def generate_html_report(result, out_path):
     bench_label = {"000300": "沪深300", "000001": "上证指数"}.get(bench_code, bench_code)
     pnl_badge_class = "pos" if pnl >= 0 else "neg"
 
-    html = _HTML_TEMPLATE.format(
+    html_report = _HTML_TEMPLATE.format(
         html_brand_lockup=html_header_brand_lockup(),
         html_footer_brand=html_footer_brand_chip(),
-        symbol=symbol,
+        symbol=html.escape(str(symbol)),
         start_date=str(start),
         end_date=str(end),
         initial_capital=f"{initial:,.2f}",
@@ -848,7 +849,7 @@ def generate_html_report(result, out_path):
     )
 
     with open(out_path, "w") as f:
-        f.write(html)
+        f.write(html_report)
 
     print(f"HTML报告已保存: {out_path}")
 
