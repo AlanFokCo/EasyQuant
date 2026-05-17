@@ -361,10 +361,16 @@ async def delete_run(run_id: str, session: AsyncSession = Depends(get_session)):
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     if run.status in ("queued", "running"):
         kill_proc(run_id)
+
+    # Defensive: derive the artifact path from run_id (trusted) rather than
+    # from html_path (stored in DB and potentially poisoned).  Only delete
+    # if the resolved directory is under the expected reports root.
     if run.html_path:
-        report_dir = Path(run.html_path).parent
-        if report_dir.is_dir():
+        reports_root = (settings.artifact_dir / "reports").resolve()
+        report_dir = (reports_root / run_id).resolve()
+        if report_dir.is_relative_to(reports_root) and report_dir.is_dir():
             shutil.rmtree(report_dir, ignore_errors=True)
+
     await session.delete(run)
     await session.commit()
     return {"ok": True}

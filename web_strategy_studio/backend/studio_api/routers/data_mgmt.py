@@ -5,12 +5,16 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List, Optional
 
+import re
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 
 from eqlib import data_cache as dc
 
 router = APIRouter(prefix="/api/v1", tags=["data"])
+
+# A 股代码严格 6 位数字，任何路径分隔符、URL 编码、前缀后缀都不接受。
+_CODE_RE = re.compile(r"^[0-9]{6}$")
 
 
 class LocalStockInfo(BaseModel):
@@ -100,8 +104,18 @@ async def delete_local_stock(code: str) -> Dict[str, Any]:
 
 
 def _normalize_code(code: str) -> str:
-    """Ensure code has exchange suffix for internal use, but return without suffix for file naming."""
-    code = code.strip().upper()
-    # If already has suffix, strip it first for consistency
-    code = code.replace(".XSHG", "").replace(".XSHE", "")
-    return code
+    """Validate and normalize a stock code.
+
+    A 股代码严格为 6 位数字。任何路径分隔符、URL 编码、exchange 后缀
+    都会导致 400 错误，防止路径穿越攻击。
+    """
+    raw = code.strip().upper()
+    # Strip known exchange suffixes for validation
+    raw = raw.replace(".XSHG", "").replace(".XSHE", "")
+
+    if not _CODE_RE.match(raw):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_CODE", "message": f"Stock code must be 6 digits, got: {code}"},
+        )
+    return raw
