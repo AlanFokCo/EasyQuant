@@ -114,9 +114,6 @@ export function StrategyLayout() {
 
   const markers = useMemo(() => buildMarkers(lint), [lint]);
 
-  // HIGH-19: Track server-side version to detect concurrent edits
-  const [serverVersion, setServerVersion] = useState<number | null>(strategy?.version ?? null);
-
   const bootRef = useRef(false);
   const hydrated = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,6 +144,9 @@ export function StrategyLayout() {
     queryFn: () => apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`),
     retry: false,
   });
+
+  // HIGH-19: Track server-side version to detect concurrent edits
+  const [serverVersion, setServerVersion] = useState<number | null>(strategy?.version ?? null);
 
   // If the stored strategy ID no longer exists (e.g. database was reset),
   // clear it so the bootstrap effect creates a fresh strategy.
