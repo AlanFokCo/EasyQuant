@@ -177,9 +177,9 @@ async def csp_for_reports(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/static/reports/"):
         response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-            "font-src 'self' data:; connect-src 'self'; sandbox"
+            "default-src 'none'; script-src 'unsafe-inline'; "
+            "style-src 'unsafe-inline'; img-src data: blob:; "
+            "font-src data:; sandbox allow-scripts"
         )
     return response
 
