@@ -22,7 +22,8 @@ from studio_api.backtest_executor import execute_backtest
 from studio_api.config import settings
 from studio_api.db import SessionLocal, get_session
 from studio_api.lint_service import lint_source
-from studio_api.models import Run, Strategy
+from studio_api.models import Run, Strategy, User
+from studio_api import auth as auth_mod
 from studio_api.proc_registry import get_proc
 from studio_api.proc_registry import kill as kill_proc
 from studio_api.run_queue import (
@@ -221,6 +222,7 @@ async def create_run(
     body: CreateRunBody,
     session: AsyncSession = Depends(get_session),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     # B18: per-IP rate limit
     client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
@@ -254,7 +256,7 @@ async def create_run(
     res = await session.execute(
         select(Strategy)
         .options(selectinload(Strategy.versions))
-        .where(Strategy.id == body.strategy_id)
+        .where(Strategy.id == body.strategy_id, Strategy.owner_id == current_user.id)
     )
     strat = res.scalar_one_or_none()
     if strat is None:
@@ -304,9 +306,19 @@ async def create_run(
 
 
 @router.get("/runs/{run_id}", response_model=RunStatusResponse)
-async def get_run(run_id: str, session: AsyncSession = Depends(get_session)):
+async def get_run(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     run = await session.get(Run, run_id)
     if run is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+    # Verify ownership via strategy
+    res = await session.execute(
+        select(Strategy.id).where(Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id)
+    )
+    if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     err = None
     if run.error_message:
@@ -354,10 +366,20 @@ async def cancel_run(run_id: str, session: AsyncSession = Depends(get_session)):
 
 
 @router.delete("/runs/{run_id}")
-async def delete_run(run_id: str, session: AsyncSession = Depends(get_session)):
+async def delete_run(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     """Delete a run record and its artifacts."""
     run = await session.get(Run, run_id)
     if run is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+    # Verify ownership via strategy
+    res = await session.execute(
+        select(Strategy.id).where(Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id)
+    )
+    if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     if run.status in ("queued", "running"):
         kill_proc(run_id)
@@ -381,6 +403,7 @@ async def run_stream(
     run_id: str,
     session: AsyncSession = Depends(get_session),
     last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13)."""
     # Resolve last_event_id to an int (default -1 = send everything).
@@ -445,7 +468,7 @@ async def run_stream(
 
 
 @router.get("/queue", response_model=QueueStatusResponse)
-async def get_queue():
+async def get_queue(current_user: User = Depends(auth_mod.get_current_user)):
     """Return current queue depth and per-run positions."""
     pending = pending_run_ids()
     return QueueStatusResponse(
@@ -469,11 +492,14 @@ async def list_runs(
     strategy_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
-    """Return a paginated list of all backtest runs."""
+    """Return a paginated list of all backtest runs for the current user."""
     q = (
         select(Run)
         .options(selectinload(Run.strategy))
+        .join(Strategy, Run.strategy_id == Strategy.id)
+        .where(Strategy.owner_id == current_user.id)
         .order_by(Run.started_at.desc(), Run.id.desc())
     )
     if strategy_id:
@@ -481,7 +507,7 @@ async def list_runs(
 
     from sqlalchemy import func as sa_func
 
-    count_q = select(sa_func.count(Run.id))
+    count_q = select(sa_func.count(Run.id)).join(Strategy, Run.strategy_id == Strategy.id).where(Strategy.owner_id == current_user.id)
     if strategy_id:
         count_q = count_q.where(Run.strategy_id == strategy_id)
     total = (await session.execute(count_q)).scalar_one() or 0
@@ -576,9 +602,19 @@ def _extract_metrics(raw: Dict[str, Any]) -> Dict[str, Optional[float]]:
 
 
 @router.get("/runs/{run_id}/metrics", response_model=RunMetricsResponse)
-async def get_run_metrics(run_id: str, session: AsyncSession = Depends(get_session)):
+async def get_run_metrics(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     run = await session.get(Run, run_id)
     if run is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+    # Verify ownership
+    res = await session.execute(
+        select(Strategy.id).where(Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id)
+    )
+    if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     raw = _read_metrics_from_json(run)
     return RunMetricsResponse(
@@ -593,6 +629,7 @@ async def get_run_metrics(run_id: str, session: AsyncSession = Depends(get_sessi
 async def compare_runs(
     body: Dict[str, Any],
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     """Compare metrics + equity curves across multiple runs (B22)."""
     run_ids: List[str] = body.get("run_ids", [])

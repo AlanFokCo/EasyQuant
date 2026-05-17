@@ -22,6 +22,7 @@ from studio_api.routers import completion, health, runs, strategies
 from studio_api.routers import format as fmt
 from studio_api.routers import lint as lint_r
 from studio_api.routers import data_mgmt as data_r
+from studio_api.routers import auth as auth_r
 
 # ---------------------------------------------------------------------------
 # Structured logging (stdlib JSON + structlog)
@@ -56,6 +57,14 @@ async def lifespan(app: FastAPI):
     settings.artifact_dir.mkdir(parents=True, exist_ok=True)
     (settings.artifact_dir / "reports").mkdir(parents=True, exist_ok=True)
     await init_db()
+
+    # BLOCKER-7: seed admin user on startup
+    from studio_api.db import SessionLocal
+    from studio_api.auth import ensure_admin_user
+    async with SessionLocal() as session:
+        admin = await ensure_admin_user(session)
+        logger.info("auth_admin_ready", user_id=admin.id, username=admin.username)
+
     if not _SYMBOLS_FILE.is_file():
         logger.warning(
             "eqlib_symbols_missing",
@@ -163,3 +172,4 @@ app.include_router(fmt.router)
 app.include_router(completion.router)
 app.include_router(health.router)
 app.include_router(data_r.router)
+app.include_router(auth_r.router)

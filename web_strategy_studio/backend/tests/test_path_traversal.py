@@ -140,6 +140,7 @@ class TestBlocker10DeleteRunRmtreeValidation:
 
         import studio_api.config as cfg
         import studio_api.routers.runs as runs_router
+        from studio_api.models import User
 
         reports_root = cfg.settings.artifact_dir / "reports"
         # Create a decoy directory outside reports
@@ -153,12 +154,17 @@ class TestBlocker10DeleteRunRmtreeValidation:
         run.id = run_id
         run.status = "failed"
         run.html_path = str(decoy / "report.html")
+        run.strategy_id = "strat_x"
 
         mock_session = AsyncMock()
         mock_session.get.return_value = run
+        mock_session.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value="user_admin"))
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = "user_admin"
 
         # Run the delete
-        result = await runs_router.delete_run(run_id, session=mock_session)
+        result = await runs_router.delete_run(run_id, session=mock_session, current_user=mock_user)
 
         # Verify decoy directory was NOT deleted
         assert (decoy / "secret.txt").exists(), (
@@ -174,6 +180,7 @@ class TestBlocker10DeleteRunRmtreeValidation:
 
         import studio_api.config as cfg
         import studio_api.routers.runs as runs_router
+        from studio_api.models import User
 
         reports_root = cfg.settings.artifact_dir / "reports"
         run_id = str(uuid.uuid4())
@@ -185,11 +192,16 @@ class TestBlocker10DeleteRunRmtreeValidation:
         run.id = run_id
         run.status = "succeeded"
         run.html_path = f"/static/reports/{run_id}/report.html"
+        run.strategy_id = "strat_x"
 
         mock_session = AsyncMock()
         mock_session.get.return_value = run
+        mock_session.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value="user_admin"))
 
-        result = await runs_router.delete_run(run_id, session=mock_session)
+        mock_user = MagicMock(spec=User)
+        mock_user.id = "user_admin"
+
+        result = await runs_router.delete_run(run_id, session=mock_session, current_user=mock_user)
 
         # The report directory should have been deleted
         assert not report_dir.exists(), (
