@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "easyquant-eqlib"
-version = "1.0.1"
+version = "1.0.2"
 description = "Event-driven quantitative trading framework for China A-share backtesting and research"
 readme = "README.md"
 requires-python = ">=3.9"
