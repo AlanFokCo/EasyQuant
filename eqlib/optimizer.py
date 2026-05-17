@@ -219,12 +219,14 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
 
         if res.success:
             weights = res.x
-            # Normalize to sum to 1
-            weights = weights / weights.sum()
             # Zero out tiny weights
             weights[np.abs(weights) < 1e-6] = 0
-            # Re-normalize
-            weights = weights / weights.sum()
+            total = weights.sum()
+            if total <= 0:
+                # All weights zeroed out — cannot normalize
+                return None
+            # Normalize to sum to 1
+            weights = weights / total
             return pd.Series(weights, index=securities)
 
         if return_none_if_fail:
