@@ -21,6 +21,7 @@ from studio_api.db import init_db
 from studio_api.routers import completion, health, runs, strategies
 from studio_api.routers import format as fmt
 from studio_api.routers import lint as lint_r
+from studio_api.routers import data_mgmt as data_r
 
 # ---------------------------------------------------------------------------
 # Structured logging (stdlib JSON + structlog)
@@ -161,3 +162,4 @@ app.include_router(lint_r.router)
 app.include_router(fmt.router)
 app.include_router(completion.router)
 app.include_router(health.router)
+app.include_router(data_r.router)

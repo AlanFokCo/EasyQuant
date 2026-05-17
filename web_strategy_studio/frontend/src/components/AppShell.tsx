@@ -147,6 +147,8 @@ export function AppShell({ editor, rightPane }: Props) {
           display: "flex",
           flexDirection: "row",
           overflow: "hidden",
+          position: "relative",
+          zIndex: 0,
         }}
       >
         {/* Sidebar (hidden on narrow) */}

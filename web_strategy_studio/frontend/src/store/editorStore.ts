@@ -19,6 +19,7 @@ type EditorState = {
   sseReconnecting: boolean;
   showHistory: boolean;
   showCompare: boolean;
+  showData: boolean;
   compareIds: string[];
   toasts: Toast[];
   theme: Theme;
@@ -29,6 +30,7 @@ type EditorState = {
   setSseReconnecting: (v: boolean) => void;
   setShowHistory: (v: boolean) => void;
   setShowCompare: (v: boolean) => void;
+  setShowData: (v: boolean) => void;
   setCompareIds: (ids: string[]) => void;
   addToast: (type: ToastType, message: string) => void;
   dismissToast: (id: string) => void;
@@ -49,6 +51,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   sseReconnecting: false,
   showHistory: false,
   showCompare: false,
+  showData: false,
   compareIds: [],
   toasts: [],
   theme: _storedTheme,
@@ -65,8 +68,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
   setSseConnected: (sseConnected) => set({ sseConnected }),
   setSseReconnecting: (sseReconnecting) => set({ sseReconnecting }),
-  setShowHistory: (showHistory) => set({ showHistory }),
-  setShowCompare: (showCompare) => set({ showCompare }),
+  setShowHistory: (showHistory) => set({ showHistory, showCompare: false, showData: false }),
+  setShowCompare: (showCompare) => set({ showCompare, showHistory: false, showData: false }),
+  setShowData: (showData) => set({ showData, showHistory: false, showCompare: false }),
   setCompareIds: (compareIds) => set({ compareIds }),
   addToast: (type, message) =>
     set((s) => {

@@ -247,7 +247,7 @@ class PreloadedData:
         end_date,
         adjust: str = "qfq",
         progress: bool = True,
-        use_local: bool = False,
+        use_local: bool = True,
         max_memory_mb: int = _DEFAULT_MAX_MEMORY_MB,
     ):
         """
@@ -259,8 +259,10 @@ class PreloadedData:
             end_date: backtest end date
             adjust: adjust type
             progress: show progress indicator
-            use_local: if True, load from local CSV files first;
-                       download and save if local file not found.
+            use_local: if True (default), load from local CSV files first;
+                       download missing data via multi-source fallback
+                       and save to local. If False, uses parquet cache
+                       with same download fallback.
             max_memory_mb: memory limit in MB (default 1024). If estimated
                            memory exceeds this, dict caches are skipped and
                            the system falls back to panel slicing.
@@ -610,10 +612,10 @@ def _local_csv_path(security: str, adjust: str = "qfq") -> Path:
 
 def save_stock_local(security: str, start_date=None, end_date=None,
                      adjust: str = "qfq") -> Optional[str]:
-    """Download stock data and save to local CSV.
+    """Download stock data and save to local CSV, merging with existing data.
 
-    If start_date/end_date are None, downloads full history.
-    If the file already exists, appends/overwrites with new data.
+    If the file already exists, reads the existing data, merges new and old
+    (union of dates, new values overwrite old ones), then saves.
 
     Parameters:
         security: stock code
@@ -626,13 +628,30 @@ def save_stock_local(security: str, start_date=None, end_date=None,
     """
     from eqlib.data import fetch_stock_data
 
-    df = fetch_stock_data(security, start_date or "20000101",
-                          end_date or datetime.date.today(), adjust)
-    if df.empty:
-        return None
-
     path = _local_csv_path(security, adjust)
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Try to read existing data
+    existing = None
+    if path.exists():
+        try:
+            existing = pd.read_csv(path, index_col=0, parse_dates=True)
+        except Exception:
+            existing = None
+
+    # Download new data (full history if no date range specified)
+    new_df = fetch_stock_data(security, start_date or "20000101",
+                              end_date or datetime.date.today(), adjust)
+    if new_df.empty:
+        return None
+
+    # Merge with existing data
+    if existing is not None and not existing.empty:
+        df = pd.concat([existing, new_df])
+        df = df[~df.index.duplicated(keep='last')].sort_index()
+    else:
+        df = new_df
+
     df.to_csv(path)
     return str(path)
 
@@ -674,6 +693,67 @@ def has_local_data(security: str, adjust: str = "qfq") -> bool:
     """Check if local CSV data exists for a security."""
     path = _local_csv_path(security, adjust)
     return path.exists()
+
+
+def get_local_date_range(security: str, adjust: str = "qfq") -> Optional[tuple]:
+    """Return the date range (start_date, end_date) of local CSV data.
+
+    Returns a tuple of (start_str, end_str) in 'YYYY-MM-DD' format,
+    or None if no local data exists.
+    """
+    path = _local_csv_path(security, adjust)
+    if not path.exists():
+        return None
+
+    try:
+        df = pd.read_csv(path, index_col=0, parse_dates=True, nrows=1)
+        # We only need first/last dates, read just those
+        import csv
+        with open(path, 'r') as f:
+            reader = csv.reader(f)
+            first_date = None
+            last_date = None
+            for i, row in enumerate(reader):
+                if i == 0:
+                    continue  # skip header
+                d = row[0].strip()
+                if first_date is None:
+                    first_date = d
+                last_date = d
+        if first_date and last_date:
+            return (first_date, last_date)
+    except Exception:
+        pass
+    return None
+
+
+def get_local_file_info(security: str, adjust: str = "qfq") -> Optional[dict]:
+    """Return file size and date range for local CSV data."""
+    path = _local_csv_path(security, adjust)
+    if not path.exists():
+        return None
+
+    size_bytes = path.stat().st_size
+    date_range = get_local_date_range(security, adjust)
+
+    return {
+        "code": security.replace(".XSHG", "").replace(".XSHE", ""),
+        "file": str(path),
+        "size_bytes": size_bytes,
+        "size_human": _human_readable_size(size_bytes),
+        "start_date": date_range[0] if date_range else None,
+        "end_date": date_range[1] if date_range else None,
+    }
+
+
+def _human_readable_size(size_bytes: int) -> str:
+    """Convert bytes to human-readable string."""
+    if size_bytes < 1024:
+        return f"{size_bytes}B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f}KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f}MB"
 
 
 def list_local_stocks(adjust: str = "qfq") -> list[str]:

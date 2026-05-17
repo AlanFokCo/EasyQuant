@@ -53,7 +53,7 @@ async def execute_backtest(
         "end_date": params.get("end_date", "2024-12-31"),
         "starting_cash": float(params.get("starting_cash", 100_000)),
         "benchmark": params.get("benchmark", "000300.XSHG"),
-        "use_local": bool(params.get("use_local", False)),
+        "use_local": bool(params.get("use_local", True)),
         "securities": params.get("securities"),
         "max_memory_mb": int(params.get("max_memory_mb", 1024)),
     }
