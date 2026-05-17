@@ -8,6 +8,7 @@ from typing import Optional
 from eqlib.context import Context
 from eqlib.data import fetch_stock_data, get_price, _get_trading_days_range
 from eqlib.data_cache import PreloadedData
+from eqlib.objects import GlobalObject
 import eqlib._state as st
 from eqlib._state import BacktestSession, _set_session, _clear_session, reset_all
 from eqlib.logger import log
@@ -23,19 +24,11 @@ def _get_preloaded() -> PreloadedData:
     return getattr(sess, '_preloaded', None) or _preloaded_fallback
 
 
-# Module-level fallback for code paths that import _preloaded directly
-# (e.g., trade.py).  After the session is set, _preloaded on the session
-# is authoritative.
+# Fallback for when no session is active (e.g., module-level imports before
+# run_backtest has been called).  _get_preloaded() returns this when the
+# session has no _preloaded set.
 _preloaded_fallback = PreloadedData()
 
-
-def _preloaded_compat():
-    return _get_preloaded()
-
-
-# Keep a direct reference that trade.py / data.py can import for backward compat.
-# This is updated to point at the active session's instance each run_backtest call.
-_preloaded = _preloaded_fallback
 
 # Slight over-estimate of effective cost rate used when computing the max
 # affordable shares for a buy order (avoids fractional-lot overshoot).
@@ -574,8 +567,6 @@ def run_backtest(initialize_func, start_date, end_date,
     Returns:
         dict with keys: context, trade_log, recorded_values, benchmark, session
     """
-    global _preloaded
-
     from eqlib.objects import OrderCost
 
     # ── Normalize date strings to date objects ─────────────────────────────
@@ -589,10 +580,10 @@ def run_backtest(initialize_func, start_date, end_date,
     _set_session(session)
 
     preloaded = PreloadedData()
-    # Attach to session so concurrent threads each have their own
+    # Attach to session so concurrent threads each have their own PreloadedData.
+    # NOTE: do NOT write to any module-level alias — that would break
+    # thread-safety.  All code should read via _get_preloaded().
     object.__setattr__(session, '_preloaded', preloaded)
-    # Update module-level alias so code that imports _preloaded directly still works
-    _preloaded = preloaded
 
     session._order_cost = OrderCost(
         open_tax=0, close_tax=0.001,
@@ -609,7 +600,7 @@ def run_backtest(initialize_func, start_date, end_date,
     _g = eqlib.g
     for attr in list(_g.__dict__.keys()):
         delattr(_g, attr)
-    session._g = _g
+    session._g = GlobalObject()
 
     initialize_func(context)
 
@@ -937,7 +928,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     _g = eqlib.g
     for attr in list(_g.__dict__.keys()):
         delattr(_g, attr)
-    session._g = _g
+    session._g = GlobalObject()
 
     initialize_func(context)
     log.info(f"Paper trading started: capital={starting_cash:,.0f}, interval={interval}s")

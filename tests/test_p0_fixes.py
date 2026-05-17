@@ -70,21 +70,15 @@ class _FakeContext:
 def _activate_preloaded(pre):
     """Install *pre* as the active session's preloaded data."""
     from eqlib._state import get_session
-    import eqlib._state as st
     sess = get_session()
     object.__setattr__(sess, "_preloaded", pre)
-    # Also update engine's module-level alias
-    import eqlib.engine as eng
-    eng._preloaded = pre
 
 
 def _clear_preloaded():
     """Remove any preloaded data from the active session."""
     from eqlib._state import get_session
-    import eqlib.engine as eng
     sess = get_session()
     object.__setattr__(sess, "_preloaded", None)
-    eng._preloaded = eng._preloaded_fallback
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -404,8 +398,6 @@ class TestC4PriceLimitEnforcement:
         ctx = Context(fill_day, fill_day, "daily", 1_000_000)
         sess._context = ctx
         object.__setattr__(sess, "_preloaded", pre)
-        import eqlib.engine as eng
-        eng._preloaded = pre
 
         amount = 100 if is_buy else -100
         if not is_buy:
