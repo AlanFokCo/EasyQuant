@@ -10,6 +10,14 @@ import akshare as ak
 import pandas as pd
 from eqlib.data_cache import _slice_by_date
 
+# Chinese calendar — primary source for A-share holiday detection.
+# Falls back to hardcoded holidays + fixed-date rules if unavailable.
+try:
+    import chinese_calendar as _cc
+    _CC_AVAILABLE = True
+except ImportError:
+    _CC_AVAILABLE = False
+
 
 # ============================================================
 # Internal caches
@@ -724,10 +732,43 @@ def _build_holiday_set() -> frozenset:
 
 _ASHARE_HOLIDAYS: frozenset = _build_holiday_set()
 
+# Fixed-date Chinese public holidays that cause A-share market closure.
+# These occur on the same Gregorian date every year (though observance may
+# shift to adjacent weekdays; we mark the date itself).
+_FIXED_HOLIDAYS = [
+    (1, 1),   # New Year's Day
+    (5, 1),   # Labor Day
+    (5, 2),   # Labor Day extended
+    (5, 3),   # Labor Day extended
+    (10, 1),  # National Day
+    (10, 2),  # National Day extended
+    (10, 3),  # National Day extended
+]
+
 
 def _is_ashare_holiday(date: datetime.date) -> bool:
-    """Return True if *date* is a known A-share public holiday (non-trading day)."""
-    return date in _ASHARE_HOLIDAYS
+    """Return True if *date* is a known A-share non-trading day.
+
+    Checks in order:
+    1. ``chinese_calendar.is_workday()`` — accurate for 2004-2026,
+       including make-up workdays on weekends.
+    2. Hardcoded holiday set (covers 2020-2028).
+    3. Fixed-date holiday rules (New Year, Labor Day, National Day) —
+       catches basic holidays for any year beyond 2028.
+    """
+    # Tier 1: chinese_calendar (primary, covers 2004-2026)
+    if _CC_AVAILABLE:
+        try:
+            return not _cc.is_workday(date)
+        except NotImplementedError:
+            pass  # Year out of range — fall through
+
+    # Tier 2: hardcoded holiday set (2020-2028)
+    if date in _ASHARE_HOLIDAYS:
+        return True
+
+    # Tier 3: fixed-date holidays for any year
+    return (date.month, date.day) in _FIXED_HOLIDAYS
 
 
 def _iter_days(start, end):
