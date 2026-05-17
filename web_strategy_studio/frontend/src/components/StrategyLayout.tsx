@@ -11,6 +11,7 @@ import { useTheme, monacoThemeName } from "../hooks/useTheme";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { AppShell } from "./AppShell";
 import { CommandPalette } from "./CommandPalette";
+import { DataManagementPanel } from "./DataManagementPanel";
 import { EditorToolbar } from "./EditorToolbar";
 import { LogConsole } from "./LogConsole";
 import { MetricsComparison } from "./MetricsComparison";
@@ -91,9 +92,11 @@ export function StrategyLayout() {
   const setRunId = useEditorStore((s) => s.setRunId);
   const showHistory = useEditorStore((s) => s.showHistory);
   const showCompare = useEditorStore((s) => s.showCompare);
+  const showData = useEditorStore((s) => s.showData);
   const addToast = useEditorStore((s) => s.addToast);
   const setShowHistory = useEditorStore((s) => s.setShowHistory);
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
+  const setShowData = useEditorStore((s) => s.setShowData);
   const setCommandPaletteOpen = useEditorStore((s) => s.setCommandPaletteOpen);
   const commandPaletteOpen = useEditorStore((s) => s.commandPaletteOpen);
   const { logs, progress, stage, artifacts, doneStatus, doneError, clearLogs } = useRunStream(runIdStore);
@@ -301,6 +304,7 @@ export function StrategyLayout() {
       else if (reportOpen) setReportOpen(false);
       else if (showHistory) setShowHistory(false);
       else if (showCompare) setShowCompare(false);
+      else if (showData) setShowData(false);
     },
   });
 
@@ -311,6 +315,9 @@ export function StrategyLayout() {
     }
     if (showCompare) {
       return <MetricsComparison />;
+    }
+    if (showData) {
+      return <DataManagementPanel />;
     }
     return (
       <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10, overflow: "auto", flex: 1 }}>

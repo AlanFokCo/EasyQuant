@@ -30,7 +30,7 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 1000,
+        zIndex: 2000,
       }}
       role="dialog"
       aria-modal

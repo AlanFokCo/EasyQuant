@@ -2,6 +2,7 @@
 
 import datetime
 import threading
+import requests
 from functools import lru_cache
 from typing import Optional, Union
 
@@ -129,18 +130,221 @@ def _is_index(code: str) -> bool:
     return stripped.startswith("399")
 
 
-def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
-    """Fetch daily OHLCV data from akshare for a single stock, ETF, or index.
+# ============================================================
+# Daily OHLCV — Multi-source fallback
+# ============================================================
 
-    Index data is cached by ``(symbol, adjust)`` only (without the date range)
-    because ``stock_zh_index_daily_em`` returns the full history in one call.
-    Subsequent requests for different date ranges reuse the same cached frame,
-    eliminating redundant full-history downloads.
+def _fetch_from_em(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+    """Source 1: EastMoney via akshare (primary)."""
+    return ak.stock_zh_a_hist(
+        symbol=symbol, period="daily",
+        start_date=start_date, end_date=end_date, adjust=adjust,
+    )
+
+
+def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+    """Source 2: Tencent Finance direct API.
+
+    URL: https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get
+    Returns JSON with kline data: [date, open, close, high, low, volume, {}, change%, amount, '']
+    Prices are ×100 (e.g., 1595.36 = ¥15.9536). Amount is in thousands of yuan.
+    Note: Tencent requires YYYY-MM-DD date format (not YYYYMMDD).
+    """
+    prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
+    full_symbol = f"{prefix}{symbol}"
+    # adjust: qfq -> qfq, hfq -> hfq, "" -> ""
+    adj_param = adjust if adjust else ""
+    # Tencent needs YYYY-MM-DD format
+    start_fmt = start_date[:4] + "-" + start_date[4:6] + "-" + start_date[6:8]
+    end_fmt = end_date[:4] + "-" + end_date[4:6] + "-" + end_date[6:8]
+    url = (
+        "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get"
+        f"?param={full_symbol},day,{start_fmt},{end_fmt},1000,{adj_param}"
+    )
+    try:
+        r = requests.get(
+            url, timeout=15,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+        )
+        data = r.json()
+        raw_data = data.get("data", {})
+        if not raw_data or isinstance(raw_data, list):
+            return pd.DataFrame()
+        stock_data = raw_data.get(full_symbol, {})
+        if not stock_data:
+            return pd.DataFrame()
+        klines = stock_data.get(
+            "qfqday" if adjust else "day", []
+        )
+    except Exception:
+        return pd.DataFrame()
+
+    if not klines:
+        return pd.DataFrame()
+
+    records = []
+    for k in klines:
+        # [date, open, close, high, low, volume, {}, change%, amount, '']
+        try:
+            row = {
+                "date": k[0],
+                "open": float(k[1]) / 100,
+                "close": float(k[2]) / 100,
+                "high": float(k[3]) / 100,
+                "low": float(k[4]) / 100,
+                "volume": float(k[5]),  # already in lots (手)
+                "pct_change": float(k[7]) if len(k) > 7 else 0,
+                "money": float(k[8]) * 1000 if len(k) > 8 else 0,  # ×1000 → yuan
+                "price_change": 0,
+                "turnover": 0,
+            }
+            records.append(row)
+        except (ValueError, IndexError):
+            continue
+
+    if not records:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(records)
+    df["date"] = pd.to_datetime(df["date"])
+    df.set_index("date", inplace=True)
+    # Reorder columns to match standard format
+    cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+    df = df[[c for c in cols if c in df.columns]]
+    return df
+
+
+def _fetch_from_sina(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+    """Source 3: Sina Finance via akshare stock_zh_a_daily().
+
+    Prices are ×100 (e.g., 1595.36 = ¥15.9536). Volume is in shares (股), needs ÷100 → lots.
+    """
+    prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
+    full_symbol = f"{prefix}{symbol}"
+    adj_map = {"qfq": "qfq", "hfq": "hfq", "": ""}
+    try:
+        df = ak.stock_zh_a_daily(
+            symbol=full_symbol, start_date=start_date, end_date=end_date,
+            adjust=adj_map.get(adjust, ""),
+        )
+    except Exception:
+        return pd.DataFrame()
+
+    if df.empty:
+        return df
+
+    # Normalize: ÷100 for prices, ÷100 for volume (shares → lots)
+    for col in ["open", "high", "low", "close"]:
+        if col in df.columns:
+            df[col] = df[col] / 100
+    if "volume" in df.columns:
+        df["volume"] = df["volume"] / 100
+
+    # Rename to standard format
+    df = _rename_cols(df, {
+        "date": "date", "open": "open", "high": "high", "low": "low",
+        "close": "close", "volume": "volume", "amount": "money",
+    })
+
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"])
+        df.set_index("date", inplace=True)
+
+    # Add missing standard columns
+    for col in ["pct_change", "price_change", "turnover"]:
+        if col not in df.columns:
+            df[col] = 0
+
+    cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+    df = df[[c for c in cols if c in df.columns]]
+    return df
+
+
+def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+    """Source 4: BaoStock (optional dependency, pip install baostock).
+
+    Uses its own socket protocol, works independently of EastMoney.
+    adjust: qfq→2, hfq→1, ""→3 (no adjust)
+    """
+    try:
+        import baostock as bs
+    except ImportError:
+        return pd.DataFrame()
+
+    prefix = "sh." if symbol.startswith(("6", "9")) else "sz."
+    full_symbol = f"{prefix}{symbol}"
+    adjust_flag = {"qfq": "2", "hfq": "1", "": "3"}.get(adjust, "3")
+
+    try:
+        bs.login()
+        rs = bs.query_history_k_data_plus(
+            full_symbol,
+            "date,open,high,low,close,volume,amount,turn,pctChg",
+            start_date=start_date, end_date=end_date,
+            frequency="daily", adjustflag=adjust_flag,
+        )
+        if rs.error_code != "0":
+            bs.logout()
+            return pd.DataFrame()
+
+        rows = []
+        while rs.next():
+            rows.append(rs.get_row_data())
+        bs.logout()
+    except Exception:
+        return pd.DataFrame()
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows, columns=rs.fields)
+    numeric_cols = ["open", "high", "low", "close", "volume", "amount", "turn", "pctChg"]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # BaoStock volume is in 股, convert to 手
+    if "volume" in df.columns:
+        df["volume"] = df["volume"] / 100
+    # amount is already in 元
+
+    df = _rename_cols(df, {
+        "date": "date", "open": "open", "high": "high", "low": "low",
+        "close": "close", "volume": "volume", "amount": "money",
+        "pctChg": "pct_change", "turn": "turnover",
+    })
+
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"])
+        df.set_index("date", inplace=True)
+
+    if "price_change" not in df.columns:
+        df["price_change"] = 0
+
+    cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+    df = df[[c for c in cols if c in df.columns]]
+    return df
+
+
+# Data source priority chain — tried in order until one succeeds.
+_DATA_FETCHERS = [
+    ("eastmoney", _fetch_from_em),
+    ("tencent", _fetch_from_tencent),
+    ("sina", _fetch_from_sina),
+    ("baostock", _fetch_from_baostock),
+]
+
+
+def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
+    """Fetch daily OHLCV data from multiple sources with automatic fallback.
+
+    Tries data sources in priority order: EastMoney → Tencent → Sina → BaoStock.
+    Returns data from the first source that succeeds.
     """
     symbol = _code_to_akshare(code)
     is_idx = _is_index(code)
 
-    # Indices: canonical cache key excludes date range (full history is always fetched)
+    # Indices: canonical cache key excludes date range
     if is_idx:
         cache_key = (symbol, "index", adjust)
     else:
@@ -150,57 +354,97 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         with _cache_lock:
             df_cached = _cache.get(cache_key)
         if df_cached is not None:
-            # For index data cached without date range, slice to the requested window
             if is_idx and start_date and end_date:
                 return _slice_by_date(df_cached, start_date, end_date)
             return df_cached
 
-    try:
-        if is_idx:
-            # Indices: always download full history once and cache it all
-            prefix = "sh" if ".XSHG" in code else "sz"
+    start_str = _normalize_date(start_date)
+    end_str = _normalize_date(end_date)
+
+    # Index data: try EastMoney, Sina, then csindex
+    if is_idx:
+        prefix = "sh" if ".XSHG" in code else "sz"
+        try:
+            df = ak.stock_zh_index_daily_em(symbol=f"{prefix}{symbol}")
+        except Exception:
             try:
-                df = ak.stock_zh_index_daily_em(symbol=f"{prefix}{symbol}")
-            except Exception:
-                # Fallback to Sina source when EastMoney is unavailable
                 df = ak.stock_zh_index_daily(symbol=f"{prefix}{symbol}")
-        elif _is_etf(symbol):
-            df = ak.fund_etf_hist_em(
-                symbol=symbol, period="daily",
-                start_date=_normalize_date(start_date),
-                end_date=_normalize_date(end_date), adjust=adjust,
+            except Exception:
+                df = pd.DataFrame()
+
+        if not df.empty:
+            with _cache_lock:
+                _cache[cache_key] = df
+            return _slice_by_date(df, start_date, end_date) if start_date and end_date else df
+
+        # Try csindex
+        try:
+            df = ak.stock_zh_index_hist_csindex(
+                symbol=symbol, start_date=start_str, end_date=end_str,
             )
-        else:
-            df = ak.stock_zh_a_hist(
-                symbol=symbol, period="daily",
-                start_date=_normalize_date(start_date),
-                end_date=_normalize_date(end_date), adjust=adjust,
-            )
-    except Exception:
+            if not df.empty:
+                df = _rename_cols(df, {
+                    "日期": "date", "开盘": "open", "最高": "high", "最低": "low",
+                    "收盘": "close", "成交量": "volume", "成交金额": "money",
+                    "涨跌幅": "pct_change",
+                })
+                if "date" in df.columns:
+                    df["date"] = pd.to_datetime(df["date"])
+                    df.set_index("date", inplace=True)
+                for col in ["price_change", "turnover"]:
+                    if col not in df.columns:
+                        df[col] = 0
+                cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+                df = df[[c for c in cols if c in df.columns]]
+                with _cache_lock:
+                    _cache[cache_key] = df
+                return _slice_by_date(df, start_date, end_date)
+        except Exception:
+            pass
+
         return pd.DataFrame()
 
-    if df.empty:
-        return df
+    # ETF/Stock: try each source in priority order
+    for source_name, fetcher in _DATA_FETCHERS:
+        try:
+            if source_name == "baostock":
+                df = fetcher(symbol, start_str, end_str, adjust)
+            elif source_name == "tencent":
+                df = fetcher(symbol, start_str, end_str, adjust)
+            elif source_name == "sina":
+                df = fetcher(symbol, start_str, end_str, adjust)
+            elif source_name == "eastmoney":
+                if _is_etf(symbol):
+                    df = ak.fund_etf_hist_em(
+                        symbol=symbol, period="daily",
+                        start_date=start_str, end_date=end_str, adjust=adjust,
+                    )
+                else:
+                    df = ak.stock_zh_a_hist(
+                        symbol=symbol, period="daily",
+                        start_date=start_str, end_date=end_str, adjust=adjust,
+                    )
+            else:
+                df = pd.DataFrame()
 
-    df = _rename_cols(df, {
-        "日期": "date", "开盘": "open", "最高": "high", "最低": "low",
-        "收盘": "close", "成交量": "volume", "成交额": "money",
-        "涨跌幅": "pct_change", "涨跌额": "price_change", "换手率": "turnover",
-    })
+            if not df.empty:
+                if source_name == "eastmoney":
+                    df = _rename_cols(df, {
+                        "日期": "date", "开盘": "open", "最高": "high", "最低": "low",
+                        "收盘": "close", "成交量": "volume", "成交额": "money",
+                        "涨跌幅": "pct_change", "涨跌额": "price_change", "换手率": "turnover",
+                    })
+                    if "date" in df.columns:
+                        df["date"] = pd.to_datetime(df["date"])
+                        df.set_index("date", inplace=True)
 
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"])
-        df.set_index("date", inplace=True)
+                with _cache_lock:
+                    _cache[cache_key] = df
+                return df
+        except Exception:
+            continue
 
-    # Store the full frame under the canonical key (thread-safe)
-    with _cache_lock:
-        _cache[cache_key] = df
-
-    # Slice to the requested window before returning
-    if is_idx and start_date and end_date:
-        return _slice_by_date(df, start_date, end_date)
-
-    return df
+    return pd.DataFrame()
 
 
 def get_price(security, start_date=None, end_date=None, frequency: str = "daily",

@@ -2,12 +2,12 @@
  * Sidebar — left icon-strip navigation.
  * Shows nav items + bottom theme toggle.
  */
-import { Code2, GitCompare, History, SunMoon } from "lucide-react";
+import { Code2, Database, GitCompare, History, SunMoon } from "lucide-react";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme } from "../hooks/useTheme";
 
 type NavItem = {
-  id: "editor" | "history" | "compare";
+  id: "editor" | "history" | "data" | "compare";
   icon: React.ReactNode;
   label: string;
 };
@@ -15,21 +15,25 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { id: "editor",  icon: <Code2  size={18} />, label: "策略编辑器 (Editor)" },
   { id: "history", icon: <History size={18} />, label: "回测历史 (⌘K ⌘H)" },
+  { id: "data",    icon: <Database size={18} />, label: "数据管理 (Data)" },
   { id: "compare", icon: <GitCompare size={18} />, label: "指标对比 (⌘K ⌘C)" },
 ];
 
 export function Sidebar() {
   const showHistory = useEditorStore((s) => s.showHistory);
   const showCompare = useEditorStore((s) => s.showCompare);
+  const showData = useEditorStore((s) => s.showData);
   const setShowHistory = useEditorStore((s) => s.setShowHistory);
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
+  const setShowData = useEditorStore((s) => s.setShowData);
   const { theme, setTheme } = useTheme();
 
-  const active = showHistory ? "history" : showCompare ? "compare" : "editor";
+  const active = showHistory ? "history" : showCompare ? "compare" : showData ? "data" : "editor";
 
   function handleNav(id: NavItem["id"]) {
     setShowHistory(id === "history");
     setShowCompare(id === "compare");
+    setShowData(id === "data");
   }
 
   function cycleTheme() {
@@ -54,7 +58,8 @@ export function Sidebar() {
         paddingTop: 8,
         paddingBottom: 8,
         gap: 4,
-        zIndex: 10,
+        position: "relative",
+        zIndex: 100,
       }}
     >
       {/* Brand mark */}

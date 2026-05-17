@@ -173,6 +173,7 @@ function RunRow({
         cursor: "pointer",
         transition: "background 0.15s",
       }}
+      onClick={run.status === "succeeded" ? onOpenReport : undefined}
       onMouseEnter={(e) => {
         if (!selected) (e.currentTarget.style.background = "var(--card-hover)");
       }}
