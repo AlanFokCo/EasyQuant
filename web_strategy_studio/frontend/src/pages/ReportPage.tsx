@@ -239,7 +239,7 @@ export default function ReportPage() {
           <iframe
             title="回测 HTML 报告"
             src={reportSrc}
-            sandbox="allow-scripts allow-same-origin allow-downloads"
+            sandbox="allow-scripts"
             style={{
               width: "100%",
               height: "100%",
