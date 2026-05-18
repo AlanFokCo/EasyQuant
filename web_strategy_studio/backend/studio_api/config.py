@@ -42,7 +42,11 @@ class Settings(BaseSettings):
     idempotency_ttl_sec: int = 86400
     # B17/B18: concurrency cap (max simultaneous backtest subprocesses)
     max_concurrent_runs: int = 2
-    # B18: per-IP rate limit for POST /runs
+    # B18: per-IP rate limit for POST /runs.
+    # HIGH-17: these counters are stored in-memory in a single Python dict.
+    # They are NOT shared across multiple workers or pods.
+    # Multi-worker (e.g. gunicorn --workers N) or multi-pod deployments need a
+    # shared backend such as Redis; that is currently NOT implemented.
     rate_limit_runs_per_window: int = 10
     rate_limit_window_sec: int = 300  # 5 minutes
     # B6: SSE ring buffer retention (seconds) after a run reaches terminal state
