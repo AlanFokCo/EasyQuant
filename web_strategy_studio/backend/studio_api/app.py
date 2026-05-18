@@ -15,12 +15,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import Depends
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 
 from studio_api import auth as auth_mod
 from studio_api.config import settings
-from studio_api.db import SessionLocal, init_db
+from studio_api.db import get_session, SessionLocal, init_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from studio_api.models import User
 from studio_api.routers import completion, health, runs, strategies
 from studio_api.routers import format as fmt
@@ -168,42 +168,27 @@ async def validation_handler(request, exc: RequestValidationError):
 
 reports_root = settings.artifact_dir / "reports"
 reports_root.mkdir(parents=True, exist_ok=True)
-app.mount("/static/reports", StaticFiles(directory=str(reports_root)), name="reports")
 
 
-@app.middleware("http")
-async def csp_for_reports(request: Request, call_next):
-    """HIGH-14: Attach Content-Security-Policy to /static/reports responses."""
-    response = await call_next(request)
-    if request.url.path.startswith("/static/reports/"):
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; script-src 'unsafe-inline'; "
-            "style-src 'unsafe-inline'; img-src data: blob:; "
-            "font-src data:; sandbox allow-scripts"
-        )
-    return response
-
-
-# HIGH-15: Authenticated report file endpoint
+# HIGH-15: Authenticated report file endpoints (HTML)
 @app.get("/api/v1/reports/{run_id}/report.html")
 async def get_report_html(
     run_id: str,
     current_user: User = Depends(auth_mod.get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """Serve report HTML only to the run owner (HIGH-15)."""
-    # Verify ownership via Strategy relationship
     from sqlalchemy import select
     from studio_api.models import Run, Strategy
 
-    async with SessionLocal() as session:
-        result = await session.execute(
-            select(Run, Strategy.owner_id)
-            .join(Strategy, Run.strategy_id == Strategy.id)
-            .where(Run.id == run_id)
-        )
-        row = result.first()
-        if row is None or row.owner_id != current_user.id:
-            return Response(status_code=404)
+    result = await session.execute(
+        select(Run, Strategy.owner_id)
+        .join(Strategy, Run.strategy_id == Strategy.id)
+        .where(Run.id == run_id)
+    )
+    row = result.first()
+    if row is None or row.owner_id != current_user.id:
+        return Response(status_code=404)
 
     file_path = reports_root / run_id / "report.html"
     if not file_path.is_file():
@@ -211,6 +196,39 @@ async def get_report_html(
 
     # HIGH-14: CSP header on report content
     resp = FileResponse(str(file_path), media_type="text/html")
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'none'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "font-src 'self' data:; connect-src 'self'; sandbox allow-scripts"
+    )
+    return resp
+
+
+# HIGH-15: Authenticated report file endpoints (JSON)
+@app.get("/api/v1/reports/{run_id}/report.json")
+async def get_report_json(
+    run_id: str,
+    current_user: User = Depends(auth_mod.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Serve report JSON only to the run owner (HIGH-15)."""
+    from sqlalchemy import select
+    from studio_api.models import Run, Strategy
+
+    result = await session.execute(
+        select(Run, Strategy.owner_id)
+        .join(Strategy, Run.strategy_id == Strategy.id)
+        .where(Run.id == run_id)
+    )
+    row = result.first()
+    if row is None or row.owner_id != current_user.id:
+        return Response(status_code=404)
+
+    file_path = reports_root / run_id / "report.json"
+    if not file_path.is_file():
+        return Response(status_code=404)
+
+    resp = FileResponse(str(file_path), media_type="application/json")
     resp.headers["Content-Security-Policy"] = (
         "default-src 'none'; script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "

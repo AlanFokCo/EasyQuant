@@ -1,13 +1,14 @@
 /**
  * ReportPage — standalone route for /runs/:run_id/report.
  * Opens a backtest HTML report in a full-page iframe.
- * URL can be pasted into a fresh browser tab and renders standalone.
+ * The iframe uses a blob URL (fetch-then-createObjectURL) so the JWT token
+ * is sent via an Authorization header rather than being exposed in the URL.
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ExternalLink, ArrowLeft, Copy, Check } from "lucide-react";
 
-import { apiJson, resolveArtifactUrl } from "../api/client";
+import { apiJson, getToken, resolveArtifactUrl } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 type RunInfo = {
   run_id: string;
@@ -86,12 +87,44 @@ export default function ReportPage() {
     return () => { cancelled = true; };
   }, [run_id]);
 
-  const reportSrc = (() => {
+  const reportApiUrl = (() => {
     if (!run_id) return undefined;
     const fromInfo = (runInfo as (RunInfo & { html_report_url?: string }) | null)?.html_report_url;
     if (fromInfo) return resolveArtifactUrl(fromInfo);
-    return resolveArtifactUrl(`/static/reports/${run_id}/report.html`);
+    return resolveArtifactUrl(`/api/v1/reports/${run_id}/report.html`);
   })();
+
+  // Blob URL for the iframe — fetch with Authorization header so the JWT token
+  // is never exposed in the src attribute or referer logs.
+  const [blobSrc, setBlobSrc] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!reportApiUrl) return;
+    let objectUrl: string | undefined;
+    let cancelled = false;
+
+    async function loadBlob() {
+      try {
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(reportApiUrl!, { headers });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (!cancelled) {
+          objectUrl = URL.createObjectURL(blob);
+          setBlobSrc(objectUrl);
+        }
+      } catch {
+        // Silently ignore — the "no report" message will be shown
+      }
+    }
+
+    loadBlob();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [reportApiUrl]);
 
   function copyShareLink() {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -208,12 +241,18 @@ export default function ReportPage() {
             {copied ? "已复制" : "分享链接"}
           </button>
 
-          {/* Open in new tab */}
-          {reportSrc && (
+          {/* Open in new tab — append ?token= so the request carries auth (SSE pattern) */}
+          {reportApiUrl && (
             <button
               type="button"
               aria-label="在新标签页打开报告"
-              onClick={() => window.open(reportSrc, "_blank", "noopener,noreferrer")}
+              onClick={() => {
+                const token = getToken();
+                const url = token
+                  ? `${reportApiUrl}?token=${encodeURIComponent(token)}`
+                  : reportApiUrl;
+                window.open(url, "_blank", "noopener,noreferrer");
+              }}
               style={btnGhost}
             >
               <ExternalLink size={14} />
@@ -233,12 +272,12 @@ export default function ReportPage() {
         </div>
       </header>
 
-      {/* Report iframe */}
+      {/* Report iframe — rendered from a blob URL to avoid exposing the JWT in src */}
       <div style={{ flex: 1, minHeight: 0 }}>
-        {reportSrc ? (
+        {blobSrc ? (
           <iframe
             title="回测 HTML 报告"
-            src={reportSrc}
+            src={blobSrc}
             sandbox="allow-scripts"
             style={{
               width: "100%",

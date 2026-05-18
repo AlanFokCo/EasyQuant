@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import type { IChartApi } from "lightweight-charts";
 
-import { resolveArtifactUrl } from "../api/client";
+import { resolveArtifactUrl, getToken } from "../api/client";
 
 type ReportData = {
   summary: {
@@ -94,7 +94,10 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
         const apiUrl = jsonUrl || `/api/v1/runs/${runId}/report/data`;
         const url = resolveArtifactUrl(apiUrl);
         if (!url) throw new Error("Invalid report URL");
-        const res = await fetch(url);
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(url, { headers });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (!cancelled) {
