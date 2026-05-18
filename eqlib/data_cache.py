@@ -441,7 +441,10 @@ class PreloadedData:
 
         if current_dt is not None:
             ts = pd.Timestamp(current_dt)
-            result = ind_df.loc[:ts]
+            # Strict less-than: exclude today's bar to prevent look-ahead bias
+            # (consistent with data.py:564-567).
+            cutoff = ts.normalize()
+            result = ind_df[ind_df.index < cutoff]
         else:
             result = ind_df
 
@@ -470,8 +473,11 @@ class PreloadedData:
 
         if current_dt is not None:
             ts = pd.Timestamp(current_dt)
+            # Strict less-than: exclude today's bar to prevent look-ahead bias
+            # (consistent with data.py:564-567).
+            cutoff = ts.normalize()
             result = pd.DataFrame(
-                {f: sec_data[f].loc[:ts] for f in available}
+                {f: sec_data[f][sec_data[f].index < cutoff] for f in available}
             )
         else:
             result = pd.DataFrame(

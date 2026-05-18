@@ -74,6 +74,7 @@ class PatchStrategyBody(BaseModel):
     source_code: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
+    expected_version: Optional[int] = None
 
 
 class SnapshotBody(BaseModel):

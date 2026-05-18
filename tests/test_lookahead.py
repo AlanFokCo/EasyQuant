@@ -336,3 +336,97 @@ class TestBlocker5OrderMix:
             order_target("601390", 200)
         # After exception, the first order should still be in the queue
         assert len(self._sess._pending_orders) == 1
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PR-C: PreloadedData.get_history and get_indicators must not return today's bar
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestPreloadedDataNoLookahead:
+    """Direct tests for PreloadedData.get_history and get_indicators (PR-C).
+
+    These are public methods of PreloadedData.  Previously they used
+    loc[:ts] (closed interval) which included today's bar — look-ahead bias.
+    The fix uses strict < cutoff consistent with data.py:564-567.
+    """
+
+    def _make_pre_with_indicators(self):
+        """Return a PreloadedData with 2-day OHLCV + fake indicators."""
+        import datetime
+        from eqlib.data_cache import PreloadedData
+
+        yesterday = datetime.date(2024, 1, 3)
+        today = datetime.date(2024, 1, 4)
+
+        pre = PreloadedData()
+        idx = pd.DatetimeIndex([pd.Timestamp(yesterday), pd.Timestamp(today)])
+
+        # _field_series for get_history
+        close_s = pd.Series([100.0, 999.0], index=idx)
+        volume_s = pd.Series([1000.0, 9999.0], index=idx)
+        pre._field_series["600519"] = {"close": close_s, "volume": volume_s}
+
+        # _indicators for get_indicators
+        ind_df = pd.DataFrame(
+            {"sma5": [10.0, 99.0], "rsi14": [50.0, 77.0]},
+            index=idx,
+        )
+        pre._indicators["600519"] = ind_df
+
+        return pre, yesterday, today
+
+    def test_get_history_does_not_return_today_bar(self):
+        """get_history at 09:30 today must not include today's close."""
+        pre, yesterday, today = self._make_pre_with_indicators()
+        current_dt = datetime.datetime(today.year, today.month, today.day, 9, 30)
+
+        result = pre.get_history("600519", 5, ["close", "volume"], current_dt)
+
+        assert result is not None
+        assert not result.empty
+        # Only yesterday should appear; today (close=999) must be excluded
+        assert 999.0 not in result["close"].values, (
+            "get_history returned today's close (999) — look-ahead bias in get_history"
+        )
+        assert result.iloc[-1]["close"] == 100.0
+
+    def test_get_history_returns_none_for_unknown_security(self):
+        """get_history on an unknown security returns None."""
+        pre, _y, today = self._make_pre_with_indicators()
+        result = pre.get_history("UNKNOWN", 5, ["close"], today)
+        assert result is None
+
+    def test_get_indicators_does_not_return_today_bar(self):
+        """get_indicators at 09:30 today must not include today's indicators."""
+        pre, yesterday, today = self._make_pre_with_indicators()
+        current_dt = datetime.datetime(today.year, today.month, today.day, 9, 30)
+
+        result = pre.get_indicators("600519", 5, current_dt)
+
+        assert result is not None
+        assert not result.empty
+        # Today's sma5=99 and rsi14=77 must be excluded
+        assert 99.0 not in result["sma5"].values, (
+            "get_indicators returned today's sma5 (99) — look-ahead bias in get_indicators"
+        )
+        assert result.iloc[-1]["sma5"] == 10.0
+
+    def test_get_indicators_returns_none_for_unknown_security(self):
+        """get_indicators on a security with no indicator data returns None."""
+        pre, _y, today = self._make_pre_with_indicators()
+        result = pre.get_indicators("UNKNOWN", 5, today)
+        assert result is None
+
+    def test_get_history_no_current_dt_returns_all(self):
+        """Without a current_dt filter, get_history returns all available bars."""
+        pre, _y, _t = self._make_pre_with_indicators()
+        result = pre.get_history("600519", 10, ["close"], None)
+        assert result is not None
+        assert len(result) == 2
+
+    def test_get_indicators_no_current_dt_returns_all(self):
+        """Without a current_dt filter, get_indicators returns all available rows."""
+        pre, _y, _t = self._make_pre_with_indicators()
+        result = pre.get_indicators("600519", 10, None)
+        assert result is not None
+        assert len(result) == 2
