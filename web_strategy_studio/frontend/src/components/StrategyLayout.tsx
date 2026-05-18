@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { apiJson, getToken, resolveArtifactUrl } from "../api/client";
+import { apiJson, resolveArtifactUrl } from "../api/client";
 import { useRunStream } from "../hooks/useRunStream";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme, monacoThemeName } from "../hooks/useTheme";
@@ -593,11 +593,7 @@ export function StrategyLayout() {
                     cursor: "pointer",
                   }}
                   onClick={() => {
-                    const token = getToken();
-                    const url = token
-                      ? `${reportOpenUrl}?token=${encodeURIComponent(token)}`
-                      : reportOpenUrl;
-                    window.open(url, "_blank", "noopener,noreferrer");
+                    window.open(`/runs/${runIdStore}/report`, "_blank", "noopener,noreferrer");
                   }}
                 >
                   新标签打开报告
