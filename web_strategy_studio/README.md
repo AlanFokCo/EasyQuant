@@ -189,6 +189,19 @@ docker compose -f web_strategy_studio/docker-compose.yml up -d
 - **严格模式 mypy**：`lint` 的 `profile=strict` 尚未接 mypy。
 - **前端 ESLint**：未配置；使用 `npm run lint`（`tsc --noEmit`）做类型检查。
 
+## 生产 / 多人部署建议
+
+**数据库**：默认使用 SQLite，已启用 WAL 模式（`PRAGMA journal_mode=WAL`）以提升并发读取性能。
+生产/多人部署推荐 Postgres：
+
+```bash
+EQ_STUDIO_DATABASE_URL=postgresql+asyncpg://user:password@host:5432/dbname
+```
+
+需先安装 asyncpg：`pip install asyncpg`。
+
+**限流**：当前限流计数器仅驻留内存（单进程），多 worker / 多 pod 部署需配置 Redis 共享后端（暂未实现）。
+
 ## 相关文档
 
 - [Design Spec — Web 策略工作室](../doc/design_spec_web_strategy_studio.md)

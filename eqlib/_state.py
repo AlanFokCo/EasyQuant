@@ -81,16 +81,25 @@ class BacktestSession:
 # ── Thread-local session management ───────────────────────────────────────────
 
 _thread_local = threading.local()
-_global_session = BacktestSession()   # fallback for single-threaded use
+# MED-25: lazy initialization — avoid instantiating BacktestSession at import
+# time.  The global session is created on first access via get_session().
+_global_session: "BacktestSession | None" = None
 
 
 def get_session() -> BacktestSession:
     """Return the active BacktestSession for the current thread.
 
     Returns the thread-local session when one has been registered via
-    :func:`_set_session`, otherwise returns the module-level global session.
+    :func:`_set_session`, otherwise returns (lazily creating) the module-level
+    global session.
     """
-    return getattr(_thread_local, 'session', _global_session)
+    global _global_session
+    sess = getattr(_thread_local, 'session', None)
+    if sess is not None:
+        return sess
+    if _global_session is None:
+        _global_session = BacktestSession()
+    return _global_session
 
 
 def _set_session(session: BacktestSession):
