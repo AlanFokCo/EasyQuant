@@ -24,8 +24,10 @@ def test_no_eager_instantiation_in_source():
         "Found eager BacktestSession() call before get_session() definition — "
         "MED-25 lazy init is broken"
     )
-    assert "_global_session = None" in before_get_session or \
-        "_global_session: " in before_get_session, (
+    assert (
+        "_global_session = None" in before_get_session
+        or "_global_session: " in before_get_session
+    ), (
         "_global_session should be initialized to None (lazy)"
     )
 

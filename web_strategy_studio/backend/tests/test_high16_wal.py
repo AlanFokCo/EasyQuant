@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import tempfile
 
 import pytest
 
@@ -25,10 +24,7 @@ def test_wal_mode_enabled_on_init(sqlite_db_path):
     os.environ["EQ_STUDIO_DATABASE_URL"] = db_url
     os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_test_wal")
 
-    # Re-import to pick up the new DATABASE_URL
-    import importlib
     import studio_api.config as cfg
-    import studio_api.db as db_mod
 
     cfg.settings.database_url = db_url
 
