@@ -91,6 +91,7 @@ export function StrategyLayout() {
     end_date: "2024-03-31",
     starting_cash: 100000,
     benchmark: "000300.XSHG",
+    universe: [] as string[],
     use_local: true,
   });
   const setDirty = useEditorStore((s) => s.setDirty);
@@ -304,6 +305,9 @@ export function StrategyLayout() {
           source_code: source,
           params: {
             ...params,
+            // Map universe → securities (backend field name); omit if empty
+            securities: params.universe.length > 0 ? params.universe : undefined,
+            universe: undefined,
             strategy_params: lintParams.length > 0 ? { ...paramValues } : undefined,
           },
         }),
@@ -325,7 +329,6 @@ export function StrategyLayout() {
   useEffect(() => {
     if (doneStatus === "succeeded") {
       addToast("success", "回测已完成，可在历史记录中查看报告");
-      setReportOpen(true);
     } else if (doneStatus === "failed") {
       addToast("error", "回测失败，请查看下方日志");
     }
@@ -464,15 +467,78 @@ export function StrategyLayout() {
             />
           </label>
 
-          {/* HIGH-21: Stock picker */}
+          {/* PR-1: Benchmark picker (single) */}
           <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
-            股票代码
+            基准指数
             <StockPicker
               value={params.benchmark}
               onChange={(code) => setParams((p) => ({ ...p, benchmark: code }))}
-              placeholder="搜索股票代码/名称"
+              placeholder="默认 000300.XSHG（沪深 300）"
             />
           </label>
+
+          {/* PR-1: Universe (multi-stock pool) */}
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ color: "var(--text-secondary)", marginBottom: 4 }}>
+              股票池（可选）
+            </div>
+            {params.universe.length === 0 && (
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>
+                留空表示使用策略源码里的 # @param security
+              </div>
+            )}
+            {params.universe.map((code, idx) => (
+              <div key={idx} style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <StockPicker
+                    value={code}
+                    onChange={(c) =>
+                      setParams((p) => {
+                        const u = [...p.universe];
+                        u[idx] = c;
+                        return { ...p, universe: u };
+                      })
+                    }
+                    placeholder="搜索股票代码/名称"
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-label={`删除第 ${idx + 1} 只股票`}
+                  onClick={() =>
+                    setParams((p) => ({ ...p, universe: p.universe.filter((_, i) => i !== idx) }))
+                  }
+                  style={{
+                    flexShrink: 0,
+                    padding: "2px 6px",
+                    background: "transparent",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-dim)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setParams((p) => ({ ...p, universe: [...p.universe, ""] }))}
+              style={{
+                padding: "2px 8px",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              + 添加股票
+            </button>
+          </div>
 
           <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
             starting_cash
