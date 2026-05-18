@@ -6,11 +6,11 @@ See ``studio_api/runner.py`` for the protocol and implementations.
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
 from studio_api.runner import (
     _PROGRESS_RE,
     _estimate_trading_fraction,
+)
+from studio_api.runner import (
     execute_backtest as _runner_execute,
 )
 

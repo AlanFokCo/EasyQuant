@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Any, Dict, List, Optional
 
-import re
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
-
 from eqlib import data_cache as dc
-from studio_api.models import User
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from studio_api import auth as auth_mod
+from studio_api.models import User
 
 router = APIRouter(prefix="/api/v1", tags=["data"])
 

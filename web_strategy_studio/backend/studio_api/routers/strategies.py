@@ -12,10 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from studio_api import auth as auth_mod
 from studio_api.config import settings
 from studio_api.db import get_session
 from studio_api.models import Strategy, StrategyVersion, User
-from studio_api import auth as auth_mod
 from studio_api.schemas import (
     CreateStrategyBody,
     PatchStrategyBody,

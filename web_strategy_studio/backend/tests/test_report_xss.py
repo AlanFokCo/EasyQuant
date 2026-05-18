@@ -100,6 +100,7 @@ def test_report_page_iframe_sandbox():
 def test_report_escapes_xss_in_trade_log():
     """Trade log entries with HTML must be escaped in generated HTML."""
     import html
+
     from eqlib.report import generate_html_report
 
     # Create a minimal fake result dict
@@ -155,7 +156,6 @@ def test_report_escapes_xss_in_trade_log():
 
 def test_report_escapes_xss_in_trade_date():
     """Trade date with HTML must be escaped."""
-    import html
     from eqlib.report import generate_html_report
 
     class FakePortfolio:
@@ -207,7 +207,6 @@ def test_report_escapes_xss_in_trade_date():
 
 def test_report_escapes_xss_in_positions():
     """Position security codes with HTML must be escaped."""
-    import html
     from eqlib.report import generate_html_report
 
     class FakePosition:

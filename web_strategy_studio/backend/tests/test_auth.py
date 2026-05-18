@@ -1,17 +1,16 @@
 """Tests for BLOCKER-7 (auth + JWT)."""
 
 import datetime
-import os
-import pytest
 
 import jwt
+import pytest
 
 
 class TestJwtToken:
     """Test JWT token creation and verification."""
 
     def test_create_and_decode_token(self):
-        from studio_api.auth import create_access_token, decode_access_token, JWT_SECRET
+        from studio_api.auth import create_access_token, decode_access_token
 
         user_id = "user_test"
         token = create_access_token(user_id, expires_minutes=60)
@@ -19,7 +18,7 @@ class TestJwtToken:
         assert payload["sub"] == user_id
 
     def test_expired_token_raises(self):
-        from studio_api.auth import JWT_SECRET, JWT_ALGORITHM
+        from studio_api.auth import JWT_ALGORITHM, JWT_SECRET
 
         # Create an already-expired token
         exp = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)

@@ -27,12 +27,13 @@ os.environ.setdefault(
 def client():
     # test_auth.py modifies db_mod.engine to a temp file-based DB.
     # Reset to a fresh in-memory DB so our tests are isolated from that.
-    import studio_api.db as db_mod
     from sqlalchemy.ext.asyncio import (
         AsyncSession,
         async_sessionmaker,
         create_async_engine,
     )
+
+    import studio_api.db as db_mod
 
     new_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     db_mod.engine = new_engine
@@ -46,6 +47,7 @@ def client():
     rate_limiter._hits.clear()
 
     from fastapi.testclient import TestClient
+
     from studio_api.app import app
 
     with TestClient(app, raise_server_exceptions=False) as c:

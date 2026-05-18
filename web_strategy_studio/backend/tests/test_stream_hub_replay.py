@@ -215,6 +215,7 @@ async def _test_evict(hub):
 def test_max_buffers_cap():
     """StreamHub should evict oldest non-terminal buffer when cap exceeded."""
     import asyncio
+
     from studio_api.stream_hub import StreamHub
 
     hub = StreamHub(max_buffers=3)
@@ -231,6 +232,7 @@ def test_max_buffers_cap():
 def test_terminal_buffers_not_evicted():
     """Buffers with terminal events should not be evicted."""
     import asyncio
+
     from studio_api.stream_hub import StreamHub
 
     hub = StreamHub(max_buffers=3)
