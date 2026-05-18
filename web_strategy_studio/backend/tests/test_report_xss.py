@@ -51,17 +51,23 @@ def auth_token_other(client):
     return reg.json()["access_token"]
 
 
-# ── HIGH-14: CSP headers on report static files ─────────────────────────────
+# ── HIGH-14 / HIGH-15: Static mount is gone ──────────────────────────────────
 
 
-def test_report_static_files_get_csp_header(client):
-    """Even if the file doesn't exist, the response should carry CSP headers."""
-    # Hit the static file path — CSP must be present
-    r = client.get("/static/reports/nonexistent/report.html")
-    # Even 404 responses from the static mount should carry CSP
-    csp = r.headers.get("Content-Security-Policy")
-    assert csp is not None, "Static report files must have CSP header"
-    assert "sandbox" in csp or "default-src" in csp
+def test_report_static_mount_removed(client):
+    """The unauthenticated /static/reports/ mount must be removed (HIGH-15)."""
+    # Create a real file to prove the static mount can't serve it
+    from studio_api.app import reports_root
+
+    probe_dir = reports_root / "xss_probe_run"
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    (probe_dir / "report.html").write_text("<html>probe</html>")
+
+    r = client.get("/static/reports/xss_probe_run/report.html")
+    assert r.status_code == 404, (
+        "/static/reports/ must be inaccessible — the unauthenticated static mount "
+        f"should be removed. Got HTTP {r.status_code}."
+    )
 
 
 # ── HIGH-14: iframe sandbox attribute ────────────────────────────────────────

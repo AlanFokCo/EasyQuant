@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useMemo } from "react";
 
-import { resolveArtifactUrl } from "../api/client";
+import { resolveArtifactUrl, getToken } from "../api/client";
 import ReportViewer from "./ReportViewer";
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
 
 export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
   const jsonUrl = useMemo(() => {
-    if (runId) return `/static/reports/${runId}/report.json`;
+    if (runId) return `/api/v1/reports/${runId}/report.json`;
     // Derive from htmlUrl if available
     if (htmlUrl) return htmlUrl.replace(/\.html$/, ".json");
     return undefined;
@@ -56,7 +56,15 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
               <button
                 type="button"
                 style={ghost}
-                onClick={() => window.open(resolveArtifactUrl(htmlUrl), "_blank", "noopener,noreferrer")}
+                onClick={() => {
+                  const resolved = resolveArtifactUrl(htmlUrl);
+                  if (!resolved) return;
+                  const token = getToken();
+                  const url = token
+                    ? `${resolved}?token=${encodeURIComponent(token)}`
+                    : resolved;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }}
               >
                 新标签打开
               </button>

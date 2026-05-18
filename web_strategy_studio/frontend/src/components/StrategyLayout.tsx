@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { apiJson, resolveArtifactUrl } from "../api/client";
+import { apiJson, getToken, resolveArtifactUrl } from "../api/client";
 import { useRunStream } from "../hooks/useRunStream";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme, monacoThemeName } from "../hooks/useTheme";
@@ -313,7 +313,7 @@ export function StrategyLayout() {
   const reportOpenUrl = useMemo(() => {
     const fromApi = resolveArtifactUrl(artifacts?.html_report_url ?? undefined);
     if (fromApi) return fromApi;
-    if (runIdStore) return resolveArtifactUrl(`/static/reports/${runIdStore}/report.html`);
+    if (runIdStore) return resolveArtifactUrl(`/api/v1/reports/${runIdStore}/report.html`);
     return undefined;
   }, [artifacts?.html_report_url, runIdStore]);
 
@@ -592,7 +592,13 @@ export function StrategyLayout() {
                     fontSize: 13,
                     cursor: "pointer",
                   }}
-                  onClick={() => window.open(reportOpenUrl, "_blank", "noopener,noreferrer")}
+                  onClick={() => {
+                    const token = getToken();
+                    const url = token
+                      ? `${reportOpenUrl}?token=${encodeURIComponent(token)}`
+                      : reportOpenUrl;
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  }}
                 >
                   新标签打开报告
                 </button>
