@@ -250,12 +250,13 @@ class TestGetPrevTradingDay:
         dates = pd.bdate_range(start="2020-01-01", periods=1000)
         pre = PreloadedData()
         pre._dates = pd.DatetimeIndex(dates)
-        # Query near the middle so we exercise the real binary-search path
-        query_day = dates[500].date()
+        # Vary query dates across the whole range to avoid CPU branch-prediction
+        # artefacts that a single repeated query would introduce.
+        query_dates = [dates[i % len(dates)].date() for i in range(1000)]
 
         t0 = time.perf_counter()
-        for _ in range(1000):
-            pre.get_prev_trading_day(query_day)
+        for d in query_dates:
+            pre.get_prev_trading_day(d)
         elapsed_ms = (time.perf_counter() - t0) * 1000
 
         assert elapsed_ms < 50, (

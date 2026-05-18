@@ -209,9 +209,11 @@ class TestHigh12Suspended:
         # Order must be skipped regardless of the option
         assert "600519" not in portfolio.positions
 
-        # A warning must have been emitted mentioning the security and "no bar"
+        # A warning must have been emitted mentioning the security — either the
+        # "no open price" guard (which fires first when the bar is absent) or
+        # the "has no bar" suspension check.
         warning_calls = [str(call) for call in mock_warn.call_args_list]
         assert any(
             "600519" in c and ("no bar" in c or "no open price" in c)
             for c in warning_calls
-        ), f"Expected a 'no bar' warning for 600519, got: {warning_calls}"
+        ), f"Expected a skip warning for 600519 (no bar / no open price), got: {warning_calls}"
