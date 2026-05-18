@@ -11,7 +11,6 @@ Verifies that:
 from __future__ import annotations
 
 import os
-import time
 
 import pytest
 
@@ -22,6 +21,7 @@ os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_test_optlock")
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
+
     import studio_api.config as _cfg
     from studio_api.app import app
 

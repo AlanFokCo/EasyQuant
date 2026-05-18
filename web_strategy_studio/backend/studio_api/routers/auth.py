@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
-from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from studio_api import auth as auth_mod
 from studio_api.db import get_session
 from studio_api.models import User
-from studio_api import auth as auth_mod
 from studio_api.schemas import api_error
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
