@@ -411,10 +411,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         if exec_prices is None and action in ("ORDER_VALUE", "ORDER_TARGET_VALUE"):
             preloaded = _get_preloaded()
             if preloaded is not None and preloaded._dates is not None:
-                prev_dates = [pd.Timestamp(d).date() for d in preloaded._dates
-                              if pd.Timestamp(d).date() < day]
-                if prev_dates:
-                    prev_close = _get_price_fast(security, max(prev_dates))
+                prev_day = preloaded.get_prev_trading_day(day)
+                if prev_day is not None:
+                    prev_close = _get_price_fast(security, prev_day)
                     if prev_close and prev_close > 0:
                         gap_ratio = base_price / prev_close
                         if gap_ratio > 1.1 or gap_ratio < 0.9:
@@ -435,14 +434,11 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             # Live/paper trading: use a large nominal volume for VolumeSlippage
             vol = (vol if (vol is not None and vol > 0) else 1e9)
         elif vol is None:
-            if treat_missing_as_suspended:
-                log.warn(f"fill_pending: {security} has no bar on {day} (likely suspended) — order skipped")
-                continue
-            vol = 0.0
-        elif vol == 0:
-            if treat_missing_as_suspended:
-                log.warn(f"fill_pending: {security} volume=0 on {day} (appears suspended) — order skipped")
-                continue
+            log.warn(f"fill_pending: {security} has no bar on {day} — order skipped")
+            continue
+        elif vol == 0 and treat_missing_as_suspended:
+            log.warn(f"fill_pending: {security} volume=0 on {day} (appears suspended) — order skipped")
+            continue
 
         # ── Price-limit check (optional, A-share circuit breaker) ─────────
         # Enabled via set_option('check_price_limit', True).
@@ -453,9 +449,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             prev_day_date = None
             preloaded = _get_preloaded()
             if preloaded is not None and preloaded._dates is not None:
-                dates = [pd.Timestamp(d).date() for d in preloaded._dates if pd.Timestamp(d).date() < day]
-                if dates:
-                    prev_day_date = max(dates)
+                prev_day_date = preloaded.get_prev_trading_day(day)
             if prev_day_date is not None:
                 prev_close = _get_price_fast(security, prev_day_date)
                 if prev_close:

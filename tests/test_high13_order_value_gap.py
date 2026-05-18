@@ -3,12 +3,16 @@
 When today's open price is more than 10% above or below yesterday's close,
 the engine logs a warning suggesting the caller use order() with explicit
 share counts instead of value-based orders.
+
+Also contains unit tests and a performance benchmark for
+``PreloadedData.get_prev_trading_day`` (HIGH-13 O(N) elimination).
 """
 
 from __future__ import annotations
 
 import datetime
 import logging
+import time
 import pytest
 
 
@@ -179,4 +183,82 @@ class TestHigh13OrderValueGap:
         gap_warnings = [m for m in caplog.messages if "gap" in m.lower()]
         assert not gap_warnings, (
             f"order() should not emit gap warnings, got: {gap_warnings}"
+        )
+
+
+# ── HIGH-13 performance: PreloadedData.get_prev_trading_day ──────────────────
+
+class TestGetPrevTradingDay:
+    """Unit tests + perf benchmark for PreloadedData.get_prev_trading_day."""
+
+    def _make_preloaded(self, n_days: int = 10):
+        """Return a PreloadedData whose _dates spans *n_days* starting 2024-01-01."""
+        import pandas as pd
+        from eqlib.data_cache import PreloadedData
+
+        dates = pd.bdate_range(start="2024-01-01", periods=n_days)
+        pre = PreloadedData()
+        pre._dates = pd.DatetimeIndex(dates)
+        return pre
+
+    def test_normal_day_returns_previous(self):
+        """A date present in _dates → returns the immediately preceding date."""
+        pre = self._make_preloaded(10)
+        dates = list(pre._dates.date)  # e.g. [2024-01-01, 2024-01-02, ...]
+        # Pick the third date; the previous trading day must be the second date.
+        result = pre.get_prev_trading_day(dates[2])
+        assert result == dates[1], f"Expected {dates[1]}, got {result}"
+
+    def test_day_before_first_returns_none(self):
+        """A date before the first entry → returns None."""
+        pre = self._make_preloaded(10)
+        first = pre._dates[0].date()
+        before = first - datetime.timedelta(days=5)
+        result = pre.get_prev_trading_day(before)
+        assert result is None, f"Expected None for date before first, got {result}"
+
+    def test_first_date_returns_none(self):
+        """The first date itself → returns None (no previous day)."""
+        pre = self._make_preloaded(10)
+        first = pre._dates[0].date()
+        result = pre.get_prev_trading_day(first)
+        assert result is None, f"Expected None for the very first date, got {result}"
+
+    def test_day_after_last_returns_last(self):
+        """A date beyond the last entry → returns the last trading day."""
+        pre = self._make_preloaded(10)
+        last = pre._dates[-1].date()
+        beyond = last + datetime.timedelta(days=5)
+        result = pre.get_prev_trading_day(beyond)
+        assert result == last, f"Expected {last} for date after last, got {result}"
+
+    def test_empty_dates_returns_none(self):
+        """Empty _dates → returns None without error."""
+        import pandas as pd
+        from eqlib.data_cache import PreloadedData
+
+        pre = PreloadedData()
+        pre._dates = pd.DatetimeIndex([])
+        result = pre.get_prev_trading_day(datetime.date(2024, 1, 5))
+        assert result is None
+
+    def test_performance_1000_lookups_under_50ms(self):
+        """1000 get_prev_trading_day calls on a 1000-day index must finish < 50ms."""
+        import pandas as pd
+        from eqlib.data_cache import PreloadedData
+
+        dates = pd.bdate_range(start="2020-01-01", periods=1000)
+        pre = PreloadedData()
+        pre._dates = pd.DatetimeIndex(dates)
+        # Vary query dates across the whole range to avoid CPU branch-prediction
+        # artefacts that a single repeated query would introduce.
+        query_dates = [dates[i % len(dates)].date() for i in range(1000)]
+
+        t0 = time.perf_counter()
+        for d in query_dates:
+            pre.get_prev_trading_day(d)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+
+        assert elapsed_ms < 50, (
+            f"1000 get_prev_trading_day calls took {elapsed_ms:.1f}ms (limit: 50ms)"
         )
