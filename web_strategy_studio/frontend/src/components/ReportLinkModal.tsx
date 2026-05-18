@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import { useMemo } from "react";
 
-import { resolveArtifactUrl, getToken } from "../api/client";
 import ReportViewer from "./ReportViewer";
 
 type Props = {
@@ -52,18 +51,12 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>回测报告</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {htmlUrl ? (
+            {runId ? (
               <button
                 type="button"
                 style={ghost}
                 onClick={() => {
-                  const resolved = resolveArtifactUrl(htmlUrl);
-                  if (!resolved) return;
-                  const token = getToken();
-                  const url = token
-                    ? `${resolved}?token=${encodeURIComponent(token)}`
-                    : resolved;
-                  window.open(url, "_blank", "noopener,noreferrer");
+                  window.open(`/runs/${runId}/report`, "_blank", "noopener,noreferrer");
                 }}
               >
                 新标签打开
