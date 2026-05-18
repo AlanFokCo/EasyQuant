@@ -185,23 +185,44 @@ export function StrategyLayout() {
       saveTimerRef.current = setTimeout(async () => {
         saveTimerRef.current = null;
         try {
-          // HIGH-19: Check for concurrent edit conflict before saving
-          const current = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`);
-          if (serverVersion !== null && current.version !== serverVersion) {
-            addToast("error", `版本冲突：该策略已在服务器端更新到 v${current.version}，你的本地版本（v${serverVersion}）已过时。请刷新后重试。`);
-            setDirty(false);
-            setServerVersion(current.version);
-            return;
+          // HIGH-19: Pass expected_version so the server can detect concurrent edits.
+          const patchBody: Record<string, unknown> = { source_code: code };
+          if (serverVersion !== null) {
+            patchBody.expected_version = serverVersion;
           }
           const result = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`, {
             method: "PATCH",
-            body: JSON.stringify({ source_code: code }),
+            body: JSON.stringify(patchBody),
           });
           setDirty(false);
           setServerVersion(result.version);
           qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
         } catch (e) {
-          addToast("error", e instanceof Error ? e.message : "保存失败");
+          // HIGH-19: 409 VERSION_CONFLICT — ask the user what to do.
+          if (e instanceof Error && (e as { code?: string }).code === "VERSION_CONFLICT") {
+            const overwrite = window.confirm(
+              "远端有改动，你的保存会覆盖它。\n\n点「确定」强制覆盖，点「取消」放弃本次保存并刷新。"
+            );
+            if (overwrite) {
+              // Force-write without expected_version
+              try {
+                const result = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ source_code: code }),
+                });
+                setDirty(false);
+                setServerVersion(result.version);
+                qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+              } catch (e2) {
+                addToast("error", e2 instanceof Error ? e2.message : "强制保存失败");
+              }
+            } else {
+              setDirty(false);
+              qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+            }
+          } else {
+            addToast("error", e instanceof Error ? e.message : "保存失败");
+          }
         }
       }, 400);
     },

@@ -37,6 +37,9 @@ class FixedSlippage(SlippageModel):
 
     def __init__(self, pct: float = 0.001):
         self.pct = pct
+        # HIGH-11: expose max_pct so the cash-buffer calculation in the engine
+        # can use the exact worst-case slippage instead of the default fallback.
+        self.max_pct = pct
 
     def get_execution_price(self, price: float, amount: int, is_buy: bool,
                             daily_volume: float = 0) -> float:

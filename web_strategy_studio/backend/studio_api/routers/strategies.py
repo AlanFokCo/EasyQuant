@@ -181,6 +181,15 @@ async def patch_strategy(
     strat = res.scalar_one_or_none()
     if strat is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+    # HIGH-19: optimistic lock — reject if caller's expected_version doesn't match
+    if body.expected_version is not None and body.expected_version != strat.current_version:
+        raise HTTPException(
+            status_code=409,
+            detail=api_error(
+                "VERSION_CONFLICT",
+                f"expected v{body.expected_version}, server is at v{strat.current_version}",
+            ),
+        )
     now = datetime.now(timezone.utc)
     if body.name is not None:
         strat.name = body.name
@@ -203,10 +212,29 @@ async def patch_strategy(
                 ).total_seconds()
                 coalesce = (age_sec < settings.version_coalesce_sec) and (current_sv.label is None)
             if coalesce:
-                # Reuse the current version row (update in place).
-                current_sv.source_code = body.source_code
-                current_sv.content_hash = new_hash
-                strat.updated_at = now
+                # HIGH-19: when expected_version is provided, skip the coalesce
+                # path and always create a proper new version.  This ensures two
+                # concurrent writes that both arrive with expected_version=N will
+                # each bump the version: the first succeeds (N→N+1), the second
+                # hits the top-level check above (expected N, server is N+1) → 409.
+                if body.expected_version is not None:
+                    new_ver = strat.current_version + 1
+                    strat.current_version = new_ver
+                    strat.updated_at = now
+                    session.add(
+                        StrategyVersion(
+                            id=_new_id("sv"),
+                            strategy_id=strategy_id,
+                            version=new_ver,
+                            source_code=body.source_code,
+                            content_hash=new_hash,
+                        )
+                    )
+                else:
+                    # Reuse the current version row (update in place).
+                    current_sv.source_code = body.source_code
+                    current_sv.content_hash = new_hash
+                    strat.updated_at = now
             else:
                 # Create a proper new version.
                 new_ver = strat.current_version + 1

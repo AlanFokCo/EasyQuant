@@ -145,39 +145,20 @@ describe("ReportPage — 新标签 button", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 3. StrategyLayout — "新标签打开报告" button
-//    Tested via a lean wrapper that replicates only the success-card button
-//    onClick, avoiding heavy editor dependencies (Monaco, react-query, SSE).
+// 3. StrategyLayout — "新标签打开报告" button (static source assertion)
+//    Asserts that the real StrategyLayout.tsx source never builds URLs with
+//    ?token=.  A SimulatedButton would pass even if the real file regressed.
 // ══════════════════════════════════════════════════════════════════════════════
+import fs from "node:fs";
+import path from "node:path";
+
 describe("StrategyLayout — 新标签打开报告 button", () => {
-  it("opens /runs/<id>/report and does NOT put token= in the URL", () => {
-    const windowOpen = setupWindowOpen();
-
-    /**
-     * Minimal stand-in for the StrategyLayout success-card "新标签打开报告" button.
-     * The onClick mirrors the fixed implementation: use the SPA route.
-     */
-    const runId = "run-999";
-    function SimulatedButton() {
-      return (
-        <button
-          type="button"
-          aria-label="在新标签页打开报告"
-          onClick={() => {
-            window.open(`/runs/${runId}/report`, "_blank", "noopener,noreferrer");
-          }}
-        >
-          新标签打开报告
-        </button>
-      );
-    }
-
-    render(<SimulatedButton />);
-    fireEvent.click(screen.getByRole("button", { name: /在新标签页打开报告/i }));
-
-    expect(windowOpen).toHaveBeenCalledOnce();
-    const [url] = windowOpen.mock.calls[0] as [string, ...unknown[]];
-    expect(url).toBe("/runs/run-999/report");
-    expect(url).not.toContain("token=");
+  it("StrategyLayout source must not build URLs with ?token= for new-tab buttons", () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, "../components/StrategyLayout.tsx"),
+      "utf8"
+    );
+    // Use \?token= to avoid false positives on bare "token" substrings.
+    expect(src).not.toMatch(/\?token=/);
   });
 });

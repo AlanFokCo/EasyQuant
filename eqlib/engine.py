@@ -34,6 +34,11 @@ _preloaded_fallback = PreloadedData()
 # affordable shares for a buy order (avoids fractional-lot overshoot).
 _COMMISSION_BUFFER = 1.001
 
+# HIGH-11: default maximum slippage percentage used when a slippage model
+# does not expose a max_pct attribute.  Combined with commission to give a
+# conservative upper bound on total buy cost per share.
+_DEFAULT_SLIPPAGE_MAX_PCT = 0.005
+
 
 class SecurityBar:
     """Lightweight bar object with __slots__ to avoid per-call class creation."""
@@ -249,12 +254,20 @@ def _get_open_fast(security, day) -> Optional[float]:
     return None
 
 
-def _get_volume_fast(security, day) -> float:
-    """Get daily volume for a security (used by VolumeSlippage)."""
+def _get_volume_fast(security, day) -> Optional[float]:
+    """Get daily volume for a security (used by VolumeSlippage).
+
+    Returns:
+        None  — no bar exists for this security on this day (treat as suspended
+                when set_option('treat_missing_bar_as_suspended', True), default True).
+        0.0   — bar exists but volume is 0 (treat as suspended only when
+                set_option('treat_missing_bar_as_suspended', True), default True).
+        float — positive daily volume.
+    """
     bar = _get_preloaded().get_bar(day, security)
-    if bar:
-        return float(bar.get("volume", 0))
-    return 0.0
+    if bar is None:
+        return None
+    return float(bar.get("volume", 0))
 
 
 def set_handle_data(func):
@@ -391,16 +404,45 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             log.warn(f"fill_pending: no open price for {security} on {day} — order skipped")
             continue
 
-        # ── Suspension check (item 6) ──────────────────────────────────────
-        # Skip this check for live/paper trading (exec_prices provided) when
-        # a live price is available — the security is clearly trading.
+        # ── HIGH-13: warn on large price gaps for ORDER_VALUE / ORDER_TARGET_VALUE ──
+        # A significant gap between yesterday's close and today's open suggests
+        # a limit-hit or suspension scenario; shares-based orders (order())
+        # handle this more predictably than value-based ones.
+        if exec_prices is None and action in ("ORDER_VALUE", "ORDER_TARGET_VALUE"):
+            preloaded = _get_preloaded()
+            if preloaded is not None and preloaded._dates is not None:
+                prev_dates = [pd.Timestamp(d).date() for d in preloaded._dates
+                              if pd.Timestamp(d).date() < day]
+                if prev_dates:
+                    prev_close = _get_price_fast(security, max(prev_dates))
+                    if prev_close and prev_close > 0:
+                        gap_ratio = base_price / prev_close
+                        if gap_ratio > 1.1 or gap_ratio < 0.9:
+                            log.warn(
+                                f"fill_pending {action} {security}: today's open ({base_price:.3f}) "
+                                f"has a large gap vs yesterday's close ({prev_close:.3f}, "
+                                f"ratio={gap_ratio:.2%}). Consider using order() with explicit "
+                                "share counts for more predictable execution."
+                            )
+
+        # ── Suspension check (HIGH-12) ─────────────────────────────────────
+        # Distinguish "missing bar" (None) from "zero-volume bar" (0.0).
+        # treat_missing_bar_as_suspended (default True): missing bar → suspend.
+        # volume == 0 is only treated as suspended when the same option is True.
         vol = _get_volume_fast(security, day)
+        treat_missing_as_suspended = sess._options.get("treat_missing_bar_as_suspended", True)
         if exec_prices is not None and base_price:
-            # Use a large nominal volume so VolumeSlippage still works
-            vol = vol if vol > 0 else 1e9
+            # Live/paper trading: use a large nominal volume for VolumeSlippage
+            vol = (vol if (vol is not None and vol > 0) else 1e9)
+        elif vol is None:
+            if treat_missing_as_suspended:
+                log.warn(f"fill_pending: {security} has no bar on {day} (likely suspended) — order skipped")
+                continue
+            vol = 0.0
         elif vol == 0:
-            log.warn(f"fill_pending: {security} appears suspended on {day} (volume=0) — order skipped")
-            continue
+            if treat_missing_as_suspended:
+                log.warn(f"fill_pending: {security} volume=0 on {day} (appears suspended) — order skipped")
+                continue
 
         # ── Price-limit check (optional, A-share circuit breaker) ─────────
         # Enabled via set_option('check_price_limit', True).
@@ -455,8 +497,14 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             total_cost = exec_price * rounded + commission
 
             if total_cost > portfolio.available_cash:
-                # Buy as many as we can afford
-                rounded = int(portfolio.available_cash / (exec_price * _COMMISSION_BUFFER) // 100) * 100
+                # HIGH-11: use base_price (before slippage) plus a conservative
+                # buffer that covers both maximum expected slippage and commission.
+                slippage_max_pct = getattr(sess._slippage_model, "max_pct", _DEFAULT_SLIPPAGE_MAX_PCT) \
+                    if sess._slippage_model is not None else 0.0
+                commission_rate = cost_cfg.open_tax + cost_cfg.open_commission
+                effective_rate = 1.0 + slippage_max_pct + commission_rate
+                max_affordable = int(portfolio.available_cash / (base_price * effective_rate) // 100) * 100
+                rounded = max_affordable
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash")
                     continue
