@@ -183,3 +183,35 @@ class TestHigh12Suspended:
 
         # No bar → no open price → order skipped before suspension check
         assert "600519" not in portfolio.positions
+
+    def test_missing_bar_option_false_skips_and_warns(self):
+        """option=False + missing bar: order must be skipped and a warning must be logged.
+
+        vol is None always means 'no bar' and must unconditionally skip the order
+        (regardless of treat_missing_bar_as_suspended).  This test patches the
+        underlying Python logger directly to verify the warning is emitted even
+        though eqlib's logger has propagate=False by default.
+        """
+        from unittest.mock import patch
+        from eqlib.trade import order
+        import eqlib.engine as eng
+        import logging
+
+        sess, portfolio, day = _make_session()
+        sess._options["treat_missing_bar_as_suspended"] = False
+        _set_preloaded_no_bar("600519", day)
+
+        _eqlib_logger = logging.getLogger("eqlib")
+        with patch.object(_eqlib_logger, "warning") as mock_warn:
+            order("600519", 100)
+            eng._fill_pending_orders(sess, day)
+
+        # Order must be skipped regardless of the option
+        assert "600519" not in portfolio.positions
+
+        # A warning must have been emitted mentioning the security and "no bar"
+        warning_calls = [str(call) for call in mock_warn.call_args_list]
+        assert any(
+            "600519" in c and ("no bar" in c or "no open price" in c)
+            for c in warning_calls
+        ), f"Expected a 'no bar' warning for 600519, got: {warning_calls}"

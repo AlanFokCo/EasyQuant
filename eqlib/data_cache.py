@@ -576,6 +576,38 @@ class PreloadedData:
     def dates(self) -> pd.DatetimeIndex:
         return self._dates
 
+    def get_prev_trading_day(self, day) -> Optional[datetime.date]:
+        """Return the latest trading day strictly before *day* using binary search.
+
+        Uses ``numpy.searchsorted`` on the already-sorted ``DatetimeIndex``, so
+        this is O(log N) rather than a full linear scan.
+
+        Parameters
+        ----------
+        day:
+            A ``datetime.date``, ``datetime.datetime``, or anything accepted by
+            ``pd.Timestamp``.
+
+        Returns
+        -------
+        ``datetime.date`` of the previous trading day, or ``None`` if *day* is
+        on or before the first date in the index.
+        """
+        import numpy as np
+
+        if self._dates is None or len(self._dates) == 0:
+            return None
+        day_ts = pd.Timestamp(day)
+        # searchsorted with side='left' returns the insertion point for day_ts.
+        # For a day present in the index that is the index of day_ts itself,
+        # so idx-1 is the previous trading day.
+        # For a day not in the index, idx is where it would be inserted, so
+        # idx-1 is still the last day strictly before day_ts.
+        idx = self._dates.searchsorted(day_ts, side="left") - 1
+        if idx < 0:
+            return None
+        return self._dates[idx].date()
+
     def clear(self):
         """Free memory."""
         self.panel = None

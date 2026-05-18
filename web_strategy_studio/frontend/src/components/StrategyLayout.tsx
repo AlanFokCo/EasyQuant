@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { apiJson, resolveArtifactUrl } from "../api/client";
+import { apiJson, ApiError, resolveArtifactUrl } from "../api/client";
 import { useRunStream } from "../hooks/useRunStream";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme, monacoThemeName } from "../hooks/useTheme";
@@ -199,7 +199,7 @@ export function StrategyLayout() {
           qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
         } catch (e) {
           // HIGH-19: 409 VERSION_CONFLICT — ask the user what to do.
-          if (e instanceof Error && (e as { code?: string }).code === "VERSION_CONFLICT") {
+          if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
             const overwrite = window.confirm(
               "远端有改动，你的保存会覆盖它。\n\n点「确定」强制覆盖，点「取消」放弃本次保存并刷新。"
             );
