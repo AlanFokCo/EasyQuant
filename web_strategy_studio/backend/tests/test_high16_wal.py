@@ -15,12 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 
 @pytest.fixture()
-def sqlite_db_path(tmp_path):
-    """Return a path to a temporary SQLite file (deleted after the test)."""
-    return tmp_path / "test_wal.sqlite3"
-
-
-@pytest.fixture()
 def patched_db(tmp_path):
     """Redirect the production db module's engine to a temporary SQLite file."""
     import studio_api.config as cfg
