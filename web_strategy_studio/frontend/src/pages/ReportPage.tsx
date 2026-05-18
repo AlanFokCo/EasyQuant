@@ -243,17 +243,14 @@ export default function ReportPage() {
             {copied ? "已复制" : "分享链接"}
           </button>
 
-          {/* Open in new tab — append ?token= so the request carries auth (SSE pattern) */}
-          {reportApiUrl && (
+          {/* Open in new tab — navigate to the SPA route so the JWT stays in
+              localStorage and never touches the URL or server access logs. */}
+          {run_id && (
             <button
               type="button"
               aria-label="在新标签页打开报告"
               onClick={() => {
-                const token = getToken();
-                const url = token
-                  ? `${reportApiUrl}?token=${encodeURIComponent(token)}`
-                  : reportApiUrl;
-                window.open(url, "_blank", "noopener,noreferrer");
+                window.open(`/runs/${run_id}/report`, "_blank", "noopener,noreferrer");
               }}
               style={btnGhost}
             >
