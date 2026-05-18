@@ -10,23 +10,21 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi import Depends
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from studio_api import auth as auth_mod
 from studio_api.config import settings
-from studio_api.db import get_session, SessionLocal, init_db
-from sqlalchemy.ext.asyncio import AsyncSession
+from studio_api.db import SessionLocal, get_session, init_db
 from studio_api.models import User
+from studio_api.routers import auth as auth_r
 from studio_api.routers import completion, health, runs, strategies
+from studio_api.routers import data_mgmt as data_r
 from studio_api.routers import format as fmt
 from studio_api.routers import lint as lint_r
-from studio_api.routers import data_mgmt as data_r
-from studio_api.routers import auth as auth_r
 from studio_api.routers import symbols as symbols_r
 
 # ---------------------------------------------------------------------------
@@ -64,7 +62,6 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # BLOCKER-7: seed admin user on startup
-    from studio_api.db import SessionLocal
     from studio_api.auth import ensure_admin_user
     async with SessionLocal() as session:
         admin = await ensure_admin_user(session)
@@ -188,6 +185,7 @@ async def get_report_html(
 ):
     """Serve report HTML only to the run owner (HIGH-15)."""
     from sqlalchemy import select
+
     from studio_api.models import Run, Strategy
 
     result = await session.execute(
@@ -218,6 +216,7 @@ async def get_report_json(
 ):
     """Serve report JSON only to the run owner (HIGH-15)."""
     from sqlalchemy import select
+
     from studio_api.models import Run, Strategy
 
     result = await session.execute(
