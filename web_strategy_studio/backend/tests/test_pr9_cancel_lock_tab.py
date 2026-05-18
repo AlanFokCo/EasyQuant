@@ -179,7 +179,6 @@ def test_cancel_idempotent_for_terminal_run(client, auth_token):
 def test_frontend_optimistic_lock_file_checks():
     """StrategyLayout.tsx must include version conflict detection."""
     import os
-    import re
 
     path = os.path.join(
         os.path.dirname(__file__),

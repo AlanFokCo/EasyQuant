@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 os.environ.setdefault("EQ_STUDIO_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_h21_test")

@@ -18,12 +18,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from studio_api import auth as auth_mod
 from studio_api.backtest_executor import execute_backtest
 from studio_api.config import settings
 from studio_api.db import SessionLocal, get_session
 from studio_api.lint_service import lint_source
 from studio_api.models import Run, Strategy, User
-from studio_api import auth as auth_mod
 from studio_api.proc_registry import get_proc
 from studio_api.proc_registry import kill as kill_proc
 from studio_api.run_queue import (
