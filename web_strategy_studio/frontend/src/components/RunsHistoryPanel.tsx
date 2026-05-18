@@ -134,7 +134,7 @@ export function RunsHistoryPanel({ strategyId }: { strategyId: string | null }) 
 
       <ReportLinkModal
         open={!!selectedRunId}
-        htmlUrl={selectedRunId ? `/static/reports/${selectedRunId}/report.html` : null}
+        htmlUrl={selectedRunId ? `/api/v1/reports/${selectedRunId}/report.html` : null}
         runId={selectedRunId}
         onClose={() => setSelectedRunId(null)}
       />
