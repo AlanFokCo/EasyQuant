@@ -61,8 +61,8 @@ def _artifacts_response(run: Run) -> RunArtifacts:
         return RunArtifacts(html_report_url=None, json_report_url=None)
     rid = run.id
     return RunArtifacts(
-        html_report_url=f"/static/reports/{rid}/report.html",
-        json_report_url=f"/static/reports/{rid}/report.json",
+        html_report_url=f"/api/v1/reports/{rid}/report.html",
+        json_report_url=f"/api/v1/reports/{rid}/report.json",
     )
 
 
@@ -450,8 +450,8 @@ async def run_stream(
             arts = {"html_report_url": None, "json_report_url": None}
             if run and run.status == "succeeded":
                 arts = {
-                    "html_report_url": f"/static/reports/{run_id}/report.html",
-                    "json_report_url": f"/static/reports/{run_id}/report.json",
+                    "html_report_url": f"/api/v1/reports/{run_id}/report.html",
+                    "json_report_url": f"/api/v1/reports/{run_id}/report.json",
                 }
             yield stream_hub.format_sse(0, "done", {"status": status, "artifacts": arts})
             return
