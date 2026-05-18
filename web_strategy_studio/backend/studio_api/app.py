@@ -169,6 +169,15 @@ async def validation_handler(request, exc: RequestValidationError):
 reports_root = settings.artifact_dir / "reports"
 reports_root.mkdir(parents=True, exist_ok=True)
 
+# HIGH-14: CSP header applied to all auth-gated report responses.
+# 'unsafe-inline' in script-src is required because the backtesting report HTML
+# embeds Plotly/chart initialization as inline <script> blocks.
+_REPORT_CSP = (
+    "default-src 'none'; script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+    "font-src 'self' data:; connect-src 'self'; sandbox allow-scripts"
+)
+
 
 # HIGH-15: Authenticated report file endpoints (HTML)
 @app.get("/api/v1/reports/{run_id}/report.html")
@@ -196,11 +205,7 @@ async def get_report_html(
 
     # HIGH-14: CSP header on report content
     resp = FileResponse(str(file_path), media_type="text/html")
-    resp.headers["Content-Security-Policy"] = (
-        "default-src 'none'; script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-        "font-src 'self' data:; connect-src 'self'; sandbox allow-scripts"
-    )
+    resp.headers["Content-Security-Policy"] = _REPORT_CSP
     return resp
 
 
@@ -229,11 +234,7 @@ async def get_report_json(
         return Response(status_code=404)
 
     resp = FileResponse(str(file_path), media_type="application/json")
-    resp.headers["Content-Security-Policy"] = (
-        "default-src 'none'; script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-        "font-src 'self' data:; connect-src 'self'; sandbox allow-scripts"
-    )
+    resp.headers["Content-Security-Policy"] = _REPORT_CSP
     return resp
 
 app.include_router(strategies.router)

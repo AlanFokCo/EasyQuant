@@ -12,12 +12,14 @@ Verifies that:
 from __future__ import annotations
 
 import os
+import tempfile
 
 import pytest
 
 os.environ.setdefault("EQ_STUDIO_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault(
-    "EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_report_access_ctrl_test"
+    "EQ_STUDIO_ARTIFACT_DIR",
+    os.path.join(tempfile.gettempdir(), "eq_studio_report_access_ctrl_test"),
 )
 
 

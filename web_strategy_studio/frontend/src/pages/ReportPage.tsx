@@ -114,8 +114,10 @@ export default function ReportPage() {
           objectUrl = URL.createObjectURL(blob);
           setBlobSrc(objectUrl);
         }
-      } catch {
-        // Silently ignore — the "no report" message will be shown
+      } catch (err) {
+        // Silently ignore — the "no report" message will be shown.
+        // Log for debugging (e.g. 401 if token expired, network error).
+        console.error("[ReportPage] Failed to load report blob:", err);
       }
     }
 
