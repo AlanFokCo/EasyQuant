@@ -162,7 +162,6 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
     # shrinkage estimate, which significantly reduces optimization instability
     # when the number of observations is small relative to the number of assets.
     cov = _ledoit_wolf_cov(returns)
-    mean_ret = returns.mean().values
     n = len(securities)
 
     # Build bounds
@@ -194,7 +193,7 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
             def neg_sharpe(w):
                 ret, vol = _annual_stats(w, returns, days=252)
                 if vol < 1e-10:
-                    return 0
+                    return 1e10   # large penalty pushes optimizer away
                 return -(ret - rf) / vol
 
             res = minimize(neg_sharpe, w0, method="SLSQP",
