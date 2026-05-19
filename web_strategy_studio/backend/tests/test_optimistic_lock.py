@@ -34,9 +34,13 @@ def client():
 
 @pytest.fixture(scope="module")
 def auth_headers(client):
-    reg = client.post("/api/v1/auth/register", json={"username": "optlock_user", "password": "testpass"})
+    reg = client.post(
+        "/api/v1/auth/register", json={"username": "optlock_user", "password": "testpass"}
+    )
     if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={"username": "optlock_user", "password": "testpass"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"username": "optlock_user", "password": "testpass"}
+        )
         token = resp.json()["access_token"]
     else:
         token = reg.json()["access_token"]
@@ -79,6 +83,7 @@ def test_patch_correct_expected_version_is_200(client, auth_headers):
 def test_patch_stale_expected_version_is_409(client, auth_headers):
     """PATCH with expected_version < current_version must return 409."""
     import studio_api.config as _cfg
+
     # Disable coalesce so the first PATCH creates a real new version
     original = _cfg.settings.version_coalesce_sec
     _cfg.settings.version_coalesce_sec = 0
@@ -110,6 +115,7 @@ def test_patch_stale_expected_version_is_409(client, auth_headers):
 def test_concurrent_patch_same_expected_version(client, auth_headers):
     """Two PATCHes with the same expected_version: first 200, second 409."""
     import studio_api.config as _cfg
+
     original = _cfg.settings.version_coalesce_sec
     _cfg.settings.version_coalesce_sec = 0
     try:
@@ -143,6 +149,7 @@ def test_coalesce_window_still_rejects_stale_expected_version(client, auth_heade
     top-level check (expected v0, server is v1) → 409.
     """
     import studio_api.config as _cfg
+
     original = _cfg.settings.version_coalesce_sec
     _cfg.settings.version_coalesce_sec = 60  # generous window
     try:

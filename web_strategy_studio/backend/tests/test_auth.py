@@ -25,6 +25,7 @@ class TestJwtToken:
         token = jwt.encode({"sub": "user_test", "exp": exp}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
         from studio_api.auth import decode_access_token
+
         with pytest.raises(jwt.ExpiredSignatureError):
             decode_access_token(token)
 
@@ -79,7 +80,9 @@ class TestAuthEndpoints:
         # Recreate engine for the new DB
         new_engine = db_mod.create_async_engine(tmp_db, echo=False)
         db_mod.engine = new_engine
-        db_mod.SessionLocal = db_mod.async_sessionmaker(new_engine, class_=db_mod.AsyncSession, expire_on_commit=False)
+        db_mod.SessionLocal = db_mod.async_sessionmaker(
+            new_engine, class_=db_mod.AsyncSession, expire_on_commit=False
+        )
 
         import asyncio
 
@@ -90,15 +93,19 @@ class TestAuthEndpoints:
         asyncio.get_event_loop().run_until_complete(setup_db())
 
         from studio_api.app import app
+
         transport = ASGITransport(app=app)
         return AsyncClient(transport=transport, base_url="http://test")
 
     @pytest.mark.asyncio
     async def test_register_returns_token(self, client):
-        resp = await client.post("/api/v1/auth/register", json={
-            "username": "testuser",
-            "password": "secret123",
-        })
+        resp = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "password": "secret123",
+            },
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert "access_token" in data
@@ -106,52 +113,76 @@ class TestAuthEndpoints:
 
     @pytest.mark.asyncio
     async def test_login_with_correct_credentials(self, client):
-        await client.post("/api/v1/auth/register", json={
-            "username": "loginuser",
-            "password": "secret456",
-        })
-        resp = await client.post("/api/v1/auth/login", json={
-            "username": "loginuser",
-            "password": "secret456",
-        })
+        await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "loginuser",
+                "password": "secret456",
+            },
+        )
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "loginuser",
+                "password": "secret456",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
 
     @pytest.mark.asyncio
     async def test_login_with_wrong_password(self, client):
-        await client.post("/api/v1/auth/register", json={
-            "username": "wronguser",
-            "password": "correct",
-        })
-        resp = await client.post("/api/v1/auth/login", json={
-            "username": "wronguser",
-            "password": "wrong",
-        })
+        await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "wronguser",
+                "password": "correct",
+            },
+        )
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "wronguser",
+                "password": "wrong",
+            },
+        )
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
     async def test_register_duplicate_username(self, client):
-        await client.post("/api/v1/auth/register", json={
-            "username": "dup_user",
-            "password": "pass1",
-        })
-        resp = await client.post("/api/v1/auth/register", json={
-            "username": "dup_user",
-            "password": "pass2",
-        })
+        await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "dup_user",
+                "password": "pass1",
+            },
+        )
+        resp = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "dup_user",
+                "password": "pass2",
+            },
+        )
         assert resp.status_code == 409
 
     @pytest.mark.asyncio
     async def test_me_endpoint(self, client):
-        reg = await client.post("/api/v1/auth/register", json={
-            "username": "meuser",
-            "password": "passme",
-        })
+        reg = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "meuser",
+                "password": "passme",
+            },
+        )
         token = reg.json()["access_token"]
-        resp = await client.get("/api/v1/auth/me", headers={
-            "Authorization": f"Bearer {token}",
-        })
+        resp = await client.get(
+            "/api/v1/auth/me",
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["username"] == "meuser"

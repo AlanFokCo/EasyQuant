@@ -72,7 +72,9 @@ async def get_local_stock_detail(
     full_code = _normalize_code(code)
     info = dc.get_local_file_info(full_code, adjust="qfq")
     if not info:
-        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"No local data for {code}"})
+        raise HTTPException(
+            status_code=404, detail={"code": "NOT_FOUND", "message": f"No local data for {code}"}
+        )
     return info
 
 
@@ -97,7 +99,9 @@ async def download_local_data(
             else:
                 result.downloaded.append(full_code)
         else:
-            result.failed.append({"code": full_code, "error": "Download failed or no data returned"})
+            result.failed.append(
+                {"code": full_code, "error": "Download failed or no data returned"}
+            )
 
     result.ok = len(result.downloaded) > 0 or len(result.merged) > 0
     return result
@@ -113,7 +117,9 @@ async def delete_local_stock(
     removed = dc.remove_local_data(full_code, adjust="qfq")
     if removed:
         return {"ok": True, "message": f"Deleted local data for {full_code}"}
-    raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"No local data for {code}"})
+    raise HTTPException(
+        status_code=404, detail={"code": "NOT_FOUND", "message": f"No local data for {code}"}
+    )
 
 
 def _normalize_code(code: str) -> str:

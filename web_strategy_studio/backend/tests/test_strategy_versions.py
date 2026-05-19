@@ -26,15 +26,21 @@ def client():
 
 @pytest.fixture(scope="module")
 def auth_token(client):
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "version_user",
-        "password": "testpass",
-    })
-    if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "version_user",
             "password": "testpass",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "version_user",
+                "password": "testpass",
+            },
+        )
         return resp.json()["access_token"]
     return reg.json()["access_token"]
 
@@ -165,7 +171,9 @@ def test_snapshot_creates_new_version(client, auth_token):
     v0 = created["version"]
     headers = {"Authorization": f"Bearer {auth_token}"}
 
-    r = client.post(f"/api/v1/strategies/{sid}/snapshot", json={"label": "release-1.0"}, headers=headers)
+    r = client.post(
+        f"/api/v1/strategies/{sid}/snapshot", json={"label": "release-1.0"}, headers=headers
+    )
     assert r.status_code in (200, 201), r.text
     assert r.json()["version"] > v0
 

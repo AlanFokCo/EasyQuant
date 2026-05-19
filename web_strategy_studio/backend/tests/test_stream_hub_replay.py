@@ -127,15 +127,21 @@ def test_stream_terminal_run_immediate_done():
 
     with TestClient(app, raise_server_exceptions=True) as client:
         # Auth
-        reg = client.post("/api/v1/auth/register", json={
-            "username": "stream_user",
-            "password": "testpass",
-        })
-        if reg.status_code == 409:
-            resp = client.post("/api/v1/auth/login", json={
+        reg = client.post(
+            "/api/v1/auth/register",
+            json={
                 "username": "stream_user",
                 "password": "testpass",
-            })
+            },
+        )
+        if reg.status_code == 409:
+            resp = client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username": "stream_user",
+                    "password": "testpass",
+                },
+            )
         else:
             resp = reg
         token = resp.json()["access_token"]
