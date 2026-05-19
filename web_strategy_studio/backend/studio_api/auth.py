@@ -72,17 +72,25 @@ async def get_current_user(
     try:
         payload = decode_access_token(raw_token)
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail={"code": "TOKEN_EXPIRED", "message": "Token expired"})
+        raise HTTPException(
+            status_code=401, detail={"code": "TOKEN_EXPIRED", "message": "Token expired"}
+        )
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"})
+        raise HTTPException(
+            status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"}
+        )
 
     user_id = payload.get("sub")
     if user_id is None:
-        raise HTTPException(status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"})
+        raise HTTPException(
+            status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"}
+        )
 
     user = await session.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=401, detail={"code": "USER_NOT_FOUND", "message": "User not found"})
+        raise HTTPException(
+            status_code=401, detail={"code": "USER_NOT_FOUND", "message": "User not found"}
+        )
     return user
 
 

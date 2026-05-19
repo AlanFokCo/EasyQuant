@@ -22,15 +22,21 @@ def client():
 
 @pytest.fixture(scope="module")
 def auth_token(client):
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "report_xss_user",
-        "password": "testpass",
-    })
-    if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "report_xss_user",
             "password": "testpass",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "report_xss_user",
+                "password": "testpass",
+            },
+        )
         return resp.json()["access_token"]
     return reg.json()["access_token"]
 
@@ -38,15 +44,21 @@ def auth_token(client):
 @pytest.fixture(scope="module")
 def auth_token_other(client):
     """Second user to test cross-user report access denial."""
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "other_report_user",
-        "password": "testpass2",
-    })
-    if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "other_report_user",
             "password": "testpass2",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "other_report_user",
+                "password": "testpass2",
+            },
+        )
         return resp.json()["access_token"]
     return reg.json()["access_token"]
 
@@ -77,12 +89,18 @@ def test_report_page_iframe_sandbox():
     """ReportPage.tsx iframe must NOT include allow-same-origin."""
     path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "frontend", "src", "pages", "ReportPage.tsx",
+        "..",
+        "..",
+        "frontend",
+        "src",
+        "pages",
+        "ReportPage.tsx",
     )
     with open(path) as f:
         content = f.read()
     # Find the iframe sandbox attribute
     import re
+
     m = re.search(r'sandbox\s*=\s*"([^"]*)"', content)
     assert m, "iframe must have a sandbox attribute"
     sandbox = m.group(1)
@@ -137,6 +155,7 @@ def test_report_escapes_xss_in_trade_log():
     }
 
     import tempfile
+
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
         out_path = f.name
 
@@ -145,9 +164,9 @@ def test_report_escapes_xss_in_trade_log():
         html_content = open(out_path).read()
 
         # The raw script tag must NOT appear in the HTML
-        assert xss_security not in html_content, (
-            "XSS payload from trade_log.security must be escaped in HTML output"
-        )
+        assert (
+            xss_security not in html_content
+        ), "XSS payload from trade_log.security must be escaped in HTML output"
         # The escaped version should be present
         assert html.escape(xss_security) in html_content
     finally:
@@ -171,7 +190,7 @@ def test_report_escapes_xss_in_trade_date():
             self.portfolio = FakePortfolio()
             self.universe = []
 
-    xss_date = '2024-01-02</td><td><script>alert(1)</script>'
+    xss_date = "2024-01-02</td><td><script>alert(1)</script>"
     result = {
         "context": FakeContext(),
         "trade_log": [
@@ -191,6 +210,7 @@ def test_report_escapes_xss_in_trade_date():
     }
 
     import tempfile
+
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
         out_path = f.name
 
@@ -198,9 +218,7 @@ def test_report_escapes_xss_in_trade_date():
         generate_html_report(result, out_path)
         html_content = open(out_path).read()
 
-        assert xss_date not in html_content, (
-            "XSS payload from trade_log.date must be escaped"
-        )
+        assert xss_date not in html_content, "XSS payload from trade_log.date must be escaped"
     finally:
         os.unlink(out_path)
 
@@ -218,9 +236,7 @@ def test_report_escapes_xss_in_positions():
         def __init__(self):
             self.starting_cash = 100000.0
             self.total_value = 105000.0
-            self.positions = {
-                xss_code: FakePosition()
-            }
+            self.positions = {xss_code: FakePosition()}
 
     xss_code = '<script>alert("xss")</script>'
     fake_portfolio = FakePortfolio()
@@ -243,6 +259,7 @@ def test_report_escapes_xss_in_positions():
     }
 
     import tempfile
+
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
         out_path = f.name
 
@@ -250,9 +267,7 @@ def test_report_escapes_xss_in_positions():
         generate_html_report(result, out_path)
         html_content = open(out_path).read()
 
-        assert xss_code not in html_content, (
-            "XSS payload from position key must be escaped"
-        )
+        assert xss_code not in html_content, "XSS payload from position key must be escaped"
     finally:
         os.unlink(out_path)
 

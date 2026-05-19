@@ -22,15 +22,21 @@ def client():
 
 @pytest.fixture(scope="module")
 def auth_token(client):
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "pr9_user",
-        "password": "testpass",
-    })
-    if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "pr9_user",
             "password": "testpass",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "pr9_user",
+                "password": "testpass",
+            },
+        )
         return resp.json()["access_token"]
     return reg.json()["access_token"]
 
@@ -74,15 +80,21 @@ def test_cancel_returns_404_for_unauthorized_user(client, auth_token):
     run_id = r.json().get("run_id") or r.json()["id"]
 
     # Register another user
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "other_cancel_user",
-        "password": "testpass2",
-    })
-    if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "other_cancel_user",
             "password": "testpass2",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "other_cancel_user",
+                "password": "testpass2",
+            },
+        )
     else:
         resp = reg
     other_token = resp.json()["access_token"]
@@ -159,6 +171,7 @@ def test_cancel_idempotent_for_terminal_run(client, auth_token):
 
     # Wait for run to complete
     import time
+
     for _ in range(30):
         time.sleep(0.5)
         status_resp = client.get(f"/api/v1/runs/{run_id}", headers=headers)
@@ -182,7 +195,12 @@ def test_frontend_optimistic_lock_file_checks():
 
     path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "frontend", "src", "components", "StrategyLayout.tsx",
+        "..",
+        "..",
+        "frontend",
+        "src",
+        "components",
+        "StrategyLayout.tsx",
     )
     with open(path) as f:
         content = f.read()
@@ -194,9 +212,9 @@ def test_frontend_optimistic_lock_file_checks():
     assert "version" in content.lower(), "Must check version before PATCH"
 
     # Must show conflict message
-    assert "版本冲突" in content or "conflict" in content.lower(), (
-        "Must show version conflict message"
-    )
+    assert (
+        "版本冲突" in content or "conflict" in content.lower()
+    ), "Must show version conflict message"
 
 
 def test_strategy_version_returned_on_patch(client, auth_token):
@@ -236,23 +254,27 @@ def test_frontend_uses_sessionStorage_for_runid():
 
     path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "frontend", "src", "hooks", "useRunStream.ts",
+        "..",
+        "..",
+        "frontend",
+        "src",
+        "hooks",
+        "useRunStream.ts",
     )
     with open(path) as f:
         content = f.read()
 
     # Must use sessionStorage
-    assert "sessionStorage" in content, (
-        "useRunStream must use sessionStorage for per-tab runId (HIGH-20)"
-    )
+    assert (
+        "sessionStorage" in content
+    ), "useRunStream must use sessionStorage for per-tab runId (HIGH-20)"
 
     # Must NOT use localStorage for runId
     # The old code had localStorage.getItem/setItem for runId
     import re
-    run_id_ls = re.findall(r'localStorage\.(?:get|set|remove)Item\(.*run_id', content)
-    assert not run_id_ls, (
-        f"useRunStream must not use localStorage for runId, found: {run_id_ls}"
-    )
+
+    run_id_ls = re.findall(r"localStorage\.(?:get|set|remove)Item\(.*run_id", content)
+    assert not run_id_ls, f"useRunStream must not use localStorage for runId, found: {run_id_ls}"
 
 
 def test_editorStore_uses_sessionStorage_for_runid():
@@ -261,19 +283,23 @@ def test_editorStore_uses_sessionStorage_for_runid():
 
     path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "frontend", "src", "store", "editorStore.ts",
+        "..",
+        "..",
+        "frontend",
+        "src",
+        "store",
+        "editorStore.ts",
     )
     with open(path) as f:
         content = f.read()
 
     # Must use sessionStorage for runId
-    assert "sessionStorage" in content, (
-        "editorStore must use sessionStorage for per-tab runId (HIGH-20)"
-    )
+    assert (
+        "sessionStorage" in content
+    ), "editorStore must use sessionStorage for per-tab runId (HIGH-20)"
 
     # Must NOT use localStorage for runId key
     import re
-    run_id_ls = re.findall(r'localStorage\.(?:get|set|remove)Item\(.*run_id', content)
-    assert not run_id_ls, (
-        f"editorStore must not use localStorage for runId, found: {run_id_ls}"
-    )
+
+    run_id_ls = re.findall(r"localStorage\.(?:get|set|remove)Item\(.*run_id", content)
+    assert not run_id_ls, f"editorStore must not use localStorage for runId, found: {run_id_ls}"

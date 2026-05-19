@@ -33,15 +33,21 @@ def client():
 @pytest.fixture(scope="module")
 def auth_token(client):
     """Register and login to get an auth token."""
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "patch_user",
-        "password": "testpass",
-    })
-    if reg.status_code == 409:
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "patch_user",
             "password": "testpass",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "patch_user",
+                "password": "testpass",
+            },
+        )
         return resp.json()["access_token"]
     return reg.json()["access_token"]
 
@@ -66,7 +72,9 @@ def test_patch_same_code_no_version_bump(client, auth_token):
     # PATCH with identical source code twice — version must stay the same
     same_code = tpl.json()["source_code"]
     client.patch(f"/api/v1/strategies/{sid}", json={"source_code": same_code}, headers=headers)
-    resp2 = client.patch(f"/api/v1/strategies/{sid}", json={"source_code": same_code}, headers=headers)
+    resp2 = client.patch(
+        f"/api/v1/strategies/{sid}", json={"source_code": same_code}, headers=headers
+    )
     assert resp2.status_code == 200
     assert resp2.json()["version"] == v0, "Identical-content PATCH must not increment version (B4)"
 

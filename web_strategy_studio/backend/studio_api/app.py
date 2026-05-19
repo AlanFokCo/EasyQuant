@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
 
     # BLOCKER-7: seed admin user on startup
     from studio_api.auth import ensure_admin_user
+
     async with SessionLocal() as session:
         admin = await ensure_admin_user(session)
         logger.info("auth_admin_ready", user_id=admin.id, username=admin.username)
@@ -235,6 +236,7 @@ async def get_report_json(
     resp = FileResponse(str(file_path), media_type="application/json")
     resp.headers["Content-Security-Policy"] = _REPORT_CSP
     return resp
+
 
 app.include_router(strategies.router)
 app.include_router(runs.router)
