@@ -15,6 +15,7 @@ class Base(DeclarativeBase):
 
 class User(Base):
     """Authentication user (BLOCKER-7)."""
+
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

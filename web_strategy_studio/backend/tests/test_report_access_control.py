@@ -44,6 +44,7 @@ def client():
     # Reset the in-process rate limiter so previous test modules' run creations
     # don't exhaust our limit and cause 429 responses.
     from studio_api.run_queue import rate_limiter
+
     rate_limiter._hits.clear()
 
     from fastapi.testclient import TestClient
@@ -141,8 +142,7 @@ def test_high15_static_reports_json_is_gone(client):
 
     r = client.get("/static/reports/probe_run_id/report.json")
     assert r.status_code == 404, (
-        "The /static/reports/ mount should be removed. "
-        f"Got {r.status_code} instead of 404."
+        "The /static/reports/ mount should be removed. " f"Got {r.status_code} instead of 404."
     )
 
 
@@ -181,9 +181,7 @@ def test_high15_html_owner_gets_200_or_404_not_401(client, run_id_user_a, token_
         f"/api/v1/reports/{run_id_user_a}/report.html",
         headers={"Authorization": f"Bearer {token_user_a}"},
     )
-    assert r.status_code in (200, 404), (
-        f"Owner should get 200 or 404, not {r.status_code}"
-    )
+    assert r.status_code in (200, 404), f"Owner should get 200 or 404, not {r.status_code}"
 
 
 def test_high15_html_owner_200_has_csp(client, token_user_a):
@@ -331,13 +329,13 @@ def test_high15_artifacts_response_uses_api_path(client, run_id_user_a, token_us
     json_url = data.get("json_report_url") or ""
 
     if html_url:
-        assert "/api/v1/reports/" in html_url, (
-            f"html_report_url should use /api/v1/reports/, got: {html_url}"
-        )
+        assert (
+            "/api/v1/reports/" in html_url
+        ), f"html_report_url should use /api/v1/reports/, got: {html_url}"
         assert "/static/reports/" not in html_url
 
     if json_url:
-        assert "/api/v1/reports/" in json_url, (
-            f"json_report_url should use /api/v1/reports/, got: {json_url}"
-        )
+        assert (
+            "/api/v1/reports/" in json_url
+        ), f"json_report_url should use /api/v1/reports/, got: {json_url}"
         assert "/static/reports/" not in json_url

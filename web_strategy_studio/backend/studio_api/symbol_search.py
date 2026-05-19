@@ -40,7 +40,12 @@ def search_symbols(query: str, limit: int = 20) -> List[Dict[str, str]]:
         code = (s.get("code") or s.get("symbol") or s.get("id", "")).lower()
         name = (s.get("name") or s.get("label") or "").lower()
         if q in code or q in name:
-            results.append({"code": s.get("code") or s.get("symbol") or s.get("id"), "name": s.get("name") or s.get("label") or ""})
+            results.append(
+                {
+                    "code": s.get("code") or s.get("symbol") or s.get("id"),
+                    "name": s.get("name") or s.get("label") or "",
+                }
+            )
             if len(results) >= limit:
                 break
     return results

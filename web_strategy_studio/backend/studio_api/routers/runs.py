@@ -316,7 +316,9 @@ async def get_run(
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     # Verify ownership via strategy
     res = await session.execute(
-        select(Strategy.id).where(Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id)
+        select(Strategy.id).where(
+            Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
@@ -391,7 +393,9 @@ async def delete_run(
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     # Verify ownership via strategy
     res = await session.execute(
-        select(Strategy.id).where(Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id)
+        select(Strategy.id).where(
+            Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
@@ -521,7 +525,11 @@ async def list_runs(
 
     from sqlalchemy import func as sa_func
 
-    count_q = select(sa_func.count(Run.id)).join(Strategy, Run.strategy_id == Strategy.id).where(Strategy.owner_id == current_user.id)
+    count_q = (
+        select(sa_func.count(Run.id))
+        .join(Strategy, Run.strategy_id == Strategy.id)
+        .where(Strategy.owner_id == current_user.id)
+    )
     if strategy_id:
         count_q = count_q.where(Run.strategy_id == strategy_id)
     total = (await session.execute(count_q)).scalar_one() or 0
@@ -626,7 +634,9 @@ async def get_run_metrics(
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     # Verify ownership
     res = await session.execute(
-        select(Strategy.id).where(Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id)
+        select(Strategy.id).where(
+            Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id
+        )
     )
     if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))

@@ -13,11 +13,13 @@ os.environ.setdefault("EQ_STUDIO_ARTIFACT_DIR", "/tmp/eq_studio_h21_test")
 # @param extraction (lint_service)
 # ---------------------------------------------------------------------------
 
+
 class TestParamExtraction:
     """Verify that lint_service._parse_params extracts # @param declarations."""
 
     def _lint(self, src: str):
         from studio_api.lint_service import lint_source
+
         return lint_source(src)
 
     def test_single_str_param(self):
@@ -27,30 +29,22 @@ def initialize(context):
     pass
 """
         result = self._lint(src)
-        assert result["params"] == [
-            {"name": "security", "type": "text", "default": "601390"}
-        ]
+        assert result["params"] == [{"name": "security", "type": "text", "default": "601390"}]
 
     def test_int_param(self):
         src = "# @param fast_period: int = 5\n"
         result = self._lint(src)
-        assert result["params"] == [
-            {"name": "fast_period", "type": "number", "default": 5}
-        ]
+        assert result["params"] == [{"name": "fast_period", "type": "number", "default": 5}]
 
     def test_float_param(self):
         src = "# @param stop_loss: float = 0.08\n"
         result = self._lint(src)
-        assert result["params"] == [
-            {"name": "stop_loss", "type": "number", "default": 0.08}
-        ]
+        assert result["params"] == [{"name": "stop_loss", "type": "number", "default": 0.08}]
 
     def test_bool_param(self):
         src = "# @param use_filter: bool = True\n"
         result = self._lint(src)
-        assert result["params"] == [
-            {"name": "use_filter", "type": "checkbox", "default": True}
-        ]
+        assert result["params"] == [{"name": "use_filter", "type": "checkbox", "default": True}]
 
     def test_list_param(self):
         src = "# @param securities: list = ['601390', '000001']\n"
@@ -86,6 +80,7 @@ def initialize(context):
 # strategy_params injection (isolated_runner)
 # ---------------------------------------------------------------------------
 
+
 class TestStrategyParamsInjection:
     """Verify that isolated_runner injects strategy_params into PARAMS."""
 
@@ -110,6 +105,7 @@ def initialize(context):
         (tmp_path / "user_strategy.py").write_text(strategy)
 
         import runpy
+
         ns = runpy.run_path(str(tmp_path / "user_strategy.py"), run_name="__user_strategy__")
 
         # Simulate what isolated_runner does
@@ -133,6 +129,7 @@ def initialize(context):
     def test_preserves_type(self, tmp_path: Path):
         """String '10' should become int 10 when PARAMS original is int."""
         import runpy
+
         sp = {"fast_period": "10"}
         strategy_src = 'PARAMS = {"fast_period": 5}\n'
         strategy_file = tmp_path / "s.py"
@@ -153,6 +150,7 @@ def initialize(context):
     def test_adds_new_param_not_in_params(self, tmp_path: Path):
         """strategy_params keys not in PARAMS should be added."""
         import runpy
+
         sp = {"new_param": 42}
         strategy_src = 'PARAMS = {"existing": 1}\n'
         strategy_file = tmp_path / "s.py"
@@ -175,6 +173,7 @@ def initialize(context):
     def test_no_strategy_params_leaves_params_unchanged(self, tmp_path: Path):
         """If strategy_params is None, PARAMS should be untouched."""
         import runpy
+
         strategy_src = 'PARAMS = {"fast_period": 5}\n'
         strategy_file = tmp_path / "s.py"
         strategy_file.write_text(strategy_src)
@@ -186,11 +185,13 @@ def initialize(context):
 # _make_run_config includes strategy_params
 # ---------------------------------------------------------------------------
 
+
 class TestMakeRunConfig:
     """Verify _make_run_config passes through strategy_params."""
 
     def test_strategy_params_included(self):
         from studio_api.runner import _make_run_config
+
         params = {
             "start_date": "2024-01-01",
             "end_date": "2024-12-31",
@@ -201,6 +202,7 @@ class TestMakeRunConfig:
 
     def test_strategy_params_defaults_to_none(self):
         from studio_api.runner import _make_run_config
+
         params = {
             "start_date": "2024-01-01",
             "end_date": "2024-12-31",
