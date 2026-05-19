@@ -10,11 +10,13 @@ import pytest
 # BLOCKER-9: _normalize_code strict validation
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestBlocker9NormalizeCode:
     """_normalize_code must reject anything that is not exactly 6 digits."""
 
     def _get_normalize(self):
         from studio_api.routers.data_mgmt import _normalize_code
+
         return _normalize_code
 
     def test_valid_six_digits(self):
@@ -76,12 +78,14 @@ class TestBlocker9NormalizeCode:
 # BLOCKER-9: _local_csv_path path traversal defense-in-depth
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestBlocker9LocalCsvPath:
     """_local_csv_path must raise if the resolved path escapes the data dir."""
 
     def _make_sandbox(self, monkeypatch, tmp_path):
         """Create a sandboxed data_dir and patch _get_local_data_dir."""
         import eqlib.data_cache as dc
+
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         monkeypatch.setattr(dc, "_LOCAL_DATA_DIR", str(data_dir), raising=False)
@@ -90,24 +94,28 @@ class TestBlocker9LocalCsvPath:
     def test_normal_code_returns_path_in_data_dir(self, monkeypatch, tmp_path):
         dc = self._make_sandbox(monkeypatch, tmp_path)
         from eqlib.data_cache import _local_csv_path
+
         p = _local_csv_path("601390")
         assert p.resolve().is_relative_to(dc.resolve())
 
     def test_dotdot_raises_valueerror(self, monkeypatch, tmp_path):
         self._make_sandbox(monkeypatch, tmp_path)
         from eqlib.data_cache import _local_csv_path
+
         with pytest.raises(ValueError, match="outside of data directory"):
             _local_csv_path("../../tmp/poc")
 
     def test_absolute_code_raises(self, monkeypatch, tmp_path):
         self._make_sandbox(monkeypatch, tmp_path)
         from eqlib.data_cache import _local_csv_path
+
         with pytest.raises(ValueError, match="outside of data directory"):
             _local_csv_path("/etc/passwd")
 
     def test_embedded_slash_raises(self, monkeypatch, tmp_path):
         self._make_sandbox(monkeypatch, tmp_path)
         from eqlib.data_cache import _local_csv_path
+
         with pytest.raises(ValueError, match="outside of data directory"):
             _local_csv_path("601390/../../evil")
 
@@ -116,6 +124,7 @@ class TestBlocker9LocalCsvPath:
 # BLOCKER-10: delete_run rmtree validation
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestBlocker10DeleteRunRmtreeValidation:
     """delete_run must only delete artifacts under the reports directory."""
 
@@ -123,6 +132,7 @@ class TestBlocker10DeleteRunRmtreeValidation:
     def app_setup(self, tmp_path):
         """Set up a minimal test environment with settings pointing to tmp."""
         import studio_api.config as cfg
+
         cfg.settings.artifact_dir = tmp_path / "artifacts"
         cfg.settings.artifact_dir.mkdir(parents=True, exist_ok=True)
         (cfg.settings.artifact_dir / "reports").mkdir(exist_ok=True)
@@ -150,7 +160,9 @@ class TestBlocker10DeleteRunRmtreeValidation:
 
         mock_session = AsyncMock()
         mock_session.get.return_value = run
-        mock_session.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value="user_admin"))
+        mock_session.execute.return_value = MagicMock(
+            scalar_one_or_none=MagicMock(return_value="user_admin")
+        )
 
         mock_user = MagicMock(spec=User)
         mock_user.id = "user_admin"
@@ -159,9 +171,9 @@ class TestBlocker10DeleteRunRmtreeValidation:
         await runs_router.delete_run(run_id, session=mock_session, current_user=mock_user)
 
         # Verify decoy directory was NOT deleted
-        assert (decoy / "secret.txt").exists(), (
-            "delete_run should NOT have deleted files outside reports directory"
-        )
+        assert (
+            decoy / "secret.txt"
+        ).exists(), "delete_run should NOT have deleted files outside reports directory"
 
     @pytest.mark.asyncio
     async def test_delete_run_deletes_valid_reports_dir(self, tmp_path, app_setup):
@@ -186,7 +198,9 @@ class TestBlocker10DeleteRunRmtreeValidation:
 
         mock_session = AsyncMock()
         mock_session.get.return_value = run
-        mock_session.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value="user_admin"))
+        mock_session.execute.return_value = MagicMock(
+            scalar_one_or_none=MagicMock(return_value="user_admin")
+        )
 
         mock_user = MagicMock(spec=User)
         mock_user.id = "user_admin"
@@ -194,6 +208,4 @@ class TestBlocker10DeleteRunRmtreeValidation:
         await runs_router.delete_run(run_id, session=mock_session, current_user=mock_user)
 
         # The report directory should have been deleted
-        assert not report_dir.exists(), (
-            "delete_run should have deleted the valid reports directory"
-        )
+        assert not report_dir.exists(), "delete_run should have deleted the valid reports directory"

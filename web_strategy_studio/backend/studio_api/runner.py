@@ -69,8 +69,17 @@ class Runner(ABC):
 _ALLOWED_ENV_PREFIXES = ("EQ_", "EQLIB_")
 _ALLOWED_ENV_KEYS = frozenset(
     {
-        "PATH", "PYTHONPATH", "HOME", "LANG", "LC_ALL", "TZ",
-        "USER", "LOGNAME", "TMPDIR", "TEMP", "TMP",
+        "PATH",
+        "PYTHONPATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "TZ",
+        "USER",
+        "LOGNAME",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
     }
 )
 
@@ -132,15 +141,25 @@ async def _pump_and_collect(
                     if total > 0:
                         frac = min(0.92, 0.10 + 0.82 * done / total)
                         await stream_hub.publish(
-                            run_id, "progress",
-                            {"progress": frac, "stage": "simulate", "message": f"Day {done}/{total}"},
+                            run_id,
+                            "progress",
+                            {
+                                "progress": frac,
+                                "stage": "simulate",
+                                "message": f"Day {done}/{total}",
+                            },
                         )
                 except (ValueError, IndexError):
                     pass
 
             await stream_hub.publish(
-                run_id, "log",
-                {"ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "stream": name, "line": line},
+                run_id,
+                "log",
+                {
+                    "ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "stream": name,
+                    "line": line,
+                },
             )
 
     async def progress_tick() -> None:
@@ -160,7 +179,8 @@ async def _pump_and_collect(
             except Exception:
                 frac = 0.3
             await stream_hub.publish(
-                run_id, "progress",
+                run_id,
+                "progress",
                 {"progress": min(0.92, frac), "stage": stage, "message": "backtest running"},
             )
             stage = "simulate"
@@ -242,13 +262,17 @@ class LocalRunner(Runner):
         cmd = [sys.executable, "-m", "studio_api.isolated_runner", str(work)]
 
         await stream_hub.publish(
-            run_id, "progress",
+            run_id,
+            "progress",
             {"progress": 0.08, "stage": "validate", "message": "Starting isolated runner"},
         )
 
         proc = await asyncio.create_subprocess_exec(
-            *cmd, cwd=str(work), env=_build_env(artifact_sub),
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            *cmd,
+            cwd=str(work),
+            env=_build_env(artifact_sub),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         register_proc(run_id, proc)
 
@@ -292,18 +316,30 @@ class DockerRunner(Runner):
     ) -> list[str]:
         """Construct the ``docker run`` command."""
         cmd = [
-            "docker", "run", "--rm",
-            "--network", "none",
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
             "--read-only",
-            "--tmpfs", "/tmp:size=512m",
-            "--memory", str(settings.max_memory_mb) + "m",
-            "--pids-limit", "64",
-            "--cpus", "1",
-            "--user", "65534:65534",
-            "--security-opt", "no-new-privileges",
-            "--volume", f"{work_dir}:/work:ro",
-            "--volume", f"{artifact_dir}:/out:rw",
-            "--workdir", "/work",
+            "--tmpfs",
+            "/tmp:size=512m",
+            "--memory",
+            str(settings.max_memory_mb) + "m",
+            "--pids-limit",
+            "64",
+            "--cpus",
+            "1",
+            "--user",
+            "65534:65534",
+            "--security-opt",
+            "no-new-privileges",
+            "--volume",
+            f"{work_dir}:/work:ro",
+            "--volume",
+            f"{artifact_dir}:/out:rw",
+            "--workdir",
+            "/work",
         ]
 
         if settings.enable_network:
@@ -330,7 +366,8 @@ class DockerRunner(Runner):
         (work / "user_strategy.py").write_text(source_code, encoding="utf-8")
 
         await stream_hub.publish(
-            run_id, "progress",
+            run_id,
+            "progress",
             {"progress": 0.08, "stage": "validate", "message": "Starting Docker sandbox"},
         )
 
@@ -338,7 +375,8 @@ class DockerRunner(Runner):
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         register_proc(run_id, proc)
 

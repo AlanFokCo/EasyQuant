@@ -23,16 +23,22 @@ def client():
 @pytest.fixture(scope="module")
 def auth_token(client):
     """Register and login to get an auth token."""
-    reg = client.post("/api/v1/auth/register", json={
-        "username": "ratelimit_user",
-        "password": "testpass",
-    })
-    if reg.status_code == 409:
-        # Already registered, login instead
-        resp = client.post("/api/v1/auth/login", json={
+    reg = client.post(
+        "/api/v1/auth/register",
+        json={
             "username": "ratelimit_user",
             "password": "testpass",
-        })
+        },
+    )
+    if reg.status_code == 409:
+        # Already registered, login instead
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "ratelimit_user",
+                "password": "testpass",
+            },
+        )
         return resp.json()["access_token"]
     return reg.json()["access_token"]
 
