@@ -1,6 +1,6 @@
 """JWT-based authentication (BLOCKER-7).
 
-- Password hashing via passlib (bcrypt).
+- Password hashing via bcrypt.
 - JWT tokens with configurable secret and expiry.
 - ``get_current_user`` FastAPI dependency for protected routes.
 - Admin user auto-seeded on startup.
@@ -12,16 +12,15 @@ import datetime
 import os
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from studio_api.db import get_session
 from studio_api.models import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(description="JWT bearer token")
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -33,11 +32,11 @@ JWT_EXPIRE_MINUTES = int(os.environ.get("EQ_JWT_EXPIRE_MINUTES", "1440"))  # 24 
 
 # ── Password helpers ─────────────────────────────────────────────────────────
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=12)).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 # ── JWT token ────────────────────────────────────────────────────────────────
