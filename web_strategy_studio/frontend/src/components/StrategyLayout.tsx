@@ -484,7 +484,7 @@ export function StrategyLayout() {
             </div>
             {params.universe.length === 0 && (
               <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>
-                留空表示使用策略源码里的 # @param security
+                留空表示使用策略源码里的 # @param securities / @param security
               </div>
             )}
             {params.universe.map((code, idx) => (
