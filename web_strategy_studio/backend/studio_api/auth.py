@@ -32,7 +32,7 @@ JWT_EXPIRE_MINUTES = int(os.environ.get("EQ_JWT_EXPIRE_MINUTES", "1440"))  # 24 
 
 # ── Password helpers ─────────────────────────────────────────────────────────
 def hash_password(plain: str) -> str:
-    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=12)).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
