@@ -9,9 +9,8 @@
  * localStorage under "eq_split_editor_pct" (percentage of workbench width).
  *
  * Responsive:
- *   ≥1280px : dual-pane (editor + right panel side by side)
- *   768-1279: sidebar collapses to icons (already 48px), right pane → bottom
- *   <768    : single column + top-tab switcher
+ *   ≥768px : dual-pane (editor + right panel side by side, draggable split)
+ *   <768   : single column + top-tab switcher
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Sidebar } from "./Sidebar";
@@ -83,7 +82,6 @@ export function AppShell({ editor, rightPane }: Props) {
   );
 
   // ── Responsive helpers ───────────────────────────────────────────────────
-  const isMid   = viewportWidth >= 768 && viewportWidth < 1280;
   const isNarrow = viewportWidth < 768;
 
   // For narrow, track active "tab"
@@ -184,41 +182,8 @@ export function AppShell({ editor, rightPane }: Props) {
               {rightPane}
             </div>
           </div>
-        ) : isMid ? (
-          /* Mid: side by side but smaller editor ratio */
-          <div
-            ref={workbenchRef}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-              <div style={{ flex: "0 0 60%", minWidth: 0, display: "flex", flexDirection: "column" }}>
-                {editor}
-              </div>
-              <div
-                className={`eq-divider-h${dragging ? " dragging" : ""}`}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="调整编辑器宽度"
-                tabIndex={0}
-                onMouseDown={onDividerMouseDown}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowLeft") setEditorPct((p) => clamp(p - 2, MIN_PCT, MAX_PCT));
-                  if (e.key === "ArrowRight") setEditorPct((p) => clamp(p + 2, MIN_PCT, MAX_PCT));
-                }}
-              />
-              <div style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                {rightPane}
-              </div>
-            </div>
-          </div>
         ) : (
-          /* Wide: full dual pane with draggable split */
+          /* ≥768px: dual pane with draggable split */
           <div
             ref={workbenchRef}
             style={{
