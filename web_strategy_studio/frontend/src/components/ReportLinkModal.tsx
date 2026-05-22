@@ -56,6 +56,7 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
                 type="button"
                 style={ghost}
                 onClick={() => {
+                  // Open frontend route; ReportPage uses blob URL to safely pass JWT
                   window.open(`/runs/${runId}/report`, "_blank", "noopener,noreferrer");
                 }}
               >

@@ -62,11 +62,14 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # BLOCKER-7: seed admin user on startup
-    from studio_api.auth import ensure_admin_user
+    from studio_api.auth import ensure_admin_user, ensure_preset_users
 
     async with SessionLocal() as session:
         admin = await ensure_admin_user(session)
         logger.info("auth_admin_ready", user_id=admin.id, username=admin.username)
+        preset = await ensure_preset_users(session)
+        if preset:
+            logger.info("auth_preset_users", count=len(preset), users=[u.username for u in preset])
 
     if not _SYMBOLS_FILE.is_file():
         logger.warning(

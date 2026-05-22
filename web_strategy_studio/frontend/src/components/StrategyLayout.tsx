@@ -2,7 +2,6 @@ import type { editor } from "monaco-editor";
 import { MarkerSeverity } from "monaco-editor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { apiJson, ApiError, resolveArtifactUrl } from "../api/client";
 import { useRunStream } from "../hooks/useRunStream";
@@ -79,7 +78,6 @@ function buildMarkers(lint: LintResponse | null): editor.IMarkerData[] {
 
 export function StrategyLayout() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [strategyId, setStrategyId] = useState<string | null>(() => localStorage.getItem(LS_KEY));
   const [source, setSource] = useState("");
   const [fontSize, setFontSize] = useState(14);
@@ -541,7 +539,7 @@ export function StrategyLayout() {
           </div>
 
           <label style={{ display: "block", marginBottom: 6, color: "var(--text-secondary)" }}>
-            starting_cash
+            初始资金
             <input
               type="number"
               aria-label="初始资金"
@@ -605,7 +603,7 @@ export function StrategyLayout() {
               checked={params.use_local}
               onChange={(e) => setParams((p) => ({ ...p, use_local: e.target.checked }))}
             />
-            <span>use_local（本地 CSV）</span>
+            <span>使用本地数据（更快）</span>
           </label>
         </fieldset>
 
@@ -645,41 +643,23 @@ export function StrategyLayout() {
               >
                 查看 HTML 报告
               </button>
-              {/* Open in workspace (standalone route) */}
-              {runIdStore && (
-                <button
-                  type="button"
-                  aria-label="在独立页面打开报告"
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    border: "1px solid var(--border)",
-                    background: "transparent",
-                    color: "var(--text-secondary)",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => navigate(`/runs/${runIdStore}/report`)}
-                >
-                  在工作台打开
-                </button>
-              )}
               {reportOpenUrl ? (
                 <button
                   type="button"
                   aria-label="在新标签页打开报告"
                   style={{
                     width: "100%",
-                    padding: "8px 12px",
+                    padding: "10px 12px",
                     borderRadius: "var(--radius-sm)",
-                    border: "1px solid var(--border)",
-                    background: "transparent",
-                    color: "var(--text-secondary)",
-                    fontSize: 13,
+                    border: "none",
+                    background: "var(--primary)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: 14,
                     cursor: "pointer",
                   }}
                   onClick={() => {
+                    // Open frontend route; ReportPage uses blob URL to safely pass JWT
                     window.open(`/runs/${runIdStore}/report`, "_blank", "noopener,noreferrer");
                   }}
                 >

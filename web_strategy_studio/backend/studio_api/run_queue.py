@@ -72,13 +72,17 @@ async def _worker() -> None:
     log.info("run_queue.worker_started", max_concurrent=settings.max_concurrent_runs)
     while True:
         run_id, coro_factory = await _queue.get()
+        # Acquire semaphore slot before modifying state.
+        # This prevents race condition where run_id is removed from pending
+        # but the worker crashes before acquiring the slot.
+        await _semaphore.acquire()
         # Remove from pending list (may already be removed if cancelled).
         try:
             _pending.remove(run_id)
         except ValueError:
-            pass
-        # Acquire semaphore slot before launching.
-        await _semaphore.acquire()
+            # Already removed (e.g., cancelled), release slot and continue.
+            _semaphore.release()
+            continue
         _active.add(run_id)
         log.info("run.started", run_id=run_id, active=len(_active))
 

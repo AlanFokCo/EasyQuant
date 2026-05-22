@@ -311,7 +311,7 @@ body, .md-container, .md-main {
 
 .hero-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1px;
   margin: 2rem 0 2.5rem;
   background: var(--eq-border);
@@ -322,17 +322,26 @@ body, .md-container, .md-main {
 
 .hero-card {
   background: var(--eq-bg);
-  padding: 2rem;
+  padding: 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   text-decoration: none;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
+  position: relative;
 }
 
 .hero-card:hover {
   background: var(--eq-surface);
+  transform: translateY(-2px);
+  box-shadow: var(--eq-shadow-sm);
+}
+
+.hero-card-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+  display: block;
 }
 
 .hero-card h3 {
@@ -365,6 +374,11 @@ body, .md-container, .md-main {
   color: var(--eq-accent);
   margin-top: auto;
   padding-top: 0.5rem;
+  transition: transform 0.15s;
+}
+
+.hero-card:hover > span.card-link {
+  transform: translateX(2px);
 }
 
 /* ============================================================================
@@ -594,4 +608,225 @@ body, .md-container, .md-main {
 .md-path__link {
   font-size: 0.75rem;
   color: var(--eq-text-3);
+}
+
+/* ============================================================================
+   ACCESSIBILITY — Focus Visible
+   ============================================================================ */
+
+/* Ensure focus is visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--eq-accent);
+  outline-offset: 2px;
+}
+
+/* Remove default outline for mouse clicks */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Hero cards focus state */
+.hero-card:focus-visible {
+  background: var(--eq-surface);
+  outline: 2px solid var(--eq-accent);
+  outline-offset: -2px;
+  transform: translateY(-2px);
+  box-shadow: var(--eq-shadow-sm);
+}
+
+/* Navigation links focus */
+.md-nav__link:focus-visible {
+  outline: 2px solid var(--eq-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Tabs focus */
+.md-tabs__link:focus-visible {
+  outline: 2px solid var(--eq-accent);
+  outline-offset: 4px;
+}
+
+/* ============================================================================
+   SEARCH — Keyboard shortcut hint
+   ============================================================================ */
+
+/* Show keyboard shortcut in search placeholder */
+.md-search__input::placeholder {
+  color: var(--eq-text-3) !important;
+}
+
+/* Add subtle hint below search input when focused */
+.md-search__form:focus-within::after {
+  content: "⌘K 快捷搜索";
+  position: absolute;
+  bottom: -1.5rem;
+  left: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--eq-text-3);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@media (max-width: 60em) {
+  .md-search__form:focus-within::after {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   BUTTONS — Enhanced styling
+   ============================================================================ */
+
+.md-typeset .md-button {
+  border-radius: var(--eq-radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.md-typeset .md-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.md-typeset .md-button--primary {
+  background: var(--eq-accent);
+  color: #fff;
+  border: none;
+}
+
+.md-typeset .md-button--primary:hover {
+  background: color-mix(in srgb, var(--eq-accent) 90%, #000);
+}
+
+.md-typeset .md-button:focus-visible {
+  outline: 2px solid var(--eq-accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   CODE COPY BUTTON — Enhanced
+   ============================================================================ */
+
+.md-content__button {
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.md-content__button:hover {
+  transform: scale(1.1);
+}
+
+/* ============================================================================
+   BACK TO TOP — Smooth animation
+   ============================================================================ */
+
+.md-top {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.md-top:not([hidden]) {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================================
+   NAVIGATION — Active indicator
+   ============================================================================ */
+
+.md-nav__link--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--eq-accent);
+  border-radius: 2px;
+}
+
+.md-sidebar--primary .md-nav__link--active {
+  padding-left: 0.5rem;
+}
+
+/* ============================================================================
+   HEADER — Logo animation
+   ============================================================================ */
+
+.md-header__button.md-logo img {
+  transition: transform 0.2s;
+}
+
+.md-header__button.md-logo:hover img {
+  transform: scale(1.05);
+}
+
+/* ============================================================================
+   FOOTER — Enhanced
+   ============================================================================ */
+
+.md-footer-meta {
+  border-top: 1px solid var(--eq-border);
+}
+
+.md-footer__link {
+  transition: opacity 0.15s;
+}
+
+.md-footer__link:hover {
+  opacity: 1;
+}
+
+/* ============================================================================
+   RESPONSIVE — Mobile optimizations
+   ============================================================================ */
+
+@media (max-width: 44em) {
+  .hero-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card {
+    padding: 1.25rem;
+  }
+
+  .hero-card-icon {
+    font-size: 1.25rem;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================ */
+
+@media print {
+  .hero-cards {
+    display: block;
+  }
+
+  .hero-card {
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+
+  .md-header,
+  .md-tabs,
+  .md-sidebar,
+  .md-footer,
+  .md-search {
+    display: none !important;
+  }
 }

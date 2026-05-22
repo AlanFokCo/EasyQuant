@@ -9,21 +9,31 @@ hide:
 
 <div class="hero-cards">
 <a class="hero-card" href="doc/user_guide/#0-新手四步">
+<span class="hero-card-icon">🚀</span>
 <h3>快速入门</h3>
 <p>从安装到运行第一个回测，15 分钟即可上手。</p>
 <span class="card-link">开始 →</span>
 </a>
 <a class="hero-card" href="doc/user_guide/">
+<span class="hero-card-icon">📖</span>
 <h3>用户手册</h3>
 <p>编写策略、运行回测、解读报告的完整指南。</p>
 <span class="card-link">阅读 →</span>
 </a>
 <a class="hero-card" href="tutorials/">
+<span class="hero-card-icon">🎓</span>
 <h3>分步教程</h3>
 <p>从零到实盘的系列教程，含真实策略案例。</p>
 <span class="card-link">学习 →</span>
 </a>
+<a class="hero-card" href="doc/web_studio/">
+<span class="hero-card-icon">🌐</span>
+<h3>Web 工作室</h3>
+<p>浏览器中编写策略、运行回测、查看报告。</p>
+<span class="card-link">体验 →</span>
+</a>
 <a class="hero-card" href="doc/api_reference/">
+<span class="hero-card-icon">🔧</span>
 <h3>API 参考</h3>
 <p><code>eqlib</code> 全部公开 API 的参数与示例。</p>
 <span class="card-link">查阅 →</span>
