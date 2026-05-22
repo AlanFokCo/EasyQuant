@@ -68,8 +68,14 @@ class StreamHub:
         self._max = max_queued
         self._ttl = buffer_ttl_sec
         self._max_buffers = max_buffers
-        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._locks: Dict[str, asyncio.Lock] = {}
         self._insert_order: List[str] = []  # LRU eviction tracking
+
+    def _get_lock(self, run_id: str) -> asyncio.Lock:
+        """Lazily create a lock for run_id, bound to the current event loop."""
+        if run_id not in self._locks:
+            self._locks[run_id] = asyncio.Lock()
+        return self._locks[run_id]
 
     # ------------------------------------------------------------------
     # Public interface

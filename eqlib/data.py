@@ -10,6 +10,8 @@ import akshare as ak
 import pandas as pd
 from eqlib.data_cache import _slice_by_date
 
+import numpy as np
+
 # Chinese calendar — primary source for A-share holiday detection.
 # Falls back to hardcoded holidays + fixed-date rules if unavailable.
 try:
@@ -79,7 +81,9 @@ def _normalize_date(d) -> str:
         return d.strftime("%Y%m%d")
     if isinstance(d, datetime.date):
         return d.strftime("%Y%m%d")
-    return str(d).replace("-", "")
+    # Handle strings like "2024-01-15 09:30:00" — strip time component.
+    raw = str(d).replace("-", "")
+    return raw[:8] if len(raw) > 8 else raw
 
 
 def _to_numeric(df: pd.DataFrame, cols: list[str]):
@@ -381,6 +385,14 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
                 df = pd.DataFrame()
 
         if not df.empty:
+            # Ensure DatetimeIndex for _slice_by_date
+            if not isinstance(df.index, pd.DatetimeIndex):
+                if "date" in df.columns:
+                    df["date"] = pd.to_datetime(df["date"])
+                    df.set_index("date", inplace=True)
+                elif "日期" in df.columns:
+                    df["日期"] = pd.to_datetime(df["日期"])
+                    df.set_index("日期", inplace=True)
             with _cache_lock:
                 _cache[cache_key] = df
             return _slice_by_date(df, start_date, end_date) if start_date and end_date else df
@@ -600,6 +612,11 @@ def attribute_history(security, count: int, unit: str = "1d",
     df_data = fetch_stock_data(security, start_date, end_date, adjust=adjust_map.get(fq, "qfq"))
     if df_data.empty:
         return pd.DataFrame()
+
+    # Strict less-than: exclude today's bar to prevent look-ahead bias.
+    if end_date is not None:
+        cutoff = pd.Timestamp(end_date).normalize()
+        df_data = df_data[df_data.index < cutoff]
 
     df_data = df_data.tail(count)
     available = [f for f in fields if f in df_data.columns]
@@ -1342,7 +1359,7 @@ def get_extras(field: str, security_list=None, start_date=None,
             df["code"] = df["代码"]
             price = pd.to_numeric(df["最新价"], errors="coerce")
             pb = pd.to_numeric(df["市净率"], errors="coerce")
-            result = dict(zip(df["code"], (price / pb).fillna(0)))
+            result = dict(zip(df["code"], (price / pb).replace([np.inf, -np.inf], pd.NA).fillna(0)))
         else:
             return {}
 

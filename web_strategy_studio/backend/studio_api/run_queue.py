@@ -68,7 +68,6 @@ async def enqueue(run_id: str, coro_factory: _TaskCoro) -> None:
 async def _worker() -> None:
     """Consume the queue and run tasks with concurrency cap."""
     global _semaphore, _queue
-    _queue = asyncio.Queue()
     _semaphore = asyncio.Semaphore(settings.max_concurrent_runs)
     log.info("run_queue.worker_started", max_concurrent=settings.max_concurrent_runs)
     while True:
