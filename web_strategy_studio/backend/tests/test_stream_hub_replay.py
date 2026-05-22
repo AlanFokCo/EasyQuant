@@ -21,7 +21,7 @@ def hub():
 
 
 def test_buffer_created_on_publish(hub):
-    asyncio.get_event_loop().run_until_complete(_test_buffer_created(hub))
+    asyncio.run(_test_buffer_created(hub))
 
 
 async def _test_buffer_created(hub):
@@ -33,7 +33,7 @@ async def _test_buffer_created(hub):
 
 
 def test_ring_buffer_max_size(hub):
-    asyncio.get_event_loop().run_until_complete(_test_ring_size(hub))
+    asyncio.run(_test_ring_size(hub))
 
 
 async def _test_ring_size(hub):
@@ -47,7 +47,7 @@ async def _test_ring_size(hub):
 
 
 def test_terminal_event_sets_expires(hub):
-    asyncio.get_event_loop().run_until_complete(_test_terminal(hub))
+    asyncio.run(_test_terminal(hub))
 
 
 async def _test_terminal(hub):
@@ -61,7 +61,7 @@ async def _test_terminal(hub):
 
 
 def test_buffer_expiry(hub):
-    asyncio.get_event_loop().run_until_complete(_test_expiry(hub))
+    asyncio.run(_test_expiry(hub))
 
 
 async def _test_expiry(hub):
@@ -81,7 +81,7 @@ async def _test_expiry(hub):
 
 
 def test_missed_since_returns_correct_events(hub):
-    asyncio.get_event_loop().run_until_complete(_test_missed_since(hub))
+    asyncio.run(_test_missed_since(hub))
 
 
 async def _test_missed_since(hub):
@@ -101,7 +101,7 @@ async def _test_missed_since(hub):
 
 
 def test_missed_since_empty_if_up_to_date(hub):
-    asyncio.get_event_loop().run_until_complete(_test_no_missed(hub))
+    asyncio.run(_test_no_missed(hub))
 
 
 async def _test_no_missed(hub):
@@ -189,7 +189,7 @@ def test_stream_terminal_run_immediate_done():
                 session.add(run)
                 await session.commit()
 
-        asyncio.get_event_loop().run_until_complete(_insert_terminal_run())
+        asyncio.run(_insert_terminal_run())
 
         # Hitting the stream endpoint for a terminal run with no buffer
         # must return a synthesised done event and close.
@@ -203,7 +203,7 @@ def test_stream_terminal_run_immediate_done():
 
 
 def test_evict_expired_removes_stale_buffer(hub):
-    asyncio.get_event_loop().run_until_complete(_test_evict(hub))
+    asyncio.run(_test_evict(hub))
 
 
 async def _test_evict(hub):
@@ -225,11 +225,13 @@ def test_max_buffers_cap():
     from studio_api.stream_hub import StreamHub
 
     hub = StreamHub(max_buffers=3)
-    loop = asyncio.get_event_loop()
 
-    # Create 4 non-terminal buffers — oldest should be evicted
-    for i in range(4):
-        loop.run_until_complete(hub.publish(f"run_{i}", "log", {"line": "test"}))
+    async def _publish_many() -> None:
+        # Create 4 non-terminal buffers — oldest should be evicted
+        for i in range(4):
+            await hub.publish(f"run_{i}", "log", {"line": "test"})
+
+    asyncio.run(_publish_many())
 
     assert len(hub._buffers) <= 3
     assert "run_0" not in hub._buffers  # oldest evicted
@@ -242,13 +244,15 @@ def test_terminal_buffers_not_evicted():
     from studio_api.stream_hub import StreamHub
 
     hub = StreamHub(max_buffers=3)
-    loop = asyncio.get_event_loop()
 
-    # Create 2 terminal + 2 non-terminal
-    loop.run_until_complete(hub.publish("run_done1", "done", {"status": "succeeded"}))
-    loop.run_until_complete(hub.publish("run_done2", "error", {"msg": "fail"}))
-    loop.run_until_complete(hub.publish("run_active1", "log", {"line": "x"}))
-    loop.run_until_complete(hub.publish("run_active2", "log", {"line": "y"}))
+    async def _publish_many() -> None:
+        # Create 2 terminal + 2 non-terminal
+        await hub.publish("run_done1", "done", {"status": "succeeded"})
+        await hub.publish("run_done2", "error", {"msg": "fail"})
+        await hub.publish("run_active1", "log", {"line": "x"})
+        await hub.publish("run_active2", "log", {"line": "y"})
+
+    asyncio.run(_publish_many())
 
     # Terminal buffers should survive
     assert "run_done1" in hub._buffers
