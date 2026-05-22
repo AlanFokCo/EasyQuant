@@ -55,7 +55,7 @@ def test_enqueue_adds_to_pending():
         await enqueue("run_unit_1", lambda: asyncio.sleep(0))
         assert "run_unit_1" in pending_run_ids()
 
-    asyncio.get_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
     _pending.clear()
 
 
@@ -71,7 +71,7 @@ def test_queue_position():
         assert queue_position("run_pos_b") == 2
         assert queue_position("nonexistent") is None
 
-    asyncio.get_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
     _pending.clear()
 
 

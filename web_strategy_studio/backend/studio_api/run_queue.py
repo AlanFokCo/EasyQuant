@@ -108,6 +108,16 @@ def start_worker() -> None:
     _queue = asyncio.Queue()
     _pending.clear()
     _active.clear()
+    current_loop = asyncio.get_running_loop()
+    if _worker_task is not None and not _worker_task.done():
+        try:
+            worker_loop = _worker_task.get_loop()
+        except RuntimeError:
+            # Task loop may already be closed during app/test teardown.
+            worker_loop = None
+        if worker_loop is not current_loop:
+            _worker_task.cancel()
+            _worker_task = None
     if _worker_task is None or _worker_task.done():
         _worker_task = asyncio.create_task(_worker())
 
