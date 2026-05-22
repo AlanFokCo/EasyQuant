@@ -225,9 +225,13 @@ def test_max_buffers_cap():
     from studio_api.stream_hub import StreamHub
 
     hub = StreamHub(max_buffers=3)
-    # Create 4 non-terminal buffers — oldest should be evicted
-    for i in range(4):
-        asyncio.run(hub.publish(f"run_{i}", "log", {"line": "test"}))
+
+    async def _publish_many() -> None:
+        # Create 4 non-terminal buffers — oldest should be evicted
+        for i in range(4):
+            await hub.publish(f"run_{i}", "log", {"line": "test"})
+
+    asyncio.run(_publish_many())
 
     assert len(hub._buffers) <= 3
     assert "run_0" not in hub._buffers  # oldest evicted
@@ -240,11 +244,15 @@ def test_terminal_buffers_not_evicted():
     from studio_api.stream_hub import StreamHub
 
     hub = StreamHub(max_buffers=3)
-    # Create 2 terminal + 2 non-terminal
-    asyncio.run(hub.publish("run_done1", "done", {"status": "succeeded"}))
-    asyncio.run(hub.publish("run_done2", "error", {"msg": "fail"}))
-    asyncio.run(hub.publish("run_active1", "log", {"line": "x"}))
-    asyncio.run(hub.publish("run_active2", "log", {"line": "y"}))
+
+    async def _publish_many() -> None:
+        # Create 2 terminal + 2 non-terminal
+        await hub.publish("run_done1", "done", {"status": "succeeded"})
+        await hub.publish("run_done2", "error", {"msg": "fail"})
+        await hub.publish("run_active1", "log", {"line": "x"})
+        await hub.publish("run_active2", "log", {"line": "y"})
+
+    asyncio.run(_publish_many())
 
     # Terminal buffers should survive
     assert "run_done1" in hub._buffers
