@@ -90,22 +90,44 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
 
     # Sharpe ratio
     daily_rf = risk_free_rate / ann_factor
-    sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor) if std > 0 else 0.0
+    # Handle NaN from std calculation (empty or single-element series)
+    if pd.isna(std) or std <= 0:
+        sharpe = 0.0
+    else:
+        sharpe = (daily_ret.mean() - daily_rf) / std * np.sqrt(ann_factor)
+        if not np.isfinite(sharpe):
+            sharpe = 0.0
 
     # Sortino ratio — semi-deviation against MAR=0 (industry standard)
     # Using ddof=0 (population std) for consistency with Sharpe above.
     downside = daily_ret[daily_ret < 0]
     downside_std = downside.std(ddof=0) if len(downside) >= 1 else 0.0
-    sortino = (daily_ret.mean() / downside_std * np.sqrt(ann_factor)
-               if downside_std > 0 else 0.0)
+    # Handle NaN from single-element downside series
+    if pd.isna(downside_std) or downside_std <= 0:
+        sortino = 0.0
+    else:
+        sortino = (daily_ret.mean() / downside_std * np.sqrt(ann_factor))
+        if not np.isfinite(sortino):
+            sortino = 0.0
 
     # Max drawdown
     rolling_max = values.cummax()
     drawdown = (values - rolling_max) / rolling_max
     max_dd = drawdown.min()
-    dd_end_idx = drawdown.idxmin()
-    peak_slice = values[:dd_end_idx]
-    dd_start_idx = peak_slice.idxmax() if not peak_slice.empty else values.index[0]
+    # Handle NaN drawdown
+    if pd.isna(max_dd):
+        max_dd = 0.0
+        dd_end_idx = values.index[-1] if not values.empty else None
+        dd_start_idx = values.index[0] if not values.empty else None
+    else:
+        dd_end_idx = drawdown.idxmin()
+        # Handle case where idxmin might return None or invalid index
+        if pd.isna(dd_end_idx) or dd_end_idx not in values.index:
+            dd_end_idx = values.index[-1] if not values.empty else None
+            dd_start_idx = values.index[0] if not values.empty else None
+        else:
+            peak_slice = values[:dd_end_idx]
+            dd_start_idx = peak_slice.idxmax() if not peak_slice.empty else values.index[0]
 
     # Calmar ratio
     calmar = ann_return / abs(max_dd) if max_dd != 0 else 0.0
@@ -365,6 +387,9 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
             return default
 
         cov_matrix = np.cov(strat, bench, ddof=1)
+        # Handle NaN in covariance matrix (can occur with NaN inputs)
+        if not np.isfinite(cov_matrix).all():
+            return default
         bench_var = cov_matrix[1, 1]
         if bench_var < 1e-15:
             return default

@@ -42,16 +42,16 @@
 
 1. 安装：
    ```bash
-   # PyPI 安装（推荐）
+   # PyPI 安装（推荐，无需克隆仓库）
    pip install easyquant-eqlib
-   # 或从源码安装（在仓库根目录）
+   # 或从源码安装（开发者 / 贡献者，在仓库根目录）
    # pip install .
    ```
 2. 验证导入：
    ```bash
    python -c "from eqlib import *; print('eqlib OK')"
    ```
-3. 跑一次完整回测：
+3. 跑一次完整回测（需在仓库目录运行示例）：
    ```bash
    python examples/03_run_backtest.py
    ```
@@ -64,6 +64,11 @@ python examples/01_fetch_data.py
 pip install -e ".[dev]"
 python -m pytest tests/
 ```
+
+> **替代方案：Web 策略工作室**
+> 如果你更喜欢浏览器界面，可以使用 [Web 策略工作室](../web_strategy_studio/)。
+> 无需安装 Python 环境，打开浏览器即可编写策略、运行回测、查看报告和对比指标。
+> 详见 [Web 工作室文档](web_studio.md)。
 
 ---
 

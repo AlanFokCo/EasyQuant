@@ -11,6 +11,7 @@
 | 无交易、T+1、下单数量、基准 | [回测与策略](#回测与策略) |
 | PNG 空、HTML 空白、JSON 里数字对不上 | [报告与分析](#报告与分析) |
 | 模拟盘、导出 PTrade / QMT | [模拟盘与导出](#模拟盘与导出) |
+| Web 工作室登录、部署、回测问题 | [Web 策略工作室](#web-策略工作室) |
 | 改源码、跑单元测试 | [开发与测试](#开发与测试) |
 
 ---
@@ -142,6 +143,79 @@ pip install .
 ### Q: 如何导出到 PTrade / QMT？
 
 见 [ptrade_adapter.md](ptrade_adapter.md) 与示例 `examples/13_ptrade_export.py`。
+
+---
+
+## Web 策略工作室
+
+### Q: Web 工作室是什么？
+
+Web 策略工作室是一个浏览器端的策略开发平台。无需安装 Python 环境，打开浏览器即可编写策略、运行回测、查看报告和对比指标。适合不想折腾环境配置的用户，也适合团队协作场景。
+
+详见 [Web 工作室文档](web_studio.md)。
+
+### Q: 如何启动 Web 工作室？
+
+**本地开发：**
+
+```bash
+cd web_strategy_studio
+npm run install:all   # 首次运行：安装依赖
+npm run dev:all       # 启动后端 + 前端
+```
+
+然后在浏览器打开 `http://localhost:5173/`。
+
+**Docker 部署：**
+
+```bash
+cd web_strategy_studio
+docker compose up --build
+```
+
+访问 `http://localhost:8080/`。
+
+### Q: 登录后自动退出是什么原因？
+
+**原因：** JWT Token 过期或失效时，前端会自动清除认证状态并返回登录页面。
+
+**处理：**
+- 检查后端是否正常运行
+- 生产环境需配置稳定的 JWT 密钥（环境变量 `EQ_JWT_SECRET`），否则重启后密钥变化导致所有 Token 失效
+- 若后端重启，需重新登录
+
+### Q: 回测一直显示 positions=0，没有交易？
+
+**原因：** 策略代码中可能未正确设置 `context.universe = [...]`。Web 工作室的数据预加载依赖这个配置来确定需要加载哪些股票的历史数据。
+
+**处理：** 在 `initialize(context)` 中明确设置股票池：
+
+```python
+def initialize(context):
+    context.universe = ['601390', '600519']
+```
+
+### Q: 如何添加新用户？
+
+Web 工作室不支持自主注册。用户账号需由服务端预先配置。
+
+**方式一：配置文件（推荐）**
+
+编辑 `web_strategy_studio/backend/users.yaml`：
+
+```yaml
+preset_users:
+  - username: demo
+    password: demo123
+```
+
+**方式二：环境变量**
+
+```bash
+export EQ_PRESET_USERS="demo:demo123,analyst:analyst456"
+```
+
+修改后需重启后端生效。
 
 ---
 

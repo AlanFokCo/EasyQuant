@@ -107,12 +107,15 @@ class StreamHub:
         return buf
 
     async def publish(self, run_id: str, event: str, data: Dict[str, Any]) -> None:
-        # Store in ring buffer first (so late subscribers can replay).
-        if run_id not in self._buffers:
-            self._buffers[run_id] = _RunBuffer()
-            self._insert_order.append(run_id)
-        buf = self._buffers[run_id]
-        entry = buf.push(event, data, self._ttl)
+        # Use lock to prevent race conditions on buffer creation
+        lock = self._get_lock(run_id)
+        async with lock:
+            # Store in ring buffer first (so late subscribers can replay).
+            if run_id not in self._buffers:
+                self._buffers[run_id] = _RunBuffer()
+                self._insert_order.append(run_id)
+            buf = self._buffers[run_id]
+            entry = buf.push(event, data, self._ttl)
         line = {"id": entry["id"], "event": event, "data": data}
 
         # MED-26: evict oldest non-terminal buffers when cap exceeded

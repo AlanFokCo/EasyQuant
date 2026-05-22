@@ -67,6 +67,9 @@ export function ToastContainer() {
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label="通知消息"
       style={{
         position: "fixed",
         top: 16,

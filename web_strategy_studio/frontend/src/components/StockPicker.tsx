@@ -20,6 +20,7 @@ export function StockPicker({ value, onChange, placeholder }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -37,14 +38,39 @@ export function StockPicker({ value, onChange, placeholder }: Props) {
     setQuery(value);
   }, [value]);
 
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
+  }, []);
+
   const doSearch = useCallback((q: string) => {
     if (!q || q.length < 1) {
       setResults([]);
       return;
     }
+    // Cancel previous search request
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+
     apiJson<Symbol[]>(`/api/v1/symbols/search?q=${encodeURIComponent(q)}&limit=15`)
-      .then(setResults)
-      .catch(() => setResults([]));
+      .then((data) => {
+        if (!signal.aborted) {
+          setResults(data);
+        }
+      })
+      .catch((err) => {
+        // Ignore abort errors
+        if (err.name !== "AbortError" && !signal.aborted) {
+          setResults([]);
+        }
+      });
   }, []);
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,0 +1,29 @@
+# Preset users configuration
+# These users will be automatically created on server startup.
+#
+# Format:
+#   - username: <username>
+#     password: <password>
+#
+# Example:
+#   preset_users:
+#     - username: demo
+#       password: demo123
+#     - username: analyst
+#       password: analyst456
+#
+# You can also configure via environment variable EQ_PRESET_USERS:
+#   EQ_PRESET_USERS="demo:demo123,analyst:analyst456"
+#
+# If both are configured, both sets of users will be created.
+
+preset_users:
+  # Default demo user (remove or modify as needed)
+  - username: demo
+    password: demo123
+
+  # Add more users below:
+  # - username: quant
+  #   password: quant789
+  # - username: researcher
+  #   password: researcher123

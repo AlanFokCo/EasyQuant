@@ -37,7 +37,12 @@ export function RunsHistoryPanel({ strategyId }: { strategyId: string | null }) 
   const { data, isLoading } = useQuery({
     queryKey: ["runs", strategyId],
     queryFn: () => fetchRunsList(strategyId ?? undefined),
-    refetchInterval: 10_000,
+    // Only poll when there are active (running/queued) runs
+    refetchInterval: (query) => {
+      const runs = query.state.data?.runs ?? [];
+      const hasActive = runs.some((r: RunListItem) => r.status === "running" || r.status === "queued");
+      return hasActive ? 5000 : false; // 5s when active, no polling when all done
+    },
   });
 
   const runs = useMemo(() => data?.runs ?? [], [data]);

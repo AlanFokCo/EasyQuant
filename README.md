@@ -46,12 +46,25 @@ Event-driven quantitative backtesting framework for China A-share market.
 ## Quick Start
 
 ```bash
-pip install easyquant-eqlib   # or: pip install -e .  (from source)
+# PyPI install (recommended for users)
+pip install easyquant-eqlib
+
+# Or install from source (for contributors)
+git clone https://github.com/AlanFokCo/EasyQuant.git
+cd EasyQuant
+pip install .
+```
+
+Verify installation and run your first backtest:
+
+```bash
 python -c "from eqlib import *; print('eqlib OK')"
-python examples/03_run_backtest.py
+python examples/03_run_backtest.py  # run in repo directory
 ```
 
 Open the generated `.html` report in `reports/` in your browser.
+
+> **New to Python?** If you prefer a browser-based interface, check out [Web Strategy Studio](web_strategy_studio/) — write strategies, run backtests, and view reports without installing any Python environment. See [Web Studio Docs](doc/web_studio.md) for details.
 
 ### Write Your First Strategy
 
@@ -177,6 +190,7 @@ Full index at [`examples/Examples.md`](examples/Examples.md).
 | [**Docs Site**](https://AlanFokCo.github.io/EasyQuant/) | Full documentation site with search, dark theme, navigation |
 | [**Doc Center**](doc/README.md) | Entry point: user guide, API index, FAQ, report metrics |
 | [**User Guide**](doc/user_guide.md) | Install → write strategy → run backtest → read reports |
+| [**Web Studio**](doc/web_studio.md) | Browser-based strategy development (no Python install needed) |
 | [**API Reference**](doc/api_reference.md) | All public APIs with parameters and examples |
 | [**Utils Reference**](doc/utils_reference.md) | Technical indicators, statistics, position sizing |
 | [**Tutorials**](tutorials/README.md) | Zero to production, with real strategy cases |

@@ -44,6 +44,21 @@ export function useRunStream(runId: string | null) {
     });
   }, []);
 
+  // Track mounted state to avoid setState on unmounted component
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Safe flush that checks mounted state
+  const safeFlush = useCallback(() => {
+    if (!mountedRef.current) return;
+    flush();
+  }, [flush]);
+
   useEffect(() => {
     if (!runId) {
       // HIGH-20: use sessionStorage (per-tab)
@@ -85,7 +100,7 @@ export function useRunStream(runId: string | null) {
         if (flushTimer.current) return;
         flushTimer.current = setTimeout(() => {
           flushTimer.current = null;
-          flush();
+          safeFlush();
         }, FLUSH_MS);
       };
 
@@ -121,7 +136,7 @@ export function useRunStream(runId: string | null) {
           } else {
             setDoneError(null);
           }
-          flush();
+          safeFlush();
         } catch { /* ignore */ }
         done.current = true;
         es?.close();
@@ -133,7 +148,7 @@ export function useRunStream(runId: string | null) {
       });
 
       es.addEventListener("error", (_e) => {
-        flush();
+        safeFlush();
         es?.close();
         setSseConnected(false);
         if (!done.current && !cancelled) {
@@ -164,9 +179,10 @@ export function useRunStream(runId: string | null) {
       setSseReconnecting(false);
       if (retryTimer) clearTimeout(retryTimer);
       if (flushTimer.current) clearTimeout(flushTimer.current);
-      flush();
+      // Don't flush on cleanup - component is unmounting
+      // and we shouldn't update state after unmount
     };
-  }, [runId, flush, setSseConnected, setSseReconnecting]);
+  }, [runId, safeFlush, setSseConnected, setSseReconnecting]);
 
   return {
     logs,

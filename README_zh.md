@@ -45,12 +45,25 @@
 ## 快速开始
 
 ```bash
+# PyPI 安装（推荐，无需克隆仓库）
+pip install easyquant-eqlib
+
+# 或从源码安装（开发者 / 贡献者）
+git clone https://github.com/AlanFokCo/EasyQuant.git
+cd EasyQuant
 pip install .
+```
+
+验证安装并运行第一个回测：
+
+```bash
 python -c "from eqlib import *; print('eqlib OK')"
-python examples/03_run_backtest.py
+python examples/03_run_backtest.py  # 需在仓库目录运行
 ```
 
 在 `reports/` 目录打开最新生成的 `.html` 报告。
+
+> **新手提示：** 如果你更喜欢浏览器界面，可以使用 [Web 策略工作室](web_strategy_studio/) — 无需安装 Python 环境，打开浏览器即可编写策略、运行回测、查看报告。详见 [Web 工作室文档](doc/web_studio.md)。
 
 ### 编写第一个策略
 
@@ -129,6 +142,10 @@ EasyQuant/
 ├── docs/                  # GitHub Pages 文档站源文件（MkDocs Material）
 ├── tests/                 # 测试套件
 ├── assets/                # 品牌素材（Logo、图标）
+├── web_strategy_studio/   # Web 策略工作室（浏览器端策略开发）
+│   ├── backend/           # FastAPI 后端
+│   ├── frontend/          # React + Vite 前端
+│   └── docker-compose.yml # Docker 一键部署
 ├── CLAUDE.md              # AI 代理配置与优化工作流
 └── mkdocs.yml             # 文档站配置
 ```
@@ -170,6 +187,7 @@ EasyQuant/
 | [**在线文档站**](https://AlanFokCo.github.io/EasyQuant/) | 完整文档站，支持搜索、暗色主题、导航 |
 | [**文档中心**](doc/README.md) | 入口：用户手册、API 索引、FAQ、报告指标详解 |
 | [**用户手册**](doc/user_guide.md) | 安装 → 编写策略 → 运行回测 → 解读报告 |
+| [**Web 策略工作室**](doc/web_studio.md) | 浏览器端策略开发，无需安装 Python 环境 |
 | [**API 参考**](doc/api_reference.md) | 全部公开 API 的参数与示例 |
 | [**工具库参考**](doc/utils_reference.md) | 技术指标、统计分析、仓位管理 |
 | [**新手教程**](tutorials/README.md) | 从零基础到实盘部署，含真实策略案例 |

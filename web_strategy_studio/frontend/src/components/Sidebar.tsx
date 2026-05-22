@@ -2,9 +2,10 @@
  * Sidebar — left icon-strip navigation.
  * Shows nav items + bottom theme toggle.
  */
-import { Code2, Database, GitCompare, History, SunMoon } from "lucide-react";
+import { Code2, Database, GitCompare, History, LogOut, SunMoon } from "lucide-react";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme } from "../hooks/useTheme";
+import { logout } from "../api/client";
 
 type NavItem = {
   id: "editor" | "history" | "data" | "compare";
@@ -13,27 +14,26 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "editor",  icon: <Code2  size={18} />, label: "策略编辑器 (Editor)" },
-  { id: "history", icon: <History size={18} />, label: "回测历史 (⌘K ⌘H)" },
-  { id: "data",    icon: <Database size={18} />, label: "数据管理 (Data)" },
-  { id: "compare", icon: <GitCompare size={18} />, label: "指标对比 (⌘K ⌘C)" },
+  { id: "editor",  icon: <Code2  size={18} />, label: "策略编辑器" },
+  { id: "history", icon: <History size={18} />, label: "回测历史" },
+  { id: "data",    icon: <Database size={18} />, label: "数据管理" },
+  { id: "compare", icon: <GitCompare size={18} />, label: "指标对比" },
 ];
 
 export function Sidebar() {
   const showHistory = useEditorStore((s) => s.showHistory);
   const showCompare = useEditorStore((s) => s.showCompare);
   const showData = useEditorStore((s) => s.showData);
-  const setShowHistory = useEditorStore((s) => s.setShowHistory);
-  const setShowCompare = useEditorStore((s) => s.setShowCompare);
-  const setShowData = useEditorStore((s) => s.setShowData);
   const { theme, setTheme } = useTheme();
 
   const active = showHistory ? "history" : showCompare ? "compare" : showData ? "data" : "editor";
 
   function handleNav(id: NavItem["id"]) {
-    setShowHistory(id === "history");
-    setShowCompare(id === "compare");
-    setShowData(id === "data");
+    useEditorStore.setState({
+      showHistory: id === "history",
+      showCompare: id === "compare",
+      showData: id === "data",
+    });
   }
 
   function cycleTheme() {
@@ -43,6 +43,34 @@ export function Sidebar() {
   }
 
   const themeLabel = theme === "dark" ? "深色主题" : theme === "light" ? "浅色主题" : "跟随系统";
+
+  const navBtnStyle = (isActive: boolean): React.CSSProperties => ({
+    width: 36,
+    height: 36,
+    borderRadius: "var(--radius-md)",
+    border: "none",
+    background: isActive ? "var(--primary-bg)" : "transparent",
+    color: isActive ? "var(--primary)" : "var(--text-secondary)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    transition: "background var(--motion-fast), color var(--motion-fast)",
+  });
+
+  const utilBtnStyle: React.CSSProperties = {
+    width: 36,
+    height: 36,
+    borderRadius: "var(--radius-md)",
+    border: "none",
+    background: "transparent",
+    color: "var(--text-secondary)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    transition: "background var(--motion-fast), color var(--motion-fast)",
+  };
 
   return (
     <aside
@@ -55,8 +83,7 @@ export function Sidebar() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        paddingTop: 8,
-        paddingBottom: 8,
+        padding: "var(--spacing-sm) 0",
         gap: 4,
         position: "relative",
         zIndex: 100,
@@ -70,7 +97,7 @@ export function Sidebar() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: 8,
+          marginBottom: "var(--spacing-sm)",
         }}
         aria-hidden="true"
       >
@@ -93,18 +120,16 @@ export function Sidebar() {
           aria-label={item.label}
           title={item.label}
           onClick={() => handleNav(item.id)}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "var(--radius-md)",
-            border: "none",
-            background: active === item.id ? "var(--primary-bg)" : "transparent",
-            color: active === item.id ? "var(--primary)" : "var(--text-secondary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "background var(--motion-fast), color var(--motion-fast)",
+          style={navBtnStyle(active === item.id)}
+          onMouseEnter={(e) => {
+            if (active !== item.id) {
+              e.currentTarget.style.background = "var(--bg-tertiary)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (active !== item.id) {
+              e.currentTarget.style.background = "transparent";
+            }
           }}
         >
           {item.icon}
@@ -113,27 +138,55 @@ export function Sidebar() {
 
       <div style={{ flex: 1 }} />
 
+      {/* Divider before utility buttons */}
+      <div
+        style={{
+          width: 24,
+          height: 1,
+          background: "var(--border-subtle)",
+          marginBottom: 4,
+        }}
+      />
+
       {/* Theme toggle */}
       <button
         type="button"
         aria-label={`当前: ${themeLabel}，点击切换主题`}
         title={`当前: ${themeLabel} (点击循环切换)`}
         onClick={cycleTheme}
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: "var(--radius-md)",
-          border: "none",
-          background: "transparent",
-          color: "var(--text-secondary)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: "color var(--motion-fast)",
+        style={utilBtnStyle}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--bg-tertiary)";
+          e.currentTarget.style.color = "var(--text)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "var(--text-secondary)";
         }}
       >
         <SunMoon size={16} />
+      </button>
+
+      {/* Logout */}
+      <button
+        type="button"
+        aria-label="退出登录"
+        title="退出登录"
+        onClick={() => {
+          logout();
+          window.location.reload();
+        }}
+        style={{ ...utilBtnStyle, color: "var(--text-dim)" }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--state-error-bg)";
+          e.currentTarget.style.color = "var(--state-error)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "var(--text-dim)";
+        }}
+      >
+        <LogOut size={16} />
       </button>
     </aside>
   );
