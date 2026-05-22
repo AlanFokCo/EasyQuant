@@ -10,7 +10,7 @@
 [![Docs](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/deploy-docs.yml?label=Docs)](https://AlanFokCo.github.io/EasyQuant/)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/AlanFokCo/EasyQuant/blob/main/LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.1-gray.svg)](https://github.com/AlanFokCo/EasyQuant/releases)
+[![Version](https://img.shields.io/badge/version-1.0.3-gray.svg)](https://github.com/AlanFokCo/EasyQuant/releases)
 
 <p>
 <a href="https://github.com/AlanFokCo/EasyQuant/blob/main/README.md">English</a> ·
