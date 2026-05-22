@@ -346,9 +346,11 @@ class PreloadedData:
             )
 
         # Build panel: columns = MultiIndex (security, field)
-        self.panel = pd.concat(frames, axis=1)
+        # Sort keys explicitly so concat order matches the manual MultiIndex assignment.
+        sorted_keys = sorted(frames.keys())
+        self.panel = pd.concat({sec: frames[sec] for sec in sorted_keys}, axis=1)
         self.panel.columns = pd.MultiIndex.from_tuples(
-            [(sec, col) for sec in frames for col in frames[sec].columns],
+            [(sec, col) for sec in sorted_keys for col in frames[sec].columns],
             names=["security", "field"],
         )
 

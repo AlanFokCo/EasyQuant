@@ -14,7 +14,7 @@ from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,7 +55,7 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(
         HTTPBearer(description="JWT bearer token", auto_error=False)
     ),
-    token: Optional[str] = None,
+    token: Optional[str] = Query(None, description="JWT token for SSE/EventSource endpoints"),
 ) -> User:
     """Extract and verify JWT, return the authenticated User.
 

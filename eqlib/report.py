@@ -175,18 +175,23 @@ def _align_index_close_to_times(target_time_strings: list, price_df: pd.DataFram
     if "close" not in price_df.columns:
         return []
     s = price_df["close"].astype(float).copy()
-    if not isinstance(s.index, pd.DatetimeIndex):
-        s.index = pd.to_datetime(s.index, errors="coerce")
-    s = s.sort_index()
-    s = s[~s.index.duplicated(keep="last")]
-    s = s.dropna(how="all")
+    # Ensure index is a proper DatetimeIndex (handles date objects, strings, etc.)
+    s.index = pd.to_datetime(s.index, errors="coerce")
+    s = s.dropna()  # Drop rows where date conversion failed
     if s.empty:
         return []
+    s = s[~s.index.duplicated(keep="last")]
     try:
         target_ix = pd.DatetimeIndex([pd.Timestamp(t) for t in target_time_strings])
     except Exception:
         return []
-    union_ix = s.index.union(target_ix).sort_values()
+    if target_ix.empty:
+        return []
+    try:
+        union_ix = s.index.union(target_ix)
+    except Exception:
+        # Fallback: forward-fill to each target date individually
+        return _align_fallback(s, target_ix, target_time_strings)
     s_ff = s.reindex(union_ix).sort_index().ffill()
     at_targets = s_ff.reindex(target_ix)
     if at_targets.isna().any():
@@ -202,6 +207,26 @@ def _align_index_close_to_times(target_time_strings: list, price_df: pd.DataFram
         if np.isnan(pr):
             continue
         out.append({"time": t, "value": round((pr / base - 1.0) * 100.0, 3)})
+    return out
+
+
+def _align_fallback(s: pd.Series, target_ix: pd.DatetimeIndex, target_time_strings: list) -> list:
+    """Fallback alignment when union fails: for each target date, find the last available price."""
+    s = s.sort_index()
+    out = []
+    for i, ts in enumerate(target_ix):
+        mask = s.index <= ts
+        available = s[mask]
+        if available.empty:
+            continue
+        pr = float(available.iloc[-1])
+        if np.isnan(pr):
+            continue
+        if i == 0:
+            base = pr
+        if base <= 0 or np.isnan(base):
+            continue
+        out.append({"time": target_time_strings[i], "value": round((pr / base - 1.0) * 100.0, 3)})
     return out
 
 

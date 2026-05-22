@@ -76,6 +76,8 @@ async def _process_run_task(run_id: str) -> None:
         if run is None:
             return
         if run.status == "cancelled":
+            run.finished_at = datetime.now(timezone.utc)
+            await session.commit()
             await stream_hub.publish(
                 run_id,
                 "done",
@@ -263,6 +265,10 @@ async def create_run(
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
 
     # Use the current version's source code.
+    if not strat.versions:
+        raise HTTPException(
+            status_code=400, detail=api_error("BAD_REQUEST", "Strategy has no versions")
+        )
     current_sv = next(
         (v for v in strat.versions if v.version == strat.current_version),
         max(strat.versions, key=lambda v: v.version),
@@ -424,6 +430,16 @@ async def run_stream(
     current_user: User = Depends(auth_mod.get_current_user),
 ):
     """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13)."""
+    # Verify ownership before exposing stream data
+    res = await session.execute(
+        select(Run, Strategy.owner_id)
+        .join(Strategy, Run.strategy_id == Strategy.id)
+        .where(Run.id == run_id)
+    )
+    row = res.first()
+    if row is None or row.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+    run = row[0]
     # Resolve last_event_id to an int (default -1 = send everything).
     resume_from: int = -1
     if last_event_id:
@@ -435,7 +451,6 @@ async def run_stream(
     async def event_gen():
         # B6/B13: Check if the run is already terminal in DB; if so, immediately
         # replay buffered events (from resume_from) and close — no 1-hour wait.
-        run = await session.get(Run, run_id)
         terminal_in_db = run is not None and run.status in ("succeeded", "failed", "cancelled")
 
         buf = stream_hub.get_buffer(run_id)
@@ -694,10 +709,22 @@ async def compare_runs(
 
 
 @router.get("/runs/{run_id}/report/data")
-async def get_run_report_data(run_id: str, session: AsyncSession = Depends(get_session)):
+async def get_run_report_data(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     """Return the full report.json contents for native frontend rendering."""
     run = await session.get(Run, run_id)
     if run is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
+    # Verify ownership
+    res = await session.execute(
+        select(Strategy.id).where(
+            Strategy.id == run.strategy_id, Strategy.owner_id == current_user.id
+        )
+    )
+    if res.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     if run.status != "succeeded":
         raise HTTPException(

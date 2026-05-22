@@ -24,7 +24,7 @@ import sys
 import tempfile
 import warnings
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -82,12 +82,23 @@ _ALLOWED_ENV_KEYS = frozenset(
         "TMP",
     }
 )
+# HIGH-22: Sensitive keys that must NOT be leaked to the untrusted strategy subprocess.
+_BLOCKED_ENV_KEYS = frozenset(
+    {
+        "EQ_JWT_SECRET",
+        "EQ_ADMIN_ID",
+        "EQ_ADMIN_PASSWORD",
+        "EQ_STUDIO_DATABASE_URL",
+    }
+)
 
 
 def _build_env(artifact_sub: Path) -> Dict[str, str]:
     """Build a filtered environment dict for subprocess execution."""
     filtered: Dict[str, str] = {}
     for k, v in os.environ.items():
+        if k in _BLOCKED_ENV_KEYS:
+            continue
         if k in _ALLOWED_ENV_KEYS or any(k.startswith(p) for p in _ALLOWED_ENV_PREFIXES):
             filtered[k] = v
     return {
@@ -156,7 +167,7 @@ async def _pump_and_collect(
                 run_id,
                 "log",
                 {
-                    "ts": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "stream": name,
                     "line": line,
                 },
