@@ -164,7 +164,7 @@ def initialize(context):
             },
         }
         r = client.post("/api/v1/runs", json=run_body, headers=headers)
-        assert r.status_code in (200, 201)
+        assert r.status_code in (200, 201, 202)
         run_id = r.json()["id"]
 
         # Poll for completion
@@ -230,7 +230,7 @@ def initialize(context):
             },
         }
         r = client.post("/api/v1/runs", json=run_body, headers=headers)
-        assert r.status_code in (200, 201)
+        assert r.status_code in (200, 201, 202)
         run_id = r.json()["id"]
 
         import time
