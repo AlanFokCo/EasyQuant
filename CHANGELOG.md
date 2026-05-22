@@ -6,7 +6,117 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### ⚠️ Backtest Correctness Fixes (P0)
+---
+
+## [1.0.3] — 2026-05-23
+
+### Web Strategy Studio
+
+#### Added
+
+- Auto-logout on authentication failure (401 response) with seamless redirect to login page
+- Preset users configuration via `users.yaml` file (recommended) or `EQ_PRESET_USERS` environment variable
+- Smart polling for history panel — only polls when there are active (running/queued) runs
+
+#### Changed
+
+- Removed registration page — users must be pre-configured by server
+- Fixed sidebar navigation buttons not responding to clicks
+- Added loading indicators for login button, stock search, and backtest runs
+- Enhanced button hover effects with visual feedback
+- Translated key UI labels to Chinese (e.g., "初始资金", "使用本地数据")
+- Added `aria-live="polite"` for toast notifications, improved keyboard navigation
+
+#### Fixed
+
+- Race condition in `run_queue.py` — semaphore acquisition order to prevent queue corruption
+- Stream hub buffer operations — added async lock for concurrent buffer access
+- Stock picker search cancellation — AbortController cancels previous requests
+- Unmount state handling — added `mountedRef` to prevent setState on unmounted components
+- JWT leak in URLs — fixed JWT token appearing in URLs when opening reports in new tabs
+
+#### Security
+
+- Hardened JWT handling and token validation
+- Filtered sensitive environment variables (`EQ_JWT_SECRET`, `EQ_ADMIN_PASSWORD`) from subprocess
+- Removed unauthenticated static reports mount — reports now served through authenticated API only
+
+### eqlib Core
+
+#### Fixed
+
+- NaN handling in Sharpe, Sortino, max_drawdown, and beta calculations — returns stable values for edge cases
+
+### Documentation
+
+#### Added
+
+- Web Studio section in README, user guide, tutorials, and FAQ
+- 6 new Web Studio FAQ entries (login, deployment, troubleshooting)
+
+#### Changed
+
+- Improved Quick Start sections with PyPI vs source install guidance
+- Updated web_studio.md with auto-logout mechanism and preset users configuration
+
+### GitHub Pages
+
+#### Added
+
+- "Web 工作室" hero card with icon (🌐) on homepage
+- Emoji icons for all hero cards (🚀, 📖, 🎓, 🌐, 🔧)
+- Search keyboard shortcut hint ("⌘K 快捷搜索")
+- Focus-visible states for keyboard navigation accessibility
+
+#### Changed
+
+- Enhanced hero card hover effects with elevation animation and shadow
+- Added back-to-top fade-in animation
+- Added navigation active indicator (blue accent bar)
+- Optimized responsive layout for mobile devices
+- Added print-friendly styles
+
+### CI/CD
+
+#### Fixed
+
+- Studio Tests workflow: ruff lint errors, `@types/node` for frontend TypeScript
+- Backend pytest: asyncio loop handling and queue isolation tests
+- bcrypt 4.x compatibility: replaced passlib with bcrypt directly
+
+---
+
+## [1.0.2] — 2026-05-15
+
+### Security
+
+- CORS `allow_origins` configurable via `EQ_STUDIO_CORS_ALLOWED_ORIGINS`
+- Subprocess environment filtered to prevent host secrets leaking
+- `StreamHub` cleans up empty entries to prevent unbounded memory growth
+
+### Web Strategy Studio
+
+- Dockerfile adds non-root `studio` user and `HEALTHCHECK`
+- `cancel_run` awaits subprocess exit before committing "cancelled" to DB
+- Backtest report modal uses native Lightweight Charts rendering
+- Metrics comparison table uses real LTVC mini area charts
+- Python 3.9 compatibility with legacy typing syntax
+
+### Backtest Correctness (P0)
+
+- Fixed look-ahead bias in stock selection filters
+- Fixed alpha/beta `fillna(0)` contaminating benchmark returns
+- Fixed monthly rebalance skipping when month-start is a holiday
+- Added optional price-limit enforcement (`set_option('check_price_limit', True)`)
+- Fixed MaxSharpe arithmetic-mean annualization (now uses geometric formula)
+
+### HTML Report
+
+- Added RSI(14), MACD(12,26,9), Bollinger Bands(20,2) indicators
+- Added indicator toggle panel on K-line chart
+- Added crosshair-linked legend for real-time values
+
+### ⚠️ Backtest Correctness Fixes (P0) (continued from Unreleased)
 
 Users of previous versions should re-run their backtests.  Several bugs
 caused strategies to appear significantly more profitable than they would be
