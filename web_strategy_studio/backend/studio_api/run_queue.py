@@ -113,6 +113,7 @@ def start_worker() -> None:
         try:
             worker_loop = _worker_task.get_loop()
         except RuntimeError:
+            # Task loop may already be closed during app/test teardown.
             worker_loop = None
         if worker_loop is not current_loop:
             _worker_task.cancel()
