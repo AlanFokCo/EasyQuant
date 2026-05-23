@@ -1,6 +1,8 @@
 /**
  * StatusBar — bottom bar showing connection state, dirty flag, keyboard hints.
  */
+import { useEffect, useState } from "react";
+
 import { useEditorStore } from "../store/editorStore";
 
 export function StatusBar() {
@@ -8,6 +10,15 @@ export function StatusBar() {
   const sseConnected = useEditorStore((s) => s.sseConnected);
   const sseReconnecting = useEditorStore((s) => s.sseReconnecting);
   const runId = useEditorStore((s) => s.runId);
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setViewportWidth(window.innerWidth));
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, []);
+
+  const isPhone = viewportWidth < 480;
 
   const isMac = typeof navigator !== "undefined" &&
     (/Mac/.test(navigator.userAgent) || /Mac|iPod|iPhone|iPad/.test(navigator.platform));
@@ -35,16 +46,16 @@ export function StatusBar() {
       aria-label="状态栏"
       role="status"
       style={{
-        height: 24,
+        height: isPhone ? 20 : 24,
         flexShrink: 0,
         background: "var(--bg-secondary)",
         borderTop: "1px solid var(--border)",
         display: "flex",
         alignItems: "center",
-        paddingLeft: 12,
-        paddingRight: 12,
-        gap: 16,
-        fontSize: 11,
+        paddingLeft: isPhone ? 8 : 12,
+        paddingRight: isPhone ? 8 : 12,
+        gap: isPhone ? 8 : 16,
+        fontSize: isPhone ? 10 : 11,
         color: "var(--text-dim)",
         userSelect: "none",
         overflow: "hidden",
@@ -78,19 +89,23 @@ export function StatusBar() {
 
       <div style={{ flex: 1 }} />
 
-      {/* Keyboard hints */}
-      <span aria-hidden="true">
-        <kbd style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{mod}S</kbd>{" "}
-        保存+检查
-      </span>
-      <span aria-hidden="true">
-        <kbd style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{mod}↵</kbd>{" "}
-        运行
-      </span>
-      <span aria-hidden="true">
-        <kbd style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{mod}K</kbd>{" "}
-        命令面板
-      </span>
+      {/* Keyboard hints - only on tablet/desktop */}
+      {!isPhone && (
+        <>
+          <span aria-hidden="true">
+            <kbd style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{mod}S</kbd>{" "}
+            保存+检查
+          </span>
+          <span aria-hidden="true">
+            <kbd style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{mod}↵</kbd>{" "}
+            运行
+          </span>
+          <span aria-hidden="true">
+            <kbd style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{mod}K</kbd>{" "}
+            命令面板
+          </span>
+        </>
+      )}
     </footer>
   );
 }

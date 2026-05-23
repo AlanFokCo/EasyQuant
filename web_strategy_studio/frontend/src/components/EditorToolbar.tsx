@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
 
 import { useEditorStore } from "../store/editorStore";
 
@@ -15,13 +16,23 @@ export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, 
   const setShowHistory = useEditorStore((s) => s.setShowHistory);
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
   const sseConnected = useEditorStore((s) => s.sseConnected);
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setViewportWidth(window.innerWidth));
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, []);
+
+  const isPhone = viewportWidth < 480;
+  const isMobile = viewportWidth < 768;
 
   return (
     <div
       style={{
         display: "flex",
         gap: 6,
-        padding: "6px 12px",
+        padding: isPhone ? "6px 8px" : "6px 12px",
         background: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border)",
         alignItems: "center",
@@ -29,11 +40,11 @@ export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, 
         flexShrink: 0,
       }}
     >
-      {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 8 }}>
+      {/* Logo - smaller on phone */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: isPhone ? 4 : 8 }}>
         <svg
-          width="20"
-          height="20"
+          width={isPhone ? 16 : 20}
+          height={isPhone ? 16 : 20}
           viewBox="0 0 24 24"
           fill="none"
           stroke="var(--primary)"
@@ -42,19 +53,21 @@ export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, 
         >
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
         </svg>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>
-          EasyQuant
-        </span>
+        {!isPhone && (
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>
+            EasyQuant
+          </span>
+        )}
       </div>
 
-      {/* Run button */}
+      {/* Run button - shorter text on phone */}
       <button
         type="button"
         aria-label={running ? "回测运行中" : "运行回测 (Cmd+Enter)"}
         onClick={onRunBacktest}
         disabled={running}
         style={{
-          padding: "4px 16px",
+          padding: isPhone ? "4px 12px" : "4px 16px",
           borderRadius: "var(--radius-sm)",
           border: "none",
           background: running ? "var(--text-dim)" : "var(--primary)",
@@ -65,45 +78,51 @@ export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, 
           transition: "background var(--motion-fast)",
         }}
       >
-        {running ? "运行中…" : "运行回测"}
+        {running ? "…" : isPhone ? "运行" : "运行回测"}
       </button>
 
-      {/* History & Compare */}
-      <button
-        type="button"
-        aria-label="查看回测历史 (Cmd+K Cmd+H)"
-        style={ghostBtn}
-        onClick={() => setShowHistory(true)}
-        title="回测历史"
-      >
-        历史
-      </button>
-      <button
-        type="button"
-        aria-label="指标对比 (Cmd+K Cmd+C)"
-        style={ghostBtn}
-        onClick={() => setShowCompare(true)}
-        title="指标对比"
-      >
-        对比
-      </button>
+      {/* History & Compare - only on tablet/desktop */}
+      {!isPhone && (
+        <>
+          <button
+            type="button"
+            aria-label="查看回测历史 (Cmd+K Cmd+H)"
+            style={ghostBtn}
+            onClick={() => setShowHistory(true)}
+            title="回测历史"
+          >
+            历史
+          </button>
+          <button
+            type="button"
+            aria-label="指标对比 (Cmd+K Cmd+C)"
+            style={ghostBtn}
+            onClick={() => setShowCompare(true)}
+            title="指标对比"
+          >
+            对比
+          </button>
+        </>
+      )}
 
       <div style={{ flex: 1 }} />
 
-      {/* Connection status */}
-      <span
-        aria-label={sseConnected ? "SSE 已连接" : "SSE 未连接"}
-        style={{
-          fontSize: 10,
-          color: sseConnected ? "var(--state-success)" : "var(--text-dim)",
-          marginRight: 4,
-        }}
-      >
-        {sseConnected ? "●" : "○"}
-      </span>
+      {/* Connection status - only on tablet/desktop */}
+      {!isPhone && (
+        <span
+          aria-label={sseConnected ? "SSE 已连接" : "SSE 未连接"}
+          style={{
+            fontSize: 10,
+            color: sseConnected ? "var(--state-success)" : "var(--text-dim)",
+            marginRight: 4,
+          }}
+        >
+          {sseConnected ? "●" : "○"}
+        </span>
+      )}
 
-      {/* Command palette trigger */}
-      {onOpenCommandPalette && (
+      {/* Command palette trigger - only on tablet/desktop */}
+      {!isPhone && onOpenCommandPalette && (
         <button
           type="button"
           aria-label="打开命令面板 (Cmd+K)"
@@ -115,17 +134,21 @@ export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, 
         </button>
       )}
 
-      {/* Format & font */}
-      <button type="button" aria-label="格式化代码 (Cmd+Shift+F)" title="格式化" style={iconBtn} onClick={onFormat}>
-        格式
-      </button>
-      <button type="button" aria-label="缩小字号" title="缩小" style={iconBtn} onClick={() => onFontDelta(-1)}>
-        A−
-      </button>
-      <button type="button" aria-label="放大字号" title="放大" style={iconBtn} onClick={() => onFontDelta(1)}>
-        A+
-      </button>
-      <span style={{ fontSize: 11, color: "var(--text-dim)", minWidth: 32 }}>{fontSize}px</span>
+      {/* Format & font controls - only on tablet/desktop */}
+      {!isMobile && (
+        <>
+          <button type="button" aria-label="格式化代码 (Cmd+Shift+F)" title="格式化" style={iconBtn} onClick={onFormat}>
+            格式
+          </button>
+          <button type="button" aria-label="缩小字号" title="缩小" style={iconBtn} onClick={() => onFontDelta(-1)}>
+            A−
+          </button>
+          <button type="button" aria-label="放大字号" title="放大" style={iconBtn} onClick={() => onFontDelta(1)}>
+            A+
+          </button>
+          <span style={{ fontSize: 11, color: "var(--text-dim)", minWidth: 32 }}>{fontSize}px</span>
+        </>
+      )}
     </div>
   );
 }

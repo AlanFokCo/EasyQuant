@@ -1286,6 +1286,96 @@ if (typeof LightweightCharts === 'undefined') {{
   /* Method list */
   .method-list {{ padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8; }}
   .method-list li {{ margin-bottom: 6px; }}
+  /* ═══════════════════════════════════════════════════════════
+     MOBILE RESPONSIVE (≤480px)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 480px) {{
+    /* Chart heights - reduce ~40% for phones */
+    #kline    {{ height: 280px !important; }}
+    #returns  {{ height: 200px !important; }}
+    #drawdown, #pnlbar, #dailyret, #rsichart, #macdchart {{ height: 120px !important; }}
+    /* Header adjustments */
+    .header {{ padding: 8px 0; }}
+    .header-inner {{ padding: 0 8px; flex-wrap: wrap; gap: 8px; }}
+    .eq-brand-text {{ display: none; }}
+    h1 {{ font-size: 14px; }}
+    .header-meta {{ font-size: 10px; }}
+    .pnl-badge {{ padding: 3px 8px; font-size: 12px; }}
+    /* Summary cards - 2x3 grid */
+    .summary {{ grid-template-columns: repeat(2, 1fr); gap: 6px; }}
+    .card {{ padding: 10px 8px; }}
+    .card .label {{ font-size: 10px; }}
+    .card .value {{ font-size: 16px; }}
+    /* Metrics grid - 2 columns */
+    .metrics-grid {{ grid-template-columns: repeat(2, 1fr); }}
+    .metrics-grid-secondary {{ grid-template-columns: repeat(2, 1fr); }}
+    .metric-card {{ padding: 8px 6px; }}
+    .metric-card .mc-title {{ font-size: 9px; }}
+    .metric-card .mc-val {{ font-size: 14px; }}
+    /* Section titles */
+    .section-title {{ font-size: 12px; padding: 6px 0 4px; }}
+    /* Chart panels */
+    .chart-panel-head {{ padding: 6px 12px; flex-wrap: wrap; gap: 8px; }}
+    .chart-panel-head h2 {{ font-size: 12px; }}
+    .chart-tabs {{ flex-wrap: wrap; gap: 4px; }}
+    .chart-tab {{ padding: 2px 8px; font-size: 10px; }}
+    /* Indicator buttons */
+    .indicator-panel {{ gap: 3px; }}
+    .ind-btn {{ padding: 3px 8px; font-size: 10px; }}
+    /* Crosshair legend */
+    .chart-legend {{ top: 4px; right: 4px; min-width: 150px; font-size: 10px; padding: 4px 8px; }}
+    /* Tables - smaller font */
+    .trade-table {{ font-size: 11px; }}
+    .trade-table th, .trade-table td {{ padding: 6px 8px; }}
+    .cal-wrapper {{ max-height: 300px; }}
+    .cal-table {{ font-size: 11px; }}
+    .cal-table th, .cal-table td {{ padding: 4px 6px; }}
+    /* Modal */
+    .modal {{ padding: 16px; width: 95%; max-height: 85vh; }}
+    .modal h3 {{ font-size: 14px; }}
+    .modal-cur {{ font-size: 22px; }}
+    .modal-sec p {{ font-size: 12px; }}
+    .modal-formula {{ font-size: 11px; padding: 6px 10px; }}
+    /* Sources grid - single column */
+    .sources-grid {{ grid-template-columns: 1fr; gap: 8px; }}
+    .src-card {{ padding: 10px; }}
+    .src-card .src-name {{ font-size: 12px; }}
+    .src-card .src-desc {{ font-size: 11px; }}
+    /* Container padding */
+    .container {{ padding: 8px 8px 32px; }}
+    /* Footer */
+    .footer {{ padding: 12px 0; font-size: 10px; }}
+    /* Tabs */
+    .tab-bar {{ flex-wrap: wrap; }}
+    .tab {{ padding: 8px 12px; font-size: 12px; }}
+    /* Tech grid */
+    .tech-grid {{ grid-template-columns: repeat(2, 1fr); gap: 6px; }}
+    .tech-card {{ padding: 8px 6px; }}
+    .tech-card .title {{ font-size: 10px; }}
+    .tech-card .val {{ font-size: 14px; }}
+  }}
+  /* ═══════════════════════════════════════════════════════════
+     TABLET RESPONSIVE (481px - 768px)
+     ═══════════════════════════════════════════════════════════ */
+  @media (min-width: 481px) and (max-width: 768px) {{
+    /* Chart heights - reduce ~25% for tablets */
+    #kline    {{ height: 360px !important; }}
+    #returns  {{ height: 240px !important; }}
+    #drawdown, #pnlbar, #dailyret, #rsichart, #macdchart {{ height: 140px !important; }}
+    /* Summary - 3x2 grid */
+    .summary {{ grid-template-columns: repeat(3, 1fr); }}
+    /* Metrics - 3 columns */
+    .metrics-grid {{ grid-template-columns: repeat(3, 1fr); }}
+    .metrics-grid-secondary {{ grid-template-columns: repeat(3, 1fr); }}
+    /* Chart panels */
+    .chart-panel-head {{ padding: 8px 14px; }}
+    /* Tables */
+    .trade-table {{ font-size: 12px; }}
+    /* Sources grid - 2 columns */
+    .sources-grid {{ grid-template-columns: repeat(2, 1fr); }}
+    /* Tech grid - 3 columns */
+    .tech-grid {{ grid-template-columns: repeat(3, 1fr); }}
+  }}
 </style>
 </head>
 <body>
