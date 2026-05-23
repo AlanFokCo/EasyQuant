@@ -2,7 +2,7 @@
  * ReportViewer — native Lightweight Charts rendering for backtest reports.
  * Replaces the iframe approach in ReportLinkModal for full interactivity.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createChart, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import type { IChartApi } from "lightweight-charts";
 
@@ -98,11 +98,11 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
   const isTablet = viewportWidth >= 480 && viewportWidth < 768;
 
   // Dynamic chart height based on viewport
-  function getChartHeight(base: number): number {
+  const getChartHeight = useCallback((base: number): number => {
     if (isPhone) return Math.round(base * 0.58);
     if (isTablet) return Math.round(base * 0.75);
     return base;
-  }
+  }, [isPhone, isTablet]);
 
   // Fetch report JSON data
   useEffect(() => {
@@ -333,7 +333,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
       chartsRef.current.forEach((c) => c.remove());
       chartsRef.current = [];
     };
-  }, [data]);
+  }, [data, getChartHeight]);
 
   if (loading) {
     return (
