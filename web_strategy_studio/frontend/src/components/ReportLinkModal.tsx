@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import ReportViewer from "./ReportViewer";
 
@@ -11,6 +11,16 @@ type Props = {
 };
 
 export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setViewportWidth(window.innerWidth));
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, []);
+
+  const isPhone = viewportWidth < 480;
+
   const jsonUrl = useMemo(() => {
     if (runId) return `/api/v1/reports/${runId}/report.json`;
     // Derive from htmlUrl if available
@@ -27,8 +37,8 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
         inset: 0,
         background: "rgba(0,0,0,0.65)",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        alignItems: isPhone ? "stretch" : "center",
+        justifyContent: isPhone ? "stretch" : "center",
         zIndex: 2000,
       }}
       role="dialog"
@@ -37,19 +47,27 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
       <div
         style={{
           background: "var(--bg-secondary)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-          padding: 16,
-          width: "min(100vw - 32px, 1100px)",
-          maxHeight: "min(92vh, 900px)",
+          border: isPhone ? "none" : "1px solid var(--border)",
+          borderRadius: isPhone ? 0 : 8,
+          boxShadow: isPhone ? "none" : "0 8px 32px rgba(0,0,0,0.4)",
+          padding: isPhone ? 0 : 16,
+          width: isPhone ? "100vw" : "min(100vw - 32px, 1100px)",
+          height: isPhone ? "100vh" : "auto",
+          maxHeight: isPhone ? "100vh" : "min(92vh, 900px)",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: isPhone ? 8 : 12,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>回测报告</h3>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: isPhone ? "12px 8px" : 0,
+          borderBottom: isPhone ? "1px solid var(--border)" : "none",
+        }}>
+          <h3 style={{ margin: 0, fontSize: isPhone ? 14 : 15, fontWeight: 600 }}>回测报告</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {runId ? (
               <button
@@ -69,7 +87,7 @@ export function ReportLinkModal({ open, htmlUrl, runId, onClose }: Props) {
           </div>
         </div>
         {runId ? (
-          <div style={{ flex: 1, minHeight: 420, overflow: "auto" }}>
+          <div style={{ flex: 1, minHeight: isPhone ? "calc(100vh - 56px)" : 420, overflow: "auto" }}>
             <ReportViewer runId={runId} jsonUrl={jsonUrl} />
           </div>
         ) : (

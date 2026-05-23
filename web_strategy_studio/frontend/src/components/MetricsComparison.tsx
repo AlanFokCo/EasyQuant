@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMemo } from "react";
 
 import { compareRunMetrics, EquityCurvePoint } from "../api/client";
@@ -130,6 +130,15 @@ function EquitySpark({ points }: { points: EquityCurvePoint[] }) {
 export function MetricsComparison() {
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
   const compareIds = useEditorStore((s) => s.compareIds);
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setViewportWidth(window.innerWidth));
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, []);
+
+  const isPhone = viewportWidth < 480;
 
   // B22: single compare call instead of N parallel fetchRunMetrics calls
   const { data, isLoading } = useQuery({
@@ -165,11 +174,11 @@ export function MetricsComparison() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "12px 14px",
+          padding: isPhone ? "8px 10px" : "12px 14px",
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>指标对比</h3>
+        <h3 style={{ margin: 0, fontSize: isPhone ? 13 : 14, fontWeight: 600 }}>指标对比</h3>
         <button
           type="button"
           onClick={() => setShowCompare(false)}
@@ -187,7 +196,7 @@ export function MetricsComparison() {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: "auto", padding: 14 }}>
+      <div style={{ flex: 1, overflow: "auto", padding: isPhone ? 8 : 14, maxWidth: "100%" }}>
         {isLoading && (
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
             加载指标数据中…
@@ -199,97 +208,100 @@ export function MetricsComparison() {
           </div>
         )}
         {!isLoading && runs.length > 0 && (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 12,
-            }}
-          >
-            <thead>
-              <tr>
-                <th
-                  style={{
-                    textAlign: "left",
-                    padding: "6px 10px",
-                    color: "var(--text-secondary)",
-                    fontWeight: 600,
-                    borderBottom: "1px solid var(--border)",
-                    position: "sticky",
-                    top: 0,
-                    background: "var(--bg)",
-                  }}
-                >
-                  指标
-                </th>
-                {runs.map((r) => (
+          <div style={{ overflowX: "auto", maxWidth: "100%" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: isPhone ? 11 : 12,
+                minWidth: isPhone ? 400 : "auto",
+              }}
+            >
+              <thead>
+                <tr>
                   <th
-                    key={r.run_id}
                     style={{
-                      textAlign: "center",
+                      textAlign: "left",
                       padding: "6px 10px",
                       color: "var(--text-secondary)",
                       fontWeight: 600,
                       borderBottom: "1px solid var(--border)",
-                      fontFamily: "var(--mono)",
-                      fontSize: 10,
                       position: "sticky",
                       top: 0,
                       background: "var(--bg)",
                     }}
                   >
-                    {r.run_id.slice(0, 14)}
+                    指标
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* B22: equity curve row */}
-              <tr>
-                <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--border-light)", color: "var(--text-secondary)", fontWeight: 500 }}>
-                  净值曲线
-                </td>
-                {runs.map((r) => (
-                  <td key={r.run_id} style={{ padding: "6px 10px", textAlign: "center", borderBottom: "1px solid var(--border-light)" }}>
-                    <EquitySpark points={r.equity_curve ?? []} />
-                  </td>
-                ))}
-              </tr>
-              {keys.map((key) => (
-                <tr key={key}>
-                  <td
-                    style={{
-                      padding: "6px 10px",
-                      borderBottom: "1px solid var(--border-light)",
-                      color: "var(--text-secondary)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {METRIC_LABELS[key] ?? key}
-                  </td>
-                  {runs.map((r) => {
-                    const val = r.metrics[key] ?? null;
-                    const good = isGood(key, val);
-                    return (
-                      <td
-                        key={r.run_id}
-                        style={{
-                          padding: "6px 10px",
-                          textAlign: "center",
-                          borderBottom: "1px solid var(--border-light)",
-                          fontFamily: "var(--mono)",
-                          color: good ? "var(--success)" : val === null ? "var(--text-dim)" : "var(--text)",
-                          fontWeight: good ? 600 : 400,
-                        }}
-                      >
-                        {METRIC_FMT[key] ? METRIC_FMT[key](val) : val != null ? String(val) : "—"}
-                      </td>
-                    );
-                  })}
+                  {runs.map((r) => (
+                    <th
+                      key={r.run_id}
+                      style={{
+                        textAlign: "center",
+                        padding: "6px 10px",
+                        color: "var(--text-secondary)",
+                        fontWeight: 600,
+                        borderBottom: "1px solid var(--border)",
+                        fontFamily: "var(--mono)",
+                        fontSize: 10,
+                        position: "sticky",
+                        top: 0,
+                        background: "var(--bg)",
+                      }}
+                    >
+                      {r.run_id.slice(0, 14)}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {/* B22: equity curve row */}
+                <tr>
+                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--border-light)", color: "var(--text-secondary)", fontWeight: 500 }}>
+                    净值曲线
+                  </td>
+                  {runs.map((r) => (
+                    <td key={r.run_id} style={{ padding: "6px 10px", textAlign: "center", borderBottom: "1px solid var(--border-light)" }}>
+                      <EquitySpark points={r.equity_curve ?? []} />
+                    </td>
+                  ))}
+                </tr>
+                {keys.map((key) => (
+                  <tr key={key}>
+                    <td
+                      style={{
+                        padding: "6px 10px",
+                        borderBottom: "1px solid var(--border-light)",
+                        color: "var(--text-secondary)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {METRIC_LABELS[key] ?? key}
+                    </td>
+                    {runs.map((r) => {
+                      const val = r.metrics[key] ?? null;
+                      const good = isGood(key, val);
+                      return (
+                        <td
+                          key={r.run_id}
+                          style={{
+                            padding: "6px 10px",
+                            textAlign: "center",
+                            borderBottom: "1px solid var(--border-light)",
+                            fontFamily: "var(--mono)",
+                            color: good ? "var(--success)" : val === null ? "var(--text-dim)" : "var(--text)",
+                            fontWeight: good ? 600 : 400,
+                          }}
+                        >
+                          {METRIC_FMT[key] ? METRIC_FMT[key](val) : val != null ? String(val) : "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

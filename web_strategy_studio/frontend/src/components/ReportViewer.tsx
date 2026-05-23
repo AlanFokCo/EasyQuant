@@ -85,6 +85,24 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+
+  // Track viewport width for responsive chart heights
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setViewportWidth(window.innerWidth));
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, []);
+
+  const isPhone = viewportWidth < 480;
+  const isTablet = viewportWidth >= 480 && viewportWidth < 768;
+
+  // Dynamic chart height based on viewport
+  function getChartHeight(base: number): number {
+    if (isPhone) return Math.round(base * 0.58);
+    if (isTablet) return Math.round(base * 0.75);
+    return base;
+  }
 
   // Fetch report JSON data
   useEffect(() => {
@@ -146,7 +164,8 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     container.appendChild(summaryDiv);
 
     // Helper: create chart container + chart
-    function makeChart(title: string, height: number, desc?: string) {
+    function makeChart(title: string, baseHeight: number, desc?: string) {
+      const height = getChartHeight(baseHeight);
       const panel = document.createElement("div");
       panel.style.cssText = "background:var(--bg-secondary);border-radius:4px;margin-bottom:8px;overflow:hidden;border:1px solid var(--border);";
       const head = document.createElement("div");
