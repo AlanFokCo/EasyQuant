@@ -8,7 +8,7 @@ from typing import Optional
 from eqlib.context import Context
 from eqlib.data import fetch_stock_data, get_price, _get_trading_days_range
 from eqlib.data_cache import PreloadedData
-from eqlib.objects import GlobalObject
+from eqlib.objects import GlobalObject, Order, LimitOrder, MarketOrder
 import eqlib._state as st
 from eqlib._state import BacktestSession, _set_session, _clear_session, reset_all
 from eqlib.logger import log
@@ -91,6 +91,33 @@ def set_benchmark(security):
 def set_option(name, value):
     """Set strategy option."""
     st.get_session()._options[name] = value
+
+
+def set_order_timeout(seconds: int):
+    """Set order timeout threshold in seconds.
+
+    Orders that remain pending for longer than this threshold are
+    automatically cancelled with status STATUS_EXPIRED.
+
+    Parameters:
+        seconds: timeout in seconds. Default is mode-based:
+            - Live/paper trading: 3600 (1 hour)
+            - Backtest: 86400 (1 day)
+            Set to 0 or negative to disable timeout.
+
+    Example::
+
+        # Cancel orders after 30 minutes in live trading
+        set_order_timeout(1800)
+
+        # Disable timeout (orders never expire)
+        set_order_timeout(0)
+    """
+    sess = st.get_session()
+    if seconds <= 0:
+        sess._order_timeout_seconds = None  # Disable timeout
+    else:
+        sess._order_timeout_seconds = seconds
 
 
 def run_daily(func, time="every_bar"):
@@ -308,32 +335,63 @@ def _t1_unlock(sess: BacktestSession):
         pos.closeable_amount = pos.amount
 
 
-def _get_price_limit_ratio(security: str) -> float:
+def _get_price_limit_ratio(security: str, context_dt: datetime.date = None) -> float:
     """Return the daily price-limit ratio (one-sided) for a security.
 
     Board classification:
         688xxx.XSHG  → STAR Market: ±20 %
         300xxx.XSHE  → ChiNext: ±20 %
+        ST stocks    → ±5 % (checked via get_extras if available)
         All others   → Main board / SME: ±10 %
 
-    ST stocks have a ±5 % limit but their current ST status is not reliably
-    known in the preloaded OHLCV panel, so they are treated as main-board here.
-    Users who need precise ST handling should override with ``set_option``.
+    Parameters:
+        security: stock code (e.g., "601390.XSHG")
+        context_dt: optional date for ST status lookup in backtest mode
     """
     bare = security.replace(".XSHG", "").replace(".XSHE", "")
+    # STAR Market and ChiNext: ±20%
     if bare.startswith("688") or bare.startswith("300"):
         return 0.20
-    return 0.10
+
+    # Check ST status via get_extras (requires akshare)
+    try:
+        from eqlib.data import get_extras
+        st_map = get_extras("is_st", security_list=[bare])
+        if st_map.get(bare, False):
+            return 0.05  # ST stocks: ±5%
+    except Exception:
+        # get_extras may fail in backtest mode or when akshare unavailable
+        pass
+
+    # Fallback: check if stock name contains "ST" via live data (for paper trading)
+    try:
+        import akshare as ak
+        spot = ak.stock_zh_a_spot_em()
+        row = spot[spot["代码"] == bare]
+        if len(row) > 0:
+            name = row.iloc[0]["名称"]
+            if "ST" in name or "st" in name.lower():
+                return 0.05
+    except Exception:
+        pass
+
+    return 0.10  # Main board / SME: ±10%
 
 
 def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
-                         exec_prices: Optional[dict] = None):
+                         exec_prices: Optional[dict] = None,
+                         max_daily_volume_pct: float = 0.10):
     """Fill all pending orders at today's open price.
 
     Orders buffered during yesterday's strategy execution are executed here,
     eliminating look-ahead bias.  Slippage is applied to each fill.
     After a buy is filled, the new shares are registered as T+1-locked
     (``closeable_amount`` is NOT increased for those shares until tomorrow).
+
+    Phase 2 enhancements:
+    - Large orders exceeding max_daily_volume_pct of daily volume are partially
+      filled; remaining amount stays in pending queue.
+    - Order status tracking: pending→submitted→partial_fill→filled.
 
     Parameters:
         sess: the active BacktestSession
@@ -342,9 +400,12 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             execution price.  When provided (e.g. for live/paper trading),
             these prices take precedence over preloaded data.  The suspension
             check is skipped for securities whose price is found in this dict.
+        max_daily_volume_pct: maximum fraction of daily volume that can be
+            filled in a single day (default 0.10 = 10%). Orders exceeding this
+            limit are partially filled; remaining amount stays pending.
     """
     from eqlib.context import Position
-    from eqlib.objects import OrderCost
+    from eqlib.objects import OrderCost, Order
     from eqlib.data import _is_etf
 
     pending = list(sess._pending_orders)
@@ -357,9 +418,43 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
     cost_cfg: OrderCost = sess._order_cost or OrderCost()
     portfolio = sess._context.portfolio
 
+    # Orders that are partially filled and need to stay pending
+    still_pending = []
+
     for order_req in pending:
         security = order_req["security"]
         action = order_req["action"]
+        order_obj: Order = order_req.get("order_obj")
+
+        # ── Phase 2.4: Order timeout check ───────────────────────────────────────
+        # Check if order has exceeded its timeout threshold.
+        # Live/paper trading: default 1 hour (3600s)
+        # Backtest: default 1 day (86400s) or None to disable
+        if order_obj and order_obj.order_id in sess._order_timestamps:
+            submit_time = sess._order_timestamps[order_obj.order_id]
+            current_time = datetime.datetime.now()
+            # Determine timeout threshold
+            timeout_seconds = sess._order_timeout_seconds
+            if timeout_seconds is None:
+                # Mode-based default: 1 hour for live/paper, 1 day for backtest
+                timeout_seconds = 3600 if exec_prices is not None else 86400
+            elapsed_seconds = (current_time - submit_time).total_seconds()
+            if elapsed_seconds > timeout_seconds:
+                log.warn(f"ORDER TIMEOUT {security}: order_id={order_obj.order_id} "
+                         f"elapsed={elapsed_seconds:.0f}s > timeout={timeout_seconds}s — order cancelled")
+                order_obj.transition_to(Order.STATUS_EXPIRED, reason="timeout")
+                sess._trade_log.append({
+                    "type": "ORDER_TIMEOUT",
+                    "date": day,
+                    "security": security,
+                    "order_id": order_obj.order_id,
+                    "action": action,
+                    "elapsed_seconds": elapsed_seconds,
+                    "timeout_seconds": timeout_seconds,
+                })
+                # Remove timestamp record
+                del sess._order_timestamps[order_obj.order_id]
+                continue
 
         # ── Resolve target amount ──────────────────────────────────────────
         if action == "ORDER":
@@ -391,6 +486,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             continue
 
         is_buy = delta > 0
+        requested_amount = abs(int(delta))
 
         # ── Resolve execution price ────────────────────────────────────────
         # When exec_prices is provided (paper/live trading), use it first.
@@ -403,6 +499,31 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         if not base_price:
             log.warn(f"fill_pending: no open price for {security} on {day} — order skipped")
             continue
+
+        # ── Phase 2.3: Limit order check ─────────────────────────────────────
+        # Check if order has a LimitOrder style and defer execution if
+        # the current price doesn't meet the limit condition.
+        order_style = order_req.get("style") or (order_obj.style if order_obj else None)
+        if order_style and hasattr(order_style, 'limit_price') and order_style.limit_price is not None:
+            limit_price = order_style.limit_price
+            if is_buy:
+                # Buy limit order: only execute if current price <= limit_price
+                # (we want to buy at or below our limit)
+                if base_price > limit_price:
+                    log.info(f"LIMIT ORDER BUY {security}: current price {base_price:.3f} > "
+                             f"limit price {limit_price:.3f} — order deferred")
+                    # Keep order in pending queue for future execution
+                    still_pending.append(order_req)
+                    continue
+            else:
+                # Sell limit order: only execute if current price >= limit_price
+                # (we want to sell at or above our limit)
+                if base_price < limit_price:
+                    log.info(f"LIMIT ORDER SELL {security}: current price {base_price:.3f} < "
+                             f"limit price {limit_price:.3f} — order deferred")
+                    # Keep order in pending queue for future execution
+                    still_pending.append(order_req)
+                    continue
 
         # ── HIGH-13: warn on large price gaps for ORDER_VALUE / ORDER_TARGET_VALUE ──
         # A significant gap between yesterday's close and today's open suggests
@@ -440,51 +561,96 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             log.warn(f"fill_pending: {security} volume=0 on {day} (appears suspended) — order skipped")
             continue
 
-        # ── Price-limit check (optional, A-share circuit breaker) ─────────
-        # Enabled via set_option('check_price_limit', True).
-        # Buys at limit-up open are typically unfillable; sells at limit-down
-        # open are also blocked.  Skip for live/paper trading (exec_prices)
-        # where the broker already applies the rule.
-        if exec_prices is None and sess._options.get("check_price_limit", False):
+        # ── Price-limit check (A-share circuit breaker) ─────────────────────
+        # Enabled via set_option('check_price_limit', True/False).
+        # Default: True for live/paper trading (broker rejects anyway), False for backtest.
+        # Buys at limit-up are unfillable; sells at limit-down are also blocked.
+        check_limit_default = exec_prices is not None  # True for live/paper, False for backtest
+        if sess._options.get("check_price_limit", check_limit_default):
             prev_day_date = None
             preloaded = _get_preloaded()
             if preloaded is not None and preloaded._dates is not None:
                 prev_day_date = preloaded.get_prev_trading_day(day)
-            if prev_day_date is not None:
+            # For live/paper trading, use previous close from exec_prices or fetch it
+            if exec_prices is not None and prev_day_date is None:
+                # Live mode: fetch previous close via akshare
+                try:
+                    bare = security.replace(".XSHG", "").replace(".XSHE", "")
+                    from eqlib.data import fetch_stock_data
+                    prev_df = fetch_stock_data(bare, end_date=str(day - datetime.timedelta(days=7)), count=10)
+                    if prev_df is not None and len(prev_df) > 0:
+                        prev_close = float(prev_df['close'].iloc[-1])
+                    else:
+                        prev_close = None
+                except Exception:
+                    prev_close = None
+            elif prev_day_date is not None:
                 prev_close = _get_price_fast(security, prev_day_date)
-                if prev_close:
-                    ratio = _get_price_limit_ratio(security)
-                    limit_up = prev_close * (1 + ratio)
-                    limit_down = prev_close * (1 - ratio)
-                    # A small tolerance (0.1%) absorbs floating-point rounding
-                    # in price data (e.g. adjusted-price inaccuracies) so that
-                    # a price of 10.999 is not incorrectly treated as exactly
-                    # limit-up (11.000).  The same tolerance is applied to both
-                    # sides for symmetry.
-                    _LIMIT_TOL = 0.001
-                    if is_buy and base_price >= limit_up * (1 - _LIMIT_TOL):
-                        log.warn(
-                            f"fill_pending BUY {security}: open {base_price:.3f} hit "
-                            f"limit-up ({limit_up:.3f}) on {day} — order skipped"
-                        )
-                        continue
-                    if not is_buy and base_price <= limit_down * (1 + _LIMIT_TOL):
-                        log.warn(
-                            f"fill_pending SELL {security}: open {base_price:.3f} hit "
-                            f"limit-down ({limit_down:.3f}) on {day} — order skipped"
-                        )
-                        continue
+            else:
+                prev_close = None
+
+            if prev_close:
+                ratio = _get_price_limit_ratio(security)
+                limit_up = prev_close * (1 + ratio)
+                limit_down = prev_close * (1 - ratio)
+                # A small tolerance (0.1%) absorbs floating-point rounding
+                # in price data (e.g. adjusted-price inaccuracies) so that
+                # a price of 10.999 is not incorrectly treated as exactly
+                # limit-up (11.000).  The same tolerance is applied to both
+                # sides for symmetry.
+                _LIMIT_TOL = 0.001
+                if is_buy and base_price >= limit_up * (1 - _LIMIT_TOL):
+                    log.warn(
+                        f"fill_pending BUY {security}: open {base_price:.3f} hit "
+                        f"limit-up ({limit_up:.3f}) on {day} — order skipped"
+                    )
+                    continue
+                if not is_buy and base_price <= limit_down * (1 + _LIMIT_TOL):
+                    log.warn(
+                        f"fill_pending SELL {security}: open {base_price:.3f} hit "
+                        f"limit-down ({limit_down:.3f}) on {day} — order skipped"
+                    )
+                    continue
 
         if slippage:
             exec_price = slippage.get_execution_price(
-                base_price, abs(int(delta)), is_buy, daily_volume=vol
+                base_price, requested_amount, is_buy, daily_volume=vol
             )
         else:
             exec_price = base_price
 
+        # ── Phase 2.2: Check daily volume limit for partial fill ───────────────
+        # Large orders exceeding max_daily_volume_pct of daily volume are
+        # partially filled; remaining amount stays in pending queue.
+        # This is more realistic for live trading where large orders can
+        # significantly impact market prices.
+        max_fill_by_volume = int(vol * max_daily_volume_pct) if vol and vol > 0 else requested_amount
+        # Round to 100-share lots
+        max_fill_by_volume = _round_lot(max_fill_by_volume)
+        # For sells, also consider closeable_amount
+        if not is_buy:
+            pos_closeable = portfolio.positions.get(security)
+            if pos_closeable:
+                max_fill_by_volume = min(max_fill_by_volume, int(pos_closeable.closeable_amount))
+
+        # Determine actual fill amount
+        fill_amount = min(requested_amount, max_fill_by_volume)
+        if fill_amount <= 0:
+            log.warn(f"fill_pending {is_buy and 'BUY' or 'SELL'} {security}: volume limit or closeable_amount=0")
+            continue
+
+        # Check if this is a partial fill
+        is_partial_fill = fill_amount < requested_amount
+        remaining_amount = requested_amount - fill_amount
+
+        # ── Update Order status ────────────────────────────────────────────────
+        if order_obj:
+            order_obj.transition_to(Order.STATUS_SUBMITTED)
+            order_obj.submit_time = datetime.datetime.now()
+
         # ── Execute ────────────────────────────────────────────────────────
         if is_buy:
-            rounded = _round_lot(delta)
+            rounded = _round_lot(fill_amount)
             if rounded <= 0:
                 continue
             commission = cost_cfg.calc_open_cost(exec_price, rounded)
@@ -498,7 +664,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 commission_rate = cost_cfg.open_tax + cost_cfg.open_commission
                 effective_rate = 1.0 + slippage_max_pct + commission_rate
                 max_affordable = int(portfolio.available_cash / (base_price * effective_rate) // 100) * 100
-                rounded = max_affordable
+                rounded = min(rounded, max_affordable)
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash")
                     continue
@@ -530,6 +696,16 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
 
             pos.avg_cost = total_cb / pos.amount if pos.amount > 0 else 0
 
+            # ── Update Order status for partial/full fill ───────────────────────
+            if order_obj:
+                if is_partial_fill and rounded < requested_amount:
+                    order_obj.add_partial_fill(rounded, exec_price, datetime.datetime.now())
+                    log.info(f"PARTIAL FILL BUY {security}: {rounded}/{requested_amount} @ {exec_price:.3f} "
+                             f"(open={base_price:.3f}), comm={commission:.2f}, remaining={remaining_amount}")
+                else:
+                    order_obj.add_partial_fill(rounded, exec_price, datetime.datetime.now())
+                    order_obj.transition_to(Order.STATUS_FILLED)
+
             log.info(f"FILL BUY {security}: {rounded} @ {exec_price:.3f} "
                      f"(open={base_price:.3f}), comm={commission:.2f}")
             sess._trade_log.append({
@@ -539,15 +715,18 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 "price": exec_price,
                 "amount": rounded,
                 "commission": commission,
+                "order_id": order_obj.order_id if order_obj else None,
+                "partial": is_partial_fill and rounded < requested_amount,
             })
 
         else:
             # Sell
-            sell_amount = abs(delta)
+            sell_amount = fill_amount
             if security not in portfolio.positions:
                 continue
             pos = portfolio.positions[security]
-            sell_amount = min(sell_amount, int(pos.closeable_amount))
+            # Round sell amount to 100-share lots (A-share requirement)
+            sell_amount = min(_round_lot(sell_amount), int(pos.closeable_amount))
             if sell_amount <= 0:
                 log.warn(f"fill_pending SELL {security}: closeable_amount=0 (T+1 or no position)")
                 continue
@@ -564,6 +743,16 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             if pos.amount <= 0:
                 del portfolio.positions[security]
 
+            # ── Update Order status for partial/full fill ───────────────────────
+            if order_obj:
+                if is_partial_fill and sell_amount < requested_amount:
+                    order_obj.add_partial_fill(sell_amount, exec_price, datetime.datetime.now())
+                    log.info(f"PARTIAL FILL SELL {security}: {sell_amount}/{requested_amount} @ {exec_price:.3f} "
+                             f"(open={base_price:.3f}), comm={commission:.2f}, remaining={remaining_amount}")
+                else:
+                    order_obj.add_partial_fill(sell_amount, exec_price, datetime.datetime.now())
+                    order_obj.transition_to(Order.STATUS_FILLED)
+
             log.info(f"FILL SELL {security}: {sell_amount} @ {exec_price:.3f} "
                      f"(open={base_price:.3f}), comm={commission:.2f}")
             sess._trade_log.append({
@@ -573,7 +762,40 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 "price": exec_price,
                 "amount": sell_amount,
                 "commission": commission,
+                "order_id": order_obj.order_id if order_obj else None,
+                "partial": is_partial_fill and sell_amount < requested_amount,
             })
+
+        # ── Keep remaining amount in pending queue for partial fills ───────────
+        if is_partial_fill and remaining_amount > 0 and order_obj:
+            # Create a new order request for remaining amount
+            remaining_req = {
+                "action": action,
+                "security": security,
+                "order_obj": order_obj,  # Same Order object tracking partial fills
+            }
+            if action == "ORDER":
+                remaining_req["amount"] = remaining_amount if is_buy else -remaining_amount
+            elif action == "ORDER_TARGET":
+                # For target orders, adjust the target based on what was filled
+                current = portfolio.positions.get(security)
+                current_amount = current.amount if current else 0
+                target = order_req["target_amount"]
+                # The new target is: original target minus filled amount
+                remaining_req["target_amount"] = target - (rounded if is_buy else sell_amount)
+            elif action == "ORDER_VALUE":
+                # For value orders, adjust the value based on fill
+                fill_value = (rounded if is_buy else sell_amount) * exec_price
+                remaining_req["value"] = order_req["value"] - fill_value if is_buy else order_req["value"] + fill_value
+            elif action == "ORDER_TARGET_VALUE":
+                # For target value, keep the original target (will be recomputed)
+                remaining_req["target_value"] = order_req["target_value"]
+
+            still_pending.append(remaining_req)
+            log.info(f"Order {order_obj.order_id} partially filled, {remaining_amount} shares remaining in queue")
+
+    # ── Re-add partially filled orders to pending queue ────────────────────────
+    sess._pending_orders.extend(still_pending)
 
 
 def _round_lot(amount) -> int:
@@ -1021,17 +1243,40 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                 if _warmup_done:
                     _t1_unlock(session)
                     _fill_pending_orders(session, today, exec_prices=live_prices)
+                    # Call before_trading_start hooks at market open (09:30)
+                    context.current_dt = datetime.datetime.combine(today, datetime.time(9, 30))
+                    for func in session._before_trading_start_funcs:
+                        try:
+                            func(context, _LazyData(context))
+                        except Exception as e:
+                            log.warn(f"before_trading_start hook error: {e}")
                 else:
                     _warmup_done = True
+                # Reset after_trading_end flag for the new day
+                session._after_trading_end_done = False
                 prev_day = today
 
             prices = {sec: _resolve_live_price(spot_cache, sec, pos.avg_cost)
                       for sec, pos in context.portfolio.positions.items()}
+
+            # Run scheduled functions with precise time check
             for sched in session._scheduled_funcs:
                 if _should_run_schedule(sched, today):
                     t = _get_sched_time(sched)
+                    func = _get_sched_func(sched)
                     if t == "every_bar":
-                        _get_sched_func(sched)(context)
+                        func(context)
+                    else:
+                        # Parse scheduled time and check if within ±60 seconds
+                        try:
+                            hour, minute = map(int, t.split(":"))
+                            scheduled_dt = datetime.datetime.combine(today, datetime.time(hour, minute))
+                            current_dt = context.current_dt
+                            if abs((current_dt - scheduled_dt).total_seconds()) <= 60:
+                                func(context)
+                        except Exception:
+                            # Fallback: run on every iteration if time parse fails
+                            func(context)
 
             if session._handle_data_func is not None:
                 session._handle_data_func(context, _LazyData(context))
@@ -1042,6 +1287,19 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             pnl_pct = (pnl / starting_cash * 100) if starting_cash > 0 else 0.0
             log.info(f"[{context.current_dt:%H:%M:%S}] total={total:,.2f} "
                      f"PnL={pnl:+,.2f} ({pnl_pct:+.2f}%)")
+
+            # Call after_trading_end hooks at market close (15:00)
+            if context.current_dt.hour >= 15 and context.current_dt.minute >= 0:
+                if not hasattr(session, '_after_trading_end_done'):
+                    session._after_trading_end_done = False
+                if not session._after_trading_end_done:
+                    context.current_dt = datetime.datetime.combine(today, datetime.time(15, 0))
+                    for func in session._after_trading_end_funcs:
+                        try:
+                            func(context, _LazyData(context))
+                        except Exception as e:
+                            log.warn(f"after_trading_end hook error: {e}")
+                    session._after_trading_end_done = True
 
             time.sleep(interval)
     except KeyboardInterrupt:
