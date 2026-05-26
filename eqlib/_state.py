@@ -35,6 +35,10 @@ class BacktestSession:
         _before_trading_start_funcs / _after_trading_end_funcs: lifecycle hooks
         _pending_orders: orders buffered during strategy execution,
             filled at the *next* trading day's open (look-ahead bias fix)
+        _order_timestamps: dict mapping order_id to submission datetime
+            (for timeout tracking in Phase 2.4)
+        _order_timeout_seconds: timeout threshold for pending orders
+            (default: 3600 for live/paper, 86400 for backtest)
         _t1_locked_amounts: {security: int} — new shares bought today that
             cannot be sold until the next trading day (T+1 enforcement)
         _slippage_model: SlippageModel instance or None
@@ -44,8 +48,8 @@ class BacktestSession:
         '_context', '_g', '_order_cost', '_order_cost_config', '_benchmark',
         '_options', '_scheduled_funcs', '_recorded_values', '_trade_log',
         '_handle_data_func', '_before_trading_start_funcs', '_after_trading_end_funcs',
-        '_pending_orders', '_t1_locked_amounts', '_slippage_model',
-        '_selection_func', '_selection_rebalance', '_preloaded',
+        '_pending_orders', '_order_timestamps', '_order_timeout_seconds', '_t1_locked_amounts',
+        '_slippage_model', '_selection_func', '_selection_rebalance', '_preloaded',
     )
 
     def __init__(self):
@@ -67,6 +71,10 @@ class BacktestSession:
         self._after_trading_end_funcs: list = []
         # Pending orders: buffered during strategy execution, filled next day
         self._pending_orders: list = []
+        # Order timestamps: for timeout tracking (Phase 2.4)
+        self._order_timestamps: dict = {}
+        # Order timeout: default 1 day for backtest, 1 hour for live/paper
+        self._order_timeout_seconds: int = None  # None means use mode-based default
         # T+1: maps security -> number of new shares bought today (unsellable)
         self._t1_locked_amounts: dict = {}
         # Slippage model (None = no slippage)

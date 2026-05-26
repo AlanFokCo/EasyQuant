@@ -5,10 +5,17 @@ Orders placed during strategy execution (in handle_data or run_daily callbacks)
 are buffered in ``session._pending_orders`` and filled at the **next trading
 day's open price** by the engine.  This eliminates look-ahead bias: a signal
 generated from today's closing bar cannot affect today's execution.
+
+Phase 2 enhancements:
+- Order objects track status (pending→submitted→partial_fill→filled)
+- Large orders may partially fill if exceeding daily volume limits
+- Remaining unfilled amounts stay in pending queue
 """
 
+import datetime
 import eqlib._state as st
 from eqlib.logger import log
+from eqlib.objects import Order, MarketOrder, LimitOrder
 
 
 def _get_pending_price(security):
@@ -46,12 +53,17 @@ _ABSOLUTE_ACTIONS = {"ORDER"}
 _TARGET_ACTIONS = {"ORDER_TARGET", "ORDER_VALUE", "ORDER_TARGET_VALUE"}
 
 
-def _buffer_order(action: str, **kwargs) -> str:
+def _buffer_order(action: str, **kwargs) -> Order:
     """Add an order request to the pending queue for next-day execution.
+
+    Creates an Order object for status tracking and attaches it to the request.
 
     Raises ValueError if an absolute order type (ORDER) is mixed with a
     target order type (ORDER_TARGET / ORDER_VALUE / ORDER_TARGET_VALUE)
     for the same security within a single callback.
+
+    Returns:
+        Order object with STATUS_PENDING.
     """
     sess = st.get_session()
     if sess._context is None:
@@ -59,6 +71,8 @@ def _buffer_order(action: str, **kwargs) -> str:
         return None
 
     security = kwargs.pop("security")
+    amount = kwargs.get("amount", kwargs.get("target_amount", 0))
+    style = kwargs.get("style")
 
     # ── BLOCKER-5: detect mixed absolute / target order types ─────────
     if action in _ABSOLUTE_ACTIONS:
@@ -74,14 +88,20 @@ def _buffer_order(action: str, **kwargs) -> str:
                 f"(existing={existing['action']}, new={action})"
             )
 
-    req = {"action": action, "security": security, **kwargs}
+    # Create Order object for status tracking
+    order_obj = Order(security, amount, style=style)
+
+    # ── Phase 2.4: Record order timestamp for timeout tracking ───────────
+    sess._order_timestamps[order_obj.order_id] = datetime.datetime.now()
+
+    req = {"action": action, "security": security, "order_obj": order_obj, **kwargs}
     sess._pending_orders.append(req)
-    log.debug("order buffered: action=%s security=%s queue_size=%s",
-              action, req["security"], len(sess._pending_orders))
-    return f"PENDING_{action}_{req['security']}"
+    log.debug("order buffered: action=%s security=%s queue_size=%s order_id=%s",
+              action, req["security"], len(sess._pending_orders), order_obj.order_id)
+    return order_obj
 
 
-def order(security, amount, style=None):
+def order(security, amount, style=None) -> Order:
     """Buy or sell a fixed number of shares (mirrors EasyQuant's order).
 
     Orders are buffered and filled at the next trading day's open price.
@@ -89,20 +109,20 @@ def order(security, amount, style=None):
     Parameters:
         security: stock code, e.g., '601390'
         amount: number of shares (positive = buy, negative = sell)
-        style: order style (reserved; currently ignored)
+        style: order style - MarketOrder() or LimitOrder(limit_price)
 
     Returns:
-        Pending order ID string, or None if the request was invalid.
+        Order object with status tracking, or None if the request was invalid.
     """
     if amount == 0:
         return None
     log.action("Queue order", security,
                amount=f"{'+' if amount > 0 else ''}{int(amount)}",
                fill="next_open")
-    return _buffer_order("ORDER", security=security, amount=int(amount))
+    return _buffer_order("ORDER", security=security, amount=int(amount), style=style)
 
 
-def order_target(security, amount, style=None):
+def order_target(security, amount, style=None) -> Order:
     """Adjust position to a target share count (mirrors EasyQuant's order_target).
 
     Orders are buffered and filled at the next trading day's open price.
@@ -110,21 +130,21 @@ def order_target(security, amount, style=None):
     Parameters:
         security: stock code
         amount: target number of shares (0 = close entire position)
-        style: order style (reserved)
+        style: order style - MarketOrder() or LimitOrder(limit_price)
 
     Raises:
         ValueError: if mixed with ``order`` / ``order_value`` /
         ``order_target_value`` for the same security in one callback.
 
     Returns:
-        Pending order ID string, or None.
+        Order object, or None.
     """
     log.action("Queue target-shares", security,
                target_shares=int(amount), fill="next_open")
-    return _buffer_order("ORDER_TARGET", security=security, target_amount=int(amount))
+    return _buffer_order("ORDER_TARGET", security=security, target_amount=int(amount), style=style)
 
 
-def order_value(security, value, style=None):
+def order_value(security, value, style=None) -> Order:
     """Buy or sell a target monetary value (mirrors EasyQuant's order_value).
 
     Orders are buffered and filled at the next trading day's open price.
@@ -132,19 +152,19 @@ def order_value(security, value, style=None):
     Parameters:
         security: stock code
         value: transaction value in CNY (positive = buy, negative = sell)
-        style: order style (reserved)
+        style: order style - MarketOrder() or LimitOrder(limit_price)
 
     Returns:
-        Pending order ID string, or None.
+        Order object, or None.
     """
     if value == 0:
         return None
     log.action("Queue order-value", security,
                value_cny=f"{float(value):+.0f}", fill="next_open")
-    return _buffer_order("ORDER_VALUE", security=security, value=float(value))
+    return _buffer_order("ORDER_VALUE", security=security, value=float(value), style=style)
 
 
-def order_target_value(security, value, style=None):
+def order_target_value(security, value, style=None) -> Order:
     """Adjust position to a target monetary value (mirrors EasyQuant's order_target_value).
 
     Orders are buffered and filled at the next trading day's open price.
@@ -152,7 +172,7 @@ def order_target_value(security, value, style=None):
     Parameters:
         security: stock code
         value: target position value in CNY (0 = close entire position)
-        style: order style (reserved)
+        style: order style - MarketOrder() or LimitOrder(limit_price)
 
     .. note::
         The target delta is computed at *fill time* from the current position
@@ -162,8 +182,8 @@ def order_target_value(security, value, style=None):
         may produce unexpected results.
 
     Returns:
-        Pending order ID string, or None.
+        Order object, or None.
     """
     log.action("Queue target-value", security,
                target_cny=f"{float(value):.0f}", fill="next_open")
-    return _buffer_order("ORDER_TARGET_VALUE", security=security, target_value=float(value))
+    return _buffer_order("ORDER_TARGET_VALUE", security=security, target_value=float(value), style=style)
