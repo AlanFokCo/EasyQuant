@@ -1,26 +1,39 @@
 """Notification module for paper trading alerts.
 
 Supports DingTalk (钉钉) and Feishu (飞书) webhook notifications.
-When paper trading detects trading signals, this module can send
-alerts to configured webhooks, allowing users to manually execute
-live trades based on the notifications.
+When paper trading detects trading signals, this module sends actionable
+alerts with specific trading recommendations (price range, amount, etc.).
 
-Usage:
-    from eqlib import set_notification_webhook, enable_notification
+Usage in paper trading:
+    from eqlib import *
+    from eqlib.notification import notify_signal
 
     def initialize(context):
         # Configure DingTalk notification
         set_notification_webhook("dingtalk", "https://oapi.dingtalk.com/robot/send?access_token=xxx")
-        enable_notification(["queued"])  # Notify on signal generation
+        enable_notification(["signal"])
+
+    def handle_data(context, data):
+        price = data.current(g.security, 'close')
+        # 当策略判断需要买入时
+        if should_buy:
+            # 发送通知，包含价格区间建议
+            notify_signal(
+                security=g.security,
+                side="buy",
+                amount=1000,
+                current_price=price,
+                price_range=(price * 0.98, price * 1.02)  # 建议在±2%区间内买入
+            )
 """
 
 import datetime
 import requests
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import Optional, Dict, Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from eqlib.objects import Order
     from eqlib.context import Context
+    import eqlib._state as st
 
 
 class NotificationSender:
@@ -43,12 +56,6 @@ class DingTalkSender(NotificationSender):
 
     DingTalk webhook API reference:
     https://open.dingtalk.com/document/robots/custom-robot-access
-
-    The webhook URL format:
-    https://oapi.dingtalk.com/robot/send?access_token=xxx
-
-    For security, you can enable signature verification by passing
-    secret parameter when creating the sender.
     """
 
     def __init__(self, webhook_url: str, secret: Optional[str] = None):
@@ -72,10 +79,7 @@ class DingTalkSender(NotificationSender):
         return sign
 
     def send(self, message: str, title: str = "EasyQuant交易信号", **kwargs) -> bool:
-        """Send notification to DingTalk via webhook.
-
-        Uses markdown message type for rich formatting.
-        """
+        """Send notification to DingTalk via webhook."""
         timestamp = int(datetime.datetime.now().timestamp() * 1000)
         payload = {
             "msgtype": "markdown",
@@ -85,7 +89,6 @@ class DingTalkSender(NotificationSender):
             }
         }
 
-        # Add signature if secret is configured
         if self.secret:
             sign = self._compute_sign(timestamp)
             payload["timestamp"] = timestamp
@@ -97,8 +100,7 @@ class DingTalkSender(NotificationSender):
                 result = resp.json()
                 return result.get("errcode", -1) == 0
             return False
-        except Exception as e:
-            # Log error but don't raise - notification failures shouldn't break trading
+        except Exception:
             return False
 
 
@@ -107,29 +109,15 @@ class FeishuSender(NotificationSender):
 
     Feishu webhook API reference:
     https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN
-
-    The webhook URL format:
-    https://open.feishu.cn/open-apis/bot/v2/hook/xxx
-
-    Uses interactive card message type for rich formatting.
     """
 
-    def __init__(self, webhook_url: str):
-        super().__init__(webhook_url)
-
     def send(self, message: str, title: str = "EasyQuant交易信号", **kwargs) -> bool:
-        """Send notification to Feishu via webhook.
-
-        Uses interactive card message type for rich formatting.
-        """
-        # Determine card color based on event type
+        """Send notification to Feishu via webhook."""
         event_type = kwargs.get("event_type", "info")
         color_map = {
             "buy": "blue",
             "sell": "orange",
-            "queued": "blue",
-            "filled": "green",
-            "timeout": "red",
+            "signal": "blue",
             "info": "blue"
         }
         card_color = color_map.get(event_type, "blue")
@@ -153,27 +141,35 @@ class FeishuSender(NotificationSender):
                 result = resp.json()
                 return result.get("code", -1) == 0
             return False
-        except Exception as e:
+        except Exception:
             return False
 
 
-def format_order_message(order: "Order", context: "Context", event_type: str,
-                         trade_info: Optional[Dict] = None) -> str:
-    """Format order details into notification message.
+def format_signal_message(
+    security: str,
+    side: str,
+    amount: int,
+    current_price: Optional[float] = None,
+    price_range: Optional[Tuple[float, float]] = None,
+    context: Optional["Context"] = None,
+    reason: Optional[str] = None
+) -> str:
+    """Format actionable trade signal message.
 
     Parameters:
-        order: Order object with details
+        security: Stock code (e.g., "601390")
+        side: "buy" or "sell"
+        amount: Number of shares to trade
+        current_price: Current market price
+        price_range: Tuple of (low, high) recommended execution price range
         context: Current context with portfolio info
-        event_type: "queued", "filled", "timeout", etc.
-        trade_info: Additional trade execution info (price, amount, etc.)
+        reason: Optional reason/strategy name for the signal
 
     Returns:
         Formatted markdown string for notification.
     """
-    from eqlib.objects import Order
-
     # Get security name if possible
-    security = order.security
+    security_display = security.replace(".XSHG", "").replace(".XSHE", "")
     try:
         import akshare as ak
         spot = ak.stock_zh_a_spot_em()
@@ -182,112 +178,142 @@ def format_order_message(order: "Order", context: "Context", event_type: str,
         if len(row) > 0:
             security_name = row.iloc[0]["名称"]
             security_display = f"{bare} ({security_name})"
-        else:
-            security_display = bare
     except Exception:
-        security_display = security.replace(".XSHG", "").replace(".XSHE", "")
-
-    # Format event type
-    event_labels = {
-        "queued": "信号生成",
-        "filled": "订单成交",
-        "partial_fill": "部分成交",
-        "timeout": "订单超时",
-        "cancelled": "订单取消"
-    }
-    event_label = event_labels.get(event_type, event_type)
+        pass
 
     # Format side
-    side_label = "买入" if order.side == "buy" else "卖出"
-    side_emoji = "📈" if order.side == "buy" else "📉"
-
-    # Format amount
-    amount = order.amount
-    filled_amount = order.filled_amount if hasattr(order, 'filled_amount') else 0
+    side_label = "买入" if side == "buy" else "卖出"
+    side_emoji = "📈" if side == "buy" else "📉"
 
     # Get current time
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Build message
+    # Build actionable message
     lines = [
-        f"### {side_emoji} EasyQuant {event_label}",
+        f"## {side_emoji} EasyQuant 操作建议",
         "",
-        f"**类型**: {side_label}{event_label}",
         f"**股票**: {security_display}",
-        f"**数量**: {amount:,} 股",
+        f"**操作**: {side_label}",
+        f"**数量**: {amount:,} 股 ({amount // 100} 手)",
     ]
 
-    # Add filled info for filled/partial events
-    if event_type in ("filled", "partial_fill") and trade_info:
-        price = trade_info.get("price", 0)
-        filled = trade_info.get("amount", filled_amount)
-        commission = trade_info.get("commission", 0)
-        lines.append(f"**成交价**: ¥{price:.3f}")
-        lines.append(f"**成交数量**: {filled:,} 股")
-        if commission > 0:
-            lines.append(f"**手续费**: ¥{commission:.2f}")
+    # Add current price
+    if current_price:
+        lines.append(f"**当前价格**: ¥{current_price:.3f}")
 
-    # Add status info
-    status_labels = {
-        Order.STATUS_PENDING: "待执行",
-        Order.STATUS_SUBMITTED: "已提交",
-        Order.STATUS_PARTIAL_FILL: "部分成交",
-        Order.STATUS_FILLED: "已成交",
-        Order.STATUS_CANCELLED: "已取消",
-        Order.STATUS_EXPIRED: "已超时",
-        Order.STATUS_REJECTED: "已拒绝"
-    }
-    status_label = status_labels.get(order.status, order.status)
-    lines.append(f"**状态**: {status_label}")
+    # Add recommended price range (核心需求)
+    if price_range:
+        low, high = price_range
+        lines.append(f"**建议价格区间**: ¥{low:.3f} ~ ¥{high:.3f}")
+        # 计算区间幅度
+        if current_price and current_price > 0:
+            pct_low = (low - current_price) / current_price * 100
+            pct_high = (high - current_price) / current_price * 100
+            lines.append(f"**区间幅度**: {pct_low:+.2f}% ~ {pct_high:+.2f}%")
+
+    # Add estimated value
+    if current_price:
+        estimated_value = current_price * amount
+        lines.append(f"**预估金额**: ¥{estimated_value:,.2f}")
+
     lines.append(f"**时间**: {now}")
 
-    # Add portfolio summary
+    # Add reason if provided
+    if reason:
+        lines.append("")
+        lines.append(f"**信号来源**: {reason}")
+
+    # Add account info
     if context:
         portfolio = context.portfolio
         lines.append("")
         lines.append("---")
-        lines.append(f"**账户余额**: ¥{portfolio.available_cash:,.2f}")
+        lines.append("**账户信息**:")
+        lines.append(f"- 可用资金: ¥{portfolio.available_cash:,.2f}")
+        lines.append(f"- 持仓数量: {len(portfolio.positions)} 只")
         if portfolio.total_value:
-            lines.append(f"**总资产**: ¥{portfolio.total_value:,.2f}")
+            lines.append(f"- 总资产: ¥{portfolio.total_value:,.2f}")
 
-    # Add hint for queued orders
-    if event_type == "queued":
-        lines.append("")
-        lines.append("> 信号已生成，订单将在下一交易日开盘执行。")
-        lines.append("> 请关注实盘操作机会。")
+    # Add actionable hint
+    lines.append("")
+    lines.append("> 💡 **操作建议**:")
+    if side == "buy":
+        if price_range:
+            lines.append(f"> 建议在 ¥{price_range[0]:.3f} ~ ¥{price_range[1]:.3f} 区间内买入 {amount:,} 股")
+        else:
+            lines.append(f"> 建议买入 {amount:,} 股 ({amount // 100} 手)")
+    else:
+        if price_range:
+            lines.append(f"> 建议在 ¥{price_range[0]:.3f} ~ ¥{price_range[1]:.3f} 区间内卖出 {amount:,} 股")
+        else:
+            lines.append(f"> 建议卖出 {amount:,} 股 ({amount // 100} 手)")
 
     return "\n".join(lines)
 
 
-def send_notification(sess, order: "Order", context: "Context",
-                      event_type: str, trade_info: Optional[Dict] = None) -> bool:
-    """Send notification via configured webhook.
+def notify_signal(
+    security: str,
+    side: str,
+    amount: int,
+    current_price: Optional[float] = None,
+    price_range: Optional[Tuple[float, float]] = None,
+    context: Optional["Context"] = None,
+    reason: Optional[str] = None
+) -> bool:
+    """Send actionable trade signal notification.
+
+    This is the main function to call when strategy generates a signal.
+    It sends a notification with concrete trading advice including
+    price range recommendations.
 
     Parameters:
-        sess: BacktestSession with notification configuration
-        order: Order object
-        context: Current context
-        event_type: "queued", "filled", etc.
-        trade_info: Additional trade info for filled events
+        security: Stock code (e.g., "601390")
+        side: "buy" or "sell"
+        amount: Number of shares to trade
+        current_price: Current market price
+        price_range: Tuple of (low, high) recommended execution price range
+            For example: (5.80, 6.00) means execute between ¥5.80 and ¥6.00
+        context: Current context (optional)
+        reason: Signal reason (optional, e.g., "MA金叉")
 
     Returns:
         True if notification was sent successfully, False otherwise.
+
+    Example:
+
+        notify_signal(
+            security="601390",
+            side="buy",
+            amount=1000,
+            current_price=5.85,
+            price_range=(5.80, 5.90),  # 建议在5.80-5.90区间买入
+            reason="MA5上穿MA20金叉"
+        )
     """
+    import eqlib._state as st
+    sess = st.get_session()
+
     sender = getattr(sess, '_notification_sender', None)
     if not sender:
         return False
 
-    # Check if this event is enabled
+    # Check if signal event is enabled
     enabled_events = getattr(sess, '_notification_events', [])
-    if event_type not in enabled_events:
+    if "signal" not in enabled_events and "queued" not in enabled_events:
         return False
 
     # Format message
-    message = format_order_message(order, context, event_type, trade_info)
+    message = format_signal_message(
+        security, side, amount,
+        current_price=current_price,
+        price_range=price_range,
+        context=context,
+        reason=reason
+    )
 
-    # Determine title and event type for card color
-    side_emoji = "📈" if order.side == "buy" else "📉"
-    title = f"{side_emoji} EasyQuant {order.side.upper()} {event_type}"
+    # Determine title
+    side_emoji = "📈" if side == "buy" else "📉"
+    title = f"{side_emoji} EasyQuant {side.upper()} 建议"
 
     # Send
-    return sender.send(message, title=title, event_type=f"{order.side}_{event_type}")
+    return sender.send(message, title=title, event_type=side)

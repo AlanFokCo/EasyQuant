@@ -163,27 +163,83 @@ def enable_notification(events: list = None):
     Parameters:
         events: list of event names to enable notifications for.
             Supported events:
-            - "queued": when order is queued (signal generated)
-            - "filled": when order is filled (execution complete)
-            - "partial_fill": when order is partially filled
-            - "timeout": when order times out
-            Default: ["queued", "filled"]
+            - "signal": when strategy generates a trading signal (recommended)
+            - "queued": when order is queued
+            - "filled": when order is filled
+            Default: ["signal"]
 
     Example::
 
-        # Enable all notifications
-        enable_notification(["queued", "filled", "partial_fill", "timeout"])
+        # Enable signal notifications (recommended for paper trading)
+        enable_notification(["signal"])
 
-        # Only notify on signal generation
-        enable_notification(["queued"])
+        # Enable all notifications
+        enable_notification(["signal", "filled"])
 
         # Disable all notifications
         enable_notification([])
     """
     sess = st.get_session()
     if events is None:
-        events = ["queued", "filled"]
+        events = ["signal"]
     sess._notification_events = list(events)
+
+
+def notify_signal(
+    security: str,
+    side: str,
+    amount: int,
+    current_price: float = None,
+    price_range: tuple = None,
+    reason: str = None
+):
+    """Send actionable trade signal notification.
+
+    Call this function in your strategy when you detect a trading signal.
+    It sends a notification to the configured webhook with concrete
+    trading advice including price range recommendations.
+
+    Parameters:
+        security: Stock code (e.g., "601390" or "601390.XSHG")
+        side: "buy" or "sell"
+        amount: Number of shares to trade (must be multiple of 100)
+        current_price: Current market price (optional)
+        price_range: Tuple of (low, high) recommended execution price range
+            For example: (5.80, 6.00) means execute between ¥5.80 and ¥6.00
+        reason: Signal reason (optional, e.g., "MA金叉", "RSI超卖")
+
+    Example in paper trading::
+
+        def handle_data(context, data):
+            price = data.current(g.security, 'close')
+            ma5 = data.attribute_history(g.security, 5, '1d', ['close']).mean()
+            ma20 = data.attribute_history(g.security, 20, '1d', ['close']).mean()
+
+            if ma5 > ma20 and g.prev_ma5 <= g.prev_ma20:
+                # 金叉信号 - 发送通知
+                notify_signal(
+                    security=g.security,
+                    side="buy",
+                    amount=1000,
+                    current_price=price,
+                    price_range=(price * 0.98, price * 1.02),  # ±2%区间
+                    reason="MA5上穿MA20金叉"
+                )
+                order(g.security, 1000)
+
+    Returns:
+        True if notification was sent successfully, False otherwise.
+    """
+    from eqlib.notification import notify_signal as _notify_signal
+    return _notify_signal(
+        security=security,
+        side=side,
+        amount=amount,
+        current_price=current_price,
+        price_range=price_range,
+        context=st.get_session()._context,
+        reason=reason
+    )
 
 
 def _register_on_order_queued(func):
@@ -795,7 +851,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 "partial": is_partial_fill and rounded < requested_amount,
             })
 
-            # ── Phase 2.5: Trigger notification callbacks for order filled ───────
+            # ── Trigger user callbacks for order filled (if registered) ───────
             if order_obj:
                 trade_info = {
                     "type": "BUY",
@@ -809,15 +865,6 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                         func(order_obj, sess._context, trade_info)
                     except Exception as e:
                         log.warn(f"on_order_filled callback error: {e}")
-
-                # Send webhook notification
-                event_type = "partial_fill" if (is_partial_fill and rounded < requested_amount) else "filled"
-                if event_type in sess._notification_events and sess._notification_sender:
-                    from eqlib.notification import send_notification
-                    try:
-                        send_notification(sess, order_obj, sess._context, event_type, trade_info)
-                    except Exception as e:
-                        log.warn(f"Notification send error: {e}")
 
         else:
             # Sell
@@ -866,7 +913,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 "partial": is_partial_fill and sell_amount < requested_amount,
             })
 
-            # ── Phase 2.5: Trigger notification callbacks for order filled ───────
+            # ── Trigger user callbacks for order filled (if registered) ───────
             if order_obj:
                 trade_info = {
                     "type": "SELL",
@@ -880,15 +927,6 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                         func(order_obj, sess._context, trade_info)
                     except Exception as e:
                         log.warn(f"on_order_filled callback error: {e}")
-
-                # Send webhook notification
-                event_type = "partial_fill" if (is_partial_fill and sell_amount < requested_amount) else "filled"
-                if event_type in sess._notification_events and sess._notification_sender:
-                    from eqlib.notification import send_notification
-                    try:
-                        send_notification(sess, order_obj, sess._context, event_type, trade_info)
-                    except Exception as e:
-                        log.warn(f"Notification send error: {e}")
 
         # ── Keep remaining amount in pending queue for partial fills ───────────
         if is_partial_fill and remaining_amount > 0 and order_obj:
