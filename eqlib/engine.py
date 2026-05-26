@@ -191,13 +191,14 @@ def notify_signal(
     amount: int,
     current_price: float = None,
     price_range: tuple = None,
-    reason: str = None
+    strategy_name: str = None,
+    trigger_point: str = None
 ):
     """Send actionable trade signal notification.
 
     Call this function in your strategy when you detect a trading signal.
     It sends a notification to the configured webhook with concrete
-    trading advice including price range recommendations.
+    trading advice.
 
     Parameters:
         security: Stock code (e.g., "601390" or "601390.XSHG")
@@ -205,10 +206,10 @@ def notify_signal(
         amount: Number of shares to trade (must be multiple of 100)
         current_price: Current market price (optional)
         price_range: Tuple of (low, high) recommended execution price range
-            For example: (5.80, 6.00) means execute between ¥5.80 and ¥6.00
-        reason: Signal reason (optional, e.g., "MA金叉", "RSI超卖")
+        strategy_name: 策略名称 (e.g., "双均线金叉策略")
+        trigger_point: 触发点详情 (e.g., "MA5=5.25 上穿 MA20=4.80, 金叉形成")
 
-    Example in paper trading::
+    Example::
 
         def handle_data(context, data):
             price = data.current(g.security, 'close')
@@ -216,14 +217,14 @@ def notify_signal(
             ma20 = data.attribute_history(g.security, 20, '1d', ['close']).mean()
 
             if ma5 > ma20 and g.prev_ma5 <= g.prev_ma20:
-                # 金叉信号 - 发送通知
                 notify_signal(
                     security=g.security,
                     side="buy",
                     amount=1000,
                     current_price=price,
-                    price_range=(price * 0.98, price * 1.02),  # ±2%区间
-                    reason="MA5上穿MA20金叉"
+                    price_range=(price * 0.98, price * 1.02),
+                    strategy_name="双均线金叉策略",
+                    trigger_point=f"MA5={ma5:.2f} 上穿 MA20={ma20:.2f}, 金叉形成"
                 )
                 order(g.security, 1000)
 
@@ -238,7 +239,8 @@ def notify_signal(
         current_price=current_price,
         price_range=price_range,
         context=st.get_session()._context,
-        reason=reason
+        strategy_name=strategy_name,
+        trigger_point=trigger_point
     )
 
 
