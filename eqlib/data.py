@@ -1403,3 +1403,42 @@ def after_trading_end(func):
     """Register a function to be called after market close (15:00)."""
     from eqlib.engine import _register_after_end
     _register_after_end(func)
+
+
+def on_order_queued(func):
+    """Register a callback for order queued events (signal generated).
+
+    The callback is invoked when an order is buffered during strategy
+    execution, indicating a trading signal has been generated.
+
+    Parameters:
+        func: callable taking (order, context) as arguments
+
+    Example::
+
+        @on_order_queued
+        def handle_signal(order, context):
+            print(f"Signal generated: {order.side} {order.security} {order.amount}")
+    """
+    from eqlib.engine import _register_on_order_queued
+    _register_on_order_queued(func)
+
+
+def on_order_filled(func):
+    """Register a callback for order filled events (execution complete).
+
+    The callback is invoked when a pending order is executed at the
+    next trading day's open price.
+
+    Parameters:
+        func: callable taking (order, context, trade_info) as arguments
+            trade_info: dict with 'price', 'amount', 'commission', etc.
+
+    Example::
+
+        @on_order_filled
+        def handle_fill(order, context, trade_info):
+            print(f"Order filled: {order.security} @ {trade_info['price']}")
+    """
+    from eqlib.engine import _register_on_order_filled
+    _register_on_order_filled(func)

@@ -98,6 +98,23 @@ def _buffer_order(action: str, **kwargs) -> Order:
     sess._pending_orders.append(req)
     log.debug("order buffered: action=%s security=%s queue_size=%s order_id=%s",
               action, req["security"], len(sess._pending_orders), order_obj.order_id)
+
+    # ── Phase 2.5: Trigger notification callbacks for order queued ───────────
+    # Send notification if enabled and invoke user callbacks
+    for func in sess._on_order_queued_funcs:
+        try:
+            func(order_obj, sess._context)
+        except Exception as e:
+            log.warn(f"on_order_queued callback error: {e}")
+
+    # Send webhook notification if configured
+    if "queued" in sess._notification_events and sess._notification_sender:
+        from eqlib.notification import send_notification
+        try:
+            send_notification(sess, order_obj, sess._context, "queued")
+        except Exception as e:
+            log.warn(f"Notification send error: {e}")
+
     return order_obj
 
 

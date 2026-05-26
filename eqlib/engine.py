@@ -120,6 +120,82 @@ def set_order_timeout(seconds: int):
         sess._order_timeout_seconds = seconds
 
 
+def set_notification_webhook(platform: str, url: str, secret: str = None):
+    """Configure webhook for trade notifications.
+
+    When paper trading generates signals or executes orders, notifications
+    will be sent to the configured webhook platform (DingTalk or Feishu).
+
+    Parameters:
+        platform: "dingtalk" or "feishu"
+        url: webhook URL from the platform
+            - DingTalk: https://oapi.dingtalk.com/robot/send?access_token=xxx
+            - Feishu: https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+        secret: (optional) secret for DingTalk signature verification
+
+    Example::
+
+        # DingTalk with signature
+        set_notification_webhook("dingtalk", "https://oapi.dingtalk.com/...", "SECxxx")
+
+        # Feishu
+        set_notification_webhook("feishu", "https://open.feishu.cn/open-apis/bot/v2/hook/xxx")
+
+        # Disable notifications
+        set_notification_webhook(None, None)
+    """
+    from eqlib.notification import DingTalkSender, FeishuSender
+    sess = st.get_session()
+    if platform == "dingtalk" and url:
+        sess._notification_sender = DingTalkSender(url, secret=secret)
+    elif platform == "feishu" and url:
+        sess._notification_sender = FeishuSender(url)
+    else:
+        sess._notification_sender = None
+
+
+def enable_notification(events: list = None):
+    """Enable notification for specific trade events.
+
+    By default, notifications are disabled. Call this function to
+    enable notifications for specific events.
+
+    Parameters:
+        events: list of event names to enable notifications for.
+            Supported events:
+            - "queued": when order is queued (signal generated)
+            - "filled": when order is filled (execution complete)
+            - "partial_fill": when order is partially filled
+            - "timeout": when order times out
+            Default: ["queued", "filled"]
+
+    Example::
+
+        # Enable all notifications
+        enable_notification(["queued", "filled", "partial_fill", "timeout"])
+
+        # Only notify on signal generation
+        enable_notification(["queued"])
+
+        # Disable all notifications
+        enable_notification([])
+    """
+    sess = st.get_session()
+    if events is None:
+        events = ["queued", "filled"]
+    sess._notification_events = list(events)
+
+
+def _register_on_order_queued(func):
+    """Internal: register callback for order queued events."""
+    st.get_session()._on_order_queued_funcs.append(func)
+
+
+def _register_on_order_filled(func):
+    """Internal: register callback for order filled events."""
+    st.get_session()._on_order_filled_funcs.append(func)
+
+
 def run_daily(func, time="every_bar"):
     """Schedule a function to run every trading day.
 
@@ -719,6 +795,30 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 "partial": is_partial_fill and rounded < requested_amount,
             })
 
+            # ── Phase 2.5: Trigger notification callbacks for order filled ───────
+            if order_obj:
+                trade_info = {
+                    "type": "BUY",
+                    "price": exec_price,
+                    "amount": rounded,
+                    "commission": commission,
+                    "partial": is_partial_fill and rounded < requested_amount,
+                }
+                for func in sess._on_order_filled_funcs:
+                    try:
+                        func(order_obj, sess._context, trade_info)
+                    except Exception as e:
+                        log.warn(f"on_order_filled callback error: {e}")
+
+                # Send webhook notification
+                event_type = "partial_fill" if (is_partial_fill and rounded < requested_amount) else "filled"
+                if event_type in sess._notification_events and sess._notification_sender:
+                    from eqlib.notification import send_notification
+                    try:
+                        send_notification(sess, order_obj, sess._context, event_type, trade_info)
+                    except Exception as e:
+                        log.warn(f"Notification send error: {e}")
+
         else:
             # Sell
             sell_amount = fill_amount
@@ -765,6 +865,30 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 "order_id": order_obj.order_id if order_obj else None,
                 "partial": is_partial_fill and sell_amount < requested_amount,
             })
+
+            # ── Phase 2.5: Trigger notification callbacks for order filled ───────
+            if order_obj:
+                trade_info = {
+                    "type": "SELL",
+                    "price": exec_price,
+                    "amount": sell_amount,
+                    "commission": commission,
+                    "partial": is_partial_fill and sell_amount < requested_amount,
+                }
+                for func in sess._on_order_filled_funcs:
+                    try:
+                        func(order_obj, sess._context, trade_info)
+                    except Exception as e:
+                        log.warn(f"on_order_filled callback error: {e}")
+
+                # Send webhook notification
+                event_type = "partial_fill" if (is_partial_fill and sell_amount < requested_amount) else "filled"
+                if event_type in sess._notification_events and sess._notification_sender:
+                    from eqlib.notification import send_notification
+                    try:
+                        send_notification(sess, order_obj, sess._context, event_type, trade_info)
+                    except Exception as e:
+                        log.warn(f"Notification send error: {e}")
 
         # ── Keep remaining amount in pending queue for partial fills ───────────
         if is_partial_fill and remaining_amount > 0 and order_obj:
