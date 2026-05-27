@@ -233,6 +233,11 @@ from eqlib.portfolio import StrategyConfig, run_portfolio_backtest
 # Walk-forward analysis  [EXPERIMENTAL]
 from eqlib.wfa import walk_forward, WFAResult
 
+# Scientific validation layer  [EXPERIMENTAL]
+# Import as a submodule — use ``from eqlib.scientific import validate_backtest``
+# or ``import eqlib.scientific`` to access the full API.
+from eqlib.validation_config import ValidationConfig
+
 # PTrade/QMT adapter — imported as a submodule to avoid shadowing backtest functions:
 #   from eqlib.ptrade_adapter import *
 # See doc/ptrade_adapter.md for usage instructions.
@@ -306,6 +311,8 @@ __all__ = [
     "walk_forward", "WFAResult",
     # Stock query API
     "query", "valuation", "get_current_data_object",
+    # Scientific validation config
+    "ValidationConfig",
 ]
 
 
