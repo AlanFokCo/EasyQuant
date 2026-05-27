@@ -290,8 +290,11 @@ def parameter_sensitivity(
     Because this function does not re-run the strategy under perturbed
     parameters, it treats instability across rolling time windows as a proxy for
     likely parameter sensitivity.
+
+    Args ``base_params``, ``param_names``, and ``perturbation_pct`` are
+    accepted for API compatibility but unused in the proxy implementation.
     """
-    del base_params, param_names, perturbation_pct
+    _ = (base_params, param_names, perturbation_pct)  # reserved for future use
 
     returns = _extract_daily_returns(backtest_result)
     if len(returns) < 10:

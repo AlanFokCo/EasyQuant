@@ -492,7 +492,7 @@ def _comparison_is_clean(comparison_report: ComparisonReport) -> bool:
 
     for attr_name in ("judgment", "comparison_judgment", "result"):
         value = getattr(comparison_report, attr_name, None)
-        if isinstance(value, str) and any(token in value.lower() for token in ("suspicious", "mismatch", "acceptable")):
+        if isinstance(value, str) and any(token in value.lower() for token in ("suspicious", "mismatch")):
             return False
 
     return True

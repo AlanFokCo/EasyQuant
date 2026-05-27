@@ -296,8 +296,6 @@ def _finalize_check(acc: _SeverityAccumulator, bias_type: str, ok_detail: str) -
 
 
 def _extract_daily_returns(backtest_result: Mapping[str, Any]) -> pd.Series:
-    import pandas as pd
-
     recorded = backtest_result.get("recorded_values", [])
     if not recorded:
         return pd.Series(dtype=float)

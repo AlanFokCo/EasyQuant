@@ -173,14 +173,16 @@ def _format_bias_section(bias_report: Any) -> list[str]:
     if bias_report is None:
         return ["未执行偏差检测。"]
 
+    severity_obj = getattr(bias_report, 'overall_severity', None)
+    severity_name = getattr(severity_obj, 'name', 'UNKNOWN')
     lines = [
-        f"- 总体严重程度: {getattr(getattr(bias_report, 'overall_severity', None), 'name', 'UNKNOWN')}",
+        f"- 总体严重程度: {severity_name}",
         f"- 是否存在关键偏差: {'是' if getattr(bias_report, 'has_critical', False) else '否'}",
     ]
     checks = getattr(bias_report, "checks", []) or []
     for check in checks:
-        severity = getattr(getattr(check, "severity", None), "name", "UNKNOWN")
-        lines.append(f"- {getattr(check, 'bias_type', 'unknown')}: {severity} — {getattr(check, 'details', '')}")
+        check_severity = getattr(getattr(check, "severity", None), "name", "UNKNOWN")
+        lines.append(f"- {getattr(check, 'bias_type', 'unknown')}: {check_severity} — {getattr(check, 'details', '')}")
         for recommendation in getattr(check, "recommendations", []) or []:
             lines.append(f"  - 建议: {recommendation}")
     return lines

@@ -341,8 +341,11 @@ def compare_metrics(
 
 
 def _trade_key(trade: Mapping[str, Any]) -> tuple[pd.Timestamp, str, str]:
+    date_val = trade.get("date")
+    if date_val is None:
+        raise ValueError("Trade record missing required 'date' field")
     return (
-        pd.Timestamp(trade.get("date")).normalize(),
+        pd.Timestamp(date_val).normalize(),
         str(trade.get("security", "")).strip(),
         str(trade.get("type", "")).strip().upper(),
     )
