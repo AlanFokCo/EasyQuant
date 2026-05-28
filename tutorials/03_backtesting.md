@@ -434,18 +434,20 @@ print("交互效应:   %.4f  ← 配置与选股的交互作用" % attr['interac
 - **选股效应 > 0**：说明你在板块内选的股票是对的
 - **交互效应**：通常是小的调整项
 
-### 5.3 Fama-French 因子分析
+### 5.3 简化因子分析
 
 ```python
-from eqlib import fama_french_analysis
+from eqlib import simple_factor_analysis
 
-ff = fama_french_analysis(result)
+ff = simple_factor_analysis(result)
 
 print("市场 Beta:    %.3f  ← 大盘敏感度" % ff['market_beta'])
 print("年化 Alpha:   %.4f  ← 市场无法解释的超额收益" % ff['alpha_annual'])
-print("动量相关性:   %.3f" % ff['momentum_corr'])
+print("动量相关性:   %.3f" % ff['momentum_correlation'])
 print("残差波动率:   %.3f" % ff['residual_volatility'])
 ```
+
+> **注意：** `fama_french_analysis` 已弃用，请改用 `simple_factor_analysis`。
 
 ---
 
