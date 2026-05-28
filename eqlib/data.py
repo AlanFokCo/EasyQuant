@@ -186,7 +186,7 @@ def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str
         if not stock_data:
             return pd.DataFrame()
         klines = stock_data.get(
-            "qfqday" if adjust else "day", []
+            f"{adjust}day" if adjust else "day", []
         )
     except Exception:
         return pd.DataFrame()
