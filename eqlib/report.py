@@ -30,9 +30,9 @@ def _to_tv_date(date_val):
     Handles datetime.datetime, datetime.date, pd.Timestamp, numpy datetime64,
     and arbitrary objects via ``str(...)[:10]`` fallback.
     """
-    # pd.Timestamp is a subclass of datetime.datetime, so this single
-    # isinstance check covers datetime, date, and Timestamp in one shot.
-    if isinstance(date_val, (datetime.date, pd.Timestamp)):
+    # pd.Timestamp is a subclass of datetime.datetime, which is a subclass
+    # of datetime.date — so checking against datetime.date covers all three.
+    if isinstance(date_val, datetime.date):
         return date_val.strftime("%Y-%m-%d")
     try:
         ts = pd.Timestamp(date_val)

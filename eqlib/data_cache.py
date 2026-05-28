@@ -40,11 +40,12 @@ def _get_file_lock(path: Path) -> threading.Lock:
     key = str(path)
     with _file_locks_lock:
         if key not in _file_locks:
-            # Evict unlocked entries when the table grows too large
+            # Evict unlocked entries when the table grows too large.
+            # Remove at least 1 and up to half of the unlocked entries.
             if len(_file_locks) >= _MAX_FILE_LOCKS:
                 to_remove = [k for k, v in _file_locks.items() if not v.locked()]
-                # Keep at most half the table
-                for k in to_remove[: len(to_remove) // 2 or len(to_remove)]:
+                evict_count = max(len(to_remove) // 2, 1) if to_remove else 0
+                for k in to_remove[:evict_count]:
                     del _file_locks[k]
             _file_locks[key] = threading.Lock()
         return _file_locks[key]
