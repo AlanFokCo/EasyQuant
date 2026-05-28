@@ -228,8 +228,9 @@ class TestFileLocksBounded:
             for i in range(10):
                 data_cache._get_file_lock(Path(f"/tmp/test_lock_{i}.parquet"))
 
-            # Should be capped (eviction removes unlocked entries)
-            assert len(data_cache._file_locks) <= 10  # may evict some
+            # Should be capped — eviction keeps total near _MAX_FILE_LOCKS
+            assert len(data_cache._file_locks) <= 6, \
+                f"Expected <=6 locks after eviction with cap=5, got {len(data_cache._file_locks)}"
             # The most recent lock should exist
             assert str(Path("/tmp/test_lock_9.parquet")) in data_cache._file_locks
         finally:
