@@ -52,6 +52,8 @@ type ReportData = {
   pnl_bar_data?: { time: string; value: number; color: string }[];
   daily_returns_data?: { time: string; value: number; color: string }[];
   metrics?: Record<string, string | number | null>;
+  symbols_list?: string[];
+  symbols_data?: Record<string, any>;
 };
 
 const CHART_COMMON: any = {
@@ -86,6 +88,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
 
   // Track viewport width for responsive chart heights
   useEffect(() => {
@@ -137,6 +140,11 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
   useEffect(() => {
     if (!data || !containerRef.current) return;
 
+    // Merge per-symbol data when a symbol is selected
+    const effectiveData: ReportData = selectedSymbol && data.symbols_data?.[selectedSymbol]
+      ? { ...data, ...data.symbols_data[selectedSymbol] }
+      : data;
+
     // Cleanup previous charts
     chartsRef.current.forEach((c) => c.remove());
     chartsRef.current = [];
@@ -144,8 +152,37 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     const container = containerRef.current;
     container.innerHTML = "";
 
+    // Symbol switcher
+    const symbolsList = data.symbols_list || [];
+    if (symbolsList.length > 1) {
+      const switcherDiv = document.createElement("div");
+      switcherDiv.style.cssText = "margin-bottom:8px;display:flex;align-items:center;gap:8px;";
+      const label = document.createElement("span");
+      label.textContent = "股票切换:";
+      label.style.cssText = "font-size:12px;color:var(--text-dim);";
+      switcherDiv.appendChild(label);
+      const select = document.createElement("select");
+      select.style.cssText = "padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text);font-size:12px;";
+      const allOpt = document.createElement("option");
+      allOpt.value = "";
+      allOpt.textContent = "总览";
+      select.appendChild(allOpt);
+      for (const sym of symbolsList) {
+        const opt = document.createElement("option");
+        opt.value = sym;
+        opt.textContent = sym;
+        if (sym === selectedSymbol) opt.selected = true;
+        select.appendChild(opt);
+      }
+      select.addEventListener("change", () => {
+        setSelectedSymbol(select.value || null);
+      });
+      switcherDiv.appendChild(select);
+      container.appendChild(switcherDiv);
+    }
+
     // Summary cards
-    const s = data.summary || {};
+    const s = effectiveData.summary || {};
     const summaryDiv = document.createElement("div");
     summaryDiv.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px;";
     const cards = [
@@ -187,9 +224,9 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
       return { chart, chartDiv };
     }
 
-    const candlestick = data.candlestick_data || [];
-    const volume = data.volume_data || [];
-    const markers = data.markers || [];
+    const candlestick = effectiveData.candlestick_data || [];
+    const volume = effectiveData.volume_data || [];
+    const markers = effectiveData.markers || [];
 
     // K-line chart
     if (candlestick.length > 0) {
@@ -209,9 +246,27 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
           s.setData(chartData);
         }
       };
-      addLine(data.ma5_data, "#f5222d");
-      addLine(data.ma20_data, "#1890ff");
-      addLine(data.ma60_data, "#722ed1");
+      addLine(effectiveData.ma5_data, "#f5222d");
+      addLine(effectiveData.ma20_data, "#1890ff");
+      addLine(effectiveData.ma60_data, "#722ed1");
+
+      // Bollinger Bands
+      if (effectiveData.bb_upper_data?.length) {
+        kChart.addLineSeries({ color: "#1890ff", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false } as any).setData(effectiveData.bb_upper_data);
+      }
+      if (effectiveData.bb_middle_data?.length) {
+        kChart.addLineSeries({ color: "#8c8c8c", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false } as any).setData(effectiveData.bb_middle_data);
+      }
+      if (effectiveData.bb_lower_data?.length) {
+        kChart.addLineSeries({ color: "#1890ff", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false } as any).setData(effectiveData.bb_lower_data);
+      }
+      // Support / Resistance
+      if (effectiveData.support_data?.length) {
+        kChart.addLineSeries({ color: "#52c41a", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false, lastValueVisible: false } as any).setData(effectiveData.support_data);
+      }
+      if (effectiveData.resistance_data?.length) {
+        kChart.addLineSeries({ color: "#f5222d", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false, lastValueVisible: false } as any).setData(effectiveData.resistance_data);
+      }
 
       // Volume
       if (volume.length) {
@@ -227,17 +282,17 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     }
 
     // Cumulative returns
-    const cumRet = data.cum_return_data || [];
+    const cumRet = effectiveData.cum_return_data || [];
     if (cumRet.length > 0) {
       const { chart: rChart } = makeChart("累计收益率", 300, "策略累计收益与基准对比");
       const stratLine = rChart.addLineSeries({ color: "#f5222d", lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: "策略" } as any);
       stratLine.setData(cumRet);
-      const hs300 = data.ret_hs300_data || [];
+      const hs300 = effectiveData.ret_hs300_data || [];
       if (hs300.length) {
         const hs = rChart.addLineSeries({ color: "#1890ff", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, title: "沪深300" } as any);
         hs.setData(hs300);
       }
-      const sse = data.ret_sse_data || [];
+      const sse = effectiveData.ret_sse_data || [];
       if (sse.length) {
         const ss = rChart.addLineSeries({ color: "#fa8c16", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, title: "上证指数" } as any);
         ss.setData(sse);
@@ -246,7 +301,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     }
 
     // Drawdown
-    const dd = data.drawdown_data || [];
+    const dd = effectiveData.drawdown_data || [];
     if (dd.length > 0) {
       const { chart: ddChart } = makeChart("回撤曲线", 160, "净值相对自身历史峰值的回撤");
       const ddArea = ddChart.addAreaSeries({
@@ -258,7 +313,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     }
 
     // Daily P&L
-    const pnlBars = data.pnl_bar_data || [];
+    const pnlBars = effectiveData.pnl_bar_data || [];
     if (pnlBars.length) {
       const { chart: pChart } = makeChart("每日盈亏", 160, "每个交易日资产净值变动额");
       const pHist = pChart.addHistogramSeries({ priceFormat: { type: "volume" } } as any);
@@ -267,7 +322,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     }
 
     // Daily returns
-    const drRaw = data.daily_returns_data || [];
+    const drRaw = effectiveData.daily_returns_data || [];
     if (drRaw.length) {
       const { chart: drChart } = makeChart("每日收益率", 160, "日度收益率分布");
       const drHist = drChart.addHistogramSeries({ priceFormat: { type: "percent" } } as any);
@@ -276,7 +331,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     }
 
     // RSI
-    const rsiData = data.rsi_data || [];
+    const rsiData = effectiveData.rsi_data || [];
     if (rsiData.length) {
       const { chart: rsiChart } = makeChart("RSI(14)", 160, "超卖区 <30 / 超买区 >70");
       const rsiLine = rsiChart.addLineSeries({ color: "#722ed1", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false } as any);
@@ -292,9 +347,9 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     }
 
     // MACD
-    const macdD = data.macd_data || [];
-    const macdSig = data.macd_signal_data || [];
-    const macdH = data.macd_hist_data || [];
+    const macdD = effectiveData.macd_data || [];
+    const macdSig = effectiveData.macd_signal_data || [];
+    const macdH = effectiveData.macd_hist_data || [];
     if (macdD.length) {
       const { chart: macdChart } = makeChart("MACD(12,26,9)", 160, "MACD 线、Signal 线与柱状图");
       const mHist = macdChart.addHistogramSeries({ priceFormat: { type: "price" } } as any);
@@ -333,7 +388,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
       chartsRef.current.forEach((c) => c.remove());
       chartsRef.current = [];
     };
-  }, [data, getChartHeight]);
+  }, [data, selectedSymbol, getChartHeight]);
 
   if (loading) {
     return (

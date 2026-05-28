@@ -524,17 +524,16 @@ def brinson_attribution(result, sector_data=None, benchmark_returns=None):
 
 
 def simple_factor_analysis(result, factors=None):
-    """Simplified factor analysis.
+    """Market beta and momentum regression.
+
+    NOTE: This is NOT a Fama-French factor model. It performs a simple
+    two-factor regression (market excess return + momentum proxy).
+    For true multi-factor analysis, use SMB/HML factor data.
 
     Decomposes strategy returns into:
     - Market factor (beta vs benchmark)
     - Momentum proxy (lag-5 return autocorrelation, not a true UMD factor)
     - Alpha (residual vs market)
-
-    Note: This function does **not** implement the true Fama-French 3-factor
-    model (Fama & French, 1993), which requires SMB and HML factor data.
-    The ``momentum_correlation`` field is a return autocorrelation, not a
-    genuine momentum factor exposure.
 
     .. note::
         Previously exported as ``fama_french_analysis`` (deprecated alias
