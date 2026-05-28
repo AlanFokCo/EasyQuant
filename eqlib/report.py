@@ -978,7 +978,8 @@ def _calc_metrics(result, bench_data):
         "excess_max_dd": f"{analytics.get('excess_return_max_drawdown', 0):.2%}",
         "excess_sharpe": f"{analytics.get('excess_return_sharpe', 0):.2f}",
         "daily_excess": f"{analytics.get('daily_excess_return', 0):+.4%}",
-        "profit_loss_ratio": f"{analytics.get('profit_loss_ratio', 0):.2f}",
+        "profit_loss_ratio": ("∞" if analytics.get('profit_loss_ratio', 0) == float('inf')
+                              else f"{analytics.get('profit_loss_ratio', 0):.2f}"),
         "win_count": str(analytics.get("win_count", 0)),
         "loss_count": str(analytics.get("loss_count", 0)),
         "ann_vol": f"{analytics['annual_volatility']:.2%}",
@@ -2666,7 +2667,8 @@ def generate_report_md(result, out_path):
         lines.append(f"| Win Rate (trade) | {analytics['win_rate_trade']:.1%} |")
         lines.append(f"| Win Count | {analytics.get('win_count', 0)} |")
         lines.append(f"| Loss Count | {analytics.get('loss_count', 0)} |")
-        lines.append(f"| Profit/Loss Ratio | {analytics.get('profit_loss_ratio', 0):.2f} |")
+        _plr = analytics.get('profit_loss_ratio', 0)
+        lines.append(f"| Profit/Loss Ratio | {'∞' if _plr == float('inf') else f'{_plr:.2f}'} |")
         lines.append(f"| Trade Count | {analytics['trade_count']} |")
         lines.append(f"| Annual Turnover | {analytics['annual_turnover']:.2%} |")
         lines.append(f"| Total Commission | {analytics['total_commission']:,.2f} |")
@@ -2948,7 +2950,8 @@ def generate_report_json(result, out_path):
             "win_rate_trade": round(analytics["win_rate_trade"], 4),
             "win_count": analytics.get("win_count", 0),
             "loss_count": analytics.get("loss_count", 0),
-            "profit_loss_ratio": round(analytics.get("profit_loss_ratio", 0), 2),
+            "profit_loss_ratio": (None if analytics.get("profit_loss_ratio", 0) == float('inf')
+                                  else round(analytics.get("profit_loss_ratio", 0), 2)),
             "annual_turnover": round(analytics["annual_turnover"], 4),
             "total_commission": round(analytics["total_commission"], 2),
             "net_return": round(analytics["net_return"], 4),
