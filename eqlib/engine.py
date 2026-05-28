@@ -497,10 +497,10 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
         _cache_price_limit(session, security, ratio)
         return ratio
 
-    # Determine if we are in backtest mode (no live API calls)
-    is_backtest = session is None or not session._options.get("_is_paper_trading", False)
+    # Determine if we should skip network calls (backtest or no session)
+    skip_network_calls = session is None or not session._options.get("_is_paper_trading", False)
 
-    if not is_backtest:
+    if not skip_network_calls:
         # Paper trading mode: allow network calls for ST check
         # Check ST status via get_extras (requires akshare)
         try:
@@ -527,7 +527,7 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
         except Exception:
             pass
 
-    # Backtest mode or fallback: use conservative default 10%
+    # Backtest/non-paper mode or fallback: use conservative default 10%
     ratio = 0.10
     _cache_price_limit(session, security, ratio)
     return ratio

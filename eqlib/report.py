@@ -513,7 +513,7 @@ def _compute_symbol_kline(symbol, start, end, ohlcv_data, trade_log):
     rsi_data, macd_data, macd_signal_data, macd_hist_data = [], [], [], []
     bb_upper_data, bb_middle_data, bb_lower_data = [], [], []
 
-    if not df.empty and len(df_sorted) >= 26:
+    if not df.empty and not df_sorted.empty and len(df_sorted) >= 26:
         closes = df_sorted["close"]
         delta = closes.diff()
         gain, loss = delta.clip(lower=0), (-delta.clip(upper=0))
