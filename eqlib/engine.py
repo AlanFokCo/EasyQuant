@@ -630,9 +630,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_VALUE skipped)")
                 continue
             raw = int(order_req["value"] / open_px)
-            delta = (_round_lot(raw) if order_req["value"] > 0 else raw)
+            delta = _round_lot(abs(raw))
             if order_req["value"] < 0:
-                delta = -abs(delta)
+                delta = -delta
         elif action == "ORDER_TARGET_VALUE":
             open_px = _get_open_fast(security, day)
             if not open_px:
