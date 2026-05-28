@@ -25,20 +25,15 @@ import numpy as np
 
 
 def _to_tv_date(date_val):
-    """Convert date/datetime to lightweight-charts time string (YYYY-MM-DD)."""
-    if isinstance(date_val, datetime.datetime):
-        return date_val.strftime("%Y-%m-%d")
+    """Convert date/datetime to lightweight-charts time string (YYYY-MM-DD).
+
+    Handles datetime.datetime, datetime.date, pd.Timestamp, numpy datetime64,
+    and arbitrary objects via ``str(...)[:10]`` fallback.
+    """
+    # pd.Timestamp is a subclass of datetime.datetime, which is a subclass
+    # of datetime.date — so checking against datetime.date covers all three.
     if isinstance(date_val, datetime.date):
         return date_val.strftime("%Y-%m-%d")
-    if isinstance(date_val, pd.Timestamp):
-        return date_val.strftime("%Y-%m-%d")
-    if hasattr(date_val, "dtype") and getattr(date_val, "dtype", None) is not None:
-        try:
-            ts = pd.Timestamp(date_val)
-            if not pd.isna(ts):
-                return ts.strftime("%Y-%m-%d")
-        except Exception:
-            pass
     try:
         ts = pd.Timestamp(date_val)
         if not pd.isna(ts):
