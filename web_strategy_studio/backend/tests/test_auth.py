@@ -93,6 +93,8 @@ class TestAuthEndpoints:
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
 
+        await new_engine.dispose()
+
     @pytest.mark.asyncio
     async def test_register_returns_token(self, client):
         resp = await client.post(
