@@ -233,6 +233,8 @@ def _calc_trade_win_rate(trades):
     for trade in trades:
         sec = trade["security"]
         t_type = trade.get("type")
+        if t_type not in ("BUY", "SELL"):
+            continue
         price = trade["price"]
         amount = trade["amount"]
 
@@ -288,6 +290,8 @@ def _calc_profit_loss_ratio(trades):
     for trade in trades:
         sec = trade["security"]
         t_type = trade.get("type")
+        if t_type not in ("BUY", "SELL"):
+            continue
         price = trade["price"]
         amount = trade["amount"]
 
@@ -339,6 +343,8 @@ def _calc_excess_metrics(strategy_daily_ret, benchmark_daily_ret, risk_free_rate
     Returns:
         tuple: (excess_return, excess_return_max_drawdown, excess_return_sharpe, daily_excess_return)
     """
+    # Guard against NaN entries in benchmark (e.g. missing trading days)
+    benchmark_daily_ret = benchmark_daily_ret.fillna(0.0)
     excess = strategy_daily_ret - benchmark_daily_ret
     excess_total = float((1 + excess).prod() - 1)
     excess_daily_mean = float(excess.mean()) * ann_factor
