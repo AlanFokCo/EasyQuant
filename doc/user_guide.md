@@ -615,7 +615,7 @@ ff = simple_factor_analysis(result)
 print("市场 Beta: %.3f" % ff['market_beta'])
 ```
 
-> **注意：** `fama_french_analysis` 已弃用，请改用 `simple_factor_analysis`。
+> **注意：** 本函数**不实现**真正的 Fama-French 三因子模型。`momentum_correlation` 字段为收益自相关，非真正的动量因子暴露。`fama_french_analysis` 已弃用，请改用 `simple_factor_analysis`。
 
 ---
 
