@@ -22,6 +22,8 @@
 | 选股/行业轮动 | [选股策略 API](#选股策略-api) |
 | 优化仓位权重 | [组合优化 API](#组合优化-api) |
 | 本地缓存 | [缓存 API](#缓存-api) |
+| 滚动验证 / 检测过拟合 | [滚动验证 API（实验性）](#滚动验证-api实验性) |
+| 科学验证 / 偏差检测 | [科学验证 API（实验性）](#科学验证-api实验性) |
 
 **命名约定：**
 
@@ -654,9 +656,22 @@ metrics = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
 
 Brinson 归因分析。返回 `dict`（`allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`）。
 
-### fama_french_analysis
+### simple_factor_analysis
 
-Fama-French 因子分析。返回 `dict`（`market_beta`, `market_exposure`, `alpha_annual`, `momentum_correlation`, `vol_of_vol`, `residual_volatility`, `explained_variance`）。
+简化因子分析。将策略收益分解为市场因子（beta）、动量代理（滞后收益自相关）和 Alpha（残差）。
+
+> **注意：** 本函数**不实现**真正的 Fama-French 三因子模型。`momentum_correlation` 字段为收益自相关，非真正的动量因子暴露。
+
+```python
+from eqlib import simple_factor_analysis
+ff = simple_factor_analysis(result)
+```
+
+返回 `dict`（`market_beta`, `market_exposure`, `alpha_annual`, `momentum_correlation`, `vol_of_vol`, `residual_volatility`, `explained_variance`）。
+
+!!! warning "已弃用别名"
+
+    `fama_french_analysis` 仍可使用，但已弃用。请改用 `simple_factor_analysis`。
 
 ---
 
@@ -808,6 +823,86 @@ result = run_strategy(initialize, selection_func=my_selection, selection_rebalan
 
 ---
 
+## 滚动验证 API（实验性）
+
+### walk_forward
+
+滚动验证（Walk-Forward Analysis）：将历史期间分为交替的样本内（IS）和样本外（OOS）窗口，用于检测过拟合。
+
+```python
+from eqlib import walk_forward
+
+wfa_result = walk_forward(
+    make_initialize,
+    optimize_fn=optimize,
+    start_date='2020-01-01',
+    end_date='2024-12-31',
+    train_months=12,
+    test_months=3,
+    step_months=3,
+    starting_cash=100_000,
+)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `make_initialize` | `Callable` | 工厂函数，接受参数字典并返回 `initialize` 函数 |
+| `optimize_fn` | `Callable` 或 `None` | 可选，`(train_result) -> dict` 参数选择函数 |
+| `start_date` | `str` / `date` | 分析起始日期 |
+| `end_date` | `str` / `date` | 分析结束日期 |
+| `train_months` | `int` | 每个训练窗口长度（月） |
+| `test_months` | `int` | 每个测试窗口长度（月） |
+| `step_months` | `int` | 窗口滑动步长（月） |
+| `starting_cash` | `float` | 每个窗口的初始资金 |
+| `benchmark` | `str` | 基准代码 |
+| `securities` | `list[str]` 或 `None` | 股票池 |
+
+返回 `WFAResult` 对象，包含：
+
+- `windows`：每个窗口的结果列表
+- `oos_equity`：拼接的 OOS 权益曲线（`pd.Series`）
+- `summary`：聚合统计（`total_oos_return`、`oos_sharpe` 等）
+
+---
+
+## 科学验证 API（实验性）
+
+`eqlib.scientific` 提供回测后的科学验证工具，用于过拟合检测、统计置信度测试、偏差检测和扩展风险指标。
+
+### validate_backtest
+
+一键运行全部验证检查。
+
+```python
+from eqlib.scientific import validate_backtest, ValidationConfig
+
+config = ValidationConfig()  # 可选自定义配置
+validation = validate_backtest(backtest_result, config=config)
+validation.summary()
+```
+
+### 子模块
+
+| 模块 | 主要函数 | 说明 |
+|------|----------|------|
+| `overfitting` | `out_of_sample_test`、`parameter_sensitivity`、`walk_forward_analysis` | 过拟合检测 |
+| `statistics` | `bootstrap_metrics`、`monte_carlo_simulation`、`significance_test`、`sample_size_assessment` | 统计置信度 |
+| `bias` | `check_lookahead_bias`、`check_survivorship_bias`、`check_selection_bias`、`check_data_bias` | 偏差检测 |
+| `risk` | `extended_risk_metrics`、`value_at_risk`、`conditional_var`、`stress_test`、`tail_risk_analysis` | 扩展风险 |
+| `comparison` | `compare_with_platform`、`compare_metrics`、`verify_trades` | 平台对比 |
+| `report` | `generate_validation_report` | 验证报告生成 |
+
+### ValidationConfig
+
+验证配置对象，可自定义阈值和启用/禁用各验证模块。
+
+```python
+from eqlib import ValidationConfig
+config = ValidationConfig()
+```
+
+---
+
 ## 参数化与优化约定
 
 `eqlib` 的 API 可与任意 Python 流程配合（脚本、Notebook、定时任务）。典型调用链：`run_backtest()` → `analyze_returns()` → `brinson_attribution()` → 分析结果 → 修改参数 → 再回测。
@@ -852,7 +947,11 @@ from eqlib import (
     # 组合优化
     portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
     # 分析
-    analyze_returns, brinson_attribution, fama_french_analysis,
+    analyze_returns, brinson_attribution, simple_factor_analysis,
+    # 滚动验证（实验性）
+    walk_forward, WFAResult,
+    # 科学验证（实验性）
+    ValidationConfig,
     # 选股
     StockSelector, TopNSelector, MultiFactorSelector,
     filter_st_stocks, filter_paused_stocks,
