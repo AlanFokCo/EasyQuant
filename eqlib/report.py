@@ -130,11 +130,11 @@ def _build_daily_pnl(recorded, initial):
             daily_ret = round((val - prev_val) / prev_val * 100, 3)
             pnl_bars.append({
                 "time": d, "value": round(daily_pnl, 2),
-                "color": "#f5222d" if daily_pnl >= 0 else "#52c41a",
+                "color": "#52c41a" if daily_pnl >= 0 else "#f5222d",
             })
             ret_bars.append({
                 "time": d, "value": daily_ret,
-                "color": "#f5222d" if daily_ret >= 0 else "#52c41a",
+                "color": "#52c41a" if daily_ret >= 0 else "#f5222d",
             })
         else:
             pnl_bars.append({"time": d, "value": 0, "color": "#484f58"})
@@ -214,6 +214,7 @@ def _align_fallback(s: pd.Series, target_ix: pd.DatetimeIndex, target_time_strin
     """Fallback alignment when union fails: for each target date, find the last available price."""
     s = s.sort_index()
     out = []
+    base = None
     for i, ts in enumerate(target_ix):
         mask = s.index <= ts
         available = s[mask]
@@ -222,9 +223,9 @@ def _align_fallback(s: pd.Series, target_ix: pd.DatetimeIndex, target_time_strin
         pr = float(available.iloc[-1])
         if np.isnan(pr):
             continue
-        if i == 0:
+        if base is None:
             base = pr
-        if base <= 0 or np.isnan(base):
+        if base <= 0:
             continue
         out.append({"time": target_time_strings[i], "value": round((pr / base - 1.0) * 100.0, 3)})
     return out
@@ -969,8 +970,8 @@ if (typeof LightweightCharts === 'undefined') {{
   :root {{
     --bg: #f0f2f5; --card: #fff; --border: #e8e8e8;
     --text: #262626; --text-secondary: #595959; --text-dim: #8c8c8c;
-    --primary: #1890ff; --green: #f5222d; --red: #52c41a; --yellow: #faad14;
-    --green-bg: rgba(245,34,45,.06); --red-bg: rgba(82,196,26,.06);
+    --primary: #1890ff; --green: #52c41a; --red: #f5222d; --yellow: #faad14;
+    --green-bg: rgba(82,196,26,.06); --red-bg: rgba(245,34,45,.06);
     --shadow: 0 1px 4px rgba(0,0,0,.08);
   }}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
