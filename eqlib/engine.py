@@ -40,6 +40,11 @@ _COMMISSION_BUFFER = 1.001
 _DEFAULT_SLIPPAGE_MAX_PCT = 0.005
 
 
+def _bare_code(security: str) -> str:
+    """Strip exchange suffix (.XSHG / .XSHE) from a security code."""
+    return security.replace(".XSHG", "").replace(".XSHE", "")
+
+
 class SecurityBar:
     """Lightweight bar object with __slots__ to avoid per-call class creation."""
     __slots__ = ("open", "high", "low", "close", "volume", "money")
@@ -490,7 +495,7 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
         if cache is not None and security in cache:
             return cache[security]
 
-    bare = security.replace(".XSHG", "").replace(".XSHE", "")
+    bare = _bare_code(security)
     # STAR Market and ChiNext: ±20%
     if bare.startswith("688") or bare.startswith("300"):
         ratio = 0.20
@@ -654,7 +659,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         # When exec_prices is provided (paper/live trading), use it first.
         base_price = None
         if exec_prices is not None:
-            bare_code = security.replace(".XSHG", "").replace(".XSHE", "")
+            bare_code = _bare_code(security)
             base_price = exec_prices.get(security) or exec_prices.get(bare_code)
         if not base_price:
             base_price = _get_open_fast(security, day)
@@ -737,7 +742,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             if exec_prices is not None and prev_day_date is None:
                 # Live mode: fetch previous close via akshare
                 try:
-                    bare = security.replace(".XSHG", "").replace(".XSHE", "")
+                    bare = _bare_code(security)
                     from eqlib.data import fetch_stock_data
                     prev_df = fetch_stock_data(bare, end_date=str(day - datetime.timedelta(days=7)), count=10)
                     if prev_df is not None and len(prev_df) > 0:
@@ -908,7 +913,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 log.warn(f"fill_pending SELL {security}: closeable_amount=0 (T+1 or no position)")
                 continue
 
-            is_etf_sec = _is_etf(security.replace(".XSHG", "").replace(".XSHE", ""))
+            is_etf_sec = _is_etf(_bare_code(security))
             commission = cost_cfg.calc_close_cost(exec_price, sell_amount, is_etf=is_etf_sec,
                                                   trade_date=day)
             net = exec_price * sell_amount - commission
@@ -969,12 +974,10 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             if action == "ORDER":
                 remaining_req["amount"] = remaining_amount if is_buy else -remaining_amount
             elif action == "ORDER_TARGET":
-                # For target orders, adjust the target based on what was filled
-                current = portfolio.positions.get(security)
-                current_amount = current.amount if current else 0
-                target = order_req["target_amount"]
-                # The new target is: original target minus filled amount
-                remaining_req["target_amount"] = target - (rounded if is_buy else sell_amount)
+                # For target orders, keep the original target — the engine
+                # recomputes delta = target - current_position on the next bar,
+                # so subtracting the filled amount would undershoot the target.
+                remaining_req["target_amount"] = order_req["target_amount"]
             elif action == "ORDER_VALUE":
                 # For value orders, adjust the value based on fill
                 fill_value = (rounded if is_buy else sell_amount) * exec_price
@@ -1416,7 +1419,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             universe_all = list(context.universe or []) + list(context.portfolio.positions.keys())
             if universe_all:
                 universe_bare = {
-                    s.replace(".XSHG", "").replace(".XSHE", "") for s in universe_all
+                    _bare_code(s) for s in universe_all
                 }
             spot_cache = _fetch_live_prices(spot_cache, securities=universe_bare)
 
@@ -1514,7 +1517,7 @@ def _resolve_live_price(spot_cache: dict, security: str, default: float) -> floa
     """
     price = spot_cache.get(security)
     if price is None:
-        bare = security.replace(".XSHG", "").replace(".XSHE", "")
+        bare = _bare_code(security)
         price = spot_cache.get(bare)
     return price if price is not None else default
 
