@@ -96,7 +96,6 @@ class Order:
             side: "buy" or "sell" (auto-detected from amount if None)
             order_id: unique identifier (auto-generated if None)
         """
-        import datetime
         self.order_id = order_id or f"ORD_{security}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
         self.security = security
         self.amount = abs(amount)  # requested amount (always positive)
@@ -135,7 +134,6 @@ class Order:
 
     def add_partial_fill(self, amount: int, price: float, timestamp=None):
         """Record a partial fill."""
-        import datetime
         self.partial_fills.append((amount, price, timestamp or datetime.datetime.now()))
         self.filled_amount += amount
         # Update average cost (only consider amount and price, ignore timestamp)
