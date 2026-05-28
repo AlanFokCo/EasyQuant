@@ -55,6 +55,9 @@ class VolumeSlippage(SlippageModel):
 
         impact_pct = impact * (order_shares / daily_volume)
 
+    Capped at ``max_slippage_pct`` to prevent unrealistic slippage when
+    daily volume is very low.
+
     Buys execute at ``price * (1 + impact_pct)``; sells at the inverse.
     When ``daily_volume`` is 0 or unknown, falls back to no slippage.
 
@@ -66,16 +69,19 @@ class VolumeSlippage(SlippageModel):
             representing 10% of daily volume with ``impact=0.05`` results in
             0.5% slippage.  Adjust based on the target universe's average
             daily turnover (Almgren & Chriss, 2001).
+        max_slippage_pct: maximum allowed slippage fraction (default 0.05 = 5%).
     """
 
-    def __init__(self, impact: float = 0.05):
+    def __init__(self, impact: float = 0.05, max_slippage_pct: float = 0.05):
         self.impact = impact
+        self.max_slippage_pct = max_slippage_pct
+        self.max_pct = max_slippage_pct
 
     def get_execution_price(self, price: float, amount: int, is_buy: bool,
                             daily_volume: float = 0) -> float:
         if daily_volume <= 0:
             return price
-        impact_pct = self.impact * (amount / daily_volume)
+        impact_pct = min(self.impact * (amount / daily_volume), self.max_slippage_pct)
         if is_buy:
             return price * (1.0 + impact_pct)
         return price * (1.0 - impact_pct)
