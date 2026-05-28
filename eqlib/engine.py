@@ -469,7 +469,8 @@ def _t1_unlock(sess: BacktestSession):
         pos.closeable_amount = pos.amount
 
 
-def _get_price_limit_ratio(security: str, context_dt: datetime.date = None) -> float:
+def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
+                           session: BacktestSession = None) -> float:
     """Return the daily price-limit ratio (one-sided) for a security.
 
     Board classification:
@@ -481,35 +482,62 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None) -> f
     Parameters:
         security: stock code (e.g., "601390.XSHG")
         context_dt: optional date for ST status lookup in backtest mode
+        session: optional BacktestSession for caching and mode detection
     """
+    # ── Check session cache first ────────────────────────────────────────
+    if session is not None:
+        cache = session._options.get("_price_limit_cache")
+        if cache is not None and security in cache:
+            return cache[security]
+
     bare = security.replace(".XSHG", "").replace(".XSHE", "")
     # STAR Market and ChiNext: ±20%
     if bare.startswith("688") or bare.startswith("300"):
-        return 0.20
+        ratio = 0.20
+        _cache_price_limit(session, security, ratio)
+        return ratio
 
-    # Check ST status via get_extras (requires akshare)
-    try:
-        from eqlib.data import get_extras
-        st_map = get_extras("is_st", security_list=[bare])
-        if st_map.get(bare, False):
-            return 0.05  # ST stocks: ±5%
-    except Exception:
-        # get_extras may fail in backtest mode or when akshare unavailable
-        pass
+    # Determine if we are in backtest mode (no live API calls)
+    is_backtest = session is None or not session._options.get("_is_paper_trading", False)
 
-    # Fallback: check if stock name contains "ST" via live data (for paper trading)
-    try:
-        import akshare as ak
-        spot = ak.stock_zh_a_spot_em()
-        row = spot[spot["代码"] == bare]
-        if len(row) > 0:
-            name = row.iloc[0]["名称"]
-            if "ST" in name or "st" in name.lower():
-                return 0.05
-    except Exception:
-        pass
+    if not is_backtest:
+        # Paper trading mode: allow network calls for ST check
+        # Check ST status via get_extras (requires akshare)
+        try:
+            from eqlib.data import get_extras
+            st_map = get_extras("is_st", security_list=[bare])
+            if st_map.get(bare, False):
+                ratio = 0.05
+                _cache_price_limit(session, security, ratio)
+                return ratio
+        except Exception:
+            pass
 
-    return 0.10  # Main board / SME: ±10%
+        # Fallback: check if stock name contains "ST" via live data
+        try:
+            import akshare as ak
+            spot = ak.stock_zh_a_spot_em()
+            row = spot[spot["代码"] == bare]
+            if len(row) > 0:
+                name = row.iloc[0]["名称"]
+                if "ST" in name or "st" in name.lower():
+                    ratio = 0.05
+                    _cache_price_limit(session, security, ratio)
+                    return ratio
+        except Exception:
+            pass
+
+    # Backtest mode or fallback: use conservative default 10%
+    ratio = 0.10
+    _cache_price_limit(session, security, ratio)
+    return ratio
+
+
+def _cache_price_limit(session, security, ratio):
+    """Store price-limit ratio in session cache to avoid repeated lookups."""
+    if session is not None:
+        cache = session._options.setdefault("_price_limit_cache", {})
+        cache[security] = ratio
 
 
 def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
@@ -724,7 +752,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 prev_close = None
 
             if prev_close:
-                ratio = _get_price_limit_ratio(security)
+                ratio = _get_price_limit_ratio(security, session=sess)
                 limit_up = prev_close * (1 + ratio)
                 limit_down = prev_close * (1 - ratio)
                 # A small tolerance (0.1%) absorbs floating-point rounding
@@ -1358,6 +1386,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
         close_today_commission=0, min_commission=5,
     )
     session._benchmark = benchmark
+    session._options["_is_paper_trading"] = True
 
     now = datetime.datetime.now()
     context = Context(now.date(), now.date() + datetime.timedelta(days=365),
@@ -1454,8 +1483,6 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
 
             # Call after_trading_end hooks at market close (15:00)
             if context.current_dt.hour >= 15 and context.current_dt.minute >= 0:
-                if not hasattr(session, '_after_trading_end_done'):
-                    session._after_trading_end_done = False
                 if not session._after_trading_end_done:
                     context.current_dt = datetime.datetime.combine(today, datetime.time(15, 0))
                     for func in session._after_trading_end_funcs:

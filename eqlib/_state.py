@@ -53,6 +53,8 @@ class BacktestSession:
         # Notification system (Phase 2.5)
         '_notification_sender', '_on_order_queued_funcs', '_on_order_filled_funcs',
         '_notification_events',
+        # Paper-trading: after_trading_end one-shot flag
+        '_after_trading_end_done',
     )
 
     def __init__(self):
@@ -92,6 +94,8 @@ class BacktestSession:
         self._on_order_queued_funcs: list = []  # Callbacks for signal generation
         self._on_order_filled_funcs: list = []  # Callbacks for order execution
         self._notification_events: list = []  # Enabled events, e.g., ["queued", "filled"]
+        # Paper-trading: after_trading_end one-shot flag
+        self._after_trading_end_done = False
 
 
 # ── Thread-local session management ───────────────────────────────────────────
