@@ -27,7 +27,10 @@ _LOCAL_DATA_DIR = os.environ.get("EQLIB_LOCAL_DATA_DIR", None)
 # Default memory limit for preload (1 GB in MB)
 _DEFAULT_MAX_MEMORY_MB = 1024
 
-# Per-file locks to ensure thread-safe read-merge-write in _save_to_disk
+# Per-file locks to ensure thread-safe read-merge-write in _save_to_disk.
+# Capped at _MAX_FILE_LOCKS entries; when the limit is reached the dict is
+# pruned to the most recently used half (simple LRU-ish eviction).
+_MAX_FILE_LOCKS = 1024
 _file_locks: dict = {}
 _file_locks_lock = threading.Lock()
 
@@ -37,6 +40,13 @@ def _get_file_lock(path: Path) -> threading.Lock:
     key = str(path)
     with _file_locks_lock:
         if key not in _file_locks:
+            # Evict unlocked entries when the table grows too large.
+            # Remove at least 1 and up to half of the unlocked entries.
+            if len(_file_locks) >= _MAX_FILE_LOCKS:
+                to_remove = [k for k, v in _file_locks.items() if not v.locked()]
+                evict_count = max(len(to_remove) // 2, 1) if to_remove else 0
+                for k in to_remove[:evict_count]:
+                    del _file_locks[k]
             _file_locks[key] = threading.Lock()
         return _file_locks[key]
 
