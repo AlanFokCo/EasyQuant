@@ -66,7 +66,7 @@ class TestAuthEndpoints:
     """Test the /auth endpoints using httpx + FastAPI TestClient."""
 
     @pytest.fixture
-    def client(self, tmp_path):
+    async def client(self, tmp_path):
         """Create a test client with a fresh SQLite DB in tmp_path."""
         from httpx import ASGITransport, AsyncClient
 
@@ -84,18 +84,14 @@ class TestAuthEndpoints:
             new_engine, class_=db_mod.AsyncSession, expire_on_commit=False
         )
 
-        import asyncio
-
-        async def setup_db():
-            async with new_engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-
-        asyncio.get_event_loop().run_until_complete(setup_db())
+        async with new_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         from studio_api.app import app
 
         transport = ASGITransport(app=app)
-        return AsyncClient(transport=transport, base_url="http://test")
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
     @pytest.mark.asyncio
     async def test_register_returns_token(self, client):
