@@ -32,14 +32,16 @@ Event-driven quantitative backtesting framework for China A-share market.
 - **Event-driven backtesting** — `initialize` → `run_daily` → `handle_data`, compatible with JoinQuant / Zipline programming model
 - **A-share data** — daily OHLCV, minute K-lines, tick data, real-time quotes, fundamentals, money flow via free AKShare API
 - **Position management** — buy/sell by shares, value, or target; automatic lot-size rounding (100 shares), commission calculation
-- **Risk analysis** — Sharpe, Sortino, max drawdown, alpha/beta, Brinson attribution, Fama-French factor analysis
+- **Risk analysis** — Sharpe, Sortino, max drawdown, alpha/beta, Brinson attribution, simple factor analysis
 - **Portfolio optimization** — minimum variance, maximum Sharpe, risk parity
 - **Paper trading** — run strategies live with real-time market data before going live
 - **PTrade/QMT adapter** — one-click export to broker platforms
 - **Stock selection** — periodic rebalancing with factor screening (ST/PB/PE/momentum filters, Top-N, multi-factor scoring)
-- **Utility library** — 30+ technical indicators (MA, MACD, RSI, KDJ, Bollinger, ATR, ADX), statistical tools, position sizing (Kelly, ATR-based, fixed fractional)
+- **Utility library** — 40+ technical indicators (MA, MACD, RSI, KDJ, Bollinger, ATR, ADX), statistical tools, position sizing (Kelly, ATR-based, fixed fractional)
 - **Reports** — interactive HTML, chart PNG, Markdown, JSON with 20+ risk/return metrics
 - **Chainable stock screening** — fluent API (`query` / `valuation` / `get_fundamentals`) for fundamental analysis
+- **Walk-forward analysis** — rolling in-sample/out-of-sample validation to detect overfitting (experimental)
+- **Scientific validation** — overfitting detection, statistical confidence, bias detection, extended risk metrics (experimental)
 
 ---
 
@@ -167,7 +169,7 @@ Full index at [`examples/Examples.md`](examples/Examples.md).
 | 06 | `06_advanced_api.py` | Scheduling, portfolio optimization, attribution |
 | 07 | `07_market_data.py` | Financials, industry, index, minute, tick data |
 | 08 | `08_lifecycle_callbacks.py` | Lifecycle callbacks & stock pool management |
-| 09 | `09_attribution_analysis.py` | Brinson + Fama-French factor analysis |
+| 09 | `09_attribution_analysis.py` | Brinson + simple factor analysis |
 | 10 | `10_index_concept.py` | Index & concept board strategies |
 | 11 | `11_utils_library.py` | Full utility library demonstration |
 | 12 | `12_portfolio_backtest.py` | Multi-stock portfolio backtest |

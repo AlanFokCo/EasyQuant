@@ -7,6 +7,7 @@
 面向中国 A 股市场的事件驱动量化回测框架。
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/test.yml?label=Tests)](https://github.com/AlanFokCo/EasyQuant/actions/workflows/test.yml)
+[![Studio CI](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/studio-test.yml?label=Studio%20CI)](https://github.com/AlanFokCo/EasyQuant/actions/workflows/studio-test.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/deploy-docs.yml?label=Docs)](https://AlanFokCo.github.io/EasyQuant/)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/AlanFokCo/EasyQuant/blob/main/LICENSE)
@@ -31,14 +32,16 @@
 - **事件驱动回测** — `initialize` → `run_daily` → `handle_data`，与 JoinQuant / Zipline 一致的编程模型
 - **A 股数据** — 日线 OHLCV、分钟 K 线、Tick 数据、实时行情、财务摘要、资金流向，通过 AKShare 免费获取
 - **仓位管理** — 按股数 / 金额 / 目标值买卖，自动取整到 100 股，自动计算手续费
-- **风险分析** — 夏普 / 索提诺 / 最大回撤 / alpha & beta / Brinson 归因 / Fama-French 因子分析
+- **风险分析** — 夏普 / 索提诺 / 最大回撤 / alpha & beta / Brinson 归因 / 简化因子分析
 - **组合优化** — 最小方差、最大夏普、风险平价
 - **模拟盘** — 使用实时行情持续运行策略，实盘前验证
 - **PTrade/QMT 适配** — 策略一键导出为券商平台格式
 - **选股** — 按因子定期调仓（ST/PB/PE/动量过滤、Top-N、多因子评分）
-- **工具库** — 30+ 技术指标（MA、MACD、RSI、KDJ、布林带、ATR、ADX）、统计分析、仓位管理（Kelly、ATR、固定比例）
+- **工具库** — 40+ 技术指标（MA、MACD、RSI、KDJ、布林带、ATR、ADX）、统计分析、仓位管理（Kelly、ATR、固定比例）
 - **报告输出** — 交互式 HTML 报告、图表 PNG、Markdown、JSON，含 20+ 风险/收益指标
 - **链式选股 API** — 流式接口（`query` / `valuation` / `get_fundamentals`）用于基本面筛选
+- **滚动验证 (WFA)** — 样本内/样本外滚动窗口验证，检测过拟合（实验性）
+- **科学验证** — 过拟合检测、统计置信度、偏差检测、扩展风险指标（实验性）
 
 ---
 
@@ -164,7 +167,7 @@ EasyQuant/
 | 06 | `06_advanced_api.py` | 调度、组合优化、归因分析 |
 | 07 | `07_market_data.py` | 财务、行业、指数、分钟线、Tick 数据 |
 | 08 | `08_lifecycle_callbacks.py` | 生命周期回调与股票池管理 |
-| 09 | `09_attribution_analysis.py` | Brinson 归因 + Fama-French 因子分析 |
+| 09 | `09_attribution_analysis.py` | Brinson 归因 + 简化因子分析 |
 | 10 | `10_index_concept.py` | 指数与概念板块策略 |
 | 11 | `11_utils_library.py` | 全量工具库演示 |
 | 12 | `12_portfolio_backtest.py` | 多股票组合回测 |

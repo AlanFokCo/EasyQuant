@@ -28,6 +28,9 @@
 **Brinson attribution (Brinson 归因)**
 将超额收益分解为配置效应（allocation effect）、选股效应（selection effect）和交互效应（interaction effect）三部分，用于量化各层级决策的贡献。
 
+**bootstrap (自助法)**
+一种重采样统计方法：从原始数据中有放回地抽样，生成大量模拟样本，以此估计指标的置信区间。EasyQuant 通过 `eqlib.scientific.bootstrap_metrics()` 提供支持。
+
 ---
 
 ## C
@@ -86,6 +89,16 @@ A 股最小买入单位为 1 手 = 100 股。EasyQuant 的 `order()` 系列函�
 **max drawdown (最大回撤)**
 见 drawdown。
 
+**Monte Carlo simulation (蒙特卡罗模拟)**
+通过随机打乱收益序列的顺序来模拟大量可能的权益路径，以评估策略指标（如夏普比率、最大回撤）的分布范围。EasyQuant 通过 `eqlib.scientific.monte_carlo_simulation()` 提供支持。
+
+---
+
+## O
+
+**overfitting (过拟合)**
+策略参数过度适配历史数据的特定噪声，导致在新数据上表现大幅下降。常见检测方法包括样本外测试、参数敏感度分析和滚动验证（Walk-Forward Analysis）。EasyQuant 的 `eqlib.scientific.overfitting` 模块提供自动检测工具。
+
 ---
 
 ## P
@@ -126,6 +139,9 @@ A 股最小买入单位为 1 手 = 100 股。EasyQuant 的 `order()` 系列函�
 **ST (特别处理)**
 沪深交易所对经营异常股票的特殊标记（*ST / ST）。ST 股涨跌幅限制为 ±5%，EasyQuant 的 `filter_st_stocks()` 函数可将 ST 股从股票池中排除。
 
+**survivorship bias (幸存者偏差)**
+仅使用当前仍在交易的股票进行回测，忽略了已退市或被 ST 的股票，导致回测收益虚高。EasyQuant 的 `eqlib.scientific.check_survivorship_bias()` 可检测此类偏差。
+
 ---
 
 ## T
@@ -142,6 +158,16 @@ A 股交易日历，排除节假日、周末。EasyQuant 优先使用新浪财�
 
 **universe (股票池)**
 策略运行的股票集合，通过 `context.universe` 访问，由 `set_universe()` 或在 `initialize()` 中赋值设置。
+
+---
+
+## V
+
+**VaR (Value at Risk / 在险价值)**
+在给定置信水平（如 95%）下，投资组合在一定持有期内可能遭受的最大损失。EasyQuant 通过 `eqlib.scientific.value_at_risk()` 和 `utils.value_at_risk()` 提供计算。
+
+**CVaR (Conditional VaR / 条件在险价值)**
+又称 Expected Shortfall（ES）。在损失超过 VaR 的情况下的期望损失，衡量尾部风险。EasyQuant 通过 `eqlib.scientific.conditional_var()` 和 `utils.conditional_var()` 提供计算。
 
 ---
 

@@ -607,13 +607,15 @@ print("配置效应: %.4f" % attr['allocation_effect'])
 print("选股效应: %.4f" % attr['selection_effect'])
 ```
 
-### 11.3 `fama_french_analysis`：因子分析
+### 11.3 `simple_factor_analysis`：因子分析
 
 ```python
-from eqlib import fama_french_analysis
-ff = fama_french_analysis(result)
+from eqlib import simple_factor_analysis
+ff = simple_factor_analysis(result)
 print("市场 Beta: %.3f" % ff['market_beta'])
 ```
+
+> **注意：** `fama_french_analysis` 已弃用，请改用 `simple_factor_analysis`。
 
 ---
 
@@ -761,6 +763,64 @@ audit_log/
 ```
 
 详细说明见 [Tutorial 10](../tutorials/10_agent_optimization.md)。
+
+---
+
+## 13A. 滚动验证（Walk-Forward Analysis）（实验性）
+
+滚动验证将历史期间分为交替的「样本内」（IS）训练窗口和「样本外」（OOS）测试窗口，在 IS 窗口上优化参数，在 OOS 窗口上验证，最后拼接 OOS 权益曲线。
+
+```python
+from eqlib import walk_forward
+
+def make_initialize(fast_period=5, slow_period=20):
+    def initialize(context):
+        set_benchmark('000300.XSHG')
+        context.fast = fast_period
+        context.slow = slow_period
+        run_daily(handle, time='every_bar')
+    return initialize
+
+def optimize(train_result):
+    return {'fast_period': 5, 'slow_period': 20}  # 简化示例
+
+wfa_result = walk_forward(
+    make_initialize,
+    optimize_fn=optimize,
+    start_date='2020-01-01',
+    end_date='2024-12-31',
+    train_months=12,
+    test_months=3,
+)
+print(wfa_result.summary)
+```
+
+WFA 结果包含：每个窗口的详细指标、拼接的 OOS 权益曲线、以及汇总统计（总 OOS 收益率、OOS 夏普比率等）。
+
+---
+
+## 13B. 科学验证（实验性）
+
+`eqlib.scientific` 提供回测后的科学验证工具，帮助判断策略是否可信：
+
+```python
+from eqlib.scientific import validate_backtest
+
+validation = validate_backtest(result)
+validation.summary()
+```
+
+包含以下验证模块：
+
+| 模块 | 功能 |
+|------|------|
+| **过拟合检测** | 样本外测试、参数敏感度分析、滚动验证 |
+| **统计置信度** | Bootstrap 指标、蒙特卡罗模拟、显著性检验 |
+| **偏差检测** | 前视偏差、幸存者偏差、选择偏差、数据偏差 |
+| **扩展风险** | VaR、CVaR、压力测试、尾部风险分析 |
+| **平台对比** | 与外部平台回测结果交叉验证 |
+
+详细 API 参考见 [API 参考 · 科学验证 API](api_reference.md#科学验证-api实验性)。
 
 ---
 
