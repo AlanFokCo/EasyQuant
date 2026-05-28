@@ -3,7 +3,7 @@
 Demonstrates:
 - analyze_returns: Sharpe, Sortino, max drawdown, alpha, beta
 - brinson_attribution: allocation, selection, interaction effects
-- fama_french_analysis: factor decomposition
+- simple_factor_analysis: factor decomposition
 - Using the full reporting pipeline (chart + Markdown + JSON)
 
 Usage:
@@ -122,12 +122,12 @@ if __name__ == "__main__":
     else:
         print("  Insufficient data for Brinson attribution")
 
-    # 3. Fama-French factor analysis
+    # 3. Simple factor analysis
     print(f"\n{'=' * 60}")
     print("Factor Analysis (simplified)")
     print(f"{'=' * 60}")
 
-    ff = fama_french_analysis(result)
+    ff = simple_factor_analysis(result)
     if ff:
         print(f"  Market beta:         {ff['market_beta']:.2f}")
         print(f"  Market exposure:     {ff['market_exposure']:+.2f}")

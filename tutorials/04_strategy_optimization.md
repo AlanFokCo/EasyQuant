@@ -336,7 +336,7 @@ def initialize(context):
 回测完成后，深入了解收益来源：
 
 ```python
-from eqlib import analyze_returns, brinson_attribution, fama_french_analysis
+from eqlib import analyze_returns, brinson_attribution, simple_factor_analysis
 
 # 综合风险指标
 metrics = analyze_returns(result, risk_free_rate=0.03)
@@ -349,8 +349,8 @@ attr = brinson_attribution(result)
 print("配置效应: %.4f" % attr['allocation_effect'])
 print("选股效应:   %.4f" % attr['selection_effect'])
 
-# Fama-French 因子
-ff = fama_french_analysis(result)
+# 简化因子分析
+ff = simple_factor_analysis(result)
 print("市场 Beta:  %.3f" % ff['market_beta'])
 print("年化 Alpha: %.4f" % ff['alpha_annual'])
 ```

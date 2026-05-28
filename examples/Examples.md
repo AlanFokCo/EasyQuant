@@ -60,7 +60,7 @@ python examples/<file>.py
 
 演示 eqlib 高级功能：策略调度（`run_weekly`/`run_monthly`）、组合优化（最小方差/最大夏普/风险平价）、归因分析（Brinson + Fama-French）。
 
-**涉及 API：** `portfolio_optimizer`、`MinVariance`、`MaxSharpe`、`RiskParity`、`analyze_returns`、`brinson_attribution`、`fama_french_analysis`
+**涉及 API：** `portfolio_optimizer`、`MinVariance`、`MaxSharpe`、`RiskParity`、`analyze_returns`、`brinson_attribution`、`simple_factor_analysis`
 
 ## 07 — 扩展数据 API
 
@@ -78,7 +78,7 @@ python examples/<file>.py
 
 多股票动量策略 + 完整的回测后分析：绩效指标、Brinson 归因、Fama-French 因子分析、报告生成。
 
-**涉及 API：** `analyze_returns`、`brinson_attribution`、`fama_french_analysis`、`generate_chart`、`generate_report_md`、`generate_report_json`
+**涉及 API：** `analyze_returns`、`brinson_attribution`、`simple_factor_analysis`、`generate_chart`、`generate_report_md`、`generate_report_json`
 
 ## 10 — 指数与概念策略
 
