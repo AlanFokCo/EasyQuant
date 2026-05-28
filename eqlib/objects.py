@@ -1,6 +1,7 @@
 """EasyQuant-like global objects: g, Order, OrderCost."""
 
 import datetime
+import uuid
 
 
 class GlobalObject:
@@ -96,7 +97,7 @@ class Order:
             side: "buy" or "sell" (auto-detected from amount if None)
             order_id: unique identifier (auto-generated if None)
         """
-        self.order_id = order_id or f"ORD_{security}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        self.order_id = order_id or f"ORD_{security}_{uuid.uuid4().hex[:12]}"
         self.security = security
         self.amount = abs(amount)  # requested amount (always positive)
         self.style = style or MarketOrder()
