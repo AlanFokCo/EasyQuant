@@ -468,37 +468,16 @@ def generate_chart(result, out_path):
     print(f"Chart saved: {out_path}")
 
 
-def _compute_chart_data(result):
-    """Compute all chart data arrays from a backtest result dict.
+def _compute_symbol_kline(symbol, start, end, ohlcv_data, trade_log):
+    """Compute K-line and technical indicator data for a single symbol.
 
     Returns a dict with: candlestick_data, volume_data, ma5/20/60_data,
     support_data, resistance_data, rsi_data, macd_data, macd_signal_data,
-    macd_hist_data, bb_upper/middle/lower_data, markers, cum_return_data,
-    ret_hs300_data, ret_sse_data, drawdown_data, pnl_bar_data,
-    daily_returns_data, symbol.
+    macd_hist_data, bb_upper/middle/lower_data, markers, tech_stats.
     """
-    ctx = result["context"]
-    trade_log = result["trade_log"]
-    recorded = result["recorded_values"]
-    initial = ctx.portfolio.starting_cash
-    start = ctx.start_date
-    end = ctx.end_date
-
-    # Collect traded securities
-    securities = set()
-    for t in trade_log:
-        securities.add(t["security"])
-    if not securities and ctx.universe:
-        securities.add(ctx.universe[0])
-    if not securities:
-        securities.add("601390")
-    symbol = list(securities)[0]
-
-    # K-line + technical indicators
     candlestick_data, ma5_data, ma20_data, ma60_data = [], [], [], []
     volume_data, support_data, resistance_data = [], [], []
 
-    ohlcv_data = result.get("ohlcv_data", {})
     df = ohlcv_data.get(symbol, pd.DataFrame())
     if df.empty:
         try:
@@ -527,12 +506,14 @@ def _compute_chart_data(result):
             if not pd.isna(m60): ma60_data.append({"time": d, "value": round(float(m60), 3)})
             if not pd.isna(sup): support_data.append({"time": d, "value": round(float(sup), 3)})
             if not pd.isna(res): resistance_data.append({"time": d, "value": round(float(res), 3)})
+    else:
+        df_sorted = pd.DataFrame()
 
     # RSI(14), MACD(12,26,9), Bollinger Bands(20,2)
     rsi_data, macd_data, macd_signal_data, macd_hist_data = [], [], [], []
     bb_upper_data, bb_middle_data, bb_lower_data = [], [], []
 
-    if not df.empty and len(df_sorted) >= 26:
+    if not df.empty and not df_sorted.empty and len(df_sorted) >= 26:
         closes = df_sorted["close"]
         delta = closes.diff()
         gain, loss = delta.clip(lower=0), (-delta.clip(upper=0))
@@ -565,39 +546,20 @@ def _compute_chart_data(result):
             if not pd.isna(bb_m): bb_middle_data.append({"time": d, "value": round(float(bb_m), 3)})
             if not pd.isna(bb_l): bb_lower_data.append({"time": d, "value": round(float(bb_l), 3)})
 
-    # Buy/sell markers
+    # Buy/sell markers for this symbol only
     markers = []
     for t in trade_log:
-        markers.append({
-            "time": _to_tv_date(t["date"]),
-            "position": "belowBar" if t["type"] == "BUY" else "aboveBar",
-            "color": "#26a69a" if t["type"] == "BUY" else "#ef5350",
-            "shape": "arrowUp" if t["type"] == "BUY" else "arrowDown",
-            "text": f"{'买' if t['type'] == 'BUY' else '卖'} {t['amount']}",
-        })
+        if t["security"] == symbol:
+            markers.append({
+                "time": _to_tv_date(t["date"]),
+                "position": "belowBar" if t["type"] == "BUY" else "aboveBar",
+                "color": "#26a69a" if t["type"] == "BUY" else "#ef5350",
+                "shape": "arrowUp" if t["type"] == "BUY" else "arrowDown",
+                "text": f"{'买' if t['type'] == 'BUY' else '卖'} {t['amount']}",
+            })
     markers.sort(key=lambda x: x["time"])
 
-    # Cumulative return, daily P&L, daily return
-    cum_return_data = _build_return_series(recorded, initial)
-    pnl_bar_data, daily_returns_data = _build_daily_pnl(recorded, initial)
-
-    # Benchmark cumulative returns
-    ret_hs300 = result.get("chart_index_hs300") if isinstance(result.get("chart_index_hs300"), list) else None
-    if not ret_hs300:
-        ret_hs300 = _fetch_index_returns("sh000300", start, end, recorded)
-    ret_sse = result.get("chart_index_sse") if isinstance(result.get("chart_index_sse"), list) else None
-    if not ret_sse:
-        ret_sse = _fetch_index_returns("sh000001", start, end, recorded)
-
-    # Drawdown series
-    drawdown_data = []
-    if cum_return_data:
-        peak = cum_return_data[0]["value"]
-        for d in cum_return_data:
-            if d["value"] > peak: peak = d["value"]
-            drawdown_data.append({"time": d["time"], "value": round(d["value"] - peak, 3)})
-
-    # Technical summary stats for HTML report
+    # Technical summary stats
     tech_stats = {}
     if not df.empty:
         df_s = df.sort_index()
@@ -639,7 +601,6 @@ def _compute_chart_data(result):
         }
 
     return {
-        "symbol": symbol,
         "candlestick_data": candlestick_data,
         "volume_data": volume_data,
         "ma5_data": ma5_data, "ma20_data": ma20_data, "ma60_data": ma60_data,
@@ -649,13 +610,87 @@ def _compute_chart_data(result):
         "bb_upper_data": bb_upper_data, "bb_middle_data": bb_middle_data,
         "bb_lower_data": bb_lower_data,
         "markers": markers,
+        "tech_stats": tech_stats,
+    }
+
+
+def _compute_chart_data(result):
+    """Compute all chart data arrays from a backtest result dict.
+
+    Returns a dict with: candlestick_data, volume_data, ma5/20/60_data,
+    support_data, resistance_data, rsi_data, macd_data, macd_signal_data,
+    macd_hist_data, bb_upper/middle/lower_data, markers, cum_return_data,
+    ret_hs300_data, ret_sse_data, drawdown_data, pnl_bar_data,
+    daily_returns_data, symbol, symbols_data (multi-stock K-line dict).
+    """
+    ctx = result["context"]
+    trade_log = result["trade_log"]
+    recorded = result["recorded_values"]
+    initial = ctx.portfolio.starting_cash
+    start = ctx.start_date
+    end = ctx.end_date
+
+    # Collect traded securities
+    securities = set()
+    for t in trade_log:
+        securities.add(t["security"])
+    if not securities and ctx.universe:
+        securities.add(ctx.universe[0])
+    if not securities:
+        securities.add("601390")
+    symbols_list = sorted(securities)
+    symbol = symbols_list[0]
+
+    ohlcv_data = result.get("ohlcv_data", {})
+
+    # Compute K-line data for ALL traded securities
+    symbols_data = {}
+    for sym in symbols_list:
+        symbols_data[sym] = _compute_symbol_kline(sym, start, end, ohlcv_data, trade_log)
+
+    # Primary symbol data (first traded stock) for backward compatibility
+    primary = symbols_data[symbol]
+
+    # Cumulative return, daily P&L, daily return
+    cum_return_data = _build_return_series(recorded, initial)
+    pnl_bar_data, daily_returns_data = _build_daily_pnl(recorded, initial)
+
+    # Benchmark cumulative returns
+    ret_hs300 = result.get("chart_index_hs300") if isinstance(result.get("chart_index_hs300"), list) else None
+    if not ret_hs300:
+        ret_hs300 = _fetch_index_returns("sh000300", start, end, recorded)
+    ret_sse = result.get("chart_index_sse") if isinstance(result.get("chart_index_sse"), list) else None
+    if not ret_sse:
+        ret_sse = _fetch_index_returns("sh000001", start, end, recorded)
+
+    # Drawdown series
+    drawdown_data = []
+    if cum_return_data:
+        peak = cum_return_data[0]["value"]
+        for d in cum_return_data:
+            if d["value"] > peak: peak = d["value"]
+            drawdown_data.append({"time": d["time"], "value": round(d["value"] - peak, 3)})
+
+    return {
+        "symbol": symbol,
+        "symbols_list": symbols_list,
+        "symbols_data": symbols_data,
+        "candlestick_data": primary["candlestick_data"],
+        "volume_data": primary["volume_data"],
+        "ma5_data": primary["ma5_data"], "ma20_data": primary["ma20_data"], "ma60_data": primary["ma60_data"],
+        "support_data": primary["support_data"], "resistance_data": primary["resistance_data"],
+        "rsi_data": primary["rsi_data"], "macd_data": primary["macd_data"],
+        "macd_signal_data": primary["macd_signal_data"], "macd_hist_data": primary["macd_hist_data"],
+        "bb_upper_data": primary["bb_upper_data"], "bb_middle_data": primary["bb_middle_data"],
+        "bb_lower_data": primary["bb_lower_data"],
+        "markers": primary["markers"],
         "cum_return_data": cum_return_data,
         "ret_hs300_data": ret_hs300 if ret_hs300 else [],
         "ret_sse_data": ret_sse if ret_sse else [],
         "drawdown_data": drawdown_data,
         "pnl_bar_data": pnl_bar_data,
         "daily_returns_data": daily_returns_data,
-        "tech_stats": tech_stats,
+        "tech_stats": primary["tech_stats"],
     }
 
 
@@ -872,6 +907,8 @@ def generate_html_report(result, out_path):
         bm_vol=metrics["bm_vol"],
         trade_count=metrics["trade_count"],
         tech_json=json.dumps(tech_stats),
+        symbols_data_json=json.dumps({sym: data for sym, data in chart.get("symbols_data", {}).items()}),
+        symbols_list_json=json.dumps(chart.get("symbols_list", [symbol])),
     )
 
     with open(out_path, "w") as f:
@@ -941,7 +978,8 @@ def _calc_metrics(result, bench_data):
         "excess_max_dd": f"{analytics.get('excess_return_max_drawdown', 0):.2%}",
         "excess_sharpe": f"{analytics.get('excess_return_sharpe', 0):.2f}",
         "daily_excess": f"{analytics.get('daily_excess_return', 0):+.4%}",
-        "profit_loss_ratio": f"{analytics.get('profit_loss_ratio', 0):.2f}",
+        "profit_loss_ratio": ("∞" if analytics.get('profit_loss_ratio', 0) == float('inf')
+                              else f"{analytics.get('profit_loss_ratio', 0):.2f}"),
         "win_count": str(analytics.get("win_count", 0)),
         "loss_count": str(analytics.get("loss_count", 0)),
         "ann_vol": f"{analytics['annual_volatility']:.2%}",
@@ -1549,12 +1587,15 @@ if (typeof LightweightCharts === 'undefined') {{
         <h2>K 线图 &middot; 技术指标</h2>
         <div class="chart-desc">日 K 线含 MA5/MA20/MA60 均线、布林带(20,2)、20日动态支撑/压力位、成交量柱，以及买卖信号标记。<span style="color:var(--primary);font-weight:500">&middot; 使用前复权价格（含分红调整）</span></div>
       </div>
-      <div class="legend">
-        <span><span class="dot" style="background:#f5222d"></span>MA5</span>
-        <span><span class="dot" style="background:#1890ff"></span>MA20</span>
-        <span><span class="dot" style="background:#722ed1"></span>MA60</span>
-        <span><span class="dot" style="background:#f5222d"></span>买入</span>
-        <span><span class="dot" style="background:#52c41a"></span>卖出</span>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <select id="symbolSelector" onchange="switchSymbol(this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;cursor:pointer"></select>
+        <div class="legend">
+          <span><span class="dot" style="background:#f5222d"></span>MA5</span>
+          <span><span class="dot" style="background:#1890ff"></span>MA20</span>
+          <span><span class="dot" style="background:#722ed1"></span>MA60</span>
+          <span><span class="dot" style="background:#f5222d"></span>买入</span>
+          <span><span class="dot" style="background:#52c41a"></span>卖出</span>
+        </div>
       </div>
     </div>
     <div class="indicator-panel" id="indPanel">
@@ -2083,6 +2124,25 @@ if (typeof LightweightCharts === 'undefined') {{
       throw new Error('LightweightCharts library not loaded from CDN');
     }}
 
+    // Multi-stock K-line data
+    var _symbolsData = {symbols_data_json};
+    var _symbolsList = {symbols_list_json};
+
+    // Populate stock selector dropdown
+    (function() {{
+      var sel = document.getElementById('symbolSelector');
+      if (sel && _symbolsList.length > 1) {{
+        _symbolsList.forEach(function(sym) {{
+          var opt = document.createElement('option');
+          opt.value = sym;
+          opt.textContent = sym;
+          sel.appendChild(opt);
+        }});
+      }} else if (sel) {{
+        sel.style.display = 'none';
+      }}
+    }})();
+
     /* K-line */
     const kEl = document.getElementById('kline');
     const kChart = LightweightCharts.createChart(kEl, {{
@@ -2127,6 +2187,32 @@ if (typeof LightweightCharts === 'undefined') {{
     volS.priceScale().applyOptions({{ scaleMargins: {{ top: 0.8, bottom: 0 }} }});
     volS.setData({volume_json});
     kChart.timeScale().fitContent();
+
+    // RSI/MACD chart series (declared here so switchSymbol can access them)
+    var rsiSeries, macdLineSeries, macdSignalSeries, macdHistSeries;
+
+    // Symbol switch function for multi-stock K-line
+    window.switchSymbol = function(sym) {{
+      var d = _symbolsData[sym];
+      if (!d) return;
+      cSeries.setData(d.candlestick_data || []);
+      cSeries.setMarkers(d.markers || []);
+      ma5S.setData(d.ma5_data || []);
+      ma20S.setData(d.ma20_data || []);
+      ma60S.setData(d.ma60_data || []);
+      bbUpperS.setData(d.bb_upper_data || []);
+      bbMiddleS.setData(d.bb_middle_data || []);
+      bbLowerS.setData(d.bb_lower_data || []);
+      supS.setData(d.support_data || []);
+      resS.setData(d.resistance_data || []);
+      volS.setData(d.volume_data || []);
+      kChart.timeScale().fitContent();
+      // Update RSI/MACD charts
+      if (rsiSeries) rsiSeries.setData(d.rsi_data || []);
+      if (macdLineSeries) macdLineSeries.setData(d.macd_data || []);
+      if (macdSignalSeries) macdSignalSeries.setData(d.macd_signal_data || []);
+      if (macdHistSeries) macdHistSeries.setData(d.macd_hist_data || []);
+    }};
 
     /* Cumulative returns — strategy + 沪深300 + 上证指数 */
     const rEl = document.getElementById('returns');
@@ -2199,6 +2285,7 @@ if (typeof LightweightCharts === 'undefined') {{
       color: '#722ed1', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
     }});
     rsiLine.setData({rsi_json});
+    rsiSeries = rsiLine;
     // Overbought line (70)
     const rsiOB = rsiChart.addLineSeries({{
       color: 'rgba(245,34,45,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
@@ -2227,16 +2314,19 @@ if (typeof LightweightCharts === 'undefined') {{
       priceFormat: {{ type: 'price' }},
     }});
     macdHist.setData({macd_hist_json});
+    macdHistSeries = macdHist;
     // MACD line
     const macdLineS = macdChart.addLineSeries({{
       color: '#1890ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
     }});
     macdLineS.setData({macd_json});
+    macdLineSeries = macdLineS;
     // Signal line
     const macdSigS = macdChart.addLineSeries({{
       color: '#fa8c16', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
     }});
     macdSigS.setData({macd_signal_json});
+    macdSignalSeries = macdSigS;
     // Zero line
     const macdZeroData = {macd_json}.length > 0 ? [{{ time: {macd_json}[0].time, value: 0 }}, {{ time: {macd_json}[{macd_json}.length - 1].time, value: 0 }}] : [];
     macdChart.addLineSeries({{
@@ -2577,7 +2667,8 @@ def generate_report_md(result, out_path):
         lines.append(f"| Win Rate (trade) | {analytics['win_rate_trade']:.1%} |")
         lines.append(f"| Win Count | {analytics.get('win_count', 0)} |")
         lines.append(f"| Loss Count | {analytics.get('loss_count', 0)} |")
-        lines.append(f"| Profit/Loss Ratio | {analytics.get('profit_loss_ratio', 0):.2f} |")
+        _plr = analytics.get('profit_loss_ratio', 0)
+        lines.append(f"| Profit/Loss Ratio | {'∞' if _plr == float('inf') else f'{_plr:.2f}'} |")
         lines.append(f"| Trade Count | {analytics['trade_count']} |")
         lines.append(f"| Annual Turnover | {analytics['annual_turnover']:.2%} |")
         lines.append(f"| Total Commission | {analytics['total_commission']:,.2f} |")
@@ -2859,7 +2950,8 @@ def generate_report_json(result, out_path):
             "win_rate_trade": round(analytics["win_rate_trade"], 4),
             "win_count": analytics.get("win_count", 0),
             "loss_count": analytics.get("loss_count", 0),
-            "profit_loss_ratio": round(analytics.get("profit_loss_ratio", 0), 2),
+            "profit_loss_ratio": (None if analytics.get("profit_loss_ratio", 0) == float('inf')
+                                  else round(analytics.get("profit_loss_ratio", 0), 2)),
             "annual_turnover": round(analytics["annual_turnover"], 4),
             "total_commission": round(analytics["total_commission"], 2),
             "net_return": round(analytics["net_return"], 4),

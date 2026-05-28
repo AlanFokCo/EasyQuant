@@ -98,15 +98,15 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         if not np.isfinite(sharpe):
             sharpe = 0.0
 
-    # Sortino ratio — semi-deviation against MAR=0 (industry standard)
-    # Using ddof=0 (population std) for consistency with Sharpe above.
+    # Sortino ratio — semi-deviation of negative returns
+    # Using ddof=1 (sample std) for consistency with Sharpe above.
     downside = daily_ret[daily_ret < 0]
-    downside_std = downside.std(ddof=0) if len(downside) >= 1 else 0.0
+    downside_std = downside.std() if len(downside) >= 2 else 0.0
     # Handle NaN from single-element downside series
     if pd.isna(downside_std) or downside_std <= 0:
         sortino = 0.0
     else:
-        sortino = (daily_ret.mean() / downside_std * np.sqrt(ann_factor))
+        sortino = ((daily_ret.mean() - daily_rf) / downside_std * np.sqrt(ann_factor))
         if not np.isfinite(sortino):
             sortino = 0.0
 
@@ -129,8 +129,9 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
             peak_slice = values[:dd_end_idx]
             dd_start_idx = peak_slice.idxmax() if not peak_slice.empty else values.index[0]
 
-    # Calmar ratio
-    calmar = ann_return / abs(max_dd) if max_dd != 0 else 0.0
+    # Calmar ratio — use a small threshold to avoid explosive values when
+    # max drawdown is near-zero (e.g. -1e-10 would produce a ratio of 1e10).
+    calmar = ann_return / abs(max_dd) if abs(max_dd) >= 1e-6 else 0.0
 
     # Win rate (by day)
     win_rate_daily = float((daily_ret > 0).sum()) / n_days
@@ -152,7 +153,7 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         t["price"] * t["amount"]
         for t in trades if t.get("type") == "SELL"
     )
-    annual_turnover = (min(total_buy_value, total_sell_value) / avg_portfolio_value / years
+    annual_turnover = ((total_buy_value + total_sell_value) / 2.0 / avg_portfolio_value / years
                        if avg_portfolio_value > 0 and years > 0 else 0.0)
     total_commission = sum(t.get("commission", 0.0) for t in trades)
     # total_return is from mark-to-market portfolio value; buys/sells already
@@ -321,8 +322,10 @@ def _calc_profit_loss_ratio(trades):
     win_count = len(win_pnls)
     loss_count = len(loss_pnls)
 
-    if win_count == 0 or loss_count == 0:
+    if win_count == 0:
         return 0.0, win_count, loss_count
+    if loss_count == 0:
+        return float("inf"), win_count, loss_count
 
     avg_win = sum(win_pnls) / win_count
     avg_loss = sum(loss_pnls) / loss_count
