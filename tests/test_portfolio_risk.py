@@ -44,3 +44,35 @@ class TestRiskThresholds:
         assert thresholds.correlation_red == 0.65
         # Defaults remain
         assert thresholds.max_drawdown_yellow == 0.15
+
+
+class TestRiskReport:
+    """Tests for RiskReport dataclass."""
+
+    def test_risk_report_creation(self):
+        from eqlib.portfolio_risk import RiskReport
+        report = RiskReport(
+            timestamp=pd.Timestamp("2024-01-01"),
+            alert_level=AlertLevel.YELLOW,
+            triggers=["相关性过高"],
+            portfolio_var=10000.0,
+            portfolio_var_pct=0.05,
+            correlation_matrix=None,
+            concentration={"max_single_stock": 0.08},
+            regime="bull",
+            recommendations=["监控关注"],
+        )
+        assert report.alert_level == AlertLevel.YELLOW
+        assert report.portfolio_var == 10000.0
+        assert report.regime == "bull"
+
+    def test_risk_report_optional_fields(self):
+        from eqlib.portfolio_risk import RiskReport
+        report = RiskReport(
+            timestamp=pd.Timestamp.now(),
+            alert_level=AlertLevel.RED,
+            triggers=["回撤超阈值"],
+        )
+        assert report.portfolio_var is None
+        assert report.correlation_matrix is None
+        assert report.concentration is None
