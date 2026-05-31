@@ -6,7 +6,7 @@ and three-level alert system (YELLOW/RED/KILL_SWITCH).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -40,3 +40,17 @@ class RiskThresholds:
 
     # VaR 置信水平
     var_confidence: float = 0.95
+
+
+@dataclass
+class RiskReport:
+    """风控检查报告"""
+    timestamp: pd.Timestamp
+    alert_level: AlertLevel
+    triggers: List[str]              # 触发的预警信息列表
+    portfolio_var: Optional[float] = None   # 组合 VaR（金额）
+    portfolio_var_pct: Optional[float] = None # 组合 VaR（百分比）
+    correlation_matrix: Optional[pd.DataFrame] = None  # 策略相关性矩阵
+    concentration: Optional[Dict[str, float]] = None   # 集中度指标
+    regime: Optional[str] = None            # 当前市场 regime
+    recommendations: List[str] = field(default_factory=list)  # 建议操作
