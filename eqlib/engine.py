@@ -812,8 +812,10 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
 
         # ── Update Order status ────────────────────────────────────────────────
         if order_obj:
-            order_obj.transition_to(Order.STATUS_SUBMITTED)
-            order_obj.submit_time = datetime.datetime.now()
+            # 只在 pending 状态时才转换为 submitted，避免 partial_fill -> submitted 的错误转换
+            if order_obj.status == Order.STATUS_PENDING:
+                order_obj.transition_to(Order.STATUS_SUBMITTED)
+                order_obj.submit_time = datetime.datetime.now()
 
         # ── Execute ────────────────────────────────────────────────────────
         if is_buy:

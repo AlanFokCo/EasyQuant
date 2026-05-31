@@ -49,6 +49,15 @@ class Portfolio:
         self.positions = {}
         self.total_value = starting_cash
 
+    # 兼容性属性：让用户可以用 cash 和 portfolio_value
+    @property
+    def cash(self):
+        return self.available_cash
+
+    @property
+    def portfolio_value(self):
+        return self.total_value
+
     @property
     def returns(self):
         if self.starting_cash == 0:
