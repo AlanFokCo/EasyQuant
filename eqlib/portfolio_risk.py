@@ -54,3 +54,27 @@ class RiskReport:
     concentration: Optional[Dict[str, float]] = None   # 集中度指标
     regime: Optional[str] = None            # 当前市场 regime
     recommendations: List[str] = field(default_factory=list)  # 建议操作
+
+
+class PortfolioRiskMonitor:
+    """多策略组合风控监控器"""
+
+    def __init__(self, thresholds: Optional[RiskThresholds] = None):
+        self.thresholds = thresholds or RiskThresholds()
+        self._strategy_results: Dict[str, Any] = {}
+
+    def add_strategy(self, name: str, backtest_result: Dict) -> None:
+        """添加策略回测结果
+
+        Parameters:
+            name: 策略名称
+            backtest_result: run_backtest() 返回的 result dict
+
+        Raises:
+            ValueError: 回测结果为空或缺少 recorded_values
+        """
+        if not backtest_result:
+            raise ValueError(f"策略 '{name}' 的回测结果为空")
+        if 'recorded_values' not in backtest_result:
+            raise ValueError(f"策略 '{name}' 缺少 recorded_values 数据")
+        self._strategy_results[name] = backtest_result
