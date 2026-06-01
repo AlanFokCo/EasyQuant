@@ -3,7 +3,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from eqlib.portfolio_risk import AlertLevel, RiskThresholds
+from eqlib.portfolio_risk import AlertLevel, RiskThresholds, RiskReport
 
 
 def _make_backtest_result(n_days=50, annual_return=0.15, seed=42):
@@ -397,3 +397,41 @@ class TestDailyCheck:
         report = monitor.daily_check()
         # 高相关性应触发预警
         assert any("相关性" in t for t in report.triggers) or report.alert_level == AlertLevel.KILL_SWITCH
+
+
+class TestCheckKillSwitch:
+    """Tests for check_kill_switch function."""
+
+    def test_check_kill_switch_yellow_returns_empty(self):
+        from eqlib.portfolio_risk import check_kill_switch
+        report = RiskReport(
+            timestamp=pd.Timestamp.now(),
+            alert_level=AlertLevel.YELLOW,
+            triggers=["相关性监控"],
+        )
+        actions = check_kill_switch(report)
+        assert actions == []
+
+    def test_check_kill_switch_red_returns_actions(self):
+        from eqlib.portfolio_risk import check_kill_switch
+        report = RiskReport(
+            timestamp=pd.Timestamp.now(),
+            alert_level=AlertLevel.RED,
+            triggers=["回撤超过阈值"],
+            recommendations=["人工介入"],
+        )
+        actions = check_kill_switch(report)
+        assert len(actions) > 0
+        assert any("人工" in a for a in actions)
+
+    def test_check_kill_switch_kill_returns_strong_actions(self):
+        from eqlib.portfolio_risk import check_kill_switch
+        report = RiskReport(
+            timestamp=pd.Timestamp.now(),
+            alert_level=AlertLevel.KILL_SWITCH,
+            triggers=["熔断预警：策略相关性过高"],
+            recommendations=["建议降低仓位"],
+        )
+        actions = check_kill_switch(report)
+        assert len(actions) > 0
+        assert any("暂停" in a or "熔断" in a for a in actions)

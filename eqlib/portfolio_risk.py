@@ -369,3 +369,39 @@ class PortfolioRiskMonitor:
             regime=regime,
             recommendations=recommendations,
         )
+
+
+def check_kill_switch(report: RiskReport) -> List[str]:
+    """熔断检查
+
+    Parameters:
+        report: RiskReport 风控报告
+
+    Returns:
+        需要立即执行的熔断操作列表
+    """
+    actions = []
+
+    if report.alert_level == AlertLevel.KILL_SWITCH:
+        for trigger in report.triggers:
+            if "回撤" in trigger:
+                actions.append("⚠️ 熔断触发：暂停所有策略，等待人工确认")
+            if "相关性" in trigger:
+                actions.append("⚠️ 熔断触发：降低高相关性策略仓位 50%")
+            if "集中度" in trigger or "持仓" in trigger:
+                actions.append("⚠️ 熔断触发：减仓超标股票")
+
+        if not actions:
+            actions.append("⚠️ 熔断触发：暂停策略，等待人工确认")
+
+    elif report.alert_level == AlertLevel.RED:
+        for trigger in report.triggers:
+            if "相关性" in trigger:
+                actions.append("红色预警：建议降低高相关性策略仓位")
+            if "回撤" in trigger:
+                actions.append("红色预警：建议人工检查策略状态")
+
+        if not actions:
+            actions.append("红色预警：建议人工介入检查")
+
+    return actions
