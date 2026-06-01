@@ -289,3 +289,52 @@ class TestCorrelationMatrix:
         # 相关性应在 [-1, 1] 范围内
         corr_ab = corr_matrix.loc["A", "B"]
         assert -1.0 <= corr_ab <= 1.0
+
+
+class TestConcentrationRisk:
+    """Tests for concentration_risk method."""
+
+    def test_concentration_risk_no_positions(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result = _make_backtest_result(n_days=50)
+        monitor.add_strategy("test", result)
+
+        concentration = monitor.concentration_risk()
+        assert concentration["num_holdings"] == 0
+        assert concentration["max_single_stock"] == 0.0
+
+    def test_concentration_risk_with_positions(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+
+        # 模拟有持仓的结果
+        result = _make_backtest_result(n_days=50)
+        result["context"].portfolio.positions = {
+            "601390": type("Pos", (), {"amount": 1000, "value": 10000})(),
+            "600519": type("Pos", (), {"amount": 500, "value": 5000})(),
+        }
+        result["context"].portfolio.total_value = 200000
+
+        monitor.add_strategy("test", result)
+        concentration = monitor.concentration_risk()
+
+        assert concentration["num_holdings"] == 2
+        assert concentration["max_single_stock"] > 0
+
+    def test_concentration_risk_returns_required_keys(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result = _make_backtest_result(n_days=50)
+        monitor.add_strategy("test", result)
+
+        concentration = monitor.concentration_risk()
+        required_keys = [
+            "max_single_stock",
+            "max_single_sector",
+            "small_cap_pct",
+            "num_holdings",
+            "top3_concentration",
+        ]
+        for key in required_keys:
+            assert key in concentration
