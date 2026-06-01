@@ -37,7 +37,8 @@ async def lint_strategy(
             .where(Strategy.id == strategy_id)
         )
         strat = res.scalar_one_or_none()
-        if strat is None:
+        # C1: Verify ownership — authenticated users must not lint other users' strategies
+        if strat is None or strat.owner_id != current_user.id:
             from fastapi import HTTPException
 
             raise HTTPException(
