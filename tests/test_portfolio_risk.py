@@ -360,3 +360,40 @@ class TestRegimeDetection:
         monitor = PortfolioRiskMonitor()
         regime = monitor.regime_detection()
         assert isinstance(regime, str)
+
+
+class TestDailyCheck:
+    """Tests for daily_check method."""
+
+    def test_daily_check_returns_risk_report(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor, RiskReport, AlertLevel
+        monitor = PortfolioRiskMonitor()
+        result1 = _make_backtest_result(n_days=100, seed=1)
+        result2 = _make_backtest_result(n_days=100, seed=2)
+        monitor.add_strategy("A", result1)
+        monitor.add_strategy("B", result2)
+
+        report = monitor.daily_check()
+        assert isinstance(report, RiskReport)
+        assert report.alert_level in [AlertLevel.YELLOW, AlertLevel.RED, AlertLevel.KILL_SWITCH]
+
+    def test_daily_check_no_strategy(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor, AlertLevel
+        monitor = PortfolioRiskMonitor()
+        report = monitor.daily_check()
+        assert report.alert_level == AlertLevel.YELLOW
+        assert "无策略数据" in report.triggers or len(report.triggers) == 0
+
+    def test_daily_check_high_correlation_trigger(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor, AlertLevel
+        monitor = PortfolioRiskMonitor()
+
+        # 两个高度相关的策略（相同 seed）
+        result1 = _make_backtest_result(n_days=100, seed=1)
+        result2 = _make_backtest_result(n_days=100, seed=1)
+        monitor.add_strategy("A", result1)
+        monitor.add_strategy("B", result2)
+
+        report = monitor.daily_check()
+        # 高相关性应触发预警
+        assert any("相关性" in t for t in report.triggers) or report.alert_level == AlertLevel.KILL_SWITCH
