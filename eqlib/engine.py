@@ -821,6 +821,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         if is_buy:
             rounded = _round_lot(fill_amount)
             if rounded <= 0:
+                if order_obj:
+                    order_obj.transition_to(Order.STATUS_CANCELLED, reason="sub-lot")
+                    print(f"[EasyQuant] Order {order_obj.order_id} cancelled: amount {fill_amount} rounds to 0 lots")
                 continue
             commission = cost_cfg.calc_open_cost(exec_price, rounded)
             total_cost = exec_price * rounded + commission
@@ -912,6 +915,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             # Round sell amount to 100-share lots (A-share requirement)
             sell_amount = min(_round_lot(sell_amount), int(pos.closeable_amount))
             if sell_amount <= 0:
+                if order_obj:
+                    order_obj.transition_to(Order.STATUS_CANCELLED, reason="sub-lot")
+                    print(f"[EasyQuant] Order {order_obj.order_id} cancelled: sell amount {fill_amount} rounds to 0 lots")
                 log.warn(f"fill_pending SELL {security}: closeable_amount=0 (T+1 or no position)")
                 continue
 
