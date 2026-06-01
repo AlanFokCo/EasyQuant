@@ -595,24 +595,56 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
 
         # ── Phase 2.4: Order timeout check ───────────────────────────────────────
         # Check if order has exceeded its timeout threshold.
-        # Live/paper trading: default 1 hour (3600s)
-        # Backtest: default 1 day (86400s) or None to disable
+        # Live/paper trading: default 1 hour (3600s) using wall-clock time
+        # Backtest: count trading days elapsed (default: disabled / None)
         if order_obj and order_obj.order_id in sess._order_timestamps:
-            submit_time = sess._order_timestamps[order_obj.order_id]
-            # A2: Use simulated close-of-day in backtest mode instead of wall-clock
-            if exec_prices is not None:
-                current_time = datetime.datetime.now()
+            submit_stamp = sess._order_timestamps[order_obj.order_id]
+            is_backtest = exec_prices is None
+
+            timed_out = False
+            elapsed_display = ""
+
+            if is_backtest:
+                # A-REG1: Count trading days elapsed, not wall-clock seconds.
+                # Orders fill on T+1 so wall-clock timeout always expires.
+                timeout_days = sess._order_timeout_seconds  # reuse field; None = disabled
+                if timeout_days is None:
+                    # Backtest default: disabled (None). Users can opt-in via set_order_timeout().
+                    timed_out = False
+                else:
+                    # Convert seconds to trading days if user set via set_order_timeout(seconds)
+                    timeout_trading_days = max(1, timeout_days // 86400) if timeout_days > 0 else 0
+                    if timeout_trading_days <= 0:
+                        timed_out = False
+                    else:
+                        submit_date = submit_stamp if isinstance(submit_stamp, datetime.date) and not isinstance(submit_stamp, datetime.datetime) else getattr(submit_stamp, 'date', lambda: submit_stamp)()
+                        # Count trading days between submit_date and current day
+                        if hasattr(_get_preloaded(), '_dates') and len(_get_preloaded()._dates) > 0:
+                            all_dates = [d.date() if hasattr(d, 'date') else d for d in _get_preloaded()._dates]
+                            try:
+                                submit_idx = next(i for i, d in enumerate(all_dates) if d >= submit_date)
+                                current_idx = next(i for i, d in enumerate(all_dates) if d >= day)
+                                days_elapsed = current_idx - submit_idx
+                            except StopIteration:
+                                days_elapsed = 0
+                        else:
+                            # Fallback: use calendar days (conservative)
+                            days_elapsed = (day - submit_date).days
+                        elapsed_display = f"{days_elapsed} trading days"
+                        timed_out = days_elapsed > timeout_trading_days
             else:
-                current_time = datetime.datetime.combine(day, datetime.time(15, 0))
-            # Determine timeout threshold
-            timeout_seconds = sess._order_timeout_seconds
-            if timeout_seconds is None:
-                # Mode-based default: 1 hour for live/paper, 1 day for backtest
-                timeout_seconds = 3600 if exec_prices is not None else 86400
-            elapsed_seconds = (current_time - submit_time).total_seconds()
-            if elapsed_seconds > timeout_seconds:
+                # Live/paper: wall-clock timeout
+                current_time = datetime.datetime.now()
+                timeout_seconds = sess._order_timeout_seconds
+                if timeout_seconds is None:
+                    timeout_seconds = 3600  # 1 hour default for live
+                elapsed_seconds = (current_time - submit_stamp).total_seconds()
+                elapsed_display = f"{elapsed_seconds:.0f}s"
+                timed_out = elapsed_seconds > timeout_seconds
+
+            if timed_out:
                 log.warn(f"ORDER TIMEOUT {security}: order_id={order_obj.order_id} "
-                         f"elapsed={elapsed_seconds:.0f}s > timeout={timeout_seconds}s — order cancelled")
+                         f"elapsed={elapsed_display} — order cancelled")
                 order_obj.transition_to(Order.STATUS_EXPIRED, reason="timeout")
                 sess._trade_log.append({
                     "type": "ORDER_TIMEOUT",
@@ -620,8 +652,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                     "security": security,
                     "order_id": order_obj.order_id,
                     "action": action,
-                    "elapsed_seconds": elapsed_seconds,
-                    "timeout_seconds": timeout_seconds,
+                    "elapsed": elapsed_display,
                 })
                 # Remove timestamp record
                 del sess._order_timestamps[order_obj.order_id]
@@ -661,11 +692,15 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
 
         if delta == 0:
             if order_obj:
-                order_obj.transition_to(Order.STATUS_FILLED, reason="no position change needed")
+                order_obj.transition_to(Order.STATUS_CANCELLED, reason="no position change needed")
             continue
 
         is_buy = delta > 0
         requested_amount = abs(int(delta))
+
+        # B3: Set order side at fill time for target orders (side was None at creation)
+        if order_obj and order_obj.side is None:
+            order_obj.side = "buy" if is_buy else "sell"
 
         # ── Resolve execution price ────────────────────────────────────────
         # When exec_prices is provided (paper/live trading), use it first.
@@ -951,6 +986,12 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             pos = portfolio.positions[security]
             # Round sell amount to 100-share lots (A-share requirement)
             sell_amount = min(_round_lot(sell_amount), int(pos.closeable_amount))
+
+            # B1: Recompute partial-fill flags after lot rounding + closeable cap
+            if sell_amount < requested_amount:
+                is_partial_fill = True
+                remaining_amount = requested_amount - sell_amount
+
             if sell_amount <= 0:
                 if order_obj:
                     order_obj.transition_to(Order.STATUS_CANCELLED, reason="sub-lot")
@@ -1047,7 +1088,8 @@ def run_backtest(initialize_func, start_date, end_date,
                  starting_cash=100000.0, frequency: str = "daily",
                  benchmark: str = "000300.XSHG", securities=None,
                  use_local: bool = False, max_memory_mb: int = 1024,
-                 selection_func=None, selection_rebalance: str = "monthly:1"):
+                 selection_func=None, selection_rebalance: str = "monthly:1",
+                 handle_data=None):
     """Main backtest runner.
 
     Parameters:
@@ -1067,6 +1109,8 @@ def run_backtest(initialize_func, start_date, end_date,
             - "monthly:N" — Nth day of month (1-31), default "monthly:1"
             - "weekly:N" — Nth weekday (0=Mon, 4=Fri), default "weekly:0"
             - "daily" — every trading day
+        handle_data: optional handle_data(context, data) callback.
+            Called once per bar during the backtest.
 
     Returns:
         dict with keys: context, trade_log, recorded_values, benchmark, session
@@ -1119,6 +1163,10 @@ def run_backtest(initialize_func, start_date, end_date,
     session._g = GlobalObject()
 
     initialize_func(context)
+
+    # B2: Register handle_data on the NEW session (not the old one from run_strategy)
+    if handle_data is not None:
+        session._handle_data_func = handle_data
 
     # ── Preload OHLCV data (after initialize so we can use context.universe) ─
     _securities = securities or getattr(context, 'universe', None) or []

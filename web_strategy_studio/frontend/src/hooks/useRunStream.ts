@@ -84,10 +84,27 @@ export function useRunStream(runId: string | null) {
     let backoff = 1_000;
     let cancelled = false;
 
-    const connect = () => {
+    const fetchSseToken = async (): Promise<string | null> => {
+      const mainToken = getToken();
+      if (!mainToken) return null;
+      try {
+        const resp = await fetch(`${apiOrigin}/api/v1/auth/sse-token`, {
+          method: "POST",
+          headers: { Authorization: `****** },
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return data.token ?? null;
+      } catch {
+        return null;
+      }
+    };
+
+    const connect = async () => {
       if (cancelled || done.current) return;
 
-      const token = getToken();
+      const sseToken = await fetchSseToken();
+      const token = sseToken ?? getToken();
       const parts: string[] = [];
       if (token) parts.push(`token=${encodeURIComponent(token)}`);
       if (lastEventId.current >= 0) parts.push(`last_event_id=${lastEventId.current}`);
