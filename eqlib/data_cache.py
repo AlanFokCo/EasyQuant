@@ -209,8 +209,10 @@ def estimate_memory_mb(securities: list, rows_per_sec: int) -> dict:
     close_dict_mb = (n_sec * n_rows * _CLOSE_DICT_OVERHEAD) / (1024 * 1024)
 
     # C3: Include _field_series (9 Series per security) and _indicators
+    # 5 indicator columns: RSI, MACD, Bollinger, ATR, Donchian
+    # 1.2x overhead: pandas Series index + Python object overhead
     field_series_mb = (n_sec * n_rows * _NUM_OHLCV_FIELDS * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
-    indicators_mb = (n_sec * n_rows * 5 * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)  # ~5 indicator cols
+    indicators_mb = (n_sec * n_rows * 5 * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
 
     return {
         "panel_mb": round(panel_mb, 1),

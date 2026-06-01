@@ -386,12 +386,11 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
 
     # C2: Move cache membership check inside the lock to prevent TOCTOU race
     with _cache_lock:
-        if cache_key in _cache:
-            df_cached = _cache.get(cache_key)
-            if df_cached is not None:
-                if is_idx and start_date and end_date:
-                    return _slice_by_date(df_cached, start_date, end_date)
-                return df_cached
+        df_cached = _cache.get(cache_key)
+        if df_cached is not None:
+            if is_idx and start_date and end_date:
+                return _slice_by_date(df_cached, start_date, end_date)
+            return df_cached
 
     start_str = _normalize_date(start_date)
     end_str = _normalize_date(end_date)

@@ -1367,7 +1367,10 @@ def _run_minute_bars(context: Context, session: BacktestSession,
                     func(context)
                 else:
                     # A4: Handle specific-time scheduled functions in minute mode
-                    hour, minute = map(int, t.split(":"))
+                    try:
+                        hour, minute = map(int, t.split(":"))
+                    except (ValueError, AttributeError):
+                        continue
                     bar_time = context.current_dt
                     if (hasattr(bar_time, 'hour') and
                             bar_time.hour == hour and bar_time.minute == minute):
