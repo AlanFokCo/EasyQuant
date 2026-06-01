@@ -1840,5 +1840,77 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
 
 
 def get_restriction_release(days=30) -> pd.DataFrame:
-    """限售股解禁（未来解禁列表）"""
-    return pd.DataFrame()
+    """限售股解禁（未来解禁列表）
+
+    Parameters:
+        days: 未来天数范围，默认30天
+
+    Returns:
+        DataFrame with columns:
+        - code: 股票代码
+        - name: 股票名称
+        - release_date: 解禁日期
+        - release_amount: 解禁数量（万股）
+        - release_value: 解禁市值（万元）
+        - release_pct: 占解禁前流通市值比例
+
+    数据源: akshare stock_restricted_release_detail_em
+    """
+    try:
+        # 参数标准化
+        if days < 1:
+            days = 30
+
+        # 计算日期范围
+        today = datetime.date.today()
+        end_date = today + datetime.timedelta(days=days)
+
+        # 格式化为 YYYYMMDD
+        start_str = today.strftime("%Y%m%d")
+        end_str = end_date.strftime("%Y%m%d")
+
+        # 缓存检查
+        cache_key = f"restriction_release_{start_str}_{end_str}"
+        with _cache_lock:
+            if cache_key in _cache:
+                return _cache[cache_key].copy()
+
+        # 获取解禁数据
+        df = ak.stock_restricted_release_detail_em(start_date=start_str, end_date=end_str)
+
+        if df.empty:
+            return pd.DataFrame()
+
+        # 列重命名
+        df = _rename_cols(df, {
+            "股票代码": "code",
+            "股票简称": "name",
+            "解禁时间": "release_date",
+            "解禁数量": "release_amount",
+            "实际解禁市值": "release_value",
+            "占解禁前流通市值比例": "release_pct",
+        })
+
+        # 数值转换
+        _to_numeric(df, ["release_amount", "release_value", "release_pct"])
+
+        # 只保留需要的列（过滤掉不需要的列）
+        keep_cols = ["code", "name", "release_date", "release_amount", "release_value", "release_pct"]
+        available_cols = [c for c in keep_cols if c in df.columns]
+        df = df[available_cols]
+
+        # 按解禁日期排序
+        if "release_date" in df.columns:
+            df = df.sort_values("release_date").reset_index(drop=True)
+
+        # 存入缓存
+        with _cache_lock:
+            _cache[cache_key] = df.copy()
+            if len(_cache) > _MAX_CACHE_ENTRIES:
+                _cache.popitem(last=False)
+
+        return df
+
+    except Exception as e:
+        log.debug("get_restriction_release: %s", e)
+        return pd.DataFrame()
