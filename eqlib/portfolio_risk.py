@@ -6,6 +6,7 @@ and three-level alert system (YELLOW/RED/KILL_SWITCH).
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -71,10 +72,17 @@ class PortfolioRiskMonitor:
             backtest_result: run_backtest() 返回的 result dict
 
         Raises:
-            ValueError: 回测结果为空或缺少 recorded_values
+            ValueError: 回测结果为空或缺少 recorded_values 或 recorded_values 为空
         """
         if not backtest_result:
             raise ValueError(f"策略 '{name}' 的回测结果为空")
         if 'recorded_values' not in backtest_result:
             raise ValueError(f"策略 '{name}' 缺少 recorded_values 数据")
+        recorded_values = backtest_result['recorded_values']
+        if not recorded_values:
+            raise ValueError(f"策略 '{name}' 的 recorded_values 为空")
+
+        if name in self._strategy_results:
+            warnings.warn(f"策略 '{name}' 已存在，将被覆盖", UserWarning)
+
         self._strategy_results[name] = backtest_result
