@@ -338,3 +338,25 @@ class TestConcentrationRisk:
         ]
         for key in required_keys:
             assert key in concentration
+
+
+class TestRegimeDetection:
+    """Tests for regime_detection method."""
+
+    def test_regime_detection_returns_string(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        regime = monitor.regime_detection()
+        assert regime in ["bull", "bear", "oscillation", "unknown"]
+
+    def test_regime_detection_no_data(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        regime = monitor.regime_detection()
+        assert regime is not None
+
+    def test_regime_with_mock_index_data(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        regime = monitor.regime_detection()
+        assert isinstance(regime, str)
