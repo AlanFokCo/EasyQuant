@@ -67,16 +67,17 @@ def _extract_daily_returns(backtest_result: Dict) -> pd.Series:
     # recorded_values 可能是 dict 或 list
     if isinstance(recorded, dict):
         values = pd.Series(
-            {pd.Timestamp(d): float(v.get("total_value", 0))
+            {pd.Timestamp(d): float(v.get("total_value") or 0)  # 修复 None 值
              for d, v in recorded.items()}
         ).sort_index()
     else:  # list
         values = pd.Series(
-            {pd.Timestamp(r["date"]): float(r["total_value"])
+            {pd.Timestamp(r["date"]): float(r.get("total_value") or 0)  # 修复 None 值
              for r in recorded}
         ).sort_index()
 
-    returns = values.pct_change().dropna()
+    # 修复 Inf 值：当 total_value 从 0 变为非零时 pct_change 会产生 inf
+    returns = values.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
     return returns.astype(float)
 
 
@@ -86,6 +87,7 @@ class PortfolioRiskMonitor:
     def __init__(self, thresholds: Optional[RiskThresholds] = None):
         self.thresholds = thresholds or RiskThresholds()
         self._strategy_results: Dict[str, Any] = {}
+        self._data_issues: List[str] = []  # 记录数据不足等问题
 
     def add_strategy(self, name: str, backtest_result: Dict) -> None:
         """添加策略回测结果
@@ -110,7 +112,7 @@ class PortfolioRiskMonitor:
 
         self._strategy_results[name] = backtest_result
 
-    def portfolio_var(self, confidence: float = None) -> tuple[float, float]:
+    def portfolio_var(self, confidence: Optional[float] = None) -> tuple[float, float]:
         """计算组合 VaR（历史模拟法）
 
         Parameters:
@@ -128,10 +130,12 @@ class PortfolioRiskMonitor:
         # 收集所有策略的收益率序列
         all_returns = []
         total_value = 0.0
+        insufficient_data_strategies = []  # 记录数据不足的策略
 
         for name, result in self._strategy_results.items():
             returns = _extract_daily_returns(result)
             if len(returns) < 30:  # 数据不足
+                insufficient_data_strategies.append(name)
                 continue
             all_returns.append(returns)
 
@@ -144,7 +148,18 @@ class PortfolioRiskMonitor:
                     last_val = recorded[-1].get("total_value", 0)
                 total_value += last_val
 
-        if not all_returns or total_value == 0:
+        # 记录数据不足问题（供 daily_check 使用）
+        if insufficient_data_strategies:
+            self._data_issues = [
+                f"策略 {name} 数据不足（<30天）"
+                for name in insufficient_data_strategies
+            ]
+
+        # 所有策略数据都不足 → 返回 NaN
+        if not all_returns:
+            return (float('nan'), float('nan'))
+
+        if total_value == 0:
             return (0.0, 0.0)
 
         # 简化：按等权重拼接组合收益率
@@ -152,8 +167,36 @@ class PortfolioRiskMonitor:
 
         # 历史模拟法：取分布的负分位数
         loss_quantile = 1 - confidence
-        var_pct = -np.percentile(combined_returns, loss_quantile * 100)
+        var_pct = max(0.0, -np.percentile(combined_returns, loss_quantile * 100))  # 确保 VaR 非负
 
         var_amount = total_value * var_pct
 
         return (float(var_amount), float(var_pct))
+
+    def correlation_matrix(self) -> pd.DataFrame:
+        """计算策略间相关性矩阵
+
+        Returns:
+            DataFrame, 行列均为策略名称, 值为 Pearson 相关系数
+            单策略或无策略时返回空 DataFrame
+        """
+        if len(self._strategy_results) < 2:
+            return pd.DataFrame()
+
+        # 提取各策略收益率序列
+        returns_dict = {}
+        for name, result in self._strategy_results.items():
+            returns = _extract_daily_returns(result)
+            if len(returns) >= 30:
+                returns_dict[name] = returns
+
+        if len(returns_dict) < 2:
+            return pd.DataFrame()
+
+        # 对齐日期索引
+        returns_df = pd.DataFrame(returns_dict)
+
+        # 计算 Pearson 相关性
+        corr_matrix = returns_df.corr()
+
+        return corr_matrix

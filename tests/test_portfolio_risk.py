@@ -213,5 +213,79 @@ class TestPortfolioVar:
         result = _make_backtest_result(n_days=10)
         monitor.add_strategy("short", result)
         var_amount, var_pct = monitor.portfolio_var()
-        # 数据不足时返回 NaN 或 0
-        assert var_amount == 0.0 or np.isnan(var_amount)
+        # 数据不足时应返回 NaN
+        assert np.isnan(var_amount)
+        assert np.isnan(var_pct)
+        # 应记录数据不足问题
+        assert len(monitor._data_issues) == 1
+        assert "short" in monitor._data_issues[0]
+        assert "数据不足" in monitor._data_issues[0]
+
+    def test_portfolio_var_partial_insufficient_data(self):
+        """部分策略数据不足时，跳过这些策略继续计算"""
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        # 一个数据不足的策略
+        short_result = _make_backtest_result(n_days=10, seed=1)
+        monitor.add_strategy("short", short_result)
+        # 一个数据充足的策略
+        long_result = _make_backtest_result(n_days=100, seed=2)
+        monitor.add_strategy("long", long_result)
+
+        var_amount, var_pct = monitor.portfolio_var()
+        # 应正常计算（使用 long 策略）
+        assert var_amount > 0
+        assert var_pct > 0
+        # 应记录数据不足问题
+        assert len(monitor._data_issues) == 1
+        assert "short" in monitor._data_issues[0]
+
+
+class TestCorrelationMatrix:
+    """Tests for correlation_matrix method."""
+
+    def test_correlation_matrix_basic(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result1 = _make_backtest_result(n_days=100, seed=1)
+        result2 = _make_backtest_result(n_days=100, seed=2)
+        result3 = _make_backtest_result(n_days=100, seed=3)
+        monitor.add_strategy("A", result1)
+        monitor.add_strategy("B", result2)
+        monitor.add_strategy("C", result3)
+
+        corr_matrix = monitor.correlation_matrix()
+        assert isinstance(corr_matrix, pd.DataFrame)
+        assert corr_matrix.shape == (3, 3)
+        assert list(corr_matrix.index) == ["A", "B", "C"]
+        # 对角线应为 1
+        assert corr_matrix.loc["A", "A"] == 1.0
+        assert corr_matrix.loc["B", "B"] == 1.0
+
+    def test_correlation_matrix_single_strategy(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result = _make_backtest_result(n_days=100)
+        monitor.add_strategy("单策略", result)
+
+        corr_matrix = monitor.correlation_matrix()
+        assert corr_matrix.empty  # 单策略返回空 DataFrame
+
+    def test_correlation_matrix_no_strategy(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        corr_matrix = monitor.correlation_matrix()
+        assert corr_matrix.empty
+
+    def test_correlation_values_in_range(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result1 = _make_backtest_result(n_days=100, seed=1)
+        result2 = _make_backtest_result(n_days=100, seed=2)
+        monitor.add_strategy("A", result1)
+        monitor.add_strategy("B", result2)
+
+        corr_matrix = monitor.correlation_matrix()
+        # 相关性应在 [-1, 1] 范围内
+        corr_ab = corr_matrix.loc["A", "B"]
+        assert -1.0 <= corr_ab <= 1.0
