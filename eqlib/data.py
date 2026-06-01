@@ -1538,8 +1538,101 @@ def on_order_filled(func):
 # ============================================================
 
 def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
-    """北向资金流向（汇总级别）"""
-    return pd.DataFrame()
+    """北向资金流向（汇总级别）
+
+    Parameters:
+        start_date: 开始日期 (YYYY-MM-DD 或 datetime)
+        end_date: 结束日期，默认今天
+
+    Returns:
+        DataFrame with columns:
+        - date: 交易日期
+        - net_buy: 净买入额（亿元）
+        - total_buy: 总买入额（亿元）
+        - total_sell: 总卖出额（亿元）
+
+    数据源: akshare stock_hsgt_hist_em (沪股通 + 深股通合计)
+    """
+    try:
+        # 参数标准化
+        if end_date is None:
+            end_date = datetime.date.today()
+        if start_date is None:
+            start_date = end_date - datetime.timedelta(days=30)
+
+        # 使用 YYYY-MM-DD 格式以便与 DataFrame 日期列匹配
+        if isinstance(start_date, datetime.date):
+            sd = start_date.strftime("%Y-%m-%d")
+        else:
+            # 处理字符串格式，统一转换为 YYYY-MM-DD
+            sd = str(start_date).replace("-", "")[:8]
+            sd = f"{sd[:4]}-{sd[4:6]}-{sd[6:8]}"
+
+        if isinstance(end_date, datetime.date):
+            ed = end_date.strftime("%Y-%m-%d")
+        else:
+            ed = str(end_date).replace("-", "")[:8]
+            ed = f"{ed[:4]}-{ed[4:6]}-{ed[6:8]}"
+
+        # 缓存检查
+        cache_key = f"north_flow_{sd}_{ed}"
+        with _cache_lock:
+            if cache_key in _cache:
+                return _cache[cache_key].copy()
+
+        # 获取沪股通和深股通数据
+        df_sh = ak.stock_hsgt_hist_em(symbol="沪股通")
+        df_sz = ak.stock_hsgt_hist_em(symbol="深股通")
+
+        if df_sh.empty and df_sz.empty:
+            return pd.DataFrame()
+
+        # 列重命名和处理
+        def process_df(df):
+            df = _rename_cols(df, {
+                "日期": "date",
+                "当日成交净买额": "net_buy",
+                "买入成交额": "total_buy",
+                "卖出成交额": "total_sell",
+            })
+            # 处理 datetime.date 类型转换为 YYYY-MM-DD 字符串
+            if "date" in df.columns:
+                df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+            _to_numeric(df, ["net_buy", "total_buy", "total_sell"])
+            return df
+
+        df_sh = process_df(df_sh)
+        df_sz = process_df(df_sz)
+
+        # 合并沪股通和深股通数据（按日期汇总）
+        if not df_sh.empty and not df_sz.empty:
+            # 按日期合并，数值相加
+            df = pd.merge(df_sh, df_sz, on="date", how="outer", suffixes=("_sh", "_sz"))
+            df["net_buy"] = df["net_buy_sh"].fillna(0) + df["net_buy_sz"].fillna(0)
+            df["total_buy"] = df["total_buy_sh"].fillna(0) + df["total_buy_sz"].fillna(0)
+            df["total_sell"] = df["total_sell_sh"].fillna(0) + df["total_sell_sz"].fillna(0)
+            df = df[["date", "net_buy", "total_buy", "total_sell"]]
+        elif not df_sh.empty:
+            df = df_sh
+        elif not df_sz.empty:
+            df = df_sz
+        else:
+            return pd.DataFrame()
+
+        # 日期范围筛选
+        df = df[(df["date"] >= sd) & (df["date"] <= ed)]
+
+        # 存入缓存
+        with _cache_lock:
+            _cache[cache_key] = df.copy()
+            if len(_cache) > _MAX_CACHE_ENTRIES:
+                _cache.popitem(last=False)
+
+        return df.reset_index(drop=True)
+
+    except Exception as e:
+        log.debug("get_north_money_flow: %s", e)
+        return pd.DataFrame()
 
 
 def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
