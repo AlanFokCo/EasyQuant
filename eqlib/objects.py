@@ -84,7 +84,7 @@ class Order:
     _VALID_TRANSITIONS = {
         STATUS_PENDING: [STATUS_SUBMITTED, STATUS_CANCELLED],
         STATUS_SUBMITTED: [STATUS_PARTIAL_FILL, STATUS_FILLED, STATUS_REJECTED, STATUS_CANCELLED, STATUS_EXPIRED],
-        STATUS_PARTIAL_FILL: [STATUS_FILLED, STATUS_CANCELLED, STATUS_EXPIRED],
+        STATUS_PARTIAL_FILL: [STATUS_PARTIAL_FILL, STATUS_FILLED, STATUS_CANCELLED, STATUS_EXPIRED],
     }
 
     def __init__(self, security, amount, style=None, side=None, order_id=None):
@@ -140,7 +140,7 @@ class Order:
         # Update average cost (only consider amount and price, ignore timestamp)
         total_cost = sum(a * p for a, p, _ in self.partial_fills)
         self.avg_cost = total_cost / self.filled_amount if self.filled_amount > 0 else 0
-        self.status = self.STATUS_PARTIAL_FILL
+        self.transition_to(self.STATUS_PARTIAL_FILL)
 
     def is_complete(self) -> bool:
         """Check if order is fully filled."""
