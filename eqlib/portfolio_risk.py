@@ -296,3 +296,76 @@ class PortfolioRiskMonitor:
 
         except Exception:
             return "unknown"
+
+    def daily_check(self) -> RiskReport:
+        """每日综合风控检查（主入口）
+
+        Returns:
+            RiskReport: 包含所有指标、预警级别和建议
+        """
+        triggers: List[str] = []
+        recommendations: List[str] = []
+        alert_level = AlertLevel.YELLOW
+
+        # 1. 计算 VaR
+        var_amount, var_pct = self.portfolio_var()
+
+        # 2. 计算相关性矩阵
+        corr_matrix = self.correlation_matrix()
+        max_correlation = 0.0
+        if not corr_matrix.empty:
+            for i in range(len(corr_matrix)):
+                for j in range(i + 1, len(corr_matrix)):
+                    corr_val = corr_matrix.iloc[i, j]
+                    if abs(corr_val) > max_correlation:
+                        max_correlation = abs(corr_val)
+
+            if max_correlation >= self.thresholds.correlation_kill:
+                triggers.append(f"熔断预警：策略相关性过高 ({max_correlation:.2f})")
+                recommendations.append("建议降低高相关性策略仓位 50%")
+                alert_level = AlertLevel.KILL_SWITCH
+            elif max_correlation >= self.thresholds.correlation_red:
+                triggers.append(f"红色预警：策略相关性较高 ({max_correlation:.2f})")
+                recommendations.append("建议关注策略分散度")
+                alert_level = AlertLevel.RED
+            elif max_correlation >= self.thresholds.correlation_yellow:
+                triggers.append(f"黄色预警：策略相关性 ({max_correlation:.2f})")
+
+        # 3. 计算集中度
+        concentration = self.concentration_risk()
+
+        if concentration["max_single_stock"] > self.thresholds.single_stock_max:
+            triggers.append(f"单股票持仓占比过高 ({concentration['max_single_stock']:.2%})")
+            recommendations.append("建议减仓超占比股票")
+
+        if concentration["max_single_sector"] > self.thresholds.single_sector_max:
+            triggers.append(f"单板块持仓占比过高 ({concentration['max_single_sector']:.2%})")
+
+        if concentration["small_cap_pct"] > self.thresholds.small_cap_max:
+            triggers.append(f"微盘股占比过高 ({concentration['small_cap_pct']:.2%})")
+            recommendations.append("微盘股流动性风险大，建议控制仓位")
+
+        # 4. Regime 检测
+        regime = self.regime_detection()
+        if regime == "bear":
+            triggers.append("当前市场 regime: 熊市")
+            recommendations.append("熊市环境，建议降低仓位")
+        elif regime == "oscillation":
+            triggers.append("当前市场 regime: 震荡市")
+
+        # 5. 无策略数据提示
+        if not self._strategy_results:
+            triggers.append("无策略数据")
+            recommendations.append("请先添加策略回测结果")
+
+        return RiskReport(
+            timestamp=pd.Timestamp.now(),
+            alert_level=alert_level,
+            triggers=triggers,
+            portfolio_var=var_amount if var_amount > 0 else None,
+            portfolio_var_pct=var_pct if var_pct > 0 else None,
+            correlation_matrix=corr_matrix if not corr_matrix.empty else None,
+            concentration=concentration if concentration["num_holdings"] > 0 else None,
+            regime=regime,
+            recommendations=recommendations,
+        )
