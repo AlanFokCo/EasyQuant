@@ -52,12 +52,28 @@ def decode_access_token(token: str) -> dict:
 
 
 # ── FastAPI dependency ───────────────────────────────────────────────────────
+
+# ── Short-lived SSE token (E5) ────────────────────────────────────────────────
+# SSE endpoints can't set Authorization headers, so they accept a ?token=
+# query parameter.  Using the main JWT there leaks it to logs.  Instead,
+# issue a short-lived (60 s) token scoped to SSE.
+_SSE_TOKEN_EXPIRE_SECONDS = 60
+
+
+def create_sse_token(user_id: str) -> str:
+    """Create a short-lived JWT for SSE connections."""
+    exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=_SSE_TOKEN_EXPIRE_SECONDS)
+    return jwt.encode(
+        {"sub": user_id, "exp": exp, "scope": "sse"},
+        JWT_SECRET, algorithm=JWT_ALGORITHM,
+    )
+
 async def get_current_user(
     session: AsyncSession = Depends(get_session),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(
         HTTPBearer(description="JWT bearer token", auto_error=False)
     ),
-    token: Optional[str] = Query(None, description="JWT token for SSE/EventSource endpoints"),
+    token: Optional[str] = Query(None, description="Short-lived SSE token for EventSource endpoints"),
 ) -> User:
     """Extract and verify JWT, return the authenticated User.
 
@@ -65,6 +81,7 @@ async def get_current_user(
     parameter — the latter needed by SSE/EventSource which can't set headers.
     """
     raw_token = credentials.credentials if credentials else token
+    is_query_token = credentials is None and token is not None
     if raw_token is None:
         raise HTTPException(
             status_code=401,
@@ -79,6 +96,13 @@ async def get_current_user(
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"}
+        )
+
+    # E5: Query-parameter tokens must have scope=sse (short-lived)
+    if is_query_token and payload.get("scope") != "sse":
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "TOKEN_INVALID", "message": "Query tokens must be short-lived SSE tokens"},
         )
 
     user_id = payload.get("sub")
@@ -119,7 +143,13 @@ async def get_current_user_optional(
 async def ensure_admin_user(session: AsyncSession) -> User:
     """Create or return the default admin user."""
     admin_id = os.environ.get("EQ_ADMIN_ID", "admin")
-    admin_pass = os.environ.get("EQ_ADMIN_PASSWORD", "admin123")
+    admin_pass = os.environ.get("EQ_ADMIN_PASSWORD")
+    if not admin_pass:
+        # E1: Refuse to start with default credentials — require explicit password
+        raise RuntimeError(
+            "EQ_ADMIN_PASSWORD environment variable is not set. "
+            "Please set it to a strong password before starting the server."
+        )
     existing = await session.get(User, admin_id)
     if existing is not None:
         return existing

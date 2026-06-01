@@ -158,8 +158,8 @@ def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd
     """
     from eqlib.data import fetch_stock_data
 
-    start_str = str(start_date).replace("-", "")[:10]
-    end_str = str(end_date).replace("-", "")[:10]
+    start_str = str(start_date).replace("-", "")[:8]
+    end_str = str(end_date).replace("-", "")[:8]
 
     cached = _load_from_disk(security, start_str, end_str, adjust)
     if cached is not None:
@@ -208,11 +208,19 @@ def estimate_memory_mb(securities: list, rows_per_sec: int) -> dict:
     bar_cache_mb = (n_sec * n_rows * _BAR_DICT_OVERHEAD) / (1024 * 1024)
     close_dict_mb = (n_sec * n_rows * _CLOSE_DICT_OVERHEAD) / (1024 * 1024)
 
+    # C3: Include _field_series (9 Series per security) and _indicators
+    # 5 indicator columns: RSI, MACD, Bollinger, ATR, Donchian
+    # 1.2x overhead: pandas Series index + Python object overhead
+    field_series_mb = (n_sec * n_rows * _NUM_OHLCV_FIELDS * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
+    indicators_mb = (n_sec * n_rows * 5 * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
+
     return {
         "panel_mb": round(panel_mb, 1),
         "close_dict_mb": round(close_dict_mb, 1),
         "bar_cache_mb": round(bar_cache_mb, 1),
-        "total_mb": round(panel_mb + close_dict_mb + bar_cache_mb, 1),
+        "field_series_mb": round(field_series_mb, 1),
+        "indicators_mb": round(indicators_mb, 1),
+        "total_mb": round(panel_mb + close_dict_mb + bar_cache_mb + field_series_mb + indicators_mb, 1),
         "securities": n_sec,
         "rows_per_sec": n_rows,
     }
@@ -277,8 +285,8 @@ class PreloadedData:
                            memory exceeds this, dict caches are skipped and
                            the system falls back to panel slicing.
         """
-        start_str = str(start_date).replace("-", "")[:10]
-        end_str = str(end_date).replace("-", "")[:10]
+        start_str = str(start_date).replace("-", "")[:8]
+        end_str = str(end_date).replace("-", "")[:8]
 
         # --- Parallel loading using ThreadPoolExecutor ---
         import concurrent.futures
@@ -420,17 +428,19 @@ class PreloadedData:
         self._securities = sorted(frames.keys())
         self._dates = self.panel.index
 
-        # Build {security: {field: pd.Series}} for fast attribute_history
-        fields = ["open", "high", "low", "close", "volume", "money",
-                   "pct_change", "price_change", "turnover"]
-        for sec, df in frames.items():
-            self._field_series[sec] = {}
-            for f in fields:
-                if f in df.columns:
-                    self._field_series[sec][f] = df[f]
+        # C3: Only build _field_series and _indicators when within memory limit
+        if can_build_dicts:
+            # Build {security: {field: pd.Series}} for fast attribute_history
+            fields = ["open", "high", "low", "close", "volume", "money",
+                       "pct_change", "price_change", "turnover"]
+            for sec, df in frames.items():
+                self._field_series[sec] = {}
+                for f in fields:
+                    if f in df.columns:
+                        self._field_series[sec][f] = df[f]
 
-        # Precompute all technical indicators once per stock
-        self._compute_indicators(frames)
+            # Precompute all technical indicators once per stock
+            self._compute_indicators(frames)
 
     def _compute_indicators(self, frames: dict):
         """Precompute technical indicators for all securities at once.

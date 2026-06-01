@@ -404,7 +404,9 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
             return default
 
         beta = cov_matrix[0, 1] / bench_var
-        alpha_daily = strat.mean() - beta * bench.mean()
+        # D1: Include risk-free rate in CAPM alpha computation
+        daily_rf = rf_rate / ann_factor
+        alpha_daily = (strat.mean() - daily_rf) - beta * (bench.mean() - daily_rf)
         alpha_annual = alpha_daily * ann_factor
 
         active = strat - bench

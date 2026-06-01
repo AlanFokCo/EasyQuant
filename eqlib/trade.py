@@ -92,7 +92,10 @@ def _buffer_order(action: str, **kwargs) -> Order:
     order_obj = Order(security, amount, style=style)
 
     # ── Phase 2.4: Record order timestamp for timeout tracking ───────────
-    sess._order_timestamps[order_obj.order_id] = datetime.datetime.now()
+    # A2: Use simulated time in backtest mode for correct timeout comparison
+    ctx = getattr(sess, '_context', None)
+    current_dt = getattr(ctx, 'current_dt', None) if ctx else None
+    sess._order_timestamps[order_obj.order_id] = current_dt or datetime.datetime.now()
 
     req = {"action": action, "security": security, "order_obj": order_obj, **kwargs}
     sess._pending_orders.append(req)

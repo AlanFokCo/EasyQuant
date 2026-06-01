@@ -679,7 +679,14 @@ async def compare_runs(
         )
 
     # Eager-load strategy to avoid lazy-load in async context.
-    stmt = select(Run).options(selectinload(Run.strategy)).where(Run.id.in_(run_ids))
+    # E4: Filter by owner to prevent cross-user data leakage
+    stmt = (
+        select(Run)
+        .options(selectinload(Run.strategy))
+        .where(Run.id.in_(run_ids))
+        .join(Strategy)
+        .where(Strategy.owner_id == current_user.id)
+    )
     rows = (await session.execute(stmt)).scalars().all()
     runs_by_id = {r.id: r for r in rows}
 
