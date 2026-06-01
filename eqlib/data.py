@@ -526,13 +526,18 @@ def get_price(security, start_date=None, end_date=None, frequency: str = "daily"
                 if not (f := get_price(sec, start_date, end_date, frequency, fields, count)).empty}
 
     if count is not None and start_date is None:
-        end_date = end_date or datetime.datetime.now()
+        # B2: In backtest mode, default to simulated time instead of real time
+        if end_date is None:
+            from eqlib._state import _context
+            end_date = getattr(_context, 'current_dt', None) or datetime.datetime.now()
         lookback = end_date if isinstance(end_date, datetime.date) else end_date.date()
         start_date = datetime.datetime.combine(lookback, datetime.time())
         start_date = _compute_lookback(count, start_date)
 
     if end_date is None:
-        end_date = datetime.datetime.now()
+        # B2: In backtest mode, default to simulated time instead of real time
+        from eqlib._state import _context
+        end_date = getattr(_context, 'current_dt', None) or datetime.datetime.now()
     if start_date is None:
         start_date = end_date - datetime.timedelta(days=count * 2 if count else 365)
 
@@ -553,14 +558,22 @@ def history(count: int, unit: str = "1d", field: str = "close",
     end_date = _context.current_dt
     start_date = _compute_lookback(count, end_date)
 
+    # B1: Apply same cutoff as attribute_history to exclude today's bar
+    # and prevent look-ahead bias.
+    cutoff = pd.Timestamp(end_date).normalize()
+
     df_data = get_price(security, start_date=start_date, end_date=end_date)
     if isinstance(df_data, dict):
-        result = {sec: frame[field].tail(count)
-                  for sec, frame in df_data.items()
-                  if not frame.empty and field in frame.columns}
+        result = {}
+        for sec, frame in df_data.items():
+            if not frame.empty and field in frame.columns:
+                filtered = frame[frame.index < cutoff]
+                if not filtered.empty:
+                    result[sec] = filtered[field].tail(count)
         return pd.DataFrame(result) if df else result
 
     if not df_data.empty and field in df_data.columns:
+        df_data = df_data[df_data.index < cutoff]
         series = df_data[field].tail(count)
         return series.to_frame() if df else series
     return pd.DataFrame()
