@@ -435,3 +435,18 @@ class TestCheckKillSwitch:
         actions = check_kill_switch(report)
         assert len(actions) > 0
         assert any("暂停" in a or "熔断" in a for a in actions)
+
+
+class TestModuleExports:
+    """Tests for eqlib module exports."""
+
+    def test_import_from_eqlib(self):
+        from eqlib import PortfolioRiskMonitor, RiskThresholds, RiskReport, AlertLevel
+        assert PortfolioRiskMonitor is not None
+        assert RiskThresholds is not None
+        assert RiskReport is not None
+        assert AlertLevel is not None
+
+    def test_import_check_kill_switch(self):
+        from eqlib import check_kill_switch
+        assert check_kill_switch is not None
