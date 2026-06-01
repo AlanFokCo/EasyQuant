@@ -121,3 +121,26 @@ class TestRestrictionRelease:
         """验证函数可导入"""
         from eqlib.data import get_restriction_release
         assert get_restriction_release is not None
+
+    def test_basic_fetch(self):
+        """验证能获取未来解禁列表"""
+        from eqlib.data import get_restriction_release
+
+        df = get_restriction_release(days=30)
+
+        assert isinstance(df, pd.DataFrame)
+
+        if not df.empty:
+            assert "code" in df.columns
+            assert "release_date" in df.columns
+            assert "release_value" in df.columns
+
+    def test_days_parameter(self):
+        """验证 days 参数工作"""
+        from eqlib.data import get_restriction_release
+
+        df_30 = get_restriction_release(days=30)
+        df_60 = get_restriction_release(days=60)
+
+        # 60 天范围应包含更多解禁事件
+        assert len(df_60) >= len(df_30)
