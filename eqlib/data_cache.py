@@ -329,7 +329,7 @@ class PreloadedData:
                     sec, df = future.result()
                 except Exception as e:
                     failed_sec = future_to_sec[future]
-                    print(f"[EasyQuant] Warning: failed to load {failed_sec}: {e}")
+                    print(f"[EasyQuant] Warning: failed to load {failed_sec}: {type(e).__name__}: {e}")
                     load_errors.append(failed_sec)
                     done_count += 1
                     if progress and total > 5:
@@ -350,6 +350,9 @@ class PreloadedData:
 
         if progress and total > 5:
             print()  # newline after progress
+
+        if load_errors:
+            print(f"[EasyQuant] Warning: failed to load {len(load_errors)} securities: {', '.join(load_errors)}")
 
         if not frames:
             missing = ', '.join(securities)
