@@ -405,3 +405,12 @@ def check_kill_switch(report: RiskReport) -> List[str]:
             actions.append("红色预警：建议人工介入检查")
 
     return actions
+
+
+__all__ = [
+    "AlertLevel",
+    "RiskThresholds",
+    "RiskReport",
+    "PortfolioRiskMonitor",
+    "check_kill_switch",
+]
