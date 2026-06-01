@@ -238,6 +238,15 @@ from eqlib.wfa import walk_forward, WFAResult
 # or ``import eqlib.scientific`` to access the full API.
 from eqlib.validation_config import ValidationConfig
 
+# Portfolio risk monitoring  [EXPERIMENTAL]
+from eqlib.portfolio_risk import (
+    PortfolioRiskMonitor,
+    RiskThresholds,
+    RiskReport,
+    AlertLevel,
+    check_kill_switch,
+)
+
 # PTrade/QMT adapter — imported as a submodule to avoid shadowing backtest functions:
 #   from eqlib.ptrade_adapter import *
 # See doc/ptrade_adapter.md for usage instructions.
@@ -313,6 +322,9 @@ __all__ = [
     "query", "valuation", "get_current_data_object",
     # Scientific validation config
     "ValidationConfig",
+    # Portfolio risk monitoring
+    "PortfolioRiskMonitor", "RiskThresholds", "RiskReport", "AlertLevel",
+    "check_kill_switch",
 ]
 
 
