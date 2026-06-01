@@ -90,7 +90,7 @@ export function useRunStream(runId: string | null) {
       try {
         const resp = await fetch(`${apiOrigin}/api/v1/auth/sse-token`, {
           method: "POST",
-          headers: { Authorization: `****** },
+          headers: { Authorization: `Bearer ${mainToken}` },
         });
         if (!resp.ok) return null;
         const data = await resp.json();

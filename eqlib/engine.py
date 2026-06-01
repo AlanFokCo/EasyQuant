@@ -617,7 +617,13 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                     if timeout_trading_days <= 0:
                         timed_out = False
                     else:
-                        submit_date = submit_stamp if isinstance(submit_stamp, datetime.date) and not isinstance(submit_stamp, datetime.datetime) else getattr(submit_stamp, 'date', lambda: submit_stamp)()
+                        # Extract date from submit_stamp (may be date or datetime)
+                        if isinstance(submit_stamp, datetime.datetime):
+                            submit_date = submit_stamp.date()
+                        elif isinstance(submit_stamp, datetime.date):
+                            submit_date = submit_stamp
+                        else:
+                            submit_date = submit_stamp
                         # Count trading days between submit_date and current day
                         if hasattr(_get_preloaded(), '_dates') and len(_get_preloaded()._dates) > 0:
                             all_dates = [d.date() if hasattr(d, 'date') else d for d in _get_preloaded()._dates]
@@ -690,6 +696,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 order_obj.transition_to(Order.STATUS_CANCELLED, reason="unknown action")
             continue
 
+        # A-REG2: Cancel (not fill) when no position change is needed.
+        # PENDING → FILLED is not a valid transition.
         if delta == 0:
             if order_obj:
                 order_obj.transition_to(Order.STATUS_CANCELLED, reason="no position change needed")
