@@ -599,7 +599,11 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         # Backtest: default 1 day (86400s) or None to disable
         if order_obj and order_obj.order_id in sess._order_timestamps:
             submit_time = sess._order_timestamps[order_obj.order_id]
-            current_time = datetime.datetime.now()
+            # A2: Use simulated close-of-day in backtest mode instead of wall-clock
+            if exec_prices is not None:
+                current_time = datetime.datetime.now()
+            else:
+                current_time = datetime.datetime.combine(day, datetime.time(15, 0))
             # Determine timeout threshold
             timeout_seconds = sess._order_timeout_seconds
             if timeout_seconds is None:
@@ -852,6 +856,11 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash (after min_commission)")
                     continue
+
+            # A1: Recompute partial-fill flags after cash-constraint reduction
+            if rounded < requested_amount:
+                is_partial_fill = True
+                remaining_amount = requested_amount - rounded
 
             portfolio.available_cash -= total_cost
 

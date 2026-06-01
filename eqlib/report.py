@@ -834,6 +834,8 @@ def generate_html_report(result, out_path):
     # ============================================================
     bench_code = benchmark.replace(".XSHG", "").replace(".XSHE", "")
     bench_label = {"000300": "沪深300", "000001": "上证指数"}.get(bench_code, bench_code)
+    # E2: Escape benchmark name for safe HTML and JavaScript embedding
+    bench_label = html.escape(bench_label)
     pnl_badge_class = "pos" if pnl >= 0 else "neg"
 
     html_report = _HTML_TEMPLATE.format(
@@ -2597,7 +2599,7 @@ def generate_report_md(result, out_path):
         pass
 
     securities = set(t["security"] for t in trade_log)
-    bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
+    bench_label = html.escape(benchmark.replace(".XSHG", "").replace(".XSHE", ""))
 
     lines = []
     # ============================================================

@@ -119,7 +119,13 @@ async def get_current_user_optional(
 async def ensure_admin_user(session: AsyncSession) -> User:
     """Create or return the default admin user."""
     admin_id = os.environ.get("EQ_ADMIN_ID", "admin")
-    admin_pass = os.environ.get("EQ_ADMIN_PASSWORD", "admin123")
+    admin_pass = os.environ.get("EQ_ADMIN_PASSWORD")
+    if not admin_pass:
+        # E1: Refuse to start with default credentials — require explicit password
+        raise RuntimeError(
+            "EQ_ADMIN_PASSWORD environment variable is not set. "
+            "Please set it to a strong password before starting the server."
+        )
     existing = await session.get(User, admin_id)
     if existing is not None:
         return existing
