@@ -143,3 +143,22 @@ class TestPortfolioRiskMonitorInit:
         monitor = PortfolioRiskMonitor()
         with pytest.raises(ValueError, match="缺少 recorded_values"):
             monitor.add_strategy("test", {"trade_log": []})
+
+    def test_add_strategy_empty_recorded_values_raises(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        with pytest.raises(ValueError, match="recorded_values 为空"):
+            monitor.add_strategy("test", {"recorded_values": {}})
+
+    def test_add_strategy_overwrite_warns(self):
+        import warnings
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result = _make_backtest_result()
+        monitor.add_strategy("均线策略", result)
+        # Adding same strategy again should warn
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            monitor.add_strategy("均线策略", result)
+            assert len(w) == 1
+            assert "将被覆盖" in str(w[0].message)
