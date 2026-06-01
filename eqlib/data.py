@@ -1531,3 +1531,27 @@ def on_order_filled(func):
     """
     from eqlib.engine import _register_on_order_filled
     _register_on_order_filled(func)
+
+
+# ============================================================
+# A-share market specific data
+# ============================================================
+
+def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
+    """北向资金流向（汇总级别）"""
+    return pd.DataFrame()
+
+
+def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
+    """融资融券数据（全市场汇总）"""
+    return pd.DataFrame()
+
+
+def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
+    """涨跌停统计（每日汇总）"""
+    return pd.DataFrame()
+
+
+def get_restriction_release(days=30) -> pd.DataFrame:
+    """限售股解禁（未来解禁列表）"""
+    return pd.DataFrame()
