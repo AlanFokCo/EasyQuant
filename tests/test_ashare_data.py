@@ -90,6 +90,29 @@ class TestLimitUpDownStats:
         from eqlib.data import get_limit_up_down_stats
         assert get_limit_up_down_stats is not None
 
+    def test_basic_fetch(self):
+        """验证能获取涨跌停统计"""
+        from eqlib.data import get_limit_up_down_stats
+
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=30)
+
+        df = get_limit_up_down_stats(start_date=start_date, end_date=end_date)
+
+        assert isinstance(df, pd.DataFrame)
+
+        if not df.empty:
+            assert "date" in df.columns
+            assert "limit_up_count" in df.columns
+            assert "limit_down_count" in df.columns
+
+    def test_default_parameters(self):
+        """验证默认参数工作"""
+        from eqlib.data import get_limit_up_down_stats
+
+        df = get_limit_up_down_stats()
+        assert isinstance(df, pd.DataFrame)
+
 
 class TestRestrictionRelease:
     """Tests for get_restriction_release function."""

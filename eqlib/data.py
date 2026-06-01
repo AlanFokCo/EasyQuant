@@ -1752,8 +1752,91 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
 
 
 def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
-    """涨跌停统计（每日汇总）"""
-    return pd.DataFrame()
+    """涨跌停统计（每日汇总）
+
+    Parameters:
+        start_date: 开始日期 (YYYY-MM-DD 或 datetime)
+        end_date: 结束日期，默认今天
+
+    Returns:
+        DataFrame with columns:
+        - date: 交易日期
+        - limit_up_count: 涨停股票数量
+        - limit_down_count: 跌停股票数量
+
+    数据源: akshare stock_zt_pool_em / stock_zt_pool_dtgc_em
+    注意: API 只能获取最近 30 个交易日的数据
+    """
+    try:
+        # 参数标准化
+        if end_date is None:
+            end_date = datetime.date.today()
+        if start_date is None:
+            start_date = end_date - datetime.timedelta(days=30)
+
+        # 转换为 datetime.date 类型以便后续处理
+        if isinstance(start_date, str):
+            start_date = pd.Timestamp(start_date).date()
+        if isinstance(end_date, str):
+            end_date = pd.Timestamp(end_date).date()
+
+        # 缓存键
+        sd_str = start_date.strftime("%Y%m%d")
+        ed_str = end_date.strftime("%Y%m%d")
+        cache_key = f"limit_up_down_{sd_str}_{ed_str}"
+        with _cache_lock:
+            if cache_key in _cache:
+                return _cache[cache_key].copy()
+
+        # 获取交易日期列表
+        trade_days = get_trade_days(start_date, end_date)
+        if not trade_days:
+            return pd.DataFrame()
+
+        # 逐日获取涨跌停数据
+        results = []
+        for trade_date in trade_days:
+            date_str = trade_date.strftime("%Y%m%d")
+
+            # 获取涨停池数据
+            try:
+                df_up = ak.stock_zt_pool_em(date=date_str)
+                limit_up_count = len(df_up) if not df_up.empty else 0
+            except Exception:
+                limit_up_count = 0
+
+            # 获取跌停池数据
+            try:
+                df_down = ak.stock_zt_pool_dtgc_em(date=date_str)
+                limit_down_count = len(df_down) if not df_down.empty else 0
+            except Exception:
+                limit_down_count = 0
+
+            # 只记录有数据的交易日（非交易日返回空）
+            if limit_up_count > 0 or limit_down_count > 0:
+                results.append({
+                    "date": trade_date.strftime("%Y-%m-%d"),
+                    "limit_up_count": limit_up_count,
+                    "limit_down_count": limit_down_count,
+                })
+
+        if not results:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(results)
+        df = df.sort_values("date").reset_index(drop=True)
+
+        # 存入缓存
+        with _cache_lock:
+            _cache[cache_key] = df.copy()
+            if len(_cache) > _MAX_CACHE_ENTRIES:
+                _cache.popitem(last=False)
+
+        return df
+
+    except Exception as e:
+        log.debug("get_limit_up_down_stats: %s", e)
+        return pd.DataFrame()
 
 
 def get_restriction_release(days=30) -> pd.DataFrame:
