@@ -226,6 +226,18 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
                 return None
             # Normalize to sum to 1
             weights = weights / total
+            # D4: Iteratively clip weights to max_weight and renormalize
+            # 20 iterations is sufficient: each pass reduces at least one weight,
+            # and with n assets, convergence is guaranteed in ≤ n iterations.
+            max_w = constraints.get("max_weight", 1.0) if constraints else 1.0
+            for _ in range(20):  # prevent infinite loop
+                if np.all(weights <= max_w + 1e-9):
+                    break
+                weights = np.minimum(weights, max_w)
+                total = weights.sum()
+                if total <= 0:
+                    return None
+                weights = weights / total
             return pd.Series(weights, index=securities)
 
         if return_none_if_fail:

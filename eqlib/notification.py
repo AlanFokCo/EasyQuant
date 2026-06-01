@@ -88,11 +88,13 @@ class DingTalkSender(NotificationSender):
 
         if self.secret:
             sign = self._compute_sign(timestamp)
-            payload["timestamp"] = timestamp
-            payload["sign"] = sign
+            # F1: DingTalk API requires timestamp and sign as URL query parameters
+            url = f"{self.webhook_url}&timestamp={timestamp}&sign={sign}"
+        else:
+            url = self.webhook_url
 
         try:
-            resp = requests.post(self.webhook_url, json=payload, timeout=10)
+            resp = requests.post(url, json=payload, timeout=10)
             if resp.status_code == 200:
                 result = resp.json()
                 return result.get("errcode", -1) == 0

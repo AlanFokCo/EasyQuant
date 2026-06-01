@@ -68,7 +68,7 @@ from eqlib.slippage import SlippageModel, FixedSlippage, VolumeSlippage
 from eqlib._state import BacktestSession, get_session
 
 # Trading  [STABLE]
-from eqlib.trade import order, order_target, order_value, order_target_value
+from eqlib.trade import order, order_target, order_value, order_target_value, cancel_order
 
 # Data  [STABLE]
 from eqlib.data import (
@@ -262,7 +262,7 @@ __all__ = [
     # Session management
     "BacktestSession", "get_session",
     # Trading
-    "order", "order_target", "order_value", "order_target_value",
+    "order", "order_target", "order_value", "order_target_value", "cancel_order",
     # Data
     "get_price", "history", "attribute_history", "get_all_securities",
     "download_stock_data", "load_csv",
@@ -376,11 +376,9 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
     if isinstance(end_date, str):
         end_date = _dt.datetime.strptime(end_date, "%Y-%m-%d").date()
 
-    # Register handle_data if provided
-    if handle_data is not None:
-        set_handle_data(handle_data)
+    # B2: handle_data is now passed directly to run_backtest (not set on old session)
 
-    # Run backtest
+    # Run backtest — pass handle_data so the NEW session picks it up
     result = run_backtest(
         initialize_func, start_date, end_date,
         starting_cash=starting_cash, benchmark=benchmark,
@@ -388,6 +386,7 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
         max_memory_mb=max_memory_mb,
         selection_func=selection_func,
         selection_rebalance=selection_rebalance,
+        handle_data=handle_data,
     )
 
     if result is None:

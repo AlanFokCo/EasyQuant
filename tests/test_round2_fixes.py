@@ -292,3 +292,94 @@ class TestBareCode:
     def test_empty(self):
         from eqlib.engine import _bare_code
         assert _bare_code("") == ""
+
+
+# ── 7. PENDING -> EXPIRED transition (Finding 1) ──────────────────────────
+
+class TestPendingToExpiredTransition:
+    """PENDING -> EXPIRED must be a valid transition for order timeout."""
+
+    def test_pending_to_expired(self):
+        from eqlib.objects import Order
+        order = Order("000001.XSHE", 100, side="long")
+        assert order.status == Order.STATUS_PENDING
+        order.transition_to(Order.STATUS_EXPIRED, reason="timeout")
+        assert order.status == Order.STATUS_EXPIRED
+
+    def test_pending_to_submitted_still_valid(self):
+        from eqlib.objects import Order
+        order = Order("000001.XSHE", 100, side="long")
+        order.transition_to(Order.STATUS_SUBMITTED)
+        assert order.status == Order.STATUS_SUBMITTED
+
+    def test_pending_to_cancelled_still_valid(self):
+        from eqlib.objects import Order
+        order = Order("000001.XSHE", 100, side="long")
+        order.transition_to(Order.STATUS_CANCELLED, reason="user")
+        assert order.status == Order.STATUS_CANCELLED
+
+    def test_pending_to_filled_still_invalid(self):
+        from eqlib.objects import Order
+        order = Order("000001.XSHE", 100, side="long")
+        with pytest.raises(ValueError, match="Invalid transition"):
+            order.transition_to(Order.STATUS_FILLED)
+
+
+# ── 8. Sub-lot order cancellation (Finding 2) ─────────────────────────────
+
+class TestSubLotOrderCancellation:
+    """Sub-lot orders should be cancelled, not stuck in SUBMITTED."""
+
+    def test_submitted_to_cancelled_with_sublot_reason(self):
+        from eqlib.objects import Order
+        order = Order("000001.XSHE", 50, side="buy")
+        order.transition_to(Order.STATUS_SUBMITTED)
+        order.transition_to(Order.STATUS_CANCELLED, reason="sub-lot")
+        assert order.status == Order.STATUS_CANCELLED
+
+    def test_round_lot_returns_zero_for_sub_lot(self):
+        from eqlib.engine import _round_lot
+        assert _round_lot(50) == 0
+        assert _round_lot(99) == 0
+        assert _round_lot(0) == 0
+
+
+# ── 9. PreloadedData per-future exception handling (Finding 3) ─────────────
+
+class TestPreloadedDataExceptionHandling:
+    """load() should handle per-future exceptions gracefully."""
+
+    def test_partial_failure_continues(self):
+        import concurrent.futures
+
+        good_df = pd.DataFrame(
+            {"close": [10.0, 11.0]},
+            index=pd.to_datetime(["2024-01-01", "2024-01-02"]),
+        )
+
+        def fake_load_one(sec):
+            if sec == "BAD.XSHE":
+                raise RuntimeError("Simulated network error")
+            return (sec, good_df.copy())
+
+        securities = ["GOOD1.XSHE", "BAD.XSHE", "GOOD2.XSHE"]
+        frames = {}
+        load_errors = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            future_to_sec = {
+                pool.submit(fake_load_one, sec): sec for sec in securities
+            }
+            for future in concurrent.futures.as_completed(future_to_sec):
+                try:
+                    sec, df = future.result()
+                except Exception:
+                    failed_sec = future_to_sec[future]
+                    load_errors.append(failed_sec)
+                    continue
+                if df is not None and not df.empty:
+                    frames[sec] = df
+
+        assert "GOOD1.XSHE" in frames
+        assert "GOOD2.XSHE" in frames
+        assert "BAD.XSHE" not in frames
+        assert "BAD.XSHE" in load_errors

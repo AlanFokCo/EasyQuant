@@ -7,12 +7,17 @@ from studio_api.db import get_session
 from studio_api.lint_service import lint_source
 from studio_api.models import Strategy
 from studio_api.schemas import LintBody, LintResponse
+from studio_api import auth as auth_mod
+from studio_api.models import User
 
 router = APIRouter(prefix="/api/v1", tags=["lint"])
 
 
 @router.post("/lint", response_model=LintResponse)
-async def lint_inline(body: LintBody):
+async def lint_inline(
+    body: LintBody,
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     r = lint_source(body.source_code, body.profile)
     return LintResponse(**r)
 
@@ -22,6 +27,7 @@ async def lint_strategy(
     strategy_id: str,
     body: LintBody,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
 ):
     code = body.source_code
     if not code.strip():
@@ -31,7 +37,8 @@ async def lint_strategy(
             .where(Strategy.id == strategy_id)
         )
         strat = res.scalar_one_or_none()
-        if strat is None:
+        # C1: Verify ownership — authenticated users must not lint other users' strategies
+        if strat is None or strat.owner_id != current_user.id:
             from fastapi import HTTPException
 
             raise HTTPException(
