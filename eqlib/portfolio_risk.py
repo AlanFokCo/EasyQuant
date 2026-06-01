@@ -263,3 +263,36 @@ class PortfolioRiskMonitor:
             "num_holdings": len(all_positions),
             "top3_concentration": float(top3_concentration),
         }
+
+    def regime_detection(self) -> str:
+        """市场 regime 检测（简单趋势法）
+
+        Returns:
+            'bull' / 'bear' / 'oscillation' / 'unknown'
+        """
+        try:
+            from eqlib.data import get_price
+
+            end_date = pd.Timestamp.now().date()
+            start_date = end_date - pd.Timedelta(days=90)
+
+            index_data = get_price("000300.XSHG", start_date=start_date, end_date=end_date)
+
+            if index_data is None or len(index_data) < 60:
+                return "unknown"
+
+            close = index_data["close"]
+            ma20 = close.iloc[-20:].mean()
+            ma60 = close.iloc[-60:].mean()
+
+            gap_pct = abs(ma20 - ma60) / ma60
+
+            if ma20 > ma60 and gap_pct > 0.02:
+                return "bull"
+            elif ma20 < ma60 and gap_pct > 0.02:
+                return "bear"
+            else:
+                return "oscillation"
+
+        except Exception:
+            return "unknown"
