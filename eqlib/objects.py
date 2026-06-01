@@ -87,21 +87,26 @@ class Order:
         STATUS_PARTIAL_FILL: [STATUS_PARTIAL_FILL, STATUS_FILLED, STATUS_CANCELLED, STATUS_EXPIRED],
     }
 
-    def __init__(self, security, amount, style=None, side=None, order_id=None):
+    _SIDE_AUTO = object()  # sentinel for auto-detect
+
+    def __init__(self, security, amount, style=None, side=_SIDE_AUTO, order_id=None):
         """Initialize an Order.
 
         Parameters:
             security: stock code
             amount: requested number of shares (positive for buy, negative for sell)
             style: LimitOrder or MarketOrder (default MarketOrder)
-            side: "buy" or "sell" (auto-detected from amount if None)
+            side: "buy", "sell", or None (auto-detected from amount if _SIDE_AUTO)
             order_id: unique identifier (auto-generated if None)
         """
         self.order_id = order_id or f"ORD_{security}_{uuid.uuid4().hex[:12]}"
         self.security = security
         self.amount = abs(amount)  # requested amount (always positive)
         self.style = style or MarketOrder()
-        self.side = side or ("buy" if amount > 0 else "sell")
+        if side is Order._SIDE_AUTO:
+            self.side = "buy" if amount > 0 else "sell"
+        else:
+            self.side = side  # B3: may be None for target orders (set at fill time)
         self.status = self.STATUS_PENDING
 
         # Fill tracking

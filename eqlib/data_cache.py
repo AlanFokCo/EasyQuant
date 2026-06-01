@@ -209,10 +209,11 @@ def estimate_memory_mb(securities: list, rows_per_sec: int) -> dict:
     close_dict_mb = (n_sec * n_rows * _CLOSE_DICT_OVERHEAD) / (1024 * 1024)
 
     # C3: Include _field_series (9 Series per security) and _indicators
-    # 5 indicator columns: RSI, MACD, Bollinger, ATR, Donchian
+    # 11 indicator columns: rsi, bb_upper, bb_mid, bb_lower, macd_dif,
+    # macd_dea, macd_hist, atr, dc_upper, dc_mid, dc_lower
     # 1.2x overhead: pandas Series index + Python object overhead
     field_series_mb = (n_sec * n_rows * _NUM_OHLCV_FIELDS * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
-    indicators_mb = (n_sec * n_rows * 5 * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
+    indicators_mb = (n_sec * n_rows * 11 * _BYTES_PER_FLOAT * 1.2) / (1024 * 1024)
 
     return {
         "panel_mb": round(panel_mb, 1),
@@ -501,6 +502,21 @@ class PreloadedData:
         """
         sec_data = self._field_series.get(security)
         if sec_data is None:
+            # D2: Panel-based fallback when _field_series is empty (memory limit exceeded)
+            if self.panel is not None and security in self.panel.columns.get_level_values(0):
+                try:
+                    sec_panel = self.panel[security]
+                    available = [f for f in fields if f in sec_panel.columns]
+                    if not available:
+                        return pd.DataFrame()
+                    result = sec_panel[available]
+                    if current_dt is not None:
+                        ts = pd.Timestamp(current_dt)
+                        cutoff = ts.normalize()
+                        result = result[result.index < cutoff]
+                    return result.tail(count)
+                except Exception:
+                    return None
             return None
 
         available = [f for f in fields if f in sec_data]
