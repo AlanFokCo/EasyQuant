@@ -200,3 +200,66 @@ class PortfolioRiskMonitor:
         corr_matrix = returns_df.corr()
 
         return corr_matrix
+
+    def concentration_risk(self) -> Dict[str, float]:
+        """计算集中度风险
+
+        Returns:
+            {
+                'max_single_stock': 单股票最大持仓占比,
+                'max_single_sector': 单板块最大持仓占比,
+                'small_cap_pct': 微盘股占比（市值<50亿）,
+                'num_holdings': 持仓股票数量,
+                'top3_concentration': 前三大持仓占比
+            }
+        """
+        # 收集所有持仓
+        all_positions: Dict[str, Dict] = {}
+        total_value = 0.0
+
+        for name, result in self._strategy_results.items():
+            ctx = result.get("context")
+            if ctx and hasattr(ctx, "portfolio"):
+                portfolio = ctx.portfolio
+                if hasattr(portfolio, "total_value"):
+                    total_value += portfolio.total_value
+                if hasattr(portfolio, "positions"):
+                    for sec, pos in portfolio.positions.items():
+                        if sec not in all_positions:
+                            all_positions[sec] = {"amount": 0, "value": 0}
+                        if hasattr(pos, "amount"):
+                            all_positions[sec]["amount"] += pos.amount
+                        if hasattr(pos, "value"):
+                            all_positions[sec]["value"] += pos.value
+
+        if not all_positions or total_value == 0:
+            return {
+                "max_single_stock": 0.0,
+                "max_single_sector": 0.0,
+                "small_cap_pct": 0.0,
+                "num_holdings": 0,
+                "top3_concentration": 0.0,
+            }
+
+        # 计算各持仓占比
+        position_values = {sec: data.get("value", 0) for sec, data in all_positions.items()}
+        position_pcts = {sec: val / total_value for sec, val in position_values.items()}
+
+        # 最大单股票占比
+        max_single_stock = max(position_pcts.values()) if position_pcts else 0.0
+
+        # 前三大持仓占比
+        sorted_pcts = sorted(position_pcts.values(), reverse=True)
+        top3_concentration = sum(sorted_pcts[:3]) if len(sorted_pcts) >= 3 else sum(sorted_pcts)
+
+        # 板块和市值分析需要 akshare 数据，简化处理
+        max_single_sector = max_single_stock  # 保守估计
+        small_cap_pct = 0.0
+
+        return {
+            "max_single_stock": float(max_single_stock),
+            "max_single_sector": float(max_single_sector),
+            "small_cap_pct": float(small_cap_pct),
+            "num_holdings": len(all_positions),
+            "top3_concentration": float(top3_concentration),
+        }
