@@ -637,6 +637,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             open_px = _get_open_fast(security, day)
             if not open_px:
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_VALUE skipped)")
+                if order_obj:
+                    order_obj.transition_to(Order.STATUS_CANCELLED, reason="no open price")
                 continue
             raw = int(order_req["value"] / open_px)
             delta = _round_lot(abs(raw))
@@ -646,14 +648,20 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             open_px = _get_open_fast(security, day)
             if not open_px:
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_TARGET_VALUE skipped)")
+                if order_obj:
+                    order_obj.transition_to(Order.STATUS_CANCELLED, reason="no open price")
                 continue
             target_sh = _round_lot(int(order_req["target_value"] / open_px)) if order_req["target_value"] > 0 else 0
             current = portfolio.positions[security].amount if security in portfolio.positions else 0
             delta = target_sh - current
         else:
+            if order_obj:
+                order_obj.transition_to(Order.STATUS_CANCELLED, reason="unknown action")
             continue
 
         if delta == 0:
+            if order_obj:
+                order_obj.transition_to(Order.STATUS_FILLED, reason="no position change needed")
             continue
 
         is_buy = delta > 0
@@ -669,6 +677,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             base_price = _get_open_fast(security, day)
         if not base_price:
             log.warn(f"fill_pending: no open price for {security} on {day} — order skipped")
+            if order_obj:
+                order_obj.transition_to(Order.STATUS_CANCELLED, reason="no price data")
             continue
 
         # ── Phase 2.3: Limit order check ─────────────────────────────────────
@@ -727,9 +737,13 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             vol = (vol if (vol is not None and vol > 0) else 1e9)
         elif vol is None:
             log.warn(f"fill_pending: {security} has no bar on {day} — order skipped")
+            if order_obj:
+                order_obj.transition_to(Order.STATUS_CANCELLED, reason="no bar data")
             continue
         elif vol == 0 and treat_missing_as_suspended:
             log.warn(f"fill_pending: {security} volume=0 on {day} (appears suspended) — order skipped")
+            if order_obj:
+                order_obj.transition_to(Order.STATUS_CANCELLED, reason="suspended")
             continue
 
         # ── Price-limit check (A-share circuit breaker) ─────────────────────
@@ -775,18 +789,28 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                         f"fill_pending BUY {security}: open {base_price:.3f} hit "
                         f"limit-up ({limit_up:.3f}) on {day} — order skipped"
                     )
+                    if order_obj:
+                        order_obj.transition_to(Order.STATUS_CANCELLED, reason="limit-up")
                     continue
                 if not is_buy and base_price <= limit_down * (1 + _LIMIT_TOL):
                     log.warn(
                         f"fill_pending SELL {security}: open {base_price:.3f} hit "
                         f"limit-down ({limit_down:.3f}) on {day} — order skipped"
                     )
+                    if order_obj:
+                        order_obj.transition_to(Order.STATUS_CANCELLED, reason="limit-down")
                     continue
 
         if slippage:
             exec_price = slippage.get_execution_price(
                 base_price, requested_amount, is_buy, daily_volume=vol
             )
+            # F3: slippage model returns None for zero-volume stocks
+            if exec_price is None:
+                log.warn(f"fill_pending: {security} slippage returned None (zero volume) — order skipped")
+                if order_obj:
+                    order_obj.transition_to(Order.STATUS_CANCELLED, reason="zero volume")
+                continue
         else:
             exec_price = base_price
 
@@ -843,6 +867,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 rounded = min(rounded, max_affordable)
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash")
+                    if order_obj:
+                        order_obj.transition_to(Order.STATUS_CANCELLED, reason="insufficient cash")
                     continue
                 commission = cost_cfg.calc_open_cost(exec_price, rounded)
                 total_cost = exec_price * rounded + commission
@@ -855,6 +881,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                     total_cost = exec_price * rounded + commission
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash (after min_commission)")
+                    if order_obj:
+                        order_obj.transition_to(Order.STATUS_CANCELLED, reason="insufficient cash")
                     continue
 
             # A1: Recompute partial-fill flags after cash-constraint reduction
@@ -1337,6 +1365,13 @@ def _run_minute_bars(context: Context, session: BacktestSession,
                 func = _get_sched_func(sched)
                 if t == "every_bar":
                     func(context)
+                else:
+                    # A4: Handle specific-time scheduled functions in minute mode
+                    hour, minute = map(int, t.split(":"))
+                    bar_time = context.current_dt
+                    if (hasattr(bar_time, 'hour') and
+                            bar_time.hour == hour and bar_time.minute == minute):
+                        func(context)
 
 
 def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datetime.date]:

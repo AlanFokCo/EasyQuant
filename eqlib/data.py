@@ -384,13 +384,14 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
     else:
         cache_key = (symbol, str(start_date), str(end_date), adjust)
 
-    if cache_key in _cache:
-        with _cache_lock:
+    # C2: Move cache membership check inside the lock to prevent TOCTOU race
+    with _cache_lock:
+        if cache_key in _cache:
             df_cached = _cache.get(cache_key)
-        if df_cached is not None:
-            if is_idx and start_date and end_date:
-                return _slice_by_date(df_cached, start_date, end_date)
-            return df_cached
+            if df_cached is not None:
+                if is_idx and start_date and end_date:
+                    return _slice_by_date(df_cached, start_date, end_date)
+                return df_cached
 
     start_str = _normalize_date(start_date)
     end_str = _normalize_date(end_date)
@@ -1010,10 +1011,12 @@ def load_csv(path, index_col: str = "date", parse_dates: bool = True) -> pd.Data
 
 def clear_cache():
     """Clear the internal data cache."""
-    _cache.clear()
+    with _cache_lock:
+        _cache.clear()
     global _spot_cache, _spot_fetch_time
-    _spot_cache = None
-    _spot_fetch_time = 0
+    with _spot_lock:
+        _spot_cache = None
+        _spot_fetch_time = 0
 
 
 # ============================================================
