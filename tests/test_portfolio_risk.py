@@ -162,3 +162,56 @@ class TestPortfolioRiskMonitorInit:
             monitor.add_strategy("均线策略", result)
             assert len(w) == 1
             assert "将被覆盖" in str(w[0].message)
+
+
+class TestPortfolioVar:
+    """Tests for portfolio_var method."""
+
+    def test_portfolio_var_basic(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result1 = _make_backtest_result(n_days=100, seed=1)
+        result2 = _make_backtest_result(n_days=100, seed=2)
+        monitor.add_strategy("策略A", result1)
+        monitor.add_strategy("策略B", result2)
+
+        var_amount, var_pct = monitor.portfolio_var()
+        assert var_amount > 0
+        assert var_pct > 0
+        assert var_pct < 0.20  # 正常波动范围
+
+    def test_portfolio_var_no_strategy(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        var_amount, var_pct = monitor.portfolio_var()
+        assert var_amount == 0.0
+        assert var_pct == 0.0
+
+    def test_portfolio_var_single_strategy(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result = _make_backtest_result(n_days=100)
+        monitor.add_strategy("单策略", result)
+        var_amount, var_pct = monitor.portfolio_var()
+        assert var_amount > 0
+
+    def test_portfolio_var_confidence_override(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        result = _make_backtest_result(n_days=100)
+        monitor.add_strategy("test", result)
+
+        var_95, pct_95 = monitor.portfolio_var(confidence=0.95)
+        var_99, pct_99 = monitor.portfolio_var(confidence=0.99)
+        # 99% VaR 应大于 95% VaR（更极端）
+        assert var_99 >= var_95
+
+    def test_portfolio_var_insufficient_data(self):
+        from eqlib.portfolio_risk import PortfolioRiskMonitor
+        monitor = PortfolioRiskMonitor()
+        # 只有 10 天数据，不足以计算 VaR
+        result = _make_backtest_result(n_days=10)
+        monitor.add_strategy("short", result)
+        var_amount, var_pct = monitor.portfolio_var()
+        # 数据不足时返回 NaN 或 0
+        assert var_amount == 0.0 or np.isnan(var_amount)
