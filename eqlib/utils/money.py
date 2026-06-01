@@ -46,7 +46,7 @@ def kelly_from_returns(returns: pd.Series) -> float:
     Separates wins and losses to compute win rate and avg win/loss.
     """
     wins = returns[returns > 0]
-    losses = returns[returns <= 0]
+    losses = returns[returns < 0]
     win_rate = len(wins) / len(returns) if len(returns) > 0 else 0
     avg_win = wins.mean() if len(wins) > 0 else 0
     avg_loss = abs(losses.mean()) if len(losses) > 0 else 0

@@ -82,6 +82,17 @@ async def login(body: LoginBody, session: AsyncSession = Depends(get_session)):
     )
 
 
+class SseTokenResponse(BaseModel):
+    token: str
+
+
+@router.post("/auth/sse-token", response_model=SseTokenResponse)
+async def get_sse_token(user: User = Depends(auth_mod.get_current_user)):
+    """Issue a short-lived SSE token for EventSource connections."""
+    token = auth_mod.create_sse_token(user.id)
+    return SseTokenResponse(token=token)
+
+
 @router.get("/auth/me")
 async def me(user: User = Depends(auth_mod.get_current_user)):
     """Return current user info."""

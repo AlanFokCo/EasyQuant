@@ -80,7 +80,7 @@ class VolumeSlippage(SlippageModel):
     def get_execution_price(self, price: float, amount: int, is_buy: bool,
                             daily_volume: float = 0) -> float:
         if daily_volume <= 0:
-            return price
+            return None  # F3: Signal engine to skip trade on zero-volume stocks
         impact_pct = min(self.impact * (amount / daily_volume), self.max_slippage_pct)
         if is_buy:
             return price * (1.0 + impact_pct)

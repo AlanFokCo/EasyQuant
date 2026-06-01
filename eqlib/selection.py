@@ -136,6 +136,20 @@ def filter_st_stocks(securities: list[str]) -> list[str]:
     """
     from eqlib.data import get_extras
 
+    # F2: WARNING — this filter uses current-day ST status from akshare,
+    # not point-in-time data. During historical backtests, this introduces
+    # survivorship bias: stocks that were ST in the past but aren't today
+    # will NOT be filtered out, and stocks that are ST today but weren't
+    # in the past WILL be incorrectly filtered.
+    import warnings
+    from eqlib._state import _context
+    if hasattr(_context, 'current_dt') and _context.current_dt is not None:
+        warnings.warn(
+            "filter_st_stocks uses current-day ST status, not point-in-time data. "
+            "This may introduce survivorship bias in backtests.",
+            stacklevel=2,
+        )
+
     # get_extras returns bare codes as keys; convert input to bare
     bare_codes = _to_bare_list(securities)
     is_st = get_extras('is_st', bare_codes)

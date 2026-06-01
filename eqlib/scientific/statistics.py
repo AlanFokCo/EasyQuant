@@ -356,7 +356,7 @@ def monte_carlo_simulation(
             working = base.copy()
             if random_start_dates and working.size > 1:
                 working = np.roll(working, int(rng.integers(0, working.size)))
-            simulated = rng.permutation(working)
+            simulated = rng.choice(working, size=len(working), replace=True)
             if random_params:
                 simulated = _apply_param_perturbation(simulated, rng, param_ranges)
 

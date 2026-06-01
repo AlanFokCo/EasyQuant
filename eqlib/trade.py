@@ -89,10 +89,24 @@ def _buffer_order(action: str, **kwargs) -> Order:
             )
 
     # Create Order object for status tracking
-    order_obj = Order(security, amount, style=style)
+    # B3: For target-based orders, side cannot be determined until the engine
+    # computes the actual delta. Set side=None; engine will assign at fill time.
+    if action in _TARGET_ACTIONS:
+        order_obj = Order(security, amount, style=style, side=None)
+    else:
+        order_obj = Order(security, amount, style=style)
 
     # ── Phase 2.4: Record order timestamp for timeout tracking ───────────
-    sess._order_timestamps[order_obj.order_id] = datetime.datetime.now()
+    # A-REG1: Store submission date (not datetime) for trading-day-based timeout.
+    # In backtest mode, orders fill on T+1, so wall-clock timeout is wrong.
+    ctx = getattr(sess, '_context', None)
+    current_dt = getattr(ctx, 'current_dt', None) if ctx else None
+    if current_dt is not None:
+        # Backtest: store just the date for trading-day counting
+        sess._order_timestamps[order_obj.order_id] = current_dt.date() if hasattr(current_dt, 'date') else current_dt
+    else:
+        # Live/paper: store full datetime for wall-clock timeout
+        sess._order_timestamps[order_obj.order_id] = datetime.datetime.now()
 
     req = {"action": action, "security": security, "order_obj": order_obj, **kwargs}
     sess._pending_orders.append(req)
@@ -195,3 +209,29 @@ def order_target_value(security, value, style=None) -> Order:
     log.action("Queue target-value", security,
                target_cny=f"{float(value):.0f}", fill="next_open")
     return _buffer_order("ORDER_TARGET_VALUE", security=security, target_value=float(value), style=style)
+
+
+def cancel_order(order_obj):
+    """Cancel a pending order before it fills.
+
+    Removes the order from the pending queue and transitions it to
+    STATUS_CANCELLED. Has no effect if the order has already been
+    filled or cancelled.
+
+    Parameters:
+        order_obj: the Order object returned by order(), order_target(), etc.
+
+    Returns:
+        The Order object (with updated status).
+    """
+    if order_obj is None:
+        return None
+
+    sess = st.get_session()
+    sess._pending_orders = [
+        req for req in sess._pending_orders
+        if req.get("order_obj") is not order_obj
+    ]
+    if order_obj.status in (Order.STATUS_PENDING, Order.STATUS_SUBMITTED):
+        order_obj.transition_to(Order.STATUS_CANCELLED, reason="user cancelled")
+    return order_obj
