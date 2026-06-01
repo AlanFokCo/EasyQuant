@@ -1636,8 +1636,119 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
 
 
 def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
-    """融资融券数据（全市场汇总）"""
-    return pd.DataFrame()
+    """融资融券数据（全市场汇总）
+
+    Parameters:
+        start_date: 开始日期 (YYYY-MM-DD 或 datetime)
+        end_date: 结束日期，默认今天
+
+    Returns:
+        DataFrame with columns:
+        - date: 交易日期
+        - margin_balance: 融资余额（亿元）
+        - margin_buy: 融资买入额（亿元）
+        - margin_repay: 融资偿还额（亿元）
+        - short_balance: 融券余额（亿元）
+
+    数据源: akshare macro_china_market_margin_sh / macro_china_market_margin_sz
+    """
+    try:
+        # 参数标准化
+        if end_date is None:
+            end_date = datetime.date.today()
+        if start_date is None:
+            start_date = end_date - datetime.timedelta(days=30)
+
+        # 使用 YYYY-MM-DD 格式以便与 DataFrame 日期列匹配
+        if isinstance(start_date, datetime.date):
+            sd = start_date.strftime("%Y-%m-%d")
+        else:
+            # 处理字符串格式，统一转换为 YYYY-MM-DD
+            sd = str(start_date).replace("-", "")[:8]
+            sd = f"{sd[:4]}-{sd[4:6]}-{sd[6:8]}"
+
+        if isinstance(end_date, datetime.date):
+            ed = end_date.strftime("%Y-%m-%d")
+        else:
+            ed = str(end_date).replace("-", "")[:8]
+            ed = f"{ed[:4]}-{ed[4:6]}-{ed[6:8]}"
+
+        # 缓存检查
+        cache_key = f"margin_data_{sd}_{ed}"
+        with _cache_lock:
+            if cache_key in _cache:
+                return _cache[cache_key].copy()
+
+        # 获取沪市和深市融资融券数据
+        df_sh = ak.macro_china_market_margin_sh()
+        df_sz = ak.macro_china_market_margin_sz()
+
+        if df_sh.empty and df_sz.empty:
+            return pd.DataFrame()
+
+        # 列重命名和处理
+        def process_df(df):
+            df = _rename_cols(df, {
+                "日期": "date",
+                "融资余额": "margin_balance",
+                "融资买入额": "margin_buy",
+                "融券余额": "short_balance",
+            })
+            if "date" in df.columns:
+                df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+            # 转换为亿元 (原数据单位为元)
+            _to_numeric(df, ["margin_balance", "margin_buy", "short_balance"])
+            for col in ["margin_balance", "margin_buy", "short_balance"]:
+                if col in df.columns:
+                    df[col] = df[col] / 1e8  # 转换为亿元
+            return df
+
+        df_sh = process_df(df_sh)
+        df_sz = process_df(df_sz)
+
+        # 合并沪市和深市数据（按日期汇总）
+        if not df_sh.empty and not df_sz.empty:
+            # 按日期合并，数值相加
+            df = pd.merge(df_sh, df_sz, on="date", how="outer", suffixes=("_sh", "_sz"))
+            df["margin_balance"] = df["margin_balance_sh"].fillna(0) + df["margin_balance_sz"].fillna(0)
+            df["margin_buy"] = df["margin_buy_sh"].fillna(0) + df["margin_buy_sz"].fillna(0)
+            df["short_balance"] = df["short_balance_sh"].fillna(0) + df["short_balance_sz"].fillna(0)
+            df = df[["date", "margin_balance", "margin_buy", "short_balance"]]
+        elif not df_sh.empty:
+            df = df_sh
+        elif not df_sz.empty:
+            df = df_sz
+        else:
+            return pd.DataFrame()
+
+        # 日期范围筛选
+        df = df[(df["date"] >= sd) & (df["date"] <= ed)]
+
+        # 按日期排序
+        df = df.sort_values("date").reset_index(drop=True)
+
+        # 计算 margin_repay: 融资偿还额 = 前一日融资余额 + 当日融资买入 - 当日融资余额
+        if "margin_balance" in df.columns and "margin_buy" in df.columns:
+            # 使用 shift 计算前一日的融资余额
+            prev_balance = df["margin_balance"].shift(1)
+            df["margin_repay"] = prev_balance + df["margin_buy"] - df["margin_balance"]
+            # 第一行无法计算，设为 NaN
+            df["margin_repay"] = df["margin_repay"].fillna(0)
+
+        # 重新排列列顺序
+        df = df[["date", "margin_balance", "margin_buy", "margin_repay", "short_balance"]]
+
+        # 存入缓存
+        with _cache_lock:
+            _cache[cache_key] = df.copy()
+            if len(_cache) > _MAX_CACHE_ENTRIES:
+                _cache.popitem(last=False)
+
+        return df.reset_index(drop=True)
+
+    except Exception as e:
+        log.debug("get_margin_data: %s", e)
+        return pd.DataFrame()
 
 
 def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:

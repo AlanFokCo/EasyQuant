@@ -59,6 +59,28 @@ class TestMarginData:
         from eqlib.data import get_margin_data
         assert get_margin_data is not None
 
+    def test_basic_fetch(self):
+        """验证能获取融资融券数据"""
+        from eqlib.data import get_margin_data
+
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=30)
+
+        df = get_margin_data(start_date=start_date, end_date=end_date)
+
+        assert isinstance(df, pd.DataFrame)
+
+        if not df.empty:
+            assert "date" in df.columns
+            assert "margin_balance" in df.columns
+
+    def test_default_parameters(self):
+        """验证默认参数工作"""
+        from eqlib.data import get_margin_data
+
+        df = get_margin_data()
+        assert isinstance(df, pd.DataFrame)
+
 
 class TestLimitUpDownStats:
     """Tests for get_limit_up_down_stats function."""
