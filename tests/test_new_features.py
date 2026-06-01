@@ -45,9 +45,9 @@ class TestSlippageModels:
     def test_volume_slippage_zero_volume_fallback(self):
         from eqlib.slippage import VolumeSlippage
         model = VolumeSlippage(impact=0.1)
-        # daily_volume=0 → fall through to no slippage
+        # F3: daily_volume=0 → return None to signal engine to skip trade
         price = model.get_execution_price(10.0, 1000, is_buy=True, daily_volume=0)
-        assert price == 10.0
+        assert price is None
 
 
 # ============================================================
