@@ -323,8 +323,19 @@ class PreloadedData:
         ) as pool:
             future_to_sec = {pool.submit(_load_one, sec): sec for sec in securities}
             done_count = 0
+            load_errors = []
             for future in concurrent.futures.as_completed(future_to_sec):
-                sec, df = future.result()
+                try:
+                    sec, df = future.result()
+                except Exception as e:
+                    failed_sec = future_to_sec[future]
+                    print(f"[EasyQuant] Warning: failed to load {failed_sec}: {type(e).__name__}: {e}")
+                    load_errors.append(failed_sec)
+                    done_count += 1
+                    if progress and total > 5:
+                        pct = done_count / total * 100
+                        print(f"\r  Loading data: {done_count}/{total} ({pct:.0f}%)", end="", flush=True)
+                    continue
                 if df is not None and not df.empty:
                     if not isinstance(df.index, pd.DatetimeIndex):
                         try:
@@ -339,6 +350,9 @@ class PreloadedData:
 
         if progress and total > 5:
             print()  # newline after progress
+
+        if load_errors:
+            print(f"[EasyQuant] Warning: failed to load {len(load_errors)} securities: {', '.join(load_errors)}")
 
         if not frames:
             missing = ', '.join(securities)
