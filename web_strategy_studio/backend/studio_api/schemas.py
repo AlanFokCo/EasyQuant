@@ -31,7 +31,7 @@ class DefaultBacktestParams(BaseModel):
     end_date: str = "2024-12-31"
     starting_cash: float = 100_000
     benchmark: str = "000300.XSHG"
-    use_local: bool = False
+    use_local: bool = True
     report_dir: Optional[str] = None
     securities: Optional[List[str]] = None
     max_memory_mb: int = 1024
@@ -103,7 +103,7 @@ class RunParams(BaseModel):
     end_date: str
     starting_cash: float = 100_000
     benchmark: str = "000300.XSHG"
-    use_local: bool = False
+    use_local: bool = True
     report_dir: Optional[str] = None
     securities: Optional[List[str]] = None
     max_memory_mb: int = 1024

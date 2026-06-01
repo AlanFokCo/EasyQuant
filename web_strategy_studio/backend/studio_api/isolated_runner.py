@@ -14,12 +14,12 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-# 设置默认本地数据目录
-EQLIB_LOCAL_DATA_DIR = os.environ.get("EQLIB_LOCAL_DATA_DIR", str(Path.home() / "eqlib_data"))
-os.environ["EQLIB_LOCAL_DATA_DIR"] = EQLIB_LOCAL_DATA_DIR
-
 
 def main() -> int:
+    # Set default local data directory (before importing eqlib)
+    eqlib_data_dir = os.environ.get("EQLIB_LOCAL_DATA_DIR", str(Path.home() / "eqlib_data"))
+    os.environ["EQLIB_LOCAL_DATA_DIR"] = eqlib_data_dir
+
     if len(sys.argv) < 2:
         print("usage: isolated_runner WORKDIR", file=sys.stderr)
         return 1
@@ -55,7 +55,6 @@ def main() -> int:
     try:
         from eqlib import run_backtest
         from eqlib.report import generate_html_report, generate_report_json
-        from eqlib.data_cache import save_stock_local, has_local_data
     except ImportError as e:
         print(f"EQ_ERROR: eqlib import: {e}", file=sys.stderr)
         _write_result(out_dir, work, ok=False, error=str(e), error_code="NO_EQLIB")
@@ -83,33 +82,6 @@ def main() -> int:
 
     # 使用本地数据模式（默认 True，但尊重用户配置）
     use_local = bool(cfg.get("use_local", True))
-    start_date = cfg["start_date"]
-    end_date = cfg["end_date"]
-
-    # 如果有股票列表且使用本地模式，预下载缺失的数据
-    download_failures = []
-    if use_local and securities and isinstance(securities, list) and len(securities) > 0:
-        print(f"EQ_INFO: checking local data for {len(securities)} stocks...")
-
-        for stock in securities:
-            # 使用 eqlib 的 has_local_data() 检查，避免路径不一致问题
-            if not has_local_data(stock, adjust="qfq"):
-                print(f"EQ_INFO: downloading {stock}...")
-                try:
-                    save_stock_local(stock, start_date, end_date, adjust="qfq")
-                    print(f"EQ_INFO: downloaded {stock}")
-                except Exception as e:
-                    print(f"EQ_ERROR: failed to download {stock}: {e}")
-                    download_failures.append(stock)
-
-        # 如果下载失败且使用本地模式，提前报错避免回测时数据缺失
-        if download_failures:
-            err_msg = f"Failed to download {len(download_failures)} stocks: {download_failures[:5]}"
-            if len(download_failures) > 5:
-                err_msg += f" ... and {len(download_failures) - 5} more"
-            print(f"EQ_ERROR: {err_msg}", file=sys.stderr)
-            _write_result(out_dir, work, ok=False, error=err_msg, error_code="DATA_DOWNLOAD_FAIL")
-            return 3
 
     try:
         result = run_backtest(
