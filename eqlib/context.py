@@ -11,8 +11,13 @@ class Position:
         self.amount = 0
         self.avg_cost = 0.0
         self.total_value = 0.0
-        self.closeable_amount = 0.0
+        self.closeable_amount = 0
         self._current_price = 0.0
+
+    @property
+    def value(self):
+        """Market value of the position (alias for total_value)."""
+        return self.total_value
 
     @property
     def current_price(self):
@@ -31,7 +36,7 @@ class Position:
 
     def update(self, price):
         self._current_price = price
-        self.total_value = self.amount * price
+        self.total_value = round(self.amount * price, 2)
 
     def __repr__(self):
         return (
@@ -65,11 +70,12 @@ class Portfolio:
         return (self.total_value - self.starting_cash) / self.starting_cash
 
     def _sync_total_value(self, prices):
-        self.total_value = self.available_cash
+        total = self.available_cash
         for sec, pos in self.positions.items():
             p = prices.get(sec, pos.avg_cost)
             pos.update(p)
-            self.total_value += pos.total_value
+            total += pos.total_value
+        self.total_value = round(total, 2)
 
     def __repr__(self):
         return (

@@ -2,6 +2,7 @@
 (initialize -> handle_data / run_daily -> report)."""
 
 import datetime
+import math
 import time
 import pandas as pd
 from typing import Optional
@@ -489,13 +490,26 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
         context_dt: optional date for ST status lookup in backtest mode
         session: optional BacktestSession for caching and mode detection
     """
-    # ── Check session cache first ────────────────────────────────────────
+    # ── Check session cache first (with 30-day expiry for ST lookups) ────
     if session is not None:
         cache = session._options.get("_price_limit_cache")
         if cache is not None and security in cache:
-            return cache[security]
+            entry = cache[security]
+            # Structural limits (STAR/ChiNext/BSE/Main) never expire
+            if isinstance(entry, (int, float)):
+                return entry
+            # ST-based limits expire after 30 days
+            if isinstance(entry, dict):
+                cached_date = entry.get("date")
+                if cached_date and context_dt and (context_dt - cached_date).days < 30:
+                    return entry["ratio"]
 
     bare = _bare_code(security)
+    # BSE (Beijing Stock Exchange): ±30%
+    if bare.startswith("83") or bare.startswith("87") or bare.startswith("43") or bare.startswith("92"):
+        ratio = 0.30
+        _cache_price_limit(session, security, ratio)
+        return ratio
     # STAR Market and ChiNext: ±20%
     if bare.startswith("688") or bare.startswith("300"):
         ratio = 0.20
@@ -513,7 +527,7 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
             st_map = get_extras("is_st", security_list=[bare])
             if st_map.get(bare, False):
                 ratio = 0.05
-                _cache_price_limit(session, security, ratio)
+                _cache_price_limit_st(session, security, ratio, context_dt)
                 return ratio
         except Exception:
             pass
@@ -527,7 +541,7 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
                 name = row.iloc[0]["名称"]
                 if "ST" in name or "st" in name.lower():
                     ratio = 0.05
-                    _cache_price_limit(session, security, ratio)
+                    _cache_price_limit_st(session, security, ratio, context_dt)
                     return ratio
         except Exception:
             pass
@@ -539,10 +553,17 @@ def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
 
 
 def _cache_price_limit(session, security, ratio):
-    """Store price-limit ratio in session cache to avoid repeated lookups."""
+    """Store structural price-limit ratio in session cache (never expires)."""
     if session is not None:
         cache = session._options.setdefault("_price_limit_cache", {})
         cache[security] = ratio
+
+
+def _cache_price_limit_st(session, security, ratio, context_dt):
+    """Store ST-based price-limit ratio with date stamp (expires after 30 days)."""
+    if session is not None:
+        cache = session._options.setdefault("_price_limit_cache", {})
+        cache[security] = {"ratio": ratio, "date": context_dt or datetime.date.today()}
 
 
 def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
@@ -672,23 +693,30 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             delta = order_req["target_amount"] - current
         elif action == "ORDER_VALUE":
             open_px = _get_open_fast(security, day)
-            if not open_px:
+            if not open_px or (isinstance(open_px, float) and math.isnan(open_px)):
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_VALUE skipped)")
                 if order_obj:
                     order_obj.transition_to(Order.STATUS_CANCELLED, reason="no open price")
                 continue
-            raw = int(order_req["value"] / open_px)
+            # Estimate exec_price with slippage for accurate share calculation
+            is_buy_est = order_req["value"] > 0
+            slippage_pct = getattr(sess._slippage_model, "pct", 0) if sess._slippage_model else 0
+            est_px = open_px * (1 + slippage_pct) if is_buy_est else open_px * (1 - slippage_pct)
+            raw = int(order_req["value"] / est_px)
             delta = _round_lot(abs(raw))
             if order_req["value"] < 0:
                 delta = -delta
         elif action == "ORDER_TARGET_VALUE":
             open_px = _get_open_fast(security, day)
-            if not open_px:
+            if not open_px or (isinstance(open_px, float) and math.isnan(open_px)):
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_TARGET_VALUE skipped)")
                 if order_obj:
                     order_obj.transition_to(Order.STATUS_CANCELLED, reason="no open price")
                 continue
-            target_sh = _round_lot(int(order_req["target_value"] / open_px)) if order_req["target_value"] > 0 else 0
+            # Estimate exec_price with slippage for accurate share calculation
+            slippage_pct = getattr(sess._slippage_model, "pct", 0) if sess._slippage_model else 0
+            est_px = open_px * (1 + slippage_pct) if order_req["target_value"] > 0 else open_px
+            target_sh = _round_lot(int(order_req["target_value"] / est_px)) if order_req["target_value"] > 0 else 0
             current = portfolio.positions[security].amount if security in portfolio.positions else 0
             delta = target_sh - current
         else:
@@ -896,8 +924,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                     order_obj.transition_to(Order.STATUS_CANCELLED, reason="sub-lot")
                     print(f"[EasyQuant] Order {order_obj.order_id} cancelled: amount {fill_amount} rounds to 0 lots (rounded={rounded})")
                 continue
-            commission = cost_cfg.calc_open_cost(exec_price, rounded)
-            total_cost = exec_price * rounded + commission
+            commission = round(cost_cfg.calc_open_cost(exec_price, rounded), 2)
+            total_cost = round(exec_price * rounded + commission, 2)
 
             if total_cost > portfolio.available_cash:
                 # HIGH-11: use base_price (before slippage) plus a conservative
@@ -913,15 +941,15 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                     if order_obj:
                         order_obj.transition_to(Order.STATUS_CANCELLED, reason="insufficient cash")
                     continue
-                commission = cost_cfg.calc_open_cost(exec_price, rounded)
-                total_cost = exec_price * rounded + commission
+                commission = round(cost_cfg.calc_open_cost(exec_price, rounded), 2)
+                total_cost = round(exec_price * rounded + commission, 2)
                 # Guard against min_commission pushing total_cost over budget
                 while total_cost > portfolio.available_cash and rounded > 0:
                     rounded -= 100
                     if rounded <= 0:
                         break
-                    commission = cost_cfg.calc_open_cost(exec_price, rounded)
-                    total_cost = exec_price * rounded + commission
+                    commission = round(cost_cfg.calc_open_cost(exec_price, rounded), 2)
+                    total_cost = round(exec_price * rounded + commission, 2)
                 if rounded <= 0:
                     log.warn(f"fill_pending BUY {security}: insufficient cash (after min_commission)")
                     if order_obj:
@@ -933,20 +961,20 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 is_partial_fill = True
                 remaining_amount = requested_amount - rounded
 
-            portfolio.available_cash -= total_cost
+            portfolio.available_cash = round(portfolio.available_cash - total_cost, 2)
 
             if security not in portfolio.positions:
                 portfolio.positions[security] = Position(security)
 
             pos = portfolio.positions[security]
-            total_cb = pos.avg_cost * pos.amount + exec_price * rounded
+            total_cb = round(pos.avg_cost * pos.amount + exec_price * rounded, 4)
             pos.amount += rounded
             # T+1: newly bought shares are not sellable today
             locked = sess._t1_locked_amounts.get(security, 0) + rounded
             sess._t1_locked_amounts[security] = locked
             pos.closeable_amount = pos.amount - locked
 
-            pos.avg_cost = total_cb / pos.amount if pos.amount > 0 else 0
+            pos.avg_cost = round(total_cb / pos.amount, 4) if pos.amount > 0 else 0
 
             # ── Update Order status for partial/full fill ───────────────────────
             if order_obj:
@@ -992,8 +1020,13 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             if security not in portfolio.positions:
                 continue
             pos = portfolio.positions[security]
-            # Round sell amount to 100-share lots (A-share requirement)
-            sell_amount = min(_round_lot(sell_amount), int(pos.closeable_amount))
+            # A-share rule: allow selling odd lots (零股) when closing position.
+            # If selling entire position, use exact closeable_amount without lot rounding.
+            closeable = int(pos.closeable_amount)
+            if sell_amount >= closeable:
+                sell_amount = closeable  # Allow odd lots when closing
+            else:
+                sell_amount = min(_round_lot(sell_amount), closeable)
 
             # B1: Recompute partial-fill flags after lot rounding + closeable cap
             if sell_amount < requested_amount:
@@ -1008,11 +1041,11 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 continue
 
             is_etf_sec = _is_etf(_bare_code(security))
-            commission = cost_cfg.calc_close_cost(exec_price, sell_amount, is_etf=is_etf_sec,
-                                                  trade_date=day)
-            net = exec_price * sell_amount - commission
+            commission = round(cost_cfg.calc_close_cost(exec_price, sell_amount, is_etf=is_etf_sec,
+                                                  trade_date=day), 2)
+            net = round(exec_price * sell_amount - commission, 2)
 
-            portfolio.available_cash += net
+            portfolio.available_cash = round(portfolio.available_cash + net, 2)
             pos.amount -= sell_amount
             pos.closeable_amount = max(0, pos.closeable_amount - sell_amount)
 
@@ -1135,6 +1168,21 @@ def run_backtest(initialize_func, start_date, end_date,
     session = BacktestSession()
     _set_session(session)
 
+    try:
+        return _run_backtest_core(
+            session, initialize_func, start_date, end_date, frequency,
+            starting_cash, benchmark, securities, handle_data,
+            selection_func, selection_rebalance, use_local, max_memory_mb,
+        )
+    finally:
+        _clear_session()
+
+
+def _run_backtest_core(session, initialize_func, start_date, end_date, frequency,
+                       starting_cash, benchmark, securities, handle_data,
+                       selection_func, selection_rebalance, use_local, max_memory_mb):
+    """Core backtest logic, called by run_backtest within a try/finally block."""
+    from eqlib.objects import OrderCost
     preloaded = PreloadedData()
     # Attach to session so concurrent threads each have their own PreloadedData.
     # NOTE: do NOT write to any module-level alias — that would break
@@ -1191,7 +1239,6 @@ def run_backtest(initialize_func, start_date, end_date,
     trading_days = _get_trading_days(start_date, end_date, preloaded)
     if not trading_days:
         log.error("No trading days found")
-        _clear_session()
         return None
 
     # Pick up selection config from session (set via run_selection in initialize)
@@ -1355,7 +1402,6 @@ def run_backtest(initialize_func, start_date, end_date,
     except Exception:
         pass
 
-    _clear_session()
     return result
 
 
@@ -1609,6 +1655,8 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             time.sleep(interval)
     except KeyboardInterrupt:
         log.info("Paper trading stopped.")
+    finally:
+        _clear_session()
 
     return {
         "context": context,

@@ -134,8 +134,9 @@ class TestSortinoRiskFreeRate:
         )
 
     def test_sortino_zero_rf_matches_manual(self):
-        """With rf=0, Sortino should equal (mean / downside_std) * sqrt(252)."""
+        """With rf=0, Sortino should equal (mean / downside_std) * sqrt(TRADING_DAYS_PER_YEAR)."""
         from eqlib.attribution import analyze_returns
+        from eqlib.constants import TRADING_DAYS_PER_YEAR
 
         daily = self._build_daily_returns()
         result = _make_fake_result(daily)
@@ -147,7 +148,7 @@ class TestSortinoRiskFreeRate:
         daily_ret = values.pct_change().dropna()
         downside = daily_ret[daily_ret < 0]
         downside_std = downside.std()  # ddof=1
-        expected = (daily_ret.mean() / downside_std) * np.sqrt(252)
+        expected = (daily_ret.mean() / downside_std) * np.sqrt(TRADING_DAYS_PER_YEAR)
 
         assert abs(stats["sortino_ratio"] - expected) < 1e-6
 
@@ -175,7 +176,8 @@ class TestConsistentDdof:
         downside_std_ddof1 = downside.std()  # default ddof=1
         downside_std_ddof0 = downside.std(ddof=0)
 
-        expected_ddof1 = (daily_ret.mean() / downside_std_ddof1) * np.sqrt(252)
+        from eqlib.constants import TRADING_DAYS_PER_YEAR
+        expected_ddof1 = (daily_ret.mean() / downside_std_ddof1) * np.sqrt(TRADING_DAYS_PER_YEAR)
 
         assert abs(stats["sortino_ratio"] - expected_ddof1) < 1e-6, (
             f"Sortino {stats['sortino_ratio']} should use ddof=1 ({expected_ddof1})"

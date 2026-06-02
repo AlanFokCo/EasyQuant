@@ -12,4 +12,6 @@ adjustments a single-line change.
 RISK_FREE_RATE: float = 0.03
 
 # Number of trading days per year for Chinese A-share markets.
-TRADING_DAYS_PER_YEAR: int = 252
+# A-shares have ~242-245 trading days/year (Chinese public holidays remove
+# ~10 more days vs US).  Using 244 as the midpoint.
+TRADING_DAYS_PER_YEAR: int = 244

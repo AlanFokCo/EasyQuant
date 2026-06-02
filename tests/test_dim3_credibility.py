@@ -120,8 +120,9 @@ class TestTurnoverAverage:
             values = (1 + pd.Series(daily_ret)).cumprod() * 100000.0
             avg_val = float(values.mean())
 
+        from eqlib.constants import TRADING_DAYS_PER_YEAR
         n_days = analytics["trading_days"]
-        years = n_days / 252.0
+        years = n_days / TRADING_DAYS_PER_YEAR
 
         min_based = min(total_buy, total_sell) / avg_val / years
         avg_based = (total_buy + total_sell) / 2.0 / avg_val / years
