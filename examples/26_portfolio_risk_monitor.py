@@ -273,9 +273,12 @@ def demo_portfolio_risk_monitor(result_trend, result_mr):
 
         # 分析相关性风险
         max_corr = 0.0
+        pair = ("N/A", "N/A")
         for i in range(len(corr_matrix)):
             for j in range(i + 1, len(corr_matrix)):
                 corr_val = abs(corr_matrix.iloc[i, j])
+                if pd.isna(corr_val):
+                    continue
                 if corr_val > max_corr:
                     max_corr = corr_val
                     pair = (corr_matrix.index[i], corr_matrix.columns[j])

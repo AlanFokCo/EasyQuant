@@ -102,29 +102,23 @@ if __name__ == "__main__":
         print(f"\n{'='*50}")
         print("Portfolio Concentration Risk Analysis:")
 
-        # Create risk monitor from the backtest result
-        positions_history = result.get('positions_history', {})
-        if positions_history:
-            risk_monitor = PortfolioRiskMonitor(
-                positions_history=positions_history,
-                total_capital=config.starting_cash
-            )
+        # Create risk monitor and register the backtest result
+        risk_monitor = PortfolioRiskMonitor()
+        risk_monitor.add_strategy("momentum", result)
 
-            # Get concentration risk metrics
-            concentration = risk_monitor.concentration_risk()
+        # Get concentration risk metrics
+        concentration = risk_monitor.concentration_risk()
 
-            print(f"  Number of Holdings:     {concentration.get('num_holdings', 'N/A')}")
-            print(f"  Top 1 Holding Weight:   {concentration.get('top1_weight', 0)*100:.1f}%")
-            print(f"  Top 3 Holdings Weight:  {concentration.get('top3_weight', 0)*100:.1f}%")
-            print(f"  Top 5 Holdings Weight:  {concentration.get('top5_weight', 0)*100:.1f}%")
-            print(f"  Herfindahl Index:       {concentration.get('herfindahl', 0):.4f}")
-            print(f"  Effective N:           {concentration.get('effective_n', 0):.2f}")
+        print(f"  Number of Holdings:     {concentration['num_holdings']}")
+        print(f"  Max Single Stock:       {concentration['max_single_stock']*100:.1f}%")
+        print(f"  Max Single Sector:      {concentration['max_single_sector']*100:.1f}%")
+        print(f"  Top 3 Concentration:    {concentration['top3_concentration']*100:.1f}%")
 
-            # Interpretation
-            hhi = concentration.get('herfindahl', 0)
-            if hhi > 0.25:
-                print("  ⚠️  High concentration risk (HHI > 0.25)")
-            elif hhi > 0.15:
-                print("  ⚡ Moderate concentration risk (HHI > 0.15)")
-            else:
-                print("  ✓ Well-diversified portfolio")
+        # Interpretation
+        max_single = concentration['max_single_stock']
+        if max_single > 0.25:
+            print("  ⚠️  High concentration risk (single stock > 25%)")
+        elif max_single > 0.15:
+            print("  ⚡ Moderate concentration risk (single stock > 15%)")
+        else:
+            print("  ✓ Well-diversified portfolio")
