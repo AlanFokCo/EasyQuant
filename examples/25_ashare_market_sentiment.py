@@ -66,6 +66,11 @@ def demo_north_flow():
     latest_5d = north["rolling_5d"].iloc[-1]
     latest_20d = north["rolling_20d"].iloc[-1]
 
+    # Handle NaN from insufficient data
+    if pd.isna(latest_5d) or pd.isna(latest_20d):
+        log.info("Insufficient data for trend analysis")
+        return "neutral"
+
     if latest_5d > 50 and latest_20d > 100:
         trend = "强势流入 (Strong inflow)"
         signal = "bullish"
@@ -126,6 +131,12 @@ def demo_margin_sentiment():
     # 判断杠杆情绪
     latest_change_pct = margin["balance_change_pct"].iloc[-1]
     latest_buy_ratio = margin["buy_ratio"].iloc[-1]
+
+    # Handle NaN from insufficient data
+    if pd.isna(latest_change_pct):
+        latest_change_pct = 0
+    if pd.isna(latest_buy_ratio):
+        latest_buy_ratio = 50
 
     if latest_change_pct > 2:
         leverage_trend = "融资快速增长 (Fast growth)"

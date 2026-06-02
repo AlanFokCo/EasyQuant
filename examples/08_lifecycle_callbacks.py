@@ -33,24 +33,25 @@ def before_market_open(context):
     current_date = context.current_dt.date()
 
     # Get limit up/down stats for market sentiment
-    limit_stats = get_limit_up_down_stats(date=current_date)
-    if limit_stats:
-        log.info(f"  Market Sentiment - Limit Up: {limit_stats.get('limit_up_count', 'N/A')}, "
-                 f"Limit Down: {limit_stats.get('limit_down_count', 'N/A')}")
+    try:
+        limit_stats = get_limit_up_down_stats()
+        if not limit_stats.empty:
+            latest = limit_stats.iloc[-1]
+            log.info(f"  Market Sentiment [{latest['date']}] - "
+                     f"Limit Up: {int(latest['limit_up_count'])}, "
+                     f"Limit Down: {int(latest['limit_down_count'])}")
+    except Exception as exc:
+        log.warning(f"  涨跌停统计获取失败: {exc}")
 
     # Get north money flow (foreign capital) - 3-day net buy as sentiment reference
-    total_net_inflow = 0
-    days_checked = 0
-    for i in range(3):
-        check_date = current_date - timedelta(days=i)
-        north_flow = get_north_money_flow(date=check_date)
-        if north_flow:
-            net_inflow = north_flow.get('north_net_inflow', 0) or 0
-            total_net_inflow += net_inflow
-            days_checked += 1
-    if days_checked > 0:
-        direction = "inflow" if total_net_inflow > 0 else "outflow"
-        log.info(f"  North Money (3-day): Net {direction} {abs(total_net_inflow)/1e8:.2f} 亿 CNY")
+    try:
+        north_df = get_north_money_flow()
+        if not north_df.empty and "net_buy" in north_df.columns:
+            total_net_inflow = north_df["net_buy"].tail(3).sum()
+            direction = "inflow" if total_net_inflow > 0 else "outflow"
+            log.info(f"  North Money (3-day): Net {direction} {abs(total_net_inflow):.2f} 亿元")
+    except Exception as exc:
+        log.warning(f"  北向资金数据获取失败: {exc}")
 
 
 def after_market_close(context):

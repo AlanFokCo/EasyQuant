@@ -145,6 +145,10 @@ if __name__ == "__main__":
     print(f"{'=' * 60}")
 
     try:
+        # Defaults for conditionally-defined variables
+        net_3d = 0
+        avg_up = avg_down = 0
+
         # Recent north capital trend (last 5 trading days)
         north_df = get_north_money_flow()
         if not north_df.empty and "net_buy" in north_df.columns:
