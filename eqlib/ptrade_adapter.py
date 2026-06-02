@@ -538,10 +538,11 @@ def order(security, amount, price=None, ContextInfo=None):
     if price is not None:
         style = 'FIX'
 
+    # QMT's order_shares: positive shares = buy, negative shares = sell
     if amount > 0:
         order_shares(qmt_code, amount, style, price or 0, ci, _account)
     elif amount < 0:
-        order_shares(qmt_code, abs(amount), style, price or 0, ci, _account)
+        order_shares(qmt_code, amount, style, price or 0, ci, _account)  # keep negative
 
 
 def order_target(security, amount, price=None, ContextInfo=None):
@@ -573,10 +574,11 @@ def order_value(security, value, price=None, ContextInfo=None):
     if ci is None:
         return
 
+    # QMT's order_value: positive = buy, negative = sell
     if value > 0:
-        order_value_qmt(qmt_code, value, 'LATEST', price or 0, ci, _account)
+        _qmt_order_value(qmt_code, value, 'LATEST', price or 0, ci, _account)
     elif value < 0:
-        order_value_qmt(qmt_code, abs(value), 'LATEST', price or 0, ci, _account)
+        _qmt_order_value(qmt_code, value, 'LATEST', price or 0, ci, _account)  # keep negative
 
 
 def order_target_value(security, target_value, price=None, ContextInfo=None):
@@ -589,7 +591,7 @@ def order_target_value(security, target_value, price=None, ContextInfo=None):
     if ci is None:
         return
 
-    order_target_value_qmt(qmt_code, target_value, 'LATEST', price or 0, ci, _account)
+    _qmt_order_target_value(qmt_code, target_value, 'LATEST', price or 0, ci, _account)
 
 
 def record(**kwargs):
@@ -749,12 +751,13 @@ def on_bar(ContextInfo):
             except Exception as e:
                 print(f'[PTrade Adapter] before_trading_start() error: {e}')
 
-        # Run daily functions (on first bar of each day)
-        for _, func in _daily_funcs:
-            try:
-                func(_context)
-            except Exception as e:
-                print(f'[PTrade Adapter] run_daily() error: {e}')
+        # Run daily functions with time != 'every_bar' (once per day on first bar)
+        for t, func in _daily_funcs:
+            if t != 'every_bar':
+                try:
+                    func(_context)
+                except Exception as e:
+                    print(f'[PTrade Adapter] run_daily() error: {e}')
 
         _last_trade_day = today
 
@@ -787,12 +790,13 @@ def on_bar(ContextInfo):
         except Exception as e:
             print(f'[PTrade Adapter] handle_data() error: {e}')
 
-    # Run all daily callbacks for every bar
-    for _, func in _daily_funcs:
-        try:
-            func(_context)
-        except Exception as e:
-            print(f'[PTrade Adapter] run_daily(bar) error: {e}')
+    # Run daily callbacks with time='every_bar' on every bar
+    for t, func in _daily_funcs:
+        if t == 'every_bar':
+            try:
+                func(_context)
+            except Exception as e:
+                print(f'[PTrade Adapter] run_daily(bar) error: {e}')
 
     # Check for last bar — run after_trading_end
     try:

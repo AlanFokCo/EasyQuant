@@ -337,13 +337,21 @@ class PortfolioRiskMonitor:
         if concentration["max_single_stock"] > self.thresholds.single_stock_max:
             triggers.append(f"单股票持仓占比过高 ({concentration['max_single_stock']:.2%})")
             recommendations.append("建议减仓超占比股票")
+            if concentration["max_single_stock"] > self.thresholds.single_stock_max * 2:
+                alert_level = AlertLevel.RED
+            elif alert_level.value < AlertLevel.YELLOW.value:
+                alert_level = AlertLevel.YELLOW
 
         if concentration["max_single_sector"] > self.thresholds.single_sector_max:
             triggers.append(f"单板块持仓占比过高 ({concentration['max_single_sector']:.2%})")
+            if alert_level.value < AlertLevel.YELLOW.value:
+                alert_level = AlertLevel.YELLOW
 
         if concentration["small_cap_pct"] > self.thresholds.small_cap_max:
             triggers.append(f"微盘股占比过高 ({concentration['small_cap_pct']:.2%})")
             recommendations.append("微盘股流动性风险大，建议控制仓位")
+            if alert_level.value < AlertLevel.YELLOW.value:
+                alert_level = AlertLevel.YELLOW
 
         # 4. Regime 检测
         regime = self.regime_detection()

@@ -95,10 +95,20 @@ def _cache_path(security: str, adjust: str) -> Path:
 
 
 def _load_from_disk(security: str, start: str, end: str, adjust: str) -> Optional[pd.DataFrame]:
-    """Try to load cached data from parquet and slice to [start, end]."""
+    """Try to load cached data from parquet and slice to [start, end].
+
+    Cache expires after 7 days to avoid serving stale adjusted prices
+    (e.g., after corporate actions like stock splits or dividends).
+    """
     try:
+        import time
         path = _cache_path(security, adjust)
         if path.exists():
+            # Check cache age — invalidate if older than 7 days
+            age_seconds = time.time() - path.stat().st_mtime
+            if age_seconds > 7 * 86400:
+                path.unlink(missing_ok=True)
+                return None
             df = pd.read_parquet(path)
             if df.empty:
                 return None

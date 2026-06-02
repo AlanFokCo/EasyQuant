@@ -558,7 +558,7 @@ class TopNSelector(StockSelector):
         self.ascending = ascending
 
     def rank(self, securities: list[str], context) -> list[str]:
-        df = fetch_factor_data(securities, fields=[self.factor])
+        df = fetch_factor_data(securities, fields=[self.factor], context=context)
         if df.empty or self.factor not in df.columns:
             return securities[:self.top_n] if len(securities) > self.top_n else securities
 
@@ -592,7 +592,7 @@ class MultiFactorSelector(StockSelector):
 
     def rank(self, securities: list[str], context) -> list[str]:
         factor_names = list(self.factors.keys())
-        df = fetch_factor_data(securities, fields=factor_names)
+        df = fetch_factor_data(securities, fields=factor_names, context=context)
         if df.empty:
             return securities[:self.top_n] if len(securities) > self.top_n else securities
 

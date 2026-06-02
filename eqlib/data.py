@@ -338,10 +338,8 @@ def _fetch_from_sina(symbol: str, start_date: str, end_date: str, adjust: str) -
     if df.empty:
         return df
 
-    # Normalize: ÷100 for prices, ÷100 for volume (shares → lots)
-    for col in ["open", "high", "low", "close"]:
-        if col in df.columns:
-            df[col] = df[col] / 100
+    # Sina (akshare stock_zh_a_daily) returns prices in yuan directly — no conversion needed.
+    # Volume is in shares; convert to lots (手, 1 lot = 100 shares).
     if "volume" in df.columns:
         df["volume"] = df["volume"] / 100
 
@@ -446,6 +444,10 @@ def _validate_ohlcv(df, source_name):
     required = {'open', 'high', 'low', 'close', 'volume'}
     if not required.issubset(df.columns):
         log.debug("validate_ohlcv: %s missing columns", source_name)
+        return False
+    # Check for NaN values in critical columns
+    if df[list(required)].isnull().any().any():
+        log.debug("validate_ohlcv: %s has NaN values in OHLCV", source_name)
         return False
     if (df['close'] <= 0).any():
         log.debug("validate_ohlcv: %s has non-positive close", source_name)
