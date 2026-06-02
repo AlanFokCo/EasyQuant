@@ -94,6 +94,11 @@ from eqlib.data import (
     set_universe, get_universe,
     # Lifecycle callbacks  [STABLE]
     before_trading_start, after_trading_end,
+    # A-share market specific data  [EXPERIMENTAL]
+    get_north_money_flow,
+    get_margin_data,
+    get_limit_up_down_stats,
+    get_restriction_release,
 )
 
 # Logging  [STABLE]
@@ -286,6 +291,9 @@ __all__ = [
     "set_universe", "get_universe",
     # P0: Lifecycle callbacks
     "before_trading_start", "after_trading_end",
+    # A-share market specific data
+    "get_north_money_flow", "get_margin_data",
+    "get_limit_up_down_stats", "get_restriction_release",
     # Logging
     "log",
     # Objects
