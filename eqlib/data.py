@@ -90,6 +90,93 @@ def _normalize_date(d) -> str:
     return raw[:8] if len(raw) > 8 else raw
 
 
+def _normalize_date_ymd(d) -> str:
+    """Convert date to YYYY-MM-DD string (ISO format).
+
+    Handles various input formats including:
+    - datetime.date / datetime.datetime objects
+    - Strings: "2024-01-15", "20240115", "2024-1-5", "2024-01-15 09:30:00"
+
+    Returns:
+        Date string in YYYY-MM-DD format
+
+    Raises:
+        ValueError: If date format cannot be parsed
+    """
+    if isinstance(d, datetime.datetime):
+        return d.strftime("%Y-%m-%d")
+    if isinstance(d, datetime.date):
+        return d.strftime("%Y-%m-%d")
+
+    # Parse string input using pd.to_datetime for flexibility
+    try:
+        parsed = pd.to_datetime(str(d).strip())
+        return parsed.strftime("%Y-%m-%d")
+    except Exception as e:
+        raise ValueError(f"Cannot parse date '{d}': {e}")
+
+
+def _get_china_today() -> datetime.date:
+    """Get today's date in China timezone (UTC+8).
+
+    Uses zoneinfo (Python 3.9+) with pytz fallback.
+
+    Returns:
+        Today's date in Asia/Shanghai timezone
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        china_tz = ZoneInfo('Asia/Shanghai')
+    except ImportError:
+        # Python < 3.9 fallback
+        import pytz
+        china_tz = pytz.timezone('Asia/Shanghai')
+
+    now_china = datetime.datetime.now(china_tz)
+    return now_china.date()
+
+
+def _validate_date_range(start_date, end_date) -> tuple[str, str]:
+    """Validate and normalize date range.
+
+    Ensures start_date <= end_date and returns normalized YYYY-MM-DD strings.
+
+    Args:
+        start_date: Start date (date object or string)
+        end_date: End date (date object or string)
+
+    Returns:
+        Tuple of (start_date_str, end_date_str) in YYYY-MM-DD format
+
+    Raises:
+        ValueError: If start_date > end_date or dates cannot be parsed
+    """
+    sd = _normalize_date_ymd(start_date)
+    ed = _normalize_date_ymd(end_date)
+
+    if sd > ed:
+        raise ValueError(f"start_date ({sd}) must not be after end_date ({ed})")
+
+    return sd, ed
+
+
+def _validate_required_columns(df: pd.DataFrame, required_cols: list[str], context: str = ""):
+    """Validate that DataFrame contains required columns.
+
+    Args:
+        df: DataFrame to validate
+        required_cols: List of required column names
+        context: Optional context string for error message
+
+    Raises:
+        ValueError: If any required columns are missing
+    """
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        ctx = f" in {context}" if context else ""
+        raise ValueError(f"Missing required columns{ctx}: {missing}. Available: {list(df.columns)}")
+
+
 def _to_numeric(df: pd.DataFrame, cols: list[str]):
     """Vectorized numeric conversion for selected columns."""
     for col in cols:
@@ -1542,7 +1629,7 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
 
     Parameters:
         start_date: 开始日期 (YYYY-MM-DD 或 datetime)
-        end_date: 结束日期，默认今天
+        end_date: 结束日期，默认今天（中国时区）
 
     Returns:
         DataFrame with columns:
@@ -1552,33 +1639,34 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
         - total_sell: 总卖出额（亿元）
 
     数据源: akshare stock_hsgt_hist_em (沪股通 + 深股通合计)
+
+    Note:
+        使用中国时区 (UTC+8) 确定"今天"，避免跨时区服务器获取错误日期。
+        缓存有效期为 1 小时（A股收盘后数据不再更新）。
     """
     try:
-        # 参数标准化
+        # 参数标准化 - 使用中国时区
         if end_date is None:
-            end_date = datetime.date.today()
+            end_date = _get_china_today()
         if start_date is None:
             start_date = end_date - datetime.timedelta(days=30)
 
-        # 使用 YYYY-MM-DD 格式以便与 DataFrame 日期列匹配
-        if isinstance(start_date, datetime.date):
-            sd = start_date.strftime("%Y-%m-%d")
-        else:
-            # 处理字符串格式，统一转换为 YYYY-MM-DD
-            sd = str(start_date).replace("-", "")[:8]
-            sd = f"{sd[:4]}-{sd[4:6]}-{sd[6:8]}"
+        # 验证并规范化日期范围 (Bug 1, 9 fix)
+        sd, ed = _validate_date_range(start_date, end_date)
 
-        if isinstance(end_date, datetime.date):
-            ed = end_date.strftime("%Y-%m-%d")
-        else:
-            ed = str(end_date).replace("-", "")[:8]
-            ed = f"{ed[:4]}-{ed[4:6]}-{ed[6:8]}"
-
-        # 缓存检查
+        # 缓存检查 (带时间过期 - Bug 5, 15 fix)
         cache_key = f"north_flow_{sd}_{ed}"
+        import time
+        cache_ttl = 3600  # 1小时过期
         with _cache_lock:
             if cache_key in _cache:
-                return _cache[cache_key].copy()
+                cached_entry = _cache[cache_key]
+                cache_time = cached_entry.get('_cache_time', 0)
+                if time.time() - cache_time < cache_ttl:
+                    return cached_entry['data'].copy()
+                else:
+                    # 过期，删除
+                    del _cache[cache_key]
 
         # 获取沪股通和深股通数据
         df_sh = ak.stock_hsgt_hist_em(symbol="沪股通")
@@ -1595,6 +1683,8 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
                 "买入成交额": "total_buy",
                 "卖出成交额": "total_sell",
             })
+            # 验证必需列 (Bug 4 fix)
+            _validate_required_columns(df, ["date", "net_buy"], "north money flow")
             # 处理 datetime.date 类型转换为 YYYY-MM-DD 字符串
             if "date" in df.columns:
                 df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
@@ -1622,14 +1712,18 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
         # 日期范围筛选
         df = df[(df["date"] >= sd) & (df["date"] <= ed)]
 
-        # 存入缓存
+        # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = df.copy()
+            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
         return df.reset_index(drop=True)
 
+    except ValueError as e:
+        # 日期格式错误或范围无效 - 应该让用户知道
+        log.warning("get_north_money_flow: %s", e)
+        return pd.DataFrame()
     except Exception as e:
         log.debug("get_north_money_flow: %s", e)
         return pd.DataFrame()
@@ -1640,44 +1734,45 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
 
     Parameters:
         start_date: 开始日期 (YYYY-MM-DD 或 datetime)
-        end_date: 结束日期，默认今天
+        end_date: 结束日期，默认今天（中国时区）
 
     Returns:
         DataFrame with columns:
         - date: 交易日期
         - margin_balance: 融资余额（亿元）
         - margin_buy: 融资买入额（亿元）
-        - margin_repay: 融资偿还额（亿元）
+        - margin_repay: 融资偿还额（亿元）- 第一行为 NaN
         - short_balance: 融券余额（亿元）
 
     数据源: akshare macro_china_market_margin_sh / macro_china_market_margin_sz
+
+    Note:
+        使用中国时区 (UTC+8) 确定"今天"。
+        margin_repay 第一行为 NaN（无前日余额可计算）。
+        缓存有效期为 1 小时。
     """
     try:
-        # 参数标准化
+        # 参数标准化 - 使用中国时区
         if end_date is None:
-            end_date = datetime.date.today()
+            end_date = _get_china_today()
         if start_date is None:
             start_date = end_date - datetime.timedelta(days=30)
 
-        # 使用 YYYY-MM-DD 格式以便与 DataFrame 日期列匹配
-        if isinstance(start_date, datetime.date):
-            sd = start_date.strftime("%Y-%m-%d")
-        else:
-            # 处理字符串格式，统一转换为 YYYY-MM-DD
-            sd = str(start_date).replace("-", "")[:8]
-            sd = f"{sd[:4]}-{sd[4:6]}-{sd[6:8]}"
+        # 验证并规范化日期范围
+        sd, ed = _validate_date_range(start_date, end_date)
 
-        if isinstance(end_date, datetime.date):
-            ed = end_date.strftime("%Y-%m-%d")
-        else:
-            ed = str(end_date).replace("-", "")[:8]
-            ed = f"{ed[:4]}-{ed[4:6]}-{ed[6:8]}"
-
-        # 缓存检查
+        # 缓存检查 (带时间过期)
         cache_key = f"margin_data_{sd}_{ed}"
+        import time
+        cache_ttl = 3600  # 1小时过期
         with _cache_lock:
             if cache_key in _cache:
-                return _cache[cache_key].copy()
+                cached_entry = _cache[cache_key]
+                cache_time = cached_entry.get('_cache_time', 0)
+                if time.time() - cache_time < cache_ttl:
+                    return cached_entry['data'].copy()
+                else:
+                    del _cache[cache_key]
 
         # 获取沪市和深市融资融券数据
         df_sh = ak.macro_china_market_margin_sh()
@@ -1728,24 +1823,29 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
         df = df.sort_values("date").reset_index(drop=True)
 
         # 计算 margin_repay: 融资偿还额 = 前一日融资余额 + 当日融资买入 - 当日融资余额
+        # Bug 7 fix: 第一行无法计算，保留 NaN 而不是错误地设为 0
         if "margin_balance" in df.columns and "margin_buy" in df.columns:
             # 使用 shift 计算前一日的融资余额
             prev_balance = df["margin_balance"].shift(1)
             df["margin_repay"] = prev_balance + df["margin_buy"] - df["margin_balance"]
-            # 第一行无法计算，设为 NaN
-            df["margin_repay"] = df["margin_repay"].fillna(0)
+            # 注意：第一行的 margin_repay 为 NaN，表示无法计算
+            # 用户可以通过 df.dropna() 或 df.fillna() 自行处理
 
         # 重新排列列顺序
         df = df[["date", "margin_balance", "margin_buy", "margin_repay", "short_balance"]]
 
-        # 存入缓存
+        # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = df.copy()
+            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
         return df.reset_index(drop=True)
 
+    except ValueError as e:
+        # 日期格式错误或范围无效
+        log.warning("get_margin_data: %s", e)
+        return pd.DataFrame()
     except Exception as e:
         log.debug("get_margin_data: %s", e)
         return pd.DataFrame()
@@ -1756,69 +1856,114 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
 
     Parameters:
         start_date: 开始日期 (YYYY-MM-DD 或 datetime)
-        end_date: 结束日期，默认今天
+        end_date: 结束日期，默认今天（中国时区）
 
     Returns:
         DataFrame with columns:
         - date: 交易日期
         - limit_up_count: 涨停股票数量
         - limit_down_count: 跌停股票数量
+        - api_error_count: API 调用失败次数（用于数据质量监控）
 
     数据源: akshare stock_zt_pool_em / stock_zt_pool_dtgc_em
-    注意: API 只能获取最近 30 个交易日的数据
+
+    Note:
+        使用中国时区 (UTC+8) 确定"今天"。
+        API 只能获取最近 30 个交易日的数据，超出范围会发出警告。
+        缓存有效期为 30 分钟（交易时段内数据会变化）。
+        使用并发 API 调用提高性能。
     """
     try:
-        # 参数标准化
+        # 参数标准化 - 使用中国时区
         if end_date is None:
-            end_date = datetime.date.today()
+            end_date = _get_china_today()
         if start_date is None:
             start_date = end_date - datetime.timedelta(days=30)
 
-        # 转换为 datetime.date 类型以便后续处理
-        if isinstance(start_date, str):
-            start_date = pd.Timestamp(start_date).date()
-        if isinstance(end_date, str):
-            end_date = pd.Timestamp(end_date).date()
+        # 验证并规范化日期范围
+        sd, ed = _validate_date_range(start_date, end_date)
 
-        # 缓存键
-        sd_str = start_date.strftime("%Y%m%d")
-        ed_str = end_date.strftime("%Y%m%d")
-        cache_key = f"limit_up_down_{sd_str}_{ed_str}"
+        # Bug 8 fix: 验证 30 天限制
+        today = _get_china_today()
+        days_ago_30 = today - datetime.timedelta(days=30)
+        if pd.to_datetime(sd).date() < days_ago_30:
+            log.warning(
+                "get_limit_up_down_stats: start_date %s is more than 30 days ago. "
+                "API only supports last 30 trading days. Results may be incomplete.",
+                sd
+            )
+
+        # 缓存检查 (带时间过期 - Bug 5, 15 fix)
+        cache_key = f"limit_up_down_{sd}_{ed}"
+        import time
+        cache_ttl = 1800  # 30分钟过期（交易时段数据会变化）
         with _cache_lock:
             if cache_key in _cache:
-                return _cache[cache_key].copy()
+                cached_entry = _cache[cache_key]
+                cache_time = cached_entry.get('_cache_time', 0)
+                if time.time() - cache_time < cache_ttl:
+                    return cached_entry['data'].copy()
+                else:
+                    del _cache[cache_key]
 
         # 获取交易日期列表
-        trade_days = get_trade_days(start_date, end_date)
+        start_date_obj = pd.to_datetime(sd).date()
+        end_date_obj = pd.to_datetime(ed).date()
+        trade_days = get_trade_days(start_date_obj, end_date_obj)
         if not trade_days:
             return pd.DataFrame()
 
-        # 逐日获取涨跌停数据
-        results = []
-        for trade_date in trade_days:
-            date_str = trade_date.strftime("%Y%m%d")
+        # Bug 11 fix: 使用并发 API 调用
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-            # 获取涨停池数据
+        def fetch_day_data(trade_date):
+            """Fetch limit up/down data for a single trading day."""
+            date_str = trade_date.strftime("%Y%m%d")
+            date_iso = trade_date.strftime("%Y-%m-%d")
+
+            limit_up_count = None
+            limit_down_count = None
+            api_error = False
+
+            # 获取涨停池数据 (Bug 3, 10 fix: 区分 API 失败和无数据)
             try:
                 df_up = ak.stock_zt_pool_em(date=date_str)
                 limit_up_count = len(df_up) if not df_up.empty else 0
-            except Exception:
+            except Exception as e:
+                log.debug("get_limit_up_down_stats: 涨停池 API error for %s: %s", date_str, e)
                 limit_up_count = 0
+                api_error = True
 
             # 获取跌停池数据
             try:
                 df_down = ak.stock_zt_pool_dtgc_em(date=date_str)
                 limit_down_count = len(df_down) if not df_down.empty else 0
-            except Exception:
+            except Exception as e:
+                log.debug("get_limit_up_down_stats: 跌停池 API error for %s: %s", date_str, e)
                 limit_down_count = 0
+                api_error = True
 
-            # 只记录有数据的交易日（非交易日返回空）
-            if limit_up_count > 0 or limit_down_count > 0:
-                results.append({
-                    "date": trade_date.strftime("%Y-%m-%d"),
-                    "limit_up_count": limit_up_count,
-                    "limit_down_count": limit_down_count,
-                })
+            return {
+                "date": date_iso,
+                "limit_up_count": limit_up_count,
+                "limit_down_count": limit_down_count,
+                "api_error": api_error,
+            }
+
+        # 并发获取所有交易日数据 (最多 5 个并发)
+        results = []
+        api_error_count = 0
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(fetch_day_data, td): td for td in trade_days}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result["api_error"]:
+                        api_error_count += 1
+                    results.append(result)
+                except Exception as e:
+                    log.debug("get_limit_up_down_stats: concurrent fetch error: %s", e)
+                    api_error_count += 1
 
         if not results:
             return pd.DataFrame()
@@ -1826,14 +1971,30 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
         df = pd.DataFrame(results)
         df = df.sort_values("date").reset_index(drop=True)
 
-        # 存入缓存
+        # 添加 API 错误统计列 (Bug 10 fix: 不掩盖 API 失败)
+        df["api_error_count"] = api_error_count
+        if api_error_count > 0:
+            log.warning(
+                "get_limit_up_down_stats: %d/%d API calls failed. "
+                "Data may be incomplete.",
+                api_error_count, len(trade_days) * 2
+            )
+
+        # 删除临时列
+        df = df.drop(columns=["api_error"])
+
+        # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = df.copy()
+            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
         return df
 
+    except ValueError as e:
+        # 日期格式错误或范围无效
+        log.warning("get_limit_up_down_stats: %s", e)
+        return pd.DataFrame()
     except Exception as e:
         log.debug("get_limit_up_down_stats: %s", e)
         return pd.DataFrame()
@@ -1843,7 +2004,7 @@ def get_restriction_release(days=30) -> pd.DataFrame:
     """限售股解禁（未来解禁列表）
 
     Parameters:
-        days: 未来天数范围，默认30天
+        days: 未来天数范围，默认30天。如果为 None 或 < 1，使用默认值 30。
 
     Returns:
         DataFrame with columns:
@@ -1855,25 +2016,36 @@ def get_restriction_release(days=30) -> pd.DataFrame:
         - release_pct: 占解禁前流通市值比例
 
     数据源: akshare stock_restricted_release_detail_em
+
+    Note:
+        使用中国时区 (UTC+8) 确定"今天"。
+        缓存有效期为 6 小时。
     """
     try:
-        # 参数标准化
-        if days < 1:
+        # Bug 2 fix: 参数标准化 - 处理 None 和无效值
+        if days is None or days < 1:
             days = 30
 
-        # 计算日期范围
-        today = datetime.date.today()
+        # 计算日期范围 - 使用中国时区
+        today = _get_china_today()
         end_date = today + datetime.timedelta(days=days)
 
         # 格式化为 YYYYMMDD
         start_str = today.strftime("%Y%m%d")
         end_str = end_date.strftime("%Y%m%d")
 
-        # 缓存检查
+        # 缓存检查 (带时间过期)
         cache_key = f"restriction_release_{start_str}_{end_str}"
+        import time
+        cache_ttl = 21600  # 6小时过期
         with _cache_lock:
             if cache_key in _cache:
-                return _cache[cache_key].copy()
+                cached_entry = _cache[cache_key]
+                cache_time = cached_entry.get('_cache_time', 0)
+                if time.time() - cache_time < cache_ttl:
+                    return cached_entry['data'].copy()
+                else:
+                    del _cache[cache_key]
 
         # 获取解禁数据
         df = ak.stock_restricted_release_detail_em(start_date=start_str, end_date=end_str)
@@ -1909,9 +2081,9 @@ def get_restriction_release(days=30) -> pd.DataFrame:
         if "release_date" in df.columns:
             df = df.sort_values("release_date").reset_index(drop=True)
 
-        # 存入缓存
+        # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = df.copy()
+            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
