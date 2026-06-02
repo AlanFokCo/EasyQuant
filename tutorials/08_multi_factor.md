@@ -18,14 +18,15 @@
 
 1. [什么是因子选股](#1-什么是因子选股)
 2. [常见因子类型](#2-常见因子类型)
-3. [因子构建基础](#3-因子构建基础)
-4. [三因子模型：动量 + 成交量 + 价格](#4-三因子模型动量--成交量--价格)
-5. [加入财务因子](#5-加入财务因子)
-6. [因子标准化与合成](#6-因子标准化与合成)
-7. [完整的多因子策略](#7-完整的多因子策略)
-8. [因子有效性检验](#8-因子有效性检验)
-9. [多因子选股的局限性](#9-多因子选股的局限性)
-10. [下一步](#10-下一步)
+3. [A 股特色因子](#3-a-股特色因子)
+4. [因子构建基础](#4-因子构建基础)
+5. [三因子模型：动量 + 成交量 + 价格](#5-三因子模型动量--成交量--价格)
+6. [加入财务因子](#6-加入财务因子)
+7. [因子标准化与合成](#7-因子标准化与合成)
+8. [完整的多因子策略](#8-完整的多因子策略)
+9. [因子有效性检验](#9-因子有效性检验)
+10. [多因子选股的局限性](#10-多因子选股的局限性)
+11. [下一步](#11-下一步)
 
 ---
 
@@ -83,7 +84,221 @@
 
 ---
 
-## 3. 因子构建基础
+## 3. A 股特色因子
+
+A 股市场有一些独特的市场特征，可以构建特有的因子来捕捉超额收益。本节介绍两个典型的 A 股特色因子：北向资金流因子（情绪因子）和限售解禁因子（风险因子）。
+
+### 3.1 北向资金流因子（情绪因子）
+
+北向资金指通过沪股通和深股通进入 A 股市场的外资。由于北向资金通常被视为"聪明钱"，其流向对市场情绪有较强的预测能力。
+
+**经济含义：**
+
+- 北向资金持续净流入 → 外资看好 A 股 → 市场情绪偏乐观
+- 北向资金持续净流出 → 外资看淡 A 股 → 市场情绪偏悲观
+
+**因子构建示例：**
+
+```python
+from eqlib import get_north_money_flow
+
+def compute_north_money_factor(lookback_days=5):
+    """
+    北向资金流因子：近 N 日北向资金净流入占比。
+
+    返回:
+        float: 净流入占成交额比例，正值表示净流入
+    """
+    df = get_north_money_flow(days=lookback_days)
+    if df is None or df.empty:
+        return None
+
+    # 计算累计净流入
+    total_net_inflow = df['north_net'].sum()
+    total_turnover = df['north_money'].sum()  # 总成交额
+
+    if total_turnover == 0:
+        return None
+
+    # 净流入比例
+    net_ratio = total_net_inflow / total_turnover
+    return net_ratio
+
+
+def compute_north_momentum_factor(lookback_days=10):
+    """
+    北向资金动量因子：近 N 日北向资金净流入趋势。
+
+    通过线性回归计算净流入趋势斜率。
+    """
+    import numpy as np
+
+    df = get_north_money_flow(days=lookback_days)
+    if df is None or len(df) < lookback_days:
+        return None
+
+    # 净流入序列
+    net_flows = df['north_net'].values
+
+    # 简单线性回归计算趋势
+    x = np.arange(len(net_flows))
+    y = net_flows
+
+    # 斜率 = Cov(x, y) / Var(x)
+    cov_xy = np.cov(x, y, ddof=0)[0, 1]
+    var_x = np.var(x, ddof=0)
+
+    if var_x == 0:
+        return None
+
+    slope = cov_xy / var_x
+    return slope
+```
+
+**使用场景：**
+
+1. **作为大盘择时信号**：当北向资金连续 3 日净流出且金额较大时，降低仓位
+2. **作为情绪因子**：与其他因子组合，给北向资金净流入股票加分
+
+**因子权重建议：** 5%-10%（情绪因子波动较大，不宜过高）
+
+### 3.2 限售解禁因子（风险因子）
+
+限售股解禁是指原本不能在二级市场流通的股票变为可流通，通常会带来抛售压力。解禁因子主要用于风险规避。
+
+**经济含义：**
+
+- 大量限售股解禁 → 潜在抛售压力 → 股价可能下跌
+- 解禁市值占总市值比例越高，影响越大
+
+**因子构建示例：**
+
+```python
+from eqlib import get_restriction_release
+import datetime
+
+def compute_restriction_risk_factor(code, lookforward_days=30):
+    """
+    限售解禁风险因子：未来 N 日内的解禁压力评分。
+
+    返回:
+        float: 解禁风险评分，越高表示风险越大
+              0 表示无解禁或解禁影响可忽略
+    """
+    today = datetime.date.today()
+    end_date = today + datetime.timedelta(days=lookforward_days)
+
+    df = get_restriction_release(
+        code=code,
+        start_date=today.strftime('%Y%m%d'),
+        end_date=end_date.strftime('%Y%m%d')
+    )
+
+    if df is None or df.empty:
+        return 0.0  # 无解禁计划
+
+    # 计算解禁市值
+    total_release_value = df['release_value'].sum()
+
+    # 获取当前市值
+    from eqlib import get_valuation
+    val = get_valuation(code)
+    if val is None:
+        return 0.0
+
+    market_cap = val.get('market_cap', 0)
+    if market_cap <= 0:
+        return 0.0
+
+    # 解禁比例 = 解禁市值 / 当前市值
+    release_ratio = total_release_value / market_cap
+
+    # 转换为风险评分（0-1，解禁比例超过 10% 视为高风险）
+    risk_score = min(release_ratio / 0.10, 1.0)
+    return risk_score
+
+
+def filter_stocks_by_restriction(stock_pool, lookforward_days=30, threshold=0.05):
+    """
+    过滤即将解禁的股票。
+
+    参数:
+        stock_pool: 股票代码列表
+        lookforward_days: 前瞻天数
+        threshold: 解禁比例阈值，超过则过滤
+
+    返回:
+        list: 过滤后的股票列表
+    """
+    filtered = []
+    for code in stock_pool:
+        risk = compute_restriction_risk_factor(code, lookforward_days)
+        if risk < threshold:
+            filtered.append(code)
+        else:
+            log.info(f'{code} 解禁风险过高 ({risk:.2%})，已过滤')
+    return filtered
+```
+
+**使用场景：**
+
+1. **股票池过滤**：在选股前排除即将有大比例解禁的股票
+2. **风险因子**：作为负向因子，解禁风险高的股票得分低
+3. **持仓监控**：对已持仓股票监控解禁计划，提前减仓
+
+**注意事项：**
+
+- 解禁因子应在选股前使用，而非与其他因子标准化后合成
+- 解禁市值数据可能存在延迟，建议结合公告信息交叉验证
+
+### 3.3 A 股特色因子组合示例
+
+将北向资金因子与限售解禁因子结合，可以构建 A 股特有的"聪明钱+风险过滤"策略：
+
+```python
+def a_share_stock_selection(base_scores, stock_pool):
+    """
+    A 股特色选股：基础因子 + 北向资金加成 + 解禁风险过滤。
+
+    参数:
+        base_scores: 基础多因子得分字典 {code: score}
+        stock_pool: 股票池
+
+    返回:
+        dict: 调整后的最终得分
+    """
+    # Step 1: 解禁风险过滤
+    filtered_stocks = filter_stocks_by_restriction(
+        stock_pool,
+        lookforward_days=30,
+        threshold=0.05
+    )
+
+    # Step 2: 北向资金情绪因子
+    north_factor = compute_north_money_factor(lookback_days=5)
+
+    # Step 3: 调整得分
+    final_scores = {}
+    for code in filtered_stocks:
+        if code not in base_scores:
+            continue
+
+        # 基础得分
+        score = base_scores[code]
+
+        # 根据北向资金流向调整仓位权重（不做个股区分）
+        # 北向资金净流入时，整体提高得分
+        if north_factor and north_factor > 0:
+            score *= (1 + north_factor * 0.5)  # 弱调整
+
+        final_scores[code] = score
+
+    return final_scores
+```
+
+---
+
+## 4. 因子构建基础
 
 在 EasyQuant 中，因子通常用 `attribute_history` 获取历史数据，然后计算得出：
 
@@ -128,7 +343,7 @@ def compute_value(code):
 
 ---
 
-## 4. 三因子模型：动量 + 成交量 + 价格
+## 5. 三因子模型：动量 + 成交量 + 价格
 
 我们先用三个纯技术因子构建一个基础版本，避免依赖实时财务数据：
 
@@ -175,7 +390,7 @@ def score_stock_three_factor(code):
 
 ---
 
-## 5. 加入财务因子
+## 6. 加入财务因子
 
 财务因子通常在策略中通过 `get_valuation` 获取，适合**低频调仓**（如每月一次）：
 
@@ -222,7 +437,7 @@ def score_stock_with_financials(code):
 
 ---
 
-## 6. 因子标准化与合成
+## 7. 因子标准化与合成
 
 不同因子的量纲不同（动量是百分比，成交量比是倍数），直接加权会出现某个因子主导的问题。需要先标准化再合成。
 
@@ -309,7 +524,7 @@ for i, (code, score) in enumerate(ranked[:5]):
 
 ---
 
-## 7. 完整的多因子策略
+## 8. 完整的多因子策略
 
 ```python
 from eqlib import *
@@ -445,7 +660,7 @@ if __name__ == '__main__':
 
 ---
 
-## 8. 因子有效性检验
+## 9. 因子有效性检验
 
 在投入使用前，需要检验因子是否真的有预测能力。
 
@@ -543,7 +758,7 @@ def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
 
 ---
 
-## 9. 多因子选股的局限性
+## 10. 多因子选股的局限性
 
 ### 9.1 A 股散户市场的特殊性
 
@@ -568,7 +783,7 @@ def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
 
 ---
 
-## 10. 下一步
+## 11. 下一步
 
 掌握了多因子选股的基础，可以进一步：
 

@@ -20,6 +20,7 @@
 2. [模拟盘交易](#2-模拟盘交易)
 3. [导出到 PTrade/QMT](#3-导出到-ptradeqmt)
 4. [实盘注意事项](#4-实盘注意事项)
+   - [4.6 组合风控监测建议](#46-组合风控监测建议)
 5. [常见问题](#5-常见问题)
 6. [完整示例](#6-完整示例)
 
@@ -283,6 +284,37 @@ def market_open(context):
 - 定期检查日志，确认策略运行正常
 - 关注买卖点是否与预期一致
 - 对比实际收益与回测预期，如果偏差过大，需要排查原因
+
+### 4.6 组合风控监测建议
+
+实盘运行多策略组合时，建议引入 `PortfolioRiskMonitor` 进行每日风控巡检。它会自动计算组合 VaR、策略相关性、持仓集中度等指标，并按阈值触发 YELLOW / RED / KILL_SWITCH 三级预警，帮助你在风险失控前及时介入。
+
+根据自身的风险承受能力，调整 `RiskThresholds` 中的关键参数。保守型投资者可将 `max_drawdown_red` 降至 0.15、`single_stock_max` 降至 0.05；激进型投资者可适当放宽，但不建议超过默认值的 1.5 倍。
+
+```python
+from eqlib import *
+
+# 根据风险偏好自定义阈值
+thresholds = RiskThresholds(
+    max_drawdown_yellow=0.12,
+    max_drawdown_red=0.18,
+    max_drawdown_kill=0.25,
+    single_stock_max=0.10,
+)
+monitor = PortfolioRiskMonitor(thresholds=thresholds)
+
+def market_open(context):
+    # ... 策略信号逻辑 ...
+
+    # 每日风控巡检（建议放在策略逻辑末尾）
+    report = monitor.daily_check()
+    if report.triggers:
+        log.warn('风控预警: %s' % '; '.join(report.triggers))
+    for action in check_kill_switch(report):
+        log.error(action)  # 熔断操作需立即关注
+```
+
+`check_kill_switch()` 会在报告级别达到 KILL_SWITCH 时返回熔断操作清单（如暂停策略、强制减仓）。建议在实盘中将该清单接入通知渠道（如 DingTalk / 飞书 webhook），确保熔断信号第一时间触达，避免在极端行情下因人工响应延迟而造成更大损失。
 
 ---
 

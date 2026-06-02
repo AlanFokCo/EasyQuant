@@ -24,8 +24,12 @@
 8. [主要市场指数](#8-主要市场指数)
 9. [基本面数据：PE / PB / ROE 等](#9-基本面数据pe--pb--roe-等)
 10. [资金流向](#10-资金流向)
-11. [这些规则在 eqlib 中的体现](#11-这些规则在-eqlib-中的体现)
-12. [下一步](#12-下一步)
+11. [北向资金](#11-北向资金)
+12. [融资融券](#12-融资融券)
+13. [涨跌停统计](#13-涨跌停统计)
+14. [限售股解禁](#14-限售股解禁)
+15. [这些规则在 eqlib 中的体现](#15-这些规则在-eqlib-中的体现)
+16. [下一步](#16-下一步)
 
 ---
 
@@ -301,7 +305,196 @@ money_flow = get_money_flow('601390', days=5)
 
 ---
 
-## 11. 这些规则在 eqlib 中的体现
+## 11. 北向资金
+
+**北向资金** 是通过沪港通和深港通从香港流入 A 股市场的资金，常被称为「聪明钱」。
+
+### 11.1 什么是北向资金
+
+| 类型 | 说明 |
+|------|------|
+| **沪股通** | 香港投资者通过香港交易所买入上交所股票 |
+| **深股通** | 香港投资者通过香港交易所买入深交所股票 |
+| **北向资金** | 沪股通 + 深股通合计（外资流入 A 股） |
+| **南向资金** | 内地投资者买入港股（反向） |
+
+北向资金的特点：
+- 机构投资者为主，决策更理性
+- 持仓周期较长，偏爱蓝筹股
+- 常被视为市场风向标
+
+### 11.2 在 eqlib 中获取北向资金
+
+```python
+from eqlib import get_north_money_flow
+
+# 获取近 3 个月北向资金流向
+north = get_north_money_flow(start_date="2024-01-01", end_date="2024-03-31")
+
+# 返回字段：
+# - date: 交易日期
+# - net_buy: 净买入额（亿元）
+# - total_buy: 总买入额（亿元）
+# - total_sell: 总卖出额（亿元）
+
+# 计算近 5 日净买入
+recent_5d = north["net_buy"].tail(5).sum()
+if recent_5d > 50:
+    print("北向资金强势流入，市场情绪积极")
+elif recent_5d < -50:
+    print("北向资金强势流出，注意风险")
+```
+
+### 11.3 策略应用
+
+北向资金连续流入/流出可作为市场择时信号：
+
+```python
+# 在策略中检查北向资金趋势
+north = get_north_money_flow()
+if not north.empty:
+    recent_3d = north["net_buy"].tail(3).sum()
+    if recent_3d < -50:  # 连续 3 日净流出超 50 亿
+        g.market_sentiment = "bearish"  # 减仓信号
+```
+
+---
+
+## 12. 融资融券
+
+**融资融券** 是投资者向券商借入资金或股票进行交易的杠杆机制。
+
+### 12.1 基本概念
+
+| 类型 | 说明 |
+|------|------|
+| **融资** | 借钱买入股票（看多，加杠杆） |
+| **融券** | 借股票卖出（看空，做空） |
+| **融资余额** | 未偿还的融资总额 |
+| **融券余额** | 未偿还的融券总额 |
+
+融资余额上升 → 市场看多情绪升温
+融资余额下降 → 市场看多情绪降温
+
+### 12.2 在 eqlib 中获取融资融券数据
+
+```python
+from eqlib import get_margin_data
+
+# 获取近 3 个月融资融券数据
+margin = get_margin_data(start_date="2024-01-01", end_date="2024-03-31")
+
+# 返回字段：
+# - date: 交易日期
+# - margin_balance: 融资余额（亿元）
+# - margin_buy: 融资买入额（亿元）
+# - margin_repay: 融资偿还额（亿元）
+# - short_balance: 融券余额（亿元）
+
+# 计算融资余额变化率
+margin["balance_change_pct"] = margin["margin_balance"].diff(5) / margin["margin_balance"].shift(5) * 100
+```
+
+### 12.3 注意事项
+
+- `margin_repay` 第一行为 NaN（无前日余额可计算）
+- 融资余额过快增长可能预示杠杆过热，需警惕回调风险
+
+---
+
+## 13. 涨跌停统计
+
+**涨跌停统计** 反映市场整体情绪和系统性风险。
+
+### 13.1 市场宽度指标
+
+| 指标 | 说明 |
+|------|------|
+| **涨停数** | 当日涨停股票数量 |
+| **跌停数** | 当日跌停股票数量 |
+| **涨跌停比值** | 涨停数 / 跌停数 |
+
+涨停数多 → 市场情绪积极
+跌停数多 → 市场情绪悲观
+跌停数 > 100 → 可能触发系统性风险
+
+### 13.2 在 eqlib 中获取涨跌停统计
+
+```python
+from eqlib import get_limit_up_down_stats
+
+# 获取近 30 天涨跌停统计
+limit_stats = get_limit_up_down_stats()
+
+# 返回字段：
+# - date: 交易日期
+# - limit_up_count: 涨停股票数量
+# - limit_down_count: 跌停股票数量
+
+# 系统性风险预警
+latest_down = limit_stats["limit_down_count"].iloc[-1]
+if latest_down > 100:
+    print("⚠️ 系统性风险预警：跌停数超过 100")
+```
+
+### 13.3 注意事项
+
+- API 只支持最近 30 个交易日
+- 涨跌停数据在交易时段内会变化
+
+---
+
+## 14. 限售股解禁
+
+**限售股解禁** 指原本不能流通的股票获得上市交易资格，可能带来卖压。
+
+### 14.1 解禁类型
+
+| 类型 | 说明 |
+|------|------|
+| **首发原股东限售股** | IPO 时股东承诺持有期限 |
+| **定向增发限售股** | 定增参与者承诺持有期限 |
+| **股权激励限售股** | 员工激励计划锁定期限 |
+
+解禁后，原持有人可自由卖出，若解禁量大且持有人减持意愿强，股价可能承压。
+
+### 14.2 在 eqlib 中获取解禁数据
+
+```python
+from eqlib import get_restriction_release
+
+# 获取未来 30 天解禁列表
+releases = get_restriction_release(days=30)
+
+# 返回字段：
+# - code: 股票代码
+# - name: 股票名称
+# - release_date: 解禁日期
+# - release_amount: 解禁数量（万股）
+# - release_value: 解禁市值（亿元）
+# - release_pct: 占解禁前流通市值比例
+
+# 按解禁市值排序，关注大额解禁
+large_releases = releases[releases["release_value"] > 50]
+print(f"未来 30 天大额解禁（>50亿）: {len(large_releases)} 只")
+```
+
+### 14.3 策略应用
+
+在选股时排除即将大额解禁的股票：
+
+```python
+# 排除未来 30 天解禁市值超过 100 亿的股票
+releases = get_restriction_release(days=30)
+large_release_codes = releases[releases["release_value"] > 100]["code"].tolist()
+
+candidates = ["601390", "600519", "000858"]
+safe_candidates = [c for c in candidates if c not in large_release_codes]
+```
+
+---
+
+## 15. 这些规则在 eqlib 中的体现
 
 | 规则 | eqlib 的处理方式 |
 |------|----------------|
@@ -312,12 +505,17 @@ money_flow = get_money_flow('601390', days=5)
 | 指数成分股 | `get_index_stocks('000300.XSHG')` |
 | 基准对比 | `set_benchmark('000300.XSHG')` |
 | 基本面数据 | `fetch_factor_data()`、`get_fundamentals()` |
+| 北向资金 | `get_north_money_flow()` |
+| 融资融券 | `get_margin_data()` |
+| 涨跌停统计 | `get_limit_up_down_stats()` |
+| 限售股解禁 | `get_restriction_release()` |
 
 ---
 
-## 12. 下一步
+## 16. 下一步
 
 - **完成所有前置知识**：[Python 基础](python_basics.md)、[技术分析基础](technical_concepts.md)
 - **进入正式教程**：[Tutorial 00：环境与第一次运行](../00_environment_and_first_run.md)
 - **Tutorial 01** 有更多 A 股市场常见错误的介绍：[01_quant_basics.md](../01_quant_basics.md)
 - **Tutorial 07** 深入讲解 A 股行业轮动：[07_sector_rotation.md](../07_sector_rotation.md)
+- **Tutorial 11** 详细介绍 A 股特色数据与风控：[11_ashare_data_and_risk.md](../11_ashare_data_and_risk.md)
