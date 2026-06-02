@@ -11,7 +11,8 @@ Usage:
 """
 
 import argparse
-from eqlib import scan_market, check_golden_cross, log
+from datetime import date, timedelta
+from eqlib import scan_market, check_golden_cross, get_restriction_release, log
 
 
 def screen_and_check(min_price=10, min_pct=3, max_pct=5, max_pe=50):
@@ -34,6 +35,47 @@ def screen_and_check(min_price=10, min_pct=3, max_pct=5, max_pe=50):
     for _, row in candidates.iterrows():
         log.info(f"  {row['name']}({row['code']}) price={row['price']:.2f} "
                  f"change={row['pct_change']:.2f}% PE={row['pe']:.1f}")
+
+    # ============================================================
+    # Step 1.5: Restriction release filter (A-share specific)
+    # Exclude stocks with upcoming large restriction releases (>5% of float)
+    # This helps avoid potential price pressure from insider selling
+    # ============================================================
+    start_date = date.today()
+    end_date = start_date + timedelta(days=30)  # Check next 30 days
+    log.info(f"\nChecking restriction releases for {start_date} to {end_date}...")
+
+    release_df = get_restriction_release(start_date=start_date, end_date=end_date)
+    excluded_codes = set()
+
+    if not release_df.empty:
+        for _, row in candidates.iterrows():
+            code = row['code']
+            # Check if this stock has an upcoming release
+            stock_releases = release_df[release_df['code'] == code]
+            for _, release in stock_releases.iterrows():
+                # Exclude if release ratio > 5% of float
+                release_ratio = release.get('release_ratio', 0) or 0
+                if release_ratio > 0.05:
+                    excluded_codes.add(code)
+                    log.warning(f"  Excluding {row['name']}({code}) - "
+                               f"release ratio {release_ratio*100:.1f}% on {release['release_date']}")
+                    break
+                # Also exclude if release value > 50亿 CNY (large-cap sell pressure)
+                release_value = release.get('release_value', 0) or 0
+                if release_value > 50e8:
+                    excluded_codes.add(code)
+                    log.warning(f"  Excluding {row['name']}({code}) - "
+                               f"large release value {release_value/1e8:.1f}亿 on {release['release_date']}")
+                    break
+
+    if excluded_codes:
+        log.info(f"Excluded {len(excluded_codes)} stocks due to upcoming large releases")
+        candidates = candidates[~candidates['code'].isin(excluded_codes)]
+
+    if candidates.empty:
+        log.info("No stocks remaining after restriction release filter")
+        return
 
     # Step 2: technical confirmation (golden cross)
     log.info(f"\nChecking technical indicators for {len(candidates)} stocks...")

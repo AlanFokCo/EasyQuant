@@ -13,6 +13,7 @@ Usage:
 """
 
 from eqlib import *
+from datetime import date, timedelta
 
 
 def before_market_open(context):
@@ -25,6 +26,31 @@ def before_market_open(context):
     st_stocks = [code for code, is_st in st_map.items() if is_st]
     if st_stocks:
         log.warning(f"ST stocks detected: {st_stocks}")
+
+    # ============================================================
+    # A-share market sentiment indicators (before market open)
+    # ============================================================
+    current_date = context.current_dt.date()
+
+    # Get limit up/down stats for market sentiment
+    limit_stats = get_limit_up_down_stats(date=current_date)
+    if limit_stats:
+        log.info(f"  Market Sentiment - Limit Up: {limit_stats.get('limit_up_count', 'N/A')}, "
+                 f"Limit Down: {limit_stats.get('limit_down_count', 'N/A')}")
+
+    # Get north money flow (foreign capital) - 3-day net buy as sentiment reference
+    total_net_inflow = 0
+    days_checked = 0
+    for i in range(3):
+        check_date = current_date - timedelta(days=i)
+        north_flow = get_north_money_flow(date=check_date)
+        if north_flow:
+            net_inflow = north_flow.get('north_net_inflow', 0) or 0
+            total_net_inflow += net_inflow
+            days_checked += 1
+    if days_checked > 0:
+        direction = "inflow" if total_net_inflow > 0 else "outflow"
+        log.info(f"  North Money (3-day): Net {direction} {abs(total_net_inflow)/1e8:.2f} 亿 CNY")
 
 
 def after_market_close(context):

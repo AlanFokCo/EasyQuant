@@ -22,6 +22,7 @@ Usage:
 """
 
 import os
+from datetime import date, timedelta
 from eqlib import *
 
 
@@ -46,6 +47,7 @@ TOP_N = 3                     # Pick top 3 stocks each week
 LOOKBACK = 20                 # Momentum lookback period (days)
 MIN_PRICE = 3.0               # Minimum stock price (avoid penny stocks)
 MAX_PRICE = 200.0             # Maximum stock price
+NORTH_MONEY_OUTFLOW_THRESHOLD = 50e8  # 50亿 CNY threshold for net outflow warning
 
 
 # ============================================================
@@ -65,6 +67,9 @@ def initialize(context):
     ))
 
     context.universe = STOCK_POOL
+    # Market sentiment flag based on north money flow
+    g.market_sentiment = "neutral"  # "bullish", "bearish", or "neutral"
+
     # Rebalance every Monday
     run_weekly(rebalance, day_of_week=0, time="every_bar")
 
@@ -115,8 +120,54 @@ def score_stocks(context):
     return ranked
 
 
+def check_north_money_sentiment(context):
+    """Check north money flow for market sentiment.
+
+    Returns True if market sentiment is favorable for buying,
+    False if there's significant net outflow (bearish signal).
+    """
+    current_date = context.current_dt.date()
+
+    # Get north money flow for the last 3 trading days
+    total_net_inflow = 0
+    days_checked = 0
+
+    for days_ago in range(3):
+        check_date = current_date - timedelta(days=days_ago)
+        flow_data = get_north_money_flow(date=check_date)
+        if flow_data:
+            net_inflow = flow_data.get('north_net_inflow', 0) or 0
+            total_net_inflow += net_inflow
+            days_checked += 1
+
+    if days_checked == 0:
+        log.info("Could not retrieve north money data, assuming neutral")
+        return True
+
+    # Check for significant 3-day net outflow
+    if total_net_inflow < -NORTH_MONEY_OUTFLOW_THRESHOLD:
+        log.warning(f"North money 3-day net outflow: {abs(total_net_inflow)/1e8:.1f}亿 CNY - "
+                   f"exceeds threshold {NORTH_MONEY_OUTFLOW_THRESHOLD/1e8:.0f}亿")
+        g.market_sentiment = "bearish"
+        return False
+    elif total_net_inflow > NORTH_MONEY_OUTFLOW_THRESHOLD:
+        g.market_sentiment = "bullish"
+        log.info(f"North money 3-day net inflow: {total_net_inflow/1e8:.1f}亿 CNY - bullish sentiment")
+    else:
+        g.market_sentiment = "neutral"
+
+    return True
+
+
 def rebalance(context):
     """Weekly rebalance: sell bottom stocks, buy top stocks."""
+
+    # ============================================================
+    # Step 0: Check north money flow for market timing
+    # Skip buying if 3-day net outflow exceeds threshold
+    # ============================================================
+    favorable_sentiment = check_north_money_sentiment(context)
+
     ranked = score_stocks(context)
     if not ranked:
         log.info("No stocks pass screening this week")
@@ -138,7 +189,21 @@ def rebalance(context):
     if not top_stocks:
         return
 
-    per_stock_cash = context.portfolio.available_cash / len(top_stocks)
+    # Skip buying if market sentiment is bearish (significant north money outflow)
+    if not favorable_sentiment:
+        log.info("  Skipping BUY due to bearish market sentiment (north money outflow)")
+        return
+
+    # Position sizing adjusted by market sentiment
+    if g.market_sentiment == "bullish":
+        position_scale = 1.0
+    elif g.market_sentiment == "neutral":
+        position_scale = 0.7  # Reduce position size in neutral market
+        log.info("  Reducing position size (30%) due to neutral sentiment")
+    else:
+        position_scale = 0.5
+
+    per_stock_cash = context.portfolio.available_cash / len(top_stocks) * position_scale
     for sec in top_stocks:
         if per_stock_cash < 1000:
             continue
