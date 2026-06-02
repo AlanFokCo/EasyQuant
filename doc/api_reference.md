@@ -21,6 +21,8 @@
 | 生成报告/计算指标 | [报告与分析 API](#报告与分析-api) |
 | 选股/行业轮动 | [选股策略 API](#选股策略-api) |
 | 优化仓位权重 | [组合优化 API](#组合优化-api) |
+| A 股特色数据 | [A 股特色数据](#a-股特色数据) |
+| 组合风控监测 | [组合风控 API（实验性）](#组合风控-api实验性) |
 | 本地缓存 | [缓存 API](#缓存-api) |
 | 滚动验证 / 检测过拟合 | [滚动验证 API（实验性）](#滚动验证-api实验性) |
 | 科学验证 / 偏差检测 | [科学验证 API（实验性）](#科学验证-api实验性) |
@@ -304,6 +306,137 @@ get_tick_data(code, trade_date=None)
 ```python
 get_money_flow(code, start_date=None, end_date=None, count=None)
 get_billboard_list(stock_list=None, date=None, start_date=None, end_date=None)
+```
+
+### A 股特色数据
+
+#### get_north_money_flow
+
+北向资金流向（沪股通 + 深股通汇总）。
+
+```python
+get_north_money_flow(start_date=None, end_date=None)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `start_date` | `str`/`date` | 开始日期，默认 30 天前 |
+| `end_date` | `str`/`date` | 结束日期，默认今天（中国时区） |
+
+返回 `DataFrame`，列包括：
+
+| 列名 | 说明 |
+|------|------|
+| `date` | 交易日期 |
+| `net_buy` | 净买入额（亿元） |
+| `total_buy` | 总买入额（亿元） |
+| `total_sell` | 总卖出额（亿元） |
+
+```python
+from eqlib import get_north_money_flow
+
+# 获取近 3 个月北向资金
+north = get_north_money_flow(start_date="2024-01-01", end_date="2024-03-31")
+
+# 计算近 5 日净买入
+recent_5d = north["net_buy"].tail(5).sum()
+if recent_5d > 50:
+    print("北向资金强势流入")
+```
+
+**注意**：使用中国时区 (UTC+8) 确定"今天"，缓存有效期 1 小时。
+
+#### get_margin_data
+
+融资融券数据（全市场汇总）。
+
+```python
+get_margin_data(start_date=None, end_date=None)
+```
+
+返回 `DataFrame`，列包括：
+
+| 列名 | 说明 |
+|------|------|
+| `date` | 交易日期 |
+| `margin_balance` | 融资余额（亿元） |
+| `margin_buy` | 融资买入额（亿元） |
+| `margin_repay` | 融资偿还额（亿元）- 第一行为 NaN |
+| `short_balance` | 融券余额（亿元） |
+
+```python
+from eqlib import get_margin_data
+
+margin = get_margin_data(start_date="2024-01-01", end_date="2024-03-31")
+
+# 融资余额变化率
+margin["change_pct"] = margin["margin_balance"].diff(5) / margin["margin_balance"].shift(5) * 100
+```
+
+**注意**：`margin_repay` 第一行为 NaN（无前日余额可计算），用户可通过 `dropna()` 或 `fillna()` 处理。
+
+#### get_limit_up_down_stats
+
+涨跌停统计（每日涨停/跌停数量）。
+
+```python
+get_limit_up_down_stats(start_date=None, end_date=None)
+```
+
+返回 `DataFrame`，列包括：
+
+| 列名 | 说明 |
+|------|------|
+| `date` | 交易日期 |
+| `limit_up_count` | 涨停股票数量 |
+| `limit_down_count` | 跌停股票数量 |
+| `api_error_count` | API 调用失败次数（数据质量监控） |
+
+```python
+from eqlib import get_limit_up_down_stats
+
+stats = get_limit_up_down_stats()
+
+# 系统性风险预警
+latest_down = stats["limit_down_count"].iloc[-1]
+if latest_down > 100:
+    print("⚠️ 系统性风险预警")
+```
+
+**注意**：API 只支持最近 30 个交易日，超出范围会发出警告。
+
+#### get_restriction_release
+
+限售股解禁（未来 N 天解禁列表）。
+
+```python
+get_restriction_release(days=30)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `days` | `int` | 未来天数范围，默认 30 |
+
+返回 `DataFrame`，列包括：
+
+| 列名 | 说明 |
+|------|------|
+| `code` | 股票代码 |
+| `name` | 股票名称 |
+| `release_date` | 解禁日期 |
+| `release_amount` | 解禁数量（万股） |
+| `release_value` | 解禁市值（亿元） |
+| `release_pct` | 占解禁前流通市值比例 |
+
+```python
+from eqlib import get_restriction_release
+
+# 获取未来 30 天解禁
+releases = get_restriction_release(days=30)
+
+# 大额解禁预警
+large = releases[releases["release_value"] > 50]
+print(f"大额解禁: {len(large)} 只")
 ```
 
 ### 财务数据
@@ -819,7 +952,243 @@ result = run_strategy(initialize, selection_func=my_selection, selection_rebalan
 | `TopNSelector(factor, top_n, ascending)` | 单因子 Top-N 选择器 |
 | `MultiFactorSelector(factors, top_n)` | 多因子加权选择器 |
 
-`fetch_factor_data` 可用字段：`price`, `pct_change`, `total_value`, `pe`, `pb`, `turnover`, `ma5`, `ma10`, `ma20`, `rsi14`。
+#### TopNSelector
+
+单因子 Top-N 选股器，按单个因子排序选出前 N 只股票。
+
+```python
+TopNSelector(factor="pe", top_n=5, ascending=True)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `factor` | `str` | 因子名称，如 `"pe"`, `"pb"`, `"pct_change"` |
+| `top_n` | `int` | 选出股票数量 |
+| `ascending` | `bool` | `True` 升序（越小越好），`False` 降序（越大越好） |
+
+```python
+# 选 PE 最低的 5 只股票
+selector = TopNSelector(factor="pe", top_n=5, ascending=True)
+top_stocks = selector.rank(candidates, context)
+```
+
+#### MultiFactorSelector
+
+多因子加权选股器，按加权综合得分排序选出前 N 只股票。
+
+```python
+MultiFactorSelector(factors={"pe": -0.4, "pb": -0.2, "pct_change": 0.4}, top_n=5)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `factors` | `dict` | 因子权重映射，负权重表示越低越好 |
+| `top_n` | `int` | 选出股票数量 |
+
+```python
+# 多因子选股：低 PE (40%)、低 PB (20%)、高动量 (40%)
+selector = MultiFactorSelector(
+    factors={"pe": -0.4, "pb": -0.2, "pct_change": 0.4},
+    top_n=10
+)
+selected = selector.rank(candidates, context)
+```
+
+#### fetch_factor_data
+
+获取多维度因子数据，用于选股筛选和打分。
+
+```python
+fetch_factor_data(securities, fields=None)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `securities` | `list[str]` | 股票代码列表 |
+| `fields` | `list[str]` | 因子字段列表，默认全部 |
+
+可用字段：`price`, `pct_change`, `total_value`, `pe`, `pb`, `turnover`, `ma5`, `ma10`, `ma20`, `rsi14`。
+
+```python
+# 获取候选股票的 PE、PB、动量因子
+candidates = ["601390", "600519", "000858"]
+df = fetch_factor_data(candidates, fields=["pe", "pb", "pct_change"])
+
+# 按 PE 排序
+df_sorted = df.sort_values("pe", ascending=True)
+```
+
+---
+
+## 组合风控 API（实验性）
+
+!!! warning "实验性功能"
+
+    组合风控 API 为实验性功能，未来版本可能有变动。
+
+### PortfolioRiskMonitor
+
+多策略组合风控监控器，用于监测 VaR、相关性、集中度等风险指标。
+
+```python
+from eqlib import PortfolioRiskMonitor, RiskThresholds
+
+# 创建监控器（可选自定义阈值）
+thresholds = RiskThresholds(
+    max_drawdown_yellow=0.15,
+    max_drawdown_red=0.20,
+    correlation_yellow=0.60,
+)
+monitor = PortfolioRiskMonitor(thresholds=thresholds)
+
+# 添加策略回测结果
+monitor.add_strategy("trend_following", result_a)
+monitor.add_strategy("mean_reversion", result_b)
+```
+
+#### add_strategy
+
+添加策略回测结果。
+
+```python
+monitor.add_strategy(name, backtest_result)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `name` | `str` | 策略名称 |
+| `backtest_result` | `dict` | `run_backtest()` 返回的结果 |
+
+#### portfolio_var
+
+计算组合 VaR（历史模拟法）。
+
+```python
+var_amount, var_pct = monitor.portfolio_var(confidence=0.95)
+```
+
+返回 `(VaR金额, VaR百分比)`。VaR 表示在给定置信度下，组合在未来一段时间内的最大预期损失。
+
+#### correlation_matrix
+
+计算策略间相关性矩阵。
+
+```python
+corr_matrix = monitor.correlation_matrix()
+```
+
+返回 `DataFrame`，行列均为策略名称，值为 Pearson 相关系数。
+
+#### concentration_risk
+
+计算持仓集中度风险。
+
+```python
+concentration = monitor.concentration_risk()
+```
+
+返回 `dict`：
+
+| 字段 | 说明 |
+|------|------|
+| `max_single_stock` | 单股票最大持仓占比 |
+| `max_single_sector` | 单板块最大持仓占比 |
+| `small_cap_pct` | 微盘股占比（市值<50亿） |
+| `num_holdings` | 持仓股票数量 |
+| `top3_concentration` | 前三大持仓占比 |
+
+#### daily_check
+
+每日综合风控检查（主入口）。
+
+```python
+from eqlib import AlertLevel
+
+report = monitor.daily_check()
+```
+
+返回 `RiskReport` 对象：
+
+| 属性 | 说明 |
+|------|------|
+| `timestamp` | 检查时间 |
+| `alert_level` | 预警级别：`YELLOW` / `RED` / `KILL_SWITCH` |
+| `triggers` | 触发的预警信息列表 |
+| `portfolio_var` | 组合 VaR（金额） |
+| `portfolio_var_pct` | 组合 VaR（百分比） |
+| `correlation_matrix` | 策略相关性矩阵 |
+| `concentration` | 集中度指标 |
+| `regime` | 当前市场 regime：`bull` / `bear` / `oscillation` / `unknown` |
+| `recommendations` | 建议操作列表 |
+
+### check_kill_switch
+
+熔断检查，返回需要立即执行的熔断操作列表。
+
+```python
+from eqlib import check_kill_switch
+
+actions = check_kill_switch(report)
+# 返回如：["⚠️ 熔断触发：暂停所有策略，等待人工确认"]
+```
+
+### RiskThresholds
+
+风控阈值配置。
+
+```python
+RiskThresholds(
+    max_drawdown_yellow=0.15,   # 黄色预警回撤
+    max_drawdown_red=0.20,      # 红色预警回撤
+    max_drawdown_kill=0.25,     # 熔断回撤
+    correlation_yellow=0.60,    # 黄色预警相关性
+    correlation_red=0.75,       # 红色预警相关性
+    correlation_kill=0.85,      # 熔断相关性
+    single_stock_max=0.10,      # 单股票最大占比
+    single_sector_max=0.30,     # 单板块最大占比
+    var_confidence=0.95,        # VaR 置信水平
+)
+```
+
+### AlertLevel
+
+预警级别枚举。
+
+| 值 | 说明 |
+|------|------|
+| `YELLOW` | 监控关注，不触发动作 |
+| `RED` | 需要人工介入 |
+| `KILL_SWITCH` | 自动熔断 + 人工确认 |
+
+### 使用示例
+
+```python
+from eqlib import (
+    PortfolioRiskMonitor,
+    RiskThresholds,
+    check_kill_switch,
+    run_backtest,
+)
+
+# 运行两个策略
+result_a = run_backtest(strategy_a, ...)
+result_b = run_backtest(strategy_b, ...)
+
+# 创建风控监控器
+monitor = PortfolioRiskMonitor()
+monitor.add_strategy("trend", result_a)
+monitor.add_strategy("reversion", result_b)
+
+# 每日检查
+report = monitor.daily_check()
+print(f"预警级别: {report.alert_level.value}")
+print(f"触发因素: {report.triggers}")
+
+# 熔断判断
+actions = check_kill_switch(report)
+for action in actions:
+    print(action)
+```
 
 ---
 
@@ -937,6 +1306,9 @@ from eqlib import (
     query, valuation, get_current_data_object,
     set_universe, get_universe,
     before_trading_start, after_trading_end,
+    # A 股特色数据
+    get_north_money_flow, get_margin_data,
+    get_limit_up_down_stats, get_restriction_release,
     # 日志
     log,
     # 对象
@@ -948,6 +1320,9 @@ from eqlib import (
     portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
     # 分析
     analyze_returns, brinson_attribution, simple_factor_analysis,
+    # 组合风控（实验性）
+    PortfolioRiskMonitor, RiskThresholds, RiskReport, AlertLevel,
+    check_kill_switch,
     # 滚动验证（实验性）
     walk_forward, WFAResult,
     # 科学验证（实验性）
