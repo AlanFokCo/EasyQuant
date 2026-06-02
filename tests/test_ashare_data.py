@@ -144,3 +144,20 @@ class TestRestrictionRelease:
 
         # 60 天范围应包含更多解禁事件
         assert len(df_60) >= len(df_30)
+
+
+class TestModuleExports:
+    """Tests for module exports."""
+
+    def test_import_from_eqlib(self):
+        """验证可以从 eqlib 导入"""
+        from eqlib import (
+            get_north_money_flow,
+            get_margin_data,
+            get_limit_up_down_stats,
+            get_restriction_release,
+        )
+        assert get_north_money_flow is not None
+        assert get_margin_data is not None
+        assert get_limit_up_down_stats is not None
+        assert get_restriction_release is not None
