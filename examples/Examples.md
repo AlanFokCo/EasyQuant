@@ -53,8 +53,16 @@ python examples/<file>.py
 | 22 | `22_stock_selection_strategy.py` | `run_selection` 选股接口（三种写法） | `python examples/22_stock_selection_strategy.py` |
 | 23 | `23_small_cap_query_example.py` | 小市值选股（query/valuation 链式筛选） | `python examples/23_small_cap_query_example.py` |
 | 24 | `24_quick_report_test.py` | 快速回测验证报告格式 | `python examples/24_quick_report_test.py` |
+| 25 | `25_ashare_market_sentiment.py` | A 股市场情绪指标（北向资金/融资融券/涨跌停/解禁） | `python examples/25_ashare_market_sentiment.py` |
+| 26 | `26_portfolio_risk_monitor.py` | 组合风控监测器（VaR/相关性/集中度/熔断） | `python examples/26_portfolio_risk_monitor.py` |
 
 ---
+
+## 04 — 实时选股
+
+价格、涨跌幅、PE 等基本面条件筛选，叠加技术面金叉信号，输出候选股票列表。
+
+**涉及 API：** `get_price`、`fetch_stock_data`、`get_restriction_release`
 
 ## 06 — 高级 API：调度、组合优化、归因分析
 
@@ -66,13 +74,13 @@ python examples/<file>.py
 
 财务摘要与报表、按财务指标筛选、指数成分股与权重、行业/概念板块、分钟线 K 线、Tick 数据。
 
-**涉及 API：** `get_financial_abstract`、`get_financial_screen`、`get_index_stocks`、`get_industry_list`、`get_industry_stocks`、`fetch_minute_data`、`get_price_minute`、`get_tick_data`
+**涉及 API：** `get_financial_abstract`、`get_financial_screen`、`get_index_stocks`、`get_industry_list`、`get_industry_stocks`、`fetch_minute_data`、`get_price_minute`、`get_tick_data`、`get_north_money_flow`、`get_margin_data`、`get_limit_up_down_stats`、`get_restriction_release`
 
 ## 08 — 生命周期回调与股票池管理
 
 `before_trading_start`（开盘前回调）、`after_trading_end`（收盘后统计）、`set_universe` / `get_universe`（动态股票池）、`run_monthly`（每月调仓）。
 
-**涉及 API：** `before_trading_start`、`after_trading_end`、`set_universe`、`get_universe`、`get_trade_days`、`run_monthly`、`get_extras`
+**涉及 API：** `before_trading_start`、`after_trading_end`、`set_universe`、`get_universe`、`get_trade_days`、`run_monthly`、`get_extras`、`get_north_money_flow`、`get_limit_up_down_stats`
 
 ## 09 — 绩效归因分析
 
@@ -96,7 +104,7 @@ python examples/<file>.py
 
 使用 `StrategyConfig` 和 `run_portfolio_backtest` 进行多股票组合回测，通过 `report_suffix` 参数区分不同版本。
 
-**涉及 API：** `StrategyConfig`、`run_portfolio_backtest`、`context.universe`、`order_value`、`order_target`
+**涉及 API：** `StrategyConfig`、`run_portfolio_backtest`、`PortfolioRiskMonitor`、`concentration_risk`、`context.universe`、`order_value`、`order_target`
 
 ## 13 — 导出 PTrade/QMT 策略
 
@@ -120,7 +128,7 @@ MACD 金叉/死叉判断趋势方向，成交量放大确认信号，ATR 追踪�
 
 动量因子 + 成交量因子 + 价格过滤，每周一调仓，等权配置排名前 N 的股票。
 
-**涉及 API：** `run_weekly`、`attribute_history`、`context.universe`、`order_value`
+**涉及 API：** `run_weekly`、`attribute_history`、`get_north_money_flow`、`context.universe`、`order_value`
 
 ## 17 — 网格交易策略
 
@@ -168,11 +176,23 @@ MACD 金叉/死叉判断趋势方向，成交量放大确认信号，ATR 追踪�
 
 **涉及 API：** `run_backtest`、`generate_chart`、`generate_html_report`、`generate_report_md`、`generate_report_json`、`analyze_returns`
 
+## 25 — A 股市场情绪指标
+
+获取并可视化 A 股特色市场情绪数据：北向资金流向（`get_north_money_flow`）、融资融券余额（`get_margin_data`）、涨跌停统计（`get_limit_up_down_stats`）、限售股解禁（`get_restriction_release`）。适合在策略中叠加宏观情绪过滤或构建情绪驱动型交易信号。
+
+**涉及 API：** `get_north_money_flow`、`get_margin_data`、`get_limit_up_down_stats`、`get_restriction_release`
+
+## 26 — 组合风控监测器
+
+使用 `PortfolioRiskMonitor` 对持仓组合进行实时风控监测：VaR/CVaR 风险价值、持仓相关性矩阵、行业/个股集中度（`concentration_risk`）、熔断阈值告警。适合在模拟盘或回测中嵌入风控逻辑，当风险超标时自动减仓或暂停交易。
+
+**涉及 API：** `PortfolioRiskMonitor`、`concentration_risk`、`utils.value_at_risk`、`utils.conditional_value_at_risk`、`run_backtest`、`order_target`
+
 ---
 
 ## 运行与行为说明
 
-- 示例 04、07、05 依赖实时行情，建议交易时段运行。
+- 示例 04、05、07、25 依赖实时行情，建议交易时段运行。
 - 示例 05、21 的模拟盘为持续运行脚本，使用 `Ctrl+C` 停止。
 - 本地回测中，`order*` 是下单请求：先进入队列，再在下一交易日开盘价撮合成交。
 - 回测报告通常输出到 `reports/` 目录。

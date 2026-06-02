@@ -41,6 +41,8 @@
 - **报告输出** — 交互式 HTML 报告、图表 PNG、Markdown、JSON，含 20+ 风险/收益指标
 - **链式选股 API** — 流式接口（`query` / `valuation` / `get_fundamentals`）用于基本面筛选
 - **滚动验证 (WFA)** — 样本内/样本外滚动窗口验证，检测过拟合（实验性）
+- **A 股特色数据** — 北向资金、融资融券、涨跌停统计、限售股解禁，捕捉 A 股独有的市场情绪与供给冲击信号
+- **组合级风控监测器** — VaR、策略相关性、集中度风险、Kill Switch 熔断，多策略组合的系统性风险防线
 - **科学验证** — 过拟合检测、统计置信度、偏差检测、扩展风险指标（实验性）
 
 ---
@@ -138,7 +140,7 @@ EasyQuant/
 │   ├── optimizer.py       # 规则参数搜索（参考）
 │   ├── audit_log.py       # 结构化 JSONL + Markdown 审计日志
 │   └── strategy_template.py  # 参数化策略模板
-├── examples/              # 24 个可运行示例脚本
+├── examples/              # 26 个可运行示例脚本
 ├── tutorials/             # 分步学习教程
 │   └── prerequisites/     # Python、技术分析、A 股基础
 ├── doc/                   # 用户手册、API 参考、FAQ
@@ -180,6 +182,8 @@ EasyQuant/
 | 22 | `22_stock_selection_strategy.py` | 定期选股调仓 |
 | 23 | `23_small_cap_query_example.py` | 小市值链式筛选 |
 | 24 | `24_quick_report_test.py` | 快速验证报告格式 |
+| 25 | `25_ashare_market_sentiment.py` | A 股市场情绪指标（北向资金、融资融券、涨跌停） |
+| 26 | `26_portfolio_risk_monitor.py` | 组合级风控监测器（VaR、相关性、集中度、熔断） |
 
 ---
 
