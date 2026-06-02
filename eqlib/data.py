@@ -1851,7 +1851,7 @@ def get_restriction_release(days=30) -> pd.DataFrame:
         - name: 股票名称
         - release_date: 解禁日期
         - release_amount: 解禁数量（万股）
-        - release_value: 解禁市值（万元）
+        - release_value: 解禁市值（亿元）
         - release_pct: 占解禁前流通市值比例
 
     数据源: akshare stock_restricted_release_detail_em
@@ -1893,6 +1893,12 @@ def get_restriction_release(days=30) -> pd.DataFrame:
 
         # 数值转换
         _to_numeric(df, ["release_amount", "release_value", "release_pct"])
+
+        # 单位转换
+        if "release_value" in df.columns:
+            df["release_value"] = df["release_value"] / 1e8  # 元 → 亿元
+        if "release_amount" in df.columns:
+            df["release_amount"] = df["release_amount"] / 1e4  # 股 → 万股
 
         # 只保留需要的列（过滤掉不需要的列）
         keep_cols = ["code", "name", "release_date", "release_amount", "release_value", "release_pct"]
