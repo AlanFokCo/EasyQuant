@@ -12,6 +12,7 @@ Usage:
 
 import pandas as pd
 from eqlib import *
+from eqlib import get_north_money_flow, get_limit_up_down_stats
 
 
 def initialize(context):
@@ -137,6 +138,65 @@ if __name__ == "__main__":
         print(f"  Explained variance:  {ff['explained_variance']:.2%}")
     else:
         print("  Insufficient data for factor analysis")
+
+    # 4. Market background context (A-share specific data)
+    print(f"\n{'=' * 60}")
+    print("市场背景 (Market Context)")
+    print(f"{'=' * 60}")
+
+    try:
+        # Recent north capital trend (last 5 trading days)
+        north_df = get_north_money_flow()
+        if not north_df.empty and "net_buy" in north_df.columns:
+            recent = north_df.tail(5)
+            net_3d = recent["net_buy"].tail(3).sum()
+            net_5d = recent["net_buy"].sum()
+            print(f"  北向资金近5日净买入: {net_5d:+.2f} 亿元")
+            print(f"  北向资金近3日净买入: {net_3d:+.2f} 亿元")
+            if net_3d > 0:
+                north_trend = "外资持续流入，市场情绪偏多"
+            elif net_3d < -10:
+                north_trend = "外资大幅流出，市场承压"
+            else:
+                north_trend = "外资流入趋缓，方向不明"
+            print(f"  北向资金趋势判断:   {north_trend}")
+        else:
+            print("  北向资金数据暂不可用")
+
+        # Recent limit up/down stats
+        limit_df = get_limit_up_down_stats()
+        if not limit_df.empty:
+            recent_limit = limit_df.tail(5)
+            avg_up = recent_limit["limit_up_count"].mean()
+            avg_down = recent_limit["limit_down_count"].mean()
+            print(f"\n  近5日涨停均值: {avg_up:.1f} 只")
+            print(f"  近5日跌停均值: {avg_down:.1f} 只")
+            if avg_up > avg_down * 2:
+                limit_trend = "涨停多跌停少，市场人气旺盛"
+            elif avg_down > avg_up:
+                limit_trend = "跌停多于涨停，市场恐慌情绪浓厚"
+            else:
+                limit_trend = "涨跌停均衡，市场处于震荡期"
+            print(f"  涨跌停趋势判断: {limit_trend}")
+        else:
+            print("  涨跌停统计数据暂不可用")
+
+        # Combined market context interpretation
+        print(f"\n  [综合市场背景]")
+        if not north_df.empty and not limit_df.empty:
+            north_bull = net_3d > 0
+            limit_bull = avg_up > avg_down * 1.5
+            if north_bull and limit_bull:
+                print("  市场情绪偏多：外资流入 + 涨停活跃，归因结果在强势市场中更可靠。")
+            elif not north_bull and not limit_bull:
+                print("  市场情绪偏弱：外资流出 + 跌停偏多，策略需警惕系统性风险。")
+            else:
+                print("  市场信号分歧：北向资金与涨跌停方向不一致，建议结合更多指标判断。")
+        else:
+            print("  部分市场数据不可用，跳过综合判断。")
+
+    except Exception as exc:
+        print(f"  市场背景数据获取失败: {exc}")
 
     # ============================================================
     # Generate Reports

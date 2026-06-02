@@ -65,6 +65,7 @@ import statistics
 
 from eqlib import *
 from eqlib import utils
+from eqlib import get_north_money_flow
 
 
 # ============================================================
@@ -693,6 +694,28 @@ def _before_market_open(context, data=None):
     except Exception:
         pass
 
+    # North-capital regime signal (A-share specific)
+    # 5-day rolling net buy → bull / bear / neutral
+    try:
+        north_df = get_north_money_flow()
+        if not north_df.empty and "net_buy" in north_df.columns:
+            recent_5d = north_df.tail(5)
+            net_5d = recent_5d["net_buy"].sum()
+            if net_5d > 50:
+                g.regime = "bull"
+                log.info("NORTH-CAPITAL REGIME: bull (5d net buy %.1f亿 > 50亿)" % net_5d)
+            elif net_5d < -50:
+                g.regime = "bear"
+                log.info("NORTH-CAPITAL REGIME: bear (5d net buy %.1f亿 < -50亿)" % net_5d)
+            else:
+                g.regime = "neutral"
+                log.info("NORTH-CAPITAL REGIME: neutral (5d net buy %.1f亿)" % net_5d)
+        else:
+            g.regime = "neutral"
+    except Exception as exc:
+        g.regime = "neutral"
+        log.warning("North-capital data unavailable, regime=neutral (%s)" % exc)
+
 
 def _after_market_close(context, data=None):
     """Post-close portfolio snapshot (registered via after_trading_end)."""
@@ -776,8 +799,11 @@ def daily_trading(context):
 
     if buy_candidates:
         total_value = context.portfolio.total_value
+        # Regime-based position scaling: reduce size in bear, hold in neutral
+        regime_scale = {"bull": 1.0, "neutral": 0.75, "bear": 0.5}.get(g.regime, 1.0)
+        effective_max_pct = MAX_SINGLE_PCT * regime_scale
         per_stock_value = min(
-            total_value * MAX_SINGLE_PCT,
+            total_value * effective_max_pct,
             context.portfolio.available_cash / len(buy_candidates),
         )
         for code, reason in buy_candidates:
@@ -820,6 +846,7 @@ def initialize(context):
     # Runtime state
     g.selected_stocks   = STOCK_POOL[:TOP_N]  # bootstrap with first N
     g.highest_since_buy = {}                      # {code: float|None}
+    g.regime            = "neutral"               # north-capital regime: bull/bear/neutral
 
     # Register lifecycle callbacks (Example 08 pattern)
     before_trading_start(_before_market_open)

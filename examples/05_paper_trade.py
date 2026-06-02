@@ -25,6 +25,7 @@ import importlib.util
 import os
 import sys
 from eqlib import *
+from eqlib import get_restriction_release, get_limit_up_down_stats
 
 
 def load_strategy(path):
@@ -71,6 +72,55 @@ def run(strategy_path=None, cash=100000, interval=60):
 # Built-in strategy: Moving Average Crossover
 # ============================================================
 
+def _paper_before_trading(context):
+    """Pre-market monitoring: restriction release warnings and market context.
+
+    Registered via before_trading_start. Logs:
+    1. Upcoming restriction releases for held positions (risk warning)
+    2. Today's limit up/down stats (market sentiment context)
+    """
+    held = [c for c, p in context.portfolio.positions.items() if p.amount > 0]
+
+    # 1. Restriction release warnings for held positions
+    try:
+        release_df = get_restriction_release(days=7)
+        if not release_df.empty and "code" in release_df.columns:
+            held_releases = release_df[release_df["code"].isin(held)]
+            if not held_releases.empty:
+                for _, row in held_releases.iterrows():
+                    name = row.get("name", "")
+                    date = row.get("release_date", "")
+                    value = row.get("release_value", 0)
+                    pct = row.get("release_pct", 0)
+                    log.warning(
+                        "⚠ 限售解禁预警: %s(%s) 解禁日:%s 市值:%.2f亿 占比:%.2f%%"
+                        % (row["code"], name, date, value, pct)
+                    )
+            else:
+                log.info("限售解禁: 持仓股近7日无限售解禁")
+        else:
+            log.info("限售解禁: 数据暂不可用")
+    except Exception as exc:
+        log.warning("限售解禁数据获取失败: %s" % exc)
+
+    # 2. Limit up/down stats as market context
+    try:
+        limit_df = get_limit_up_down_stats()
+        if not limit_df.empty:
+            latest = limit_df.iloc[-1]
+            up_count = latest.get("limit_up_count", 0)
+            down_count = latest.get("limit_down_count", 0)
+            date = latest.get("date", "")
+            log.info(
+                "市场情绪 [%s]: 涨停 %d 只 / 跌停 %d 只"
+                % (date, int(up_count), int(down_count))
+            )
+        else:
+            log.info("涨跌停统计: 数据暂不可用")
+    except Exception as exc:
+        log.warning("涨跌停统计获取失败: %s" % exc)
+
+
 def ma_initialize(context):
     """MA crossover strategy initialization."""
     g.security = "601390"
@@ -85,6 +135,10 @@ def ma_initialize(context):
     ))
 
     context.universe = [g.security]
+
+    # Pre-market monitoring: restriction releases + market sentiment
+    before_trading_start(_paper_before_trading)
+
     run_daily(ma_on_bar, time="every_bar")
 
     log.info("Paper trading strategy: MA crossover %s MA%d/MA%d" % (

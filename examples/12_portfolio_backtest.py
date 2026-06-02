@@ -9,6 +9,7 @@ Demonstrates the high-level portfolio backtest mode:
 
 import os
 from eqlib import *
+from eqlib import PortfolioRiskMonitor
 
 
 # ============================================================
@@ -83,7 +84,6 @@ if __name__ == "__main__":
 
     # Method 2: Access the result for further analysis
     if result:
-        from eqlib import analyze_returns
 
         metrics = analyze_returns(result)
         if metrics:
@@ -94,3 +94,37 @@ if __name__ == "__main__":
             print(f"  Win Rate:      {metrics['win_rate']*100:.1f}%")
             print(f"  Alpha:         {metrics['alpha']*100:.2f}%")
             print(f"  Beta:          {metrics['beta']:.3f}")
+
+        # ============================================================
+        # Portfolio Risk Analysis (A-share specific)
+        # Analyze concentration and sector exposure risks
+        # ============================================================
+        print(f"\n{'='*50}")
+        print("Portfolio Concentration Risk Analysis:")
+
+        # Create risk monitor from the backtest result
+        positions_history = result.get('positions_history', {})
+        if positions_history:
+            risk_monitor = PortfolioRiskMonitor(
+                positions_history=positions_history,
+                total_capital=config.starting_cash
+            )
+
+            # Get concentration risk metrics
+            concentration = risk_monitor.concentration_risk()
+
+            print(f"  Number of Holdings:     {concentration.get('num_holdings', 'N/A')}")
+            print(f"  Top 1 Holding Weight:   {concentration.get('top1_weight', 0)*100:.1f}%")
+            print(f"  Top 3 Holdings Weight:  {concentration.get('top3_weight', 0)*100:.1f}%")
+            print(f"  Top 5 Holdings Weight:  {concentration.get('top5_weight', 0)*100:.1f}%")
+            print(f"  Herfindahl Index:       {concentration.get('herfindahl', 0):.4f}")
+            print(f"  Effective N:           {concentration.get('effective_n', 0):.2f}")
+
+            # Interpretation
+            hhi = concentration.get('herfindahl', 0)
+            if hhi > 0.25:
+                print("  ⚠️  High concentration risk (HHI > 0.25)")
+            elif hhi > 0.15:
+                print("  ⚡ Moderate concentration risk (HHI > 0.15)")
+            else:
+                print("  ✓ Well-diversified portfolio")
