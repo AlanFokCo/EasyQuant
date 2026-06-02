@@ -78,6 +78,89 @@ pip install .
 
 分钟/Tick 依赖 `akshare` 对应接口与标的流动性，不同股票可用历史长度不同。详见 [API 参考 — 分钟线 / Tick](api_reference.md)。
 
+### Q: 北向资金 API 返回空数据怎么办？
+
+**可能原因：**
+
+1. **交易日限制**：北向资金数据仅在交易日更新，周末和节假日无数据。
+2. **网络问题**：数据源（东方财富）接口不稳定，可稍后重试。
+3. **日期范围**：`get_north_money_flow(count=N)` 返回最近 N 个交易日数据，若 N 过大可能超出数据源限制。
+
+**处理：**
+
+```python
+from eqlib import get_north_money_flow
+
+df = get_north_money_flow(count=30)
+if df.empty:
+    log.warn("北向资金数据暂不可用，使用备用逻辑")
+    # 可使用缓存或历史均值作为替代
+```
+
+建议在 `initialize` 中预加载并缓存北向资金数据，避免每次 `handle_data` 都请求。
+
+### Q: get_limit_up_down_stats 为什么只返回最近 30 天？
+
+**原因：** 该接口调用 `ak.stock_zt_pool_em`，数据源（东方财富）仅提供近 30 个交易日的涨跌停统计数据，无法获取更早历史。
+
+**替代方案：**
+
+- 对于回测场景，可使用 `attribute_history` 获取个股涨跌幅，自行统计涨跌停数量。
+- 若需更长历史，可考虑使用第三方付费数据源。
+
+```python
+from eqlib import get_limit_up_down_stats
+
+df = get_limit_up_down_stats()
+# 仅包含最近约 30 个交易日
+```
+
+### Q: 融资融券数据的 margin_repay 第一行为什么是 NaN？
+
+**原因：** `margin_repay`（融资偿还额）是相邻两日融资余额的差值计算得出的。第一行没有前一日数据，因此计算结果为 NaN。这是正常的数据处理结果。
+
+**处理：**
+
+```python
+from eqlib import get_margin_trading
+
+df = get_margin_trading('601390', count=30)
+# 去除首行 NaN
+df = df.dropna(subset=['margin_repay'])
+
+# 或使用前值填充
+df['margin_repay'] = df['margin_repay'].fillna(0)
+```
+
+### Q: 如何在策略中使用组合风控监测器？
+
+**场景：** 策略运行时需要实时监控持仓集中度、波动率和回撤。
+
+**用法：**
+
+```python
+from eqlib import PortfolioRiskMonitor
+
+def initialize(context):
+    g.risk_monitor = PortfolioRiskMonitor(
+        max_single_position_pct=0.20,  # 单只最大 20%
+        max_drawdown_alert=0.15,        # 回撤 15% 预警
+    )
+    run_daily(check_risk, time='every_bar')
+
+def check_risk(context):
+    positions = context.portfolio.positions
+    total = context.portfolio.total_value
+    g.risk_monitor.update(positions, total, context.current_dt)
+
+    alerts = g.risk_monitor.check_alerts()
+    for alert in alerts:
+        log.warn("风控预警: %s" % alert)
+        # 可根据预警调整仓位或发送通知
+```
+
+详见 [用户手册 — 组合风控](user_guide.md#12-组合风控)。
+
 ---
 
 ## 回测与策略

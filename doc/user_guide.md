@@ -409,6 +409,82 @@ result = run_backtest(
 
 建议：先确认 `has_local_data(code)` 为 `True` 再跑回测；大范围回测先用较短日期区间做冒烟测试。
 
+### 7.10 A 股特色数据
+
+eqlib 提供多个 A 股市场特有的数据接口，覆盖北向资金、融资融券、涨跌停统计和限售股解禁等维度。
+
+#### 7.10.1 北向资金
+
+北向资金（沪股通 + 深股通）是外资流入 A 股的重要风向标。
+
+```python
+from eqlib import get_north_money_flow
+
+# 获取北向资金净流入数据（近 N 个交易日）
+df = get_north_money_flow(count=30)
+# 返回字段：date, buy_value, sell_value, net_inflow, total_inflow
+
+# 在策略中使用北向资金信号
+def market_open(context):
+    north_flow = get_north_money_flow(count=5)
+    if not north_flow.empty:
+        recent_net = north_flow['net_inflow'].iloc[-1]
+        if recent_net > 1e9:  # 净流入超 10 亿
+            log.info("北向资金今日大幅净流入: %.2f 亿" % (recent_net / 1e8))
+```
+
+#### 7.10.2 融资融券
+
+融资融券数据反映杠杆资金动向。
+
+```python
+from eqlib import get_margin_trading
+
+# 获取个股融资融券数据
+df = get_margin_trading('601390', count=30)
+# 返回字段：date, margin_buy, margin_sell, margin_repay, margin_balance, etc.
+
+# 查看融资余额变化
+if not df.empty:
+    balance_change = df['margin_balance'].diff()
+    log.info("融资余额 5 日变化: %s" % balance_change.tail(5).tolist())
+```
+
+#### 7.10.3 涨跌停统计
+
+统计市场涨跌停数量，用于判断市场情绪。
+
+```python
+from eqlib import get_limit_up_down_stats
+
+# 获取涨跌停统计数据
+df = get_limit_up_down_stats()
+# 返回字段：date, limit_up_count, limit_down_count, limit_up_ratio, etc.
+
+# 判断市场情绪
+if not df.empty:
+    latest = df.iloc[-1]
+    if latest['limit_up_count'] > 100:
+        log.info("市场情绪高涨，涨停数: %d" % latest['limit_up_count'])
+```
+
+#### 7.10.4 限售股解禁
+
+解禁数据可提前规避潜在抛压。
+
+```python
+from eqlib import get_restriction_release
+
+# 获取未来 30 天的解禁计划
+df = get_restriction_release(start_date='2024-01-01', end_date='2024-01-31')
+# 返回字段：code, name, release_date, release_value, release_amount, etc.
+
+# 筛选大额解禁
+big_releases = df[df['release_value'] > 1e9]  # 解禁市值超 10 亿
+if not big_releases.empty:
+    log.info("大额解禁股票: %s" % big_releases['code'].tolist())
+```
+
 ---
 
 ## 8. 计算工具库
@@ -619,7 +695,191 @@ print("市场 Beta: %.3f" % ff['market_beta'])
 
 ---
 
-## 12. 模拟盘交易
+## 12. 组合风控
+
+`PortfolioRiskMonitor` 提供实时的组合风险监测，包括集中度、波动率和最大回撤预警。
+
+### 12.1 基本用法
+
+```python
+from eqlib import PortfolioRiskMonitor
+
+# 创建监测器
+monitor = PortfolioRiskMonitor(
+    max_single_position_pct=0.20,  # 单只股票最大仓位 20%
+    max_sector_pct=0.40,            # 单行业最大仓位 40%
+    max_drawdown_alert=0.10,        # 回撤超过 10% 预警
+    volatility_window=20,           # 波动率计算窗口
+)
+
+# 在策略中更新监测器
+def market_open(context):
+    # 更新持仓数据
+    positions = context.portfolio.positions
+    total_value = context.portfolio.total_value
+
+    monitor.update(positions, total_value, context.current_dt)
+
+    # 检查风险预警
+    alerts = monitor.check_alerts()
+    for alert in alerts:
+        log.warn("风险预警: %s" % alert)
+```
+
+### 12.2 集中度检查
+
+```python
+# 检查持仓集中度
+concentration = monitor.get_concentration()
+print("前三大持仓占比: %.2f%%" % (concentration['top3_pct'] * 100))
+print("赫芬达尔指数: %.4f" % concentration['hhi'])
+```
+
+### 12.3 波动率监测
+
+```python
+# 获取组合波动率
+vol = monitor.get_portfolio_volatility()
+print("组合年化波动率: %.2f%%" % (vol['annual_volatility'] * 100))
+```
+
+### 12.4 回撤预警
+
+```python
+# 设置回撤预警回调
+def on_drawdown_alert(level, current_dd):
+    log.warn("回撤预警! 当前回撤: %.2f%%, 阈值: %.2f%%" % (
+        current_dd * 100, level * 100))
+
+monitor.set_drawdown_callback(on_drawdown_alert)
+```
+
+### 12.5 与选股框架联动
+
+```python
+from eqlib import TopNSelector
+
+def initialize(context):
+    g.selector = TopNSelector(universe=['600519', '601390', '000858'])
+    g.risk_monitor = PortfolioRiskMonitor(max_single_position_pct=0.15)
+
+def market_open(context):
+    # 选股
+    candidates = g.selector.select(context)
+
+    # 风控检查
+    if g.risk_monitor.check_position_limit(candidates):
+        for sec in candidates:
+            order_value(sec, context.portfolio.available_cash / len(candidates))
+    else:
+        log.info("风控限制，本日不调仓")
+```
+
+---
+
+## 13. 选股策略框架
+
+eqlib 提供 `TopNSelector` 和 `MultiFactorSelector` 两个选股框架，支持周期性调仓和因子筛选。
+
+### 13.1 TopNSelector：排名选股
+
+按因子值排名选出 Top N 只股票。
+
+```python
+from eqlib import TopNSelector
+
+def initialize(context):
+    g.selector = TopNSelector(
+        universe=['600519', '601390', '000858', '600036', '601166'],
+        factor_fn=momentum_factor,  # 自定义因子函数
+        top_n=3,
+        rebalance_freq='weekly',    # 每周调仓
+    )
+    run_daily(rebalance, time='every_bar')
+
+def momentum_factor(security, context):
+    """动量因子：过去 20 日涨幅"""
+    hist = attribute_history(security, 20, '1d', ['close'])
+    if hist.empty or len(hist) < 20:
+        return None
+    return (hist['close'].iloc[-1] / hist['close'].iloc[0] - 1)
+
+def rebalance(context):
+    candidates = g.selector.select(context)
+    if candidates:
+        for sec in candidates:
+            order_value(sec, context.portfolio.available_cash / len(candidates))
+```
+
+### 13.2 MultiFactorSelector：多因子选股
+
+结合多个因子进行综合评分选股。
+
+```python
+from eqlib import MultiFactorSelector
+
+def initialize(context):
+    g.selector = MultiFactorSelector(
+        universe=['600519', '601390', '000858', '600036', '601166'],
+        factors={
+            'momentum': (momentum_factor, 0.4),    # 权重 40%
+            'volatility': (volatility_factor, 0.3), # 权重 30%
+            'value': (value_factor, 0.3),           # 权重 30%
+        },
+        top_n=3,
+        rebalance_freq='monthly',
+    )
+
+def volatility_factor(security, context):
+    """波动率因子（逆向）：波动率越低越好"""
+    hist = attribute_history(security, 20, '1d', ['close'])
+    if hist.empty:
+        return None
+    returns = hist['close'].pct_change().dropna()
+    return -returns.std()  # 取负，使低波动率得分高
+
+def value_factor(security, context):
+    """估值因子：PE 越低越好"""
+    val = get_valuation(security)
+    if val is None or val.get('pe_ratio') is None:
+        return None
+    return -val['pe_ratio']  # 取负，使低 PE 得分高
+
+def rebalance(context):
+    candidates = g.selector.select(context)
+    # 调仓逻辑...
+```
+
+### 13.3 选股周期配置
+
+| 参数 | 可选值 | 说明 |
+|------|--------|------|
+| `rebalance_freq` | `'daily'` | 每个交易日调仓 |
+| | `'weekly'` | 每周一调仓 |
+| | `'biweekly'` | 每两周调仓 |
+| | `'monthly'` | 每月首个交易日调仓 |
+| | `'quarterly'` | 每季度首个交易日调仓 |
+
+### 13.4 因子函数规范
+
+因子函数签名为：
+
+```python
+def my_factor(security: str, context: Context) -> float | None:
+    """
+    Args:
+        security: 股票代码
+        context: 策略上下文
+
+    Returns:
+        因子值（数值越大越好）或 None（该股票不参与排名）
+    """
+    pass
+```
+
+---
+
+## 14. 模拟盘交易
 
 模拟盘使用实时行情数据持续运行策略。
 
@@ -711,7 +971,7 @@ def market_open(context, data):
 
 ---
 
-## 13. 参数优化与审计
+## 15. 参数优化与审计
 
 ### 13.1 参数化策略
 
@@ -766,7 +1026,7 @@ audit_log/
 
 ---
 
-## 13A. 滚动验证（Walk-Forward Analysis）（实验性）
+## 15A. 滚动验证（Walk-Forward Analysis）（实验性）
 
 滚动验证将历史期间分为交替的「样本内」（IS）训练窗口和「样本外」（OOS）测试窗口，在 IS 窗口上优化参数，在 OOS 窗口上验证，最后拼接 OOS 权益曲线。
 
@@ -799,7 +1059,7 @@ WFA 结果包含：每个窗口的详细指标、拼接的 OOS 权益曲线、�
 
 ---
 
-## 13B. 科学验证（实验性）
+## 15B. 科学验证（实验性）
 
 `eqlib.scientific` 提供回测后的科学验证工具，帮助判断策略是否可信：
 
@@ -824,7 +1084,7 @@ validation.summary()
 
 ---
 
-## 14. 常见问题
+## 16. 常见问题
 
 更完整的排错见 [FAQ.md](FAQ.md)。
 

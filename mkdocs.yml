@@ -117,6 +117,7 @@ nav:
       - "08 · 多因子选股": tutorials/08_multi_factor.md
       - "09 · 综合策略": tutorials/09_combined_strategy.md
       - "10 · 参数优化与审计": tutorials/10_agent_optimization.md
+      - "11 · A 股数据与风控": tutorials/11_ashare_data_and_risk.md
 
   - 示例:
       - 示例索引: examples/Examples.md
