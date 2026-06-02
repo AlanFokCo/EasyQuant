@@ -24,10 +24,11 @@
 4. [第三层：技术指标入场 / 离场信号](#4-第三层技术指标入场--离场信号)
 5. [第四层：风险管理与仓位控制](#5-第四层风险管理与仓位控制)
 6. [生命周期回调集成](#6-生命周期回调集成)
-7. [完整策略代码说明](#7-完整策略代码说明)
-8. [回测验证](#8-回测验证)
-9. [模拟盘部署](#9-模拟盘部署)
-10. [策略解读与改进方向](#10-策略解读与改进方向)
+7. [组合风险监控（PortfolioRiskMonitor）](#7-组合风险监控portfolioriskmonitor)
+8. [完整策略代码说明](#8-完整策略代码说明)
+9. [回测验证](#9-回测验证)
+10. [模拟盘部署](#10-模拟盘部署)
+11. [策略解读与改进方向](#11-策略解读与改进方向)
 
 ---
 
@@ -459,9 +460,94 @@ def _after_market_close(context):
 
 ---
 
-## 7. 完整策略代码说明
+## 7. 组合风险监控（PortfolioRiskMonitor）
 
-### 7.1 文件结构
+除了个股层面的止损和仓位控制，综合策略还需要在**组合层面**进行风险监控。`PortfolioRiskMonitor` 提供了一站式的组合风险仪表盘，覆盖集中度、波动率、回撤等关键维度。
+
+### 7.1 初始化与每日检查
+
+在 `initialize` 中创建监控实例，在 `before_trading_start` 回调中执行每日检查：
+
+```python
+from eqlib import PortfolioRiskMonitor
+
+def initialize(context):
+    # ... 其他初始化代码 ...
+    context.risk_monitor = PortfolioRiskMonitor(
+        max_single_weight=0.20,    # 单股最大权重 20%
+        max_sector_weight=0.40,    # 单行业最大权重 40%
+        max_drawdown_threshold=0.15,  # 回撤预警阈值 15%
+    )
+
+
+def _before_market_open(context):
+    # 每日风控检查（开盘前执行）
+    report = context.risk_monitor.daily_check(context.portfolio)
+
+    if report['alerts']:
+        for alert in report['alerts']:
+            log.warning("RISK ALERT: %s" % alert)
+
+    # 如果回撤超过阈值，暂停当日买入
+    if report.get('drawdown_breached'):
+        context.pause_buying = True
+        log.warning("Drawdown %.2f%% exceeded threshold, pausing buys"
+                     % (report['current_drawdown'] * 100))
+    else:
+        context.pause_buying = False
+```
+
+### 7.2 北向资金体制信号
+
+北向资金流向可作为组合层面的**体制信号**（regime signal），在 `before_trading_start` 中判断当前市场情绪，动态调整仓位上限：
+
+```python
+from eqlib import get_north_money_flow
+
+def _check_north_regime(context):
+    """
+    北向资金体制信号：根据近 5 日净流入判断市场情绪体制。
+
+    返回:
+        str: 'risk_on'（乐观）, 'neutral'（中性）, 'risk_off'（悲观）
+    """
+    df = get_north_money_flow(days=5)
+    if df is None or df.empty:
+        return 'neutral'
+
+    net_5d = df['north_net'].sum()        # 5 日累计净流入（亿元）
+    avg_daily = net_5d / len(df)
+
+    if avg_daily > 20:                    # 日均净流入 > 20 亿
+        return 'risk_on'
+    elif avg_daily < -20:                 # 日均净流出 > 20 亿
+        return 'risk_off'
+    else:
+        return 'neutral'
+
+
+def _before_market_open(context):
+    # ... 其他检查 ...
+
+    regime = _check_north_regime(context)
+    log.info("North capital regime: %s" % regime)
+
+    # 根据体制调整整体仓位上限
+    regime_caps = {
+        'risk_on':  1.0,    # 乐观：满仓
+        'neutral':  0.8,    # 中性：80% 仓位
+        'risk_off': 0.5,    # 悲观：50% 仓位
+    }
+    context.max_position_pct = regime_caps.get(regime, 0.8)
+```
+
+将北向资金体制信号与 `PortfolioRiskMonitor` 结合使用，可以在综合策略中实现**自上而下**的风控：先判断市场环境（体制信号），再监控组合健康度（风险仪表盘），最后才到个股的买卖信号。
+
+---
+
+## 8. 完整策略代码说明
+
+### 8.1 文件结构
 
 ```
 examples/21_combined_strategy/
@@ -471,7 +557,7 @@ examples/21_combined_strategy/
 └── README.md               # 本教程摘要
 ```
 
-### 7.2 策略模块结构
+### 8.2 策略模块结构
 
 ```python
 # combined_strategy.py 结构
@@ -502,7 +588,7 @@ daily_trading(context)                 # 每日信号处理
 initialize(context)                    # 策略入口（必须有）
 ```
 
-### 7.3 关键参数速查
+### 8.3 关键参数速查
 
 | 参数 | 默认值 | 含义 |
 |------|--------|------|
@@ -523,9 +609,9 @@ initialize(context)                    # 策略入口（必须有）
 
 ---
 
-## 8. 回测验证
+## 9. 回测验证
 
-### 8.1 直接运行回测
+### 9.1 直接运行回测
 
 ```bash
 # 在项目根目录下运行
@@ -544,7 +630,7 @@ python examples/21_combined_strategy/run_backtest.py
 - `reports/backtest_<时间戳>.md`   — Markdown 摘要
 - `reports/backtest_<时间戳>.json` — 完整回测数据
 
-### 8.2 回测代码详解
+### 9.2 回测代码详解
 
 ```python
 # run_backtest.py 核心片段
@@ -573,7 +659,7 @@ print("Max drawdown : %.2f%%" % (metrics["max_drawdown"] * 100))
 print("Win rate     : %.2f%%" % (metrics["win_rate"] * 100))
 ```
 
-### 8.3 回测结果解读指南
+### 9.3 回测结果解读指南
 
 运行完成后，关注以下关键指标：
 
@@ -586,7 +672,7 @@ print("Win rate     : %.2f%%" % (metrics["win_rate"] * 100))
 | **Beta** | 与大盘的相关性 | < 1.0 说明策略波动小于大盘 |
 | **胜率** | 盈利交易数 / 总交易数 | > 50% 为较好 |
 
-### 8.4 使用本地数据加速（推荐）
+### 9.4 使用本地数据加速（推荐）
 
 首次运行时下载并保存数据，后续运行直接从本地读取：
 
@@ -601,9 +687,9 @@ python examples/19_local_data_backtest.py --download-all
 
 ---
 
-## 9. 模拟盘部署
+## 10. 模拟盘部署
 
-### 9.1 运行模拟盘
+### 10.1 运行模拟盘
 
 ```bash
 # 默认设置（资金 ¥500,000，每 60 秒刷新一次报价）
@@ -617,14 +703,14 @@ python examples/21_combined_strategy/run_paper_trade.py \
 # 按 Ctrl+C 停止
 ```
 
-### 9.2 模拟盘注意事项
+### 10.2 模拟盘注意事项
 
 1. **运行时段**：建议在 9:30-15:00 的交易时段内运行，获取实时行情
 2. **信号频率**：策略每日只在每根 bar 触发一次，每周一额外触发选股
 3. **网络要求**：需要网络访问 akshare 数据源
 4. **日志输出**：所有买卖决策都有详细的日志记录，方便监控
 
-### 9.3 部署到 PTrade/QMT
+### 10.3 部署到 PTrade/QMT
 
 参考 [Tutorial 05](05_live_trading.md) 和 [Example 13](../examples/13_ptrade_export.py)，
 可以将本策略导出为 PTrade/QMT 格式：
@@ -641,9 +727,9 @@ export_ptrade_script(
 
 ---
 
-## 10. 策略解读与改进方向
+## 11. 策略解读与改进方向
 
-### 10.1 策略适用的市场环境
+### 11.1 策略适用的市场环境
 
 | 市场环境 | 策略表现预期 | 原因 |
 |---------|-----------|------|
@@ -652,7 +738,7 @@ export_ptrade_script(
 | **熊市** | 较弱 | 股票普跌，买入信号难以盈利；止损频繁触发 |
 | **单边下跌** | 可控 | 硬止损 + ATR 止损限制最大损失 |
 
-### 10.2 可能的改进方向
+### 11.2 可能的改进方向
 
 **1. 加入大盘过滤（推荐优先级最高）**
 
@@ -719,7 +805,7 @@ kelly_f  = kelly_criterion(win_rate, avg_win, avg_loss)
 position_pct = min(kelly_f * 0.5, g.max_single_pct)
 ```
 
-### 10.3 过拟合风险警告
+### 11.3 过拟合风险警告
 
 > ⚠️ **重要提示**
 >
