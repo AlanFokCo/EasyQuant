@@ -85,3 +85,6 @@ node_modules/
 # Screenshot tooling (internal use only)
 screenshot_reports.py
 tools/
+
+# Internal planning documents (not for public repo)
+docs/ROADMAP-LLMQUANT-INTEGRATION.md
