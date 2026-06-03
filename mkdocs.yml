@@ -10,7 +10,6 @@ theme:
   custom_dir: docs/overrides
   logo: assets/logo-icon.svg
   favicon: assets/logo-icon.svg
-  language: zh
   font:
     text: "Noto Sans SC"
     code: "JetBrains Mono"
@@ -20,7 +19,6 @@ theme:
     - navigation.indexes
     - navigation.top
     - navigation.footer
-    - navigation.instant
     - toc.follow
     - search.highlight
     - search.suggest
@@ -49,6 +47,31 @@ extra:
 extra_css:
   - assets/stylesheets/extra.css
 plugins:
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: zh
+          name: 中文
+          default: true
+          build: true
+        - locale: en
+          name: English
+          build: true
+          nav_translations:
+            教程: Tutorials
+            操作指南: How-to Guides
+            API 参考: API Reference
+            概念解释: Explanation
+            示例: Examples
+            项目: Project
+            前置知识: Prerequisites
+            常见问题: FAQ
+            更新日志: Changelog
+            贡献指南: Contributing
+            安全政策: Security
+            Web 策略工作室: Web Studio
+            Home: Home
+            GitHub: GitHub
   - search:
       lang:
         - zh
@@ -84,49 +107,71 @@ markdown_extensions:
 nav:
   - Home: index.md
 
-  - 快速入门:
-      - 文档中心: doc/README.md
-      - 环境与第一次运行: tutorials/00_environment_and_first_run.md
+  - 教程:
+      - tutorials/index.md
+      - 前置知识:
+          - tutorials/prerequisites/index.md
+          - tutorials/prerequisites/python-basics.md
+          - tutorials/prerequisites/technical-concepts.md
+          - tutorials/prerequisites/ashare-knowledge.md
+      - "00 · 入门": tutorials/00-getting-started.md
+      - "01 · 首个策略": tutorials/01-first-strategy.md
+      - "02 · 回测": tutorials/02-backtesting.md
+      - "03 · 优化": tutorials/03-optimization.md
+      - "04 · 实盘": tutorials/04-live-trading.md
+      - "05 · RSI 均值回归": tutorials/05-rsi-mean-reversion.md
+      - "06 · 行业轮动": tutorials/06-sector-rotation.md
+      - "07 · 多因子": tutorials/07-multi-factor.md
+      - "08 · 综合策略": tutorials/08-combined-strategy.md
+      - "09 · 参数优化": tutorials/09-param-optimization.md
+      - "10 · A股数据": tutorials/10-ashare-data-risk.md
 
-  - 用户手册:
-      - 用户手册: doc/user_guide.md
-      - Web 策略工作室: doc/web_studio.md
-      - PTrade/QMT 实盘适配: doc/ptrade_adapter.md
-      - 常见问题: doc/FAQ.md
+  - 操作指南:
+      - how-to/index.md
+      - how-to/install.md
+      - how-to/write-strategy.md
+      - how-to/manage-positions.md
+      - how-to/fetch-data.md
+      - how-to/use-utilities.md
+      - how-to/run-backtest.md
+      - how-to/read-reports.md
+      - how-to/paper-trade.md
+      - how-to/selection-strategy.md
+      - how-to/portfolio-risk.md
+      - how-to/param-optimization.md
+      - Web 策略工作室:
+          - how-to/web-studio.md
+          - how-to/deploy-web-studio.md
+      - how-to/export-ptrade.md
 
   - API 参考:
-      - API 参考: doc/api_reference.md
-      - 工具库参考: doc/utils_reference.md
-      - 报告与指标: doc/reports_and_metrics.md
+      - reference/index.md
+      - reference/structures.md
+      - reference/api-trading.md
+      - reference/api-data.md
+      - reference/api-backtest.md
+      - reference/api-config.md
+      - reference/api-analysis.md
+      - reference/api-selection.md
+      - reference/api-risk.md
+      - reference/api-scientific.md
+      - reference/api-notification.md
+      - reference/utils.md
+      - reference/reports-format.md
 
-  - 教程:
-      - 教程导读: tutorials/README.md
-      - 前置知识:
-          - 总览: tutorials/prerequisites/README.md
-          - Python 基础: tutorials/prerequisites/python_basics.md
-          - 技术分析: tutorials/prerequisites/technical_concepts.md
-          - A 股市场: tutorials/prerequisites/ashare_knowledge.md
-      - "00 · 环境与第一次运行": tutorials/00_environment_and_first_run.md
-      - "01 · 量化基础": tutorials/01_quant_basics.md
-      - "02 · 首个策略": tutorials/02_first_strategy.md
-      - "03 · 回测入门": tutorials/03_backtesting.md
-      - "04 · 策略优化": tutorials/04_strategy_optimization.md
-      - "05 · 模拟盘与实盘": tutorials/05_live_trading.md
-      - "06 · RSI 均值回归": tutorials/06_rsi_mean_reversion.md
-      - "07 · 行业轮动": tutorials/07_sector_rotation.md
-      - "08 · 多因子选股": tutorials/08_multi_factor.md
-      - "09 · 综合策略": tutorials/09_combined_strategy.md
-      - "10 · 参数优化与审计": tutorials/10_agent_optimization.md
-      - "11 · A 股数据与风控": tutorials/11_ashare_data_and_risk.md
+  - 概念解释:
+      - explanation/index.md
+      - explanation/architecture.md
+      - explanation/backtest-model.md
+      - explanation/ashare-market.md
+      - explanation/glossary.md
 
-  - 示例:
-      - 示例索引: examples/Examples.md
-
-  - 词汇表: glossary.md
+  - 示例: examples/index.md
 
   - 项目:
-      - 更新日志: CHANGELOG.md
-      - 贡献指南: CONTRIBUTING.md
-      - 安全政策: SECURITY.md
+      - project/faq.md
+      - project/changelog.md
+      - project/contributing.md
+      - project/security.md
 
   - GitHub: https://github.com/AlanFokCo/EasyQuant
