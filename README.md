@@ -7,20 +7,15 @@
 Event-driven quantitative backtesting framework for China A-share market.
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/test.yml?label=Tests)](https://github.com/AlanFokCo/EasyQuant/actions/workflows/test.yml)
-[![Studio CI](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/studio-test.yml?label=Studio%20CI)](https://github.com/AlanFokCo/EasyQuant/actions/workflows/studio-test.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/AlanFokCo/EasyQuant/deploy-docs.yml?label=Docs)](https://AlanFokCo.github.io/EasyQuant/)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/AlanFokCo/EasyQuant/blob/main/LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.3-gray.svg)](https://github.com/AlanFokCo/EasyQuant/releases)
 
 <p>
 <a href="README_zh.md">中文文档</a> ·
 <a href="https://AlanFokCo.github.io/EasyQuant/">Docs Site</a> ·
-<a href="tutorials/README.md">Tutorials</a> ·
-<a href="doc/README.md">Doc Center</a> ·
-<a href="doc/api_reference.md">API Reference</a> ·
-<a href="examples/Examples.md">Examples</a> ·
-<a href="doc/FAQ.md">FAQ</a>
+<a href="https://AlanFokCo.github.io/EasyQuant/tutorials/">Tutorials</a> ·
+<a href="https://AlanFokCo.github.io/EasyQuant/reference/">API Reference</a>
 </p>
 
 </div>
@@ -29,46 +24,23 @@ Event-driven quantitative backtesting framework for China A-share market.
 
 ## Features
 
-- **Event-driven backtesting** — `initialize` → `run_daily` → `handle_data`, compatible with JoinQuant / Zipline programming model
-- **A-share data** — daily OHLCV, minute K-lines, tick data, real-time quotes, fundamentals, money flow via free AKShare API
-- **Position management** — buy/sell by shares, value, or target; automatic lot-size rounding (100 shares), commission calculation
-- **Risk analysis** — Sharpe, Sortino, max drawdown, alpha/beta, Brinson attribution, simple factor analysis
-- **Portfolio optimization** — minimum variance, maximum Sharpe, risk parity
-- **Paper trading** — run strategies live with real-time market data before going live
-- **PTrade/QMT adapter** — one-click export to broker platforms
-- **Stock selection** — periodic rebalancing with factor screening (ST/PB/PE/momentum filters, Top-N, multi-factor scoring)
-- **Utility library** — 40+ technical indicators (MA, MACD, RSI, KDJ, Bollinger, ATR, ADX), statistical tools, position sizing (Kelly, ATR-based, fixed fractional)
-- **Reports** — interactive HTML, chart PNG, Markdown, JSON with 20+ risk/return metrics
-- **Chainable stock screening** — fluent API (`query` / `valuation` / `get_fundamentals`) for fundamental analysis
-- **Walk-forward analysis** — rolling in-sample/out-of-sample validation to detect overfitting (experimental)
-- **Scientific validation** — overfitting detection, statistical confidence, bias detection, extended risk metrics (experimental)
+- **Event-driven backtesting** — `initialize` → `run_daily` → `handle_data` (JoinQuant/Zipline compatible)
+- **A-share data** — Daily/minute/tick, fundamentals, money flow, north-bound capital, limit up/down stats
+- **Risk analysis** — Sharpe, Sortino, max drawdown, alpha/beta, Brinson attribution
+- **Portfolio risk** — VaR, correlation, concentration, kill switch
+- **Paper trading** — Run strategies with real-time data + DingTalk/Feishu notifications
+- **PTrade/QMT adapter** — One-click export to broker platforms
+- **Web Studio** — Browser-based strategy development (no Python install needed)
 
 ---
 
 ## Quick Start
 
 ```bash
-# PyPI install (recommended for users)
 pip install easyquant-eqlib
 
-# Or install from source (for contributors)
-git clone https://github.com/AlanFokCo/EasyQuant.git
-cd EasyQuant
-pip install .
-```
-
-Verify installation and run your first backtest:
-
-```bash
 python -c "from eqlib import *; print('eqlib OK')"
-python examples/03_run_backtest.py  # run in repo directory
 ```
-
-Open the generated `.html` report in `reports/` in your browser.
-
-> **New to Python?** If you prefer a browser-based interface, check out [Web Strategy Studio](web_strategy_studio/) — write strategies, run backtests, and view reports without installing any Python environment. See [Web Studio Docs](doc/web_studio.md) for details.
-
-### Write Your First Strategy
 
 ```python
 from eqlib import *
@@ -80,108 +52,12 @@ def initialize(context):
 
 def market_open(context):
     hist = attribute_history(g.security, 20, '1d', ['close'])
-    ma20 = hist['close'].mean()
-    price = hist['close'].iloc[-1]
-
-    if price > ma20 * 1.02:
+    if hist['close'].iloc[-1] > hist['close'].mean() * 1.02:
         order_value(g.security, context.portfolio.available_cash)
-    elif price < ma20 * 0.98 and context.portfolio.positions.get(g.security):
-        order_target(g.security, 0)
 
-result = run_strategy(
-    initialize,
-    start_date='2024-01-01',
-    end_date='2024-12-31',
-    starting_cash=100000,
-    securities=['601390'],
-)
+result = run_strategy(initialize, start_date='2024-01-01',
+                      end_date='2024-12-31', securities=['601390'])
 ```
-
-> **Execution model:** `order*` APIs queue orders in the current callback; they are filled at the **next trading day's open** to avoid look-ahead bias.
->
-> **Output:** 4 files in `reports/` — `.png` chart, `.html` interactive report, `.md` summary, `.json` data.
-
----
-
-## Report Preview
-
-`run_strategy` generates an **interactive HTML report** plus PNG, Markdown, and JSON. Below are snapshots from real backtest runs.
-
-### Profitable Strategies
-
-| MACD Trend + Volume (600536) | Bollinger Mean Reversion (601088) | Support/Resistance (8 stocks) |
-|:---:|:---:|:---:|
-| **+103.48%** · 16 trades | **+57.77%** · 8 trades | **+119.97%** · 171 trades |
-| [![MACD](tutorials/assets/example_report_macd_volume.png)](tutorials/assets/example_report_macd_volume.png) | [![Bollinger](tutorials/assets/example_report_bollinger.png)](tutorials/assets/example_report_bollinger.png) | [![S/R](tutorials/assets/example_report_sr_strategy.png)](tutorials/assets/example_report_sr_strategy.png) |
-
-### Losing Strategies (For Learning)
-
-| Momentum Portfolio (5 stocks) | Local Data (000768) |
-|:---:|:---:|
-| **−25.69%** · 52 trades | **−33.28%** · 16 trades |
-| [![Portfolio](tutorials/assets/example_report_portfolio.png)](tutorials/assets/example_report_portfolio.png) | [![Local](tutorials/assets/example_report_19_localdata.png)](tutorials/assets/example_report_19_localdata.png) |
-
-### HTML Report (Interactive)
-
-![HTML Report — MACD+Volume](tutorials/assets/example_report_html_macd_volume.png)
-
-> **How to read reports:** header summary → metric cards (Sharpe, max drawdown, alpha) → K-line chart with MA/RSI/MACD/Bollinger Bands → cumulative returns vs benchmark → drawdown curve → daily P&L → trade/position tabs. Full guide: [Report & Metrics](doc/reports_and_metrics.md).
-
----
-
-## Project Structure
-
-```
-EasyQuant/
-├── eqlib/                 # Core library (backtest engine, data API, analysis)
-├── agent/                 # AI optimization utilities
-│   ├── optimizer.py       # Rule-based parameter search (reference)
-│   ├── audit_log.py       # Structured JSONL + Markdown audit logging
-│   └── strategy_template.py  # Parameterized strategy template
-├── examples/              # 24 runnable example scripts
-├── tutorials/             # Step-by-step learning tutorials
-│   └── prerequisites/     # Python, technical analysis, A-share basics
-├── doc/                   # User manual, API reference, FAQ
-├── docs/                  # GitHub Pages site source (MkDocs Material)
-├── tests/                 # Test suite
-├── assets/                # Brand assets (logo, icons)
-├── web_strategy_studio/   # Web Strategy Studio (FastAPI + React)
-│   ├── backend/           # FastAPI backend + Alembic migrations
-│   ├── frontend/          # React + Vite + TypeScript frontend
-│   ├── Dockerfile         # Multi-stage: frontend-builder → api → nginx
-│   ├── docker-compose.yml
-│   └── CONTRIBUTING.md    # Studio-specific contributor guide
-├── CLAUDE.md              # AI agent configuration & optimization workflow
-└── mkdocs.yml             # Documentation site configuration
-```
-
-## Examples
-
-Full index at [`examples/Examples.md`](examples/Examples.md).
-
-| # | File | Description |
-|---|------|-------------|
-| 01 | `01_fetch_data.py` | Data API: history, CSV, local loading, market scan |
-| 02 | `02_write_strategy.py` | Strategy templates (MA crossover, RSI, multi-stock) |
-| 03 | `03_run_backtest.py` | End-to-end backtest with reports |
-| 04 | `04_stock_screener.py` | Real-time stock screening |
-| 05 | `05_paper_trade.py` | Paper trading with live quotes |
-| 06 | `06_advanced_api.py` | Scheduling, portfolio optimization, attribution |
-| 07 | `07_market_data.py` | Financials, industry, index, minute, tick data |
-| 08 | `08_lifecycle_callbacks.py` | Lifecycle callbacks & stock pool management |
-| 09 | `09_attribution_analysis.py` | Brinson + simple factor analysis |
-| 10 | `10_index_concept.py` | Index & concept board strategies |
-| 11 | `11_utils_library.py` | Full utility library demonstration |
-| 12 | `12_portfolio_backtest.py` | Multi-stock portfolio backtest |
-| 13 | `13_ptrade_export.py` | Export to PTrade/QMT platform |
-| 14–17 | Strategies | Bollinger, MACD+Volume, Multi-Factor, Grid Trading |
-| 18 | `18_strategy_comparison.py` | Side-by-side strategy comparison |
-| 19 | `19_local_data_backtest.py` | Local data mode (download once, offline backtest) |
-| 20 | `20_sr_strategy/` | Support & Resistance portfolio (production case) |
-| 21 | `21_combined_strategy/` | All-Weather Alpha comprehensive strategy |
-| 22 | `22_stock_selection_strategy.py` | Periodic stock selection with factor screening |
-| 23 | `23_small_cap_query_example.py` | Small-cap screening with chainable query API |
-| 24 | `24_quick_report_test.py` | Quick report format validation |
 
 ---
 
@@ -189,30 +65,22 @@ Full index at [`examples/Examples.md`](examples/Examples.md).
 
 | Resource | Description |
 |----------|-------------|
-| [**Docs Site**](https://AlanFokCo.github.io/EasyQuant/) | Full documentation site with search, dark theme, navigation |
-| [**Doc Center**](doc/README.md) | Entry point: user guide, API index, FAQ, report metrics |
-| [**User Guide**](doc/user_guide.md) | Install → write strategy → run backtest → read reports |
-| [**Web Studio**](doc/web_studio.md) | Browser-based strategy development (no Python install needed) |
-| [**API Reference**](doc/api_reference.md) | All public APIs with parameters and examples |
-| [**Utils Reference**](doc/utils_reference.md) | Technical indicators, statistics, position sizing |
-| [**Tutorials**](tutorials/README.md) | Zero to production, with real strategy cases |
-| [**Report & Metrics Guide**](doc/reports_and_metrics.md) | Field-by-field report walkthrough |
-| [**FAQ**](doc/FAQ.md) | Installation, data, performance, troubleshooting |
+| [**Docs Site**](https://AlanFokCo.github.io/EasyQuant/) | Full documentation with search and dark theme |
+| [**Tutorials**](https://AlanFokCo.github.io/EasyQuant/tutorials/) | Zero to production, 11 step-by-step guides |
+| [**How-to Guides**](https://AlanFokCo.github.io/EasyQuant/how-to/) | Task-oriented guides by scenario |
+| [**API Reference**](https://AlanFokCo.github.io/EasyQuant/reference/) | All public APIs with parameters and examples |
+| [**Examples**](examples/) | 26 runnable example scripts |
+| [**FAQ**](https://AlanFokCo.github.io/EasyQuant/project/faq/) | Troubleshooting and common questions |
 
 ---
 
 ## Installation
 
-### PyPI (recommended for users)
-
 ```bash
+# From PyPI (recommended)
 pip install easyquant-eqlib
-python -c "from eqlib import *; print('eqlib OK')"
-```
 
-### From source (for contributors / editable install)
-
-```bash
+# From source (for contributors)
 git clone https://github.com/AlanFokCo/EasyQuant.git
 cd EasyQuant
 pip install -e ".[dev]"
@@ -223,56 +91,12 @@ python -m pytest tests/
 
 ---
 
-## Performance
-
-- **Memory-aware data loading** — automatic memory limit (default 1 GB) with fallback to compact slicing; identical results, slightly slower
-- **Fast I/O** — in-memory `attribute_history` reduces 6+ year backtests from ~20 min to ~1 min
-- **Parallel data loading** — multi-threaded preload for faster startup
-
----
-
 ## Contributing
 
-We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-For contributions to the **Web Strategy Studio**, see [`web_strategy_studio/CONTRIBUTING.md`](web_strategy_studio/CONTRIBUTING.md).
-
-### Development Setup
-
-```bash
-pip install -e ".[dev,docs]"
-python -m pytest tests/ -v
-```
-
-### Studio — Quick Dev Start
-
-```bash
-cd web_strategy_studio
-npm run install:all          # installs deps + builds symbol manifest
-npm run dev:all              # API on :8080, frontend on :5173
-```
-
-Or with Docker:
-
-```bash
-cd web_strategy_studio
-docker compose up --build    # full stack on http://localhost:8080
-```
-
-### CI/CD
-
-| Pipeline | Trigger | Description |
-|----------|---------|-------------|
-| [Tests](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/test.yml) | Push / PR to `main` | Runs eqlib test suite on Python 3.10, 3.11, 3.12 |
-| [Studio Tests](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/studio-test.yml) | Push / PR to `main` (studio paths) | Backend pytest + ruff/black + frontend typecheck/ESLint/vitest |
-| [Deploy Docs](https://github.com/AlanFokCo/EasyQuant/blob/main/.github/workflows/deploy-docs.yml) | Push to `main` (docs paths) | Builds and deploys MkDocs site to GitHub Pages |
-
----
+See [CONTRIBUTING.md](docs/project/contributing.md) for guidelines.
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/AlanFokCo/EasyQuant/blob/main/LICENSE).
-
----
+[MIT License](LICENSE)
 
 > **Disclaimer:** This project is for educational and research purposes only. It does not constitute investment advice.

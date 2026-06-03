@@ -4,12 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "doc/**"
-      - "tutorials/**"
       - "docs/**"
       - "examples/**"
-      - "reports/**"
-      - "agent/**"
       - "README_zh.md"
       - "README.md"
       - "pyproject.toml"
