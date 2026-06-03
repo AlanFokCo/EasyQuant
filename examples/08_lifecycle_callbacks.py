@@ -34,7 +34,10 @@ def before_market_open(context):
 
     # Get limit up/down stats for market sentiment
     try:
-        limit_stats = get_limit_up_down_stats()
+        limit_stats = get_limit_up_down_stats(
+            start_date=current_date,
+            end_date=current_date
+        )
         if not limit_stats.empty:
             latest = limit_stats.iloc[-1]
             log.info(f"  Market Sentiment [{latest['date']}] - "
@@ -47,9 +50,13 @@ def before_market_open(context):
     try:
         north_df = get_north_money_flow()
         if not north_df.empty and "net_buy" in north_df.columns:
-            total_net_inflow = north_df["net_buy"].tail(3).sum()
-            direction = "inflow" if total_net_inflow > 0 else "outflow"
-            log.info(f"  North Money (3-day): Net {direction} {abs(total_net_inflow):.2f} 亿元")
+            recent_3d = north_df["net_buy"].tail(3)
+            if recent_3d.isna().all():
+                log.warning("  北向资金近3日数据全部为空，跳过显示")
+            else:
+                total_net_inflow = recent_3d.sum()
+                direction = "inflow" if total_net_inflow > 0 else "outflow"
+                log.info(f"  North Money (3-day): Net {direction} {abs(total_net_inflow):.2f} 亿元")
     except Exception as exc:
         log.warning(f"  北向资金数据获取失败: {exc}")
 

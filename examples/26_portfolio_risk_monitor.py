@@ -274,24 +274,29 @@ def demo_portfolio_risk_monitor(result_trend, result_mr):
         # 分析相关性风险
         max_corr = 0.0
         pair = ("N/A", "N/A")
+        found_valid = False
         for i in range(len(corr_matrix)):
             for j in range(i + 1, len(corr_matrix)):
                 corr_val = abs(corr_matrix.iloc[i, j])
                 if pd.isna(corr_val):
                     continue
+                found_valid = True
                 if corr_val > max_corr:
                     max_corr = corr_val
                     pair = (corr_matrix.index[i], corr_matrix.columns[j])
 
-        log.info(f"\n  Maximum correlation: {max_corr:.2f} ({pair[0]} vs {pair[1]})")
-        if max_corr >= custom_thresholds.correlation_kill:
-            log.info("  ⚠️ 熔断级风险：策略相关性过高!")
-        elif max_corr >= custom_thresholds.correlation_red:
-            log.info("  ⚠️ 红色预警：策略相关性较高")
-        elif max_corr >= custom_thresholds.correlation_yellow:
-            log.info("  ⚡ 黄色预警：策略相关性值得关注")
+        if not found_valid:
+            log.info("\n  ⚠️ 无有效相关性数据，无法评估策略分散度")
         else:
-            log.info("  ✅ 策略相关性正常，分散度良好")
+            log.info(f"\n  Maximum correlation: {max_corr:.2f} ({pair[0]} vs {pair[1]})")
+            if max_corr >= custom_thresholds.correlation_kill:
+                log.info("  ⚠️ 熔断级风险：策略相关性过高!")
+            elif max_corr >= custom_thresholds.correlation_red:
+                log.info("  ⚠️ 红色预警：策略相关性较高")
+            elif max_corr >= custom_thresholds.correlation_yellow:
+                log.info("  ⚡ 黄色预警：策略相关性值得关注")
+            else:
+                log.info("  ✅ 策略相关性正常，分散度良好")
     else:
         log.info("  Correlation matrix: 无数据（需至少2个策略）")
 
