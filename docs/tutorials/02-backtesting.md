@@ -81,7 +81,7 @@
 
 真实回测会在仓库根目录的 **`reports/`** 下写出四套文件（`.html` / `.png` / `.md` / `.json`）。文件名带时间戳；带后缀的（如 `_19_localdata`）通常对应示例脚本里的 `report_suffix` 或脚本说明。
 
-**推荐阅读：** 仓库内 [`reports/README.md`](../how-to/read-reports.md) 列出了与示例脚本对应的对照表。下面 HTML 截图与其中 **`backtest_20260511_234245_19_localdata.html`** 为同一次运行（示例 [`19_local_data_backtest.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py)）；副本放在 `assets/tutorials/` 便于在网页里直接显示，**你本地学习时请同时用浏览器打开同名的 `.html`** 对照 [报告格式详解](../reference/reports-format.md)。
+**推荐阅读：** 仓库内 [`reports/README.md`](../how-to/read-reports.md) 列出了与示例脚本对应的对照表。下面 HTML 截图与其中 **`backtest_20260511_234245_19_localdata.html`** 为同一次运行（示例 [`06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py)）；副本放在 `assets/tutorials/` 便于在网页里直接显示，**你本地学习时请同时用浏览器打开同名的 `.html`** 对照 [报告格式详解](../reference/reports-format.md)。
 
 ![示例：本地数据回测 HTML 报告（19_local_data）](../assets/tutorials/example_report_html_19_localdata.png)
 
@@ -619,5 +619,5 @@ Total Trades:              12
 
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、组合优化、归因分析、避免过拟合
 - **[Tutorial 05: RSI 均值回归策略](05-rsi-mean-reversion.md)** — 换一种策略思路，学习均值回归
-- **[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_sr_strategy/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告，可直接查看策略表现
+- **[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告，可直接查看策略表现
 - **[Tutorial 04: 模拟盘到实盘](04-live-trading.md)** — 从模拟盘到 PTrade/QMT 实盘部署

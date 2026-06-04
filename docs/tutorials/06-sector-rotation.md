@@ -536,7 +536,7 @@ if __name__ == '__main__':
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 在固定股票池内，用多个因子打分，选出最优标的
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优（轮动周期、持仓数量）、组合优化
 - **[Example 10: 指数与概念策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py)** — 指数成分股轮动的完整代码
-- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_multi_factor_strategy.py)** — 多因子方法的完整代码
+- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 多因子方法的完整代码
 
 ### 练习
 

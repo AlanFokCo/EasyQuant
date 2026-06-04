@@ -125,14 +125,14 @@ run_paper_trade(
 ### 3.1 使用导出工具
 
 ```bash
-python examples/13_ptrade_export.py
+python examples/12_paper_trade.py
 ```
 
 这会生成 `examples/ptrade_strategy_generated.py`（默认以 `examples/03_run_backtest.py` 为样例策略）。
 
 ### 3.2 自定义策略导出
 
-在 `examples/13_ptrade_export.py` 的 `if __name__ == '__main__':` 中，把 `export_ptrade_script(strategy_file=...)` 的 `strategy_file` 改成你自己的策略 `.py` 路径（需包含 `initialize(context)`）。也可直接调用：
+在 `examples/12_paper_trade.py` 的 `if __name__ == '__main__':` 中，把 `export_ptrade_script(strategy_file=...)` 的 `strategy_file` 改成你自己的策略 `.py` 路径（需包含 `initialize(context)`）。也可直接调用：
 
 ```python
 from eqlib.ptrade_adapter import export_ptrade_script
@@ -470,4 +470,4 @@ def handlebar(ContextInfo):
 - [API 参考](../reference/index.md) — 完整的 API 列表
 - [工具库参考](../reference/utils.md) — 技术指标、统计工具、资金管理
 - [示例代码](../examples/index.md) — 20 个可直接运行的示例
-- **[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_sr_strategy/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告
+- **[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告

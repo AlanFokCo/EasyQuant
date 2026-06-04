@@ -789,8 +789,8 @@ def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
 
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、归因分析，检验多因子策略的稳健性
 - **[Tutorial 06: 行业轮动](06-sector-rotation.md)** — 将多因子选股与行业轮动结合，先选行业再选股
-- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_multi_factor_strategy.py)** — 完整可运行的多因子示例代码
-- **[Example 09: 绩效归因分析](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution_analysis.py)** — 对策略收益进行深度归因，了解选股效应和配置效应
+- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 完整可运行的多因子示例代码
+- **[Example 09: 绩效归因分析](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution.py)** — 对策略收益进行深度归因，了解选股效应和配置效应
 - **[工具库参考](../reference/utils.md)** — `utils.zscore`、`utils.rolling_sharpe`、`utils.max_drawdown` 等工具的详细说明
 
 ### 练习
