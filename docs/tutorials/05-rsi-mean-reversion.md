@@ -143,9 +143,9 @@ def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0,
-        close_tax=0.001,
-        open_commission=0.0003,
-        close_commission=0.0003,
+        close_tax=0.0005,
+        open_commission=0.00025,
+        close_commission=0.00025,
         min_commission=5,
     ))
     run_daily(market_open, time='every_bar')
@@ -296,8 +296,8 @@ BARS_NEEDED    = 40
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         min_commission=5,
     ))
     run_daily(market_open, time='every_bar')
@@ -415,8 +415,8 @@ g.position_pct   = 0.25   # 每只股票最多用 25% 可用资金
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         min_commission=5,
     ))
     run_daily(market_open, time='every_bar')

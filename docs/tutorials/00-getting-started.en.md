@@ -307,14 +307,14 @@ After paper trading validates the strategy, start live trading with a small posi
 
 ```python
 # Wrong: not accounting for commissions
-# 5 trades/day × (0.03% commission + 0.1% stamp duty) = huge cumulative drag over a year
+# 5 trades/day × (0.025% commission + 0.05% stamp duty) = huge cumulative drag over a year
 
 # Correct: set realistic transaction costs
 set_order_cost(OrderCost(
     open_tax=0,
-    close_tax=0.001,          # 0.1% stamp duty on sell
-    open_commission=0.0003,   # 0.03% commission on buy
-    close_commission=0.0003,
+    close_tax=0.0005,          # 0.05% stamp duty (halved since Aug 2023)
+    open_commission=0.00025,   # 0.025% commission on buy
+    close_commission=0.00025,
     min_commission=5,         # Minimum commission: 5 CNY
 ))
 ```

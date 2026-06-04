@@ -39,17 +39,17 @@
 
 | 费用 | 买入 | 卖出 | 说明 |
 |------|------|------|------|
-| 印花税 | 0% | 0.1% | 仅卖出收取 |
-| 佣金 | 0.03% | 0.03% | 最低 5 元/笔 |
+| 印花税 | 0% | 0.05% | 仅卖出收取（2023年8月起减半） |
+| 佣金 | 0.025% | 0.025% | 最低 5 元/笔（含规费） |
 
 在 eqlib 中设置：
 
 ```python
 set_order_cost(OrderCost(
     open_tax=0,
-    close_tax=0.001,
-    open_commission=0.0003,
-    close_commission=0.0003,
+    close_tax=0.0005,
+    open_commission=0.00025,
+    close_commission=0.00025,
     min_commission=5,
 ))
 ```

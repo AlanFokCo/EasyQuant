@@ -17,8 +17,8 @@ set_benchmark('000300.XSHG')   # 沪深300
 设置交易手续费。
 
 ```python
-set_order_cost(OrderCost(open_tax=0, close_tax=0.001,
-                         open_commission=0.0003, close_commission=0.0003,
+set_order_cost(OrderCost(open_tax=0, close_tax=0.0005,
+                         open_commission=0.00025, close_commission=0.00025,
                          min_commission=5))
 ```
 

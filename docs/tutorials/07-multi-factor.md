@@ -608,8 +608,8 @@ def rank_stocks(context):
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         min_commission=5,
     ))
     context.universe = STOCK_POOL

@@ -76,9 +76,9 @@ def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0,
-        close_tax=0.001,
-        open_commission=0.0003,
-        close_commission=0.0003,
+        close_tax=0.0005,
+        open_commission=0.00025,
+        close_commission=0.00025,
         min_commission=5,
     ))
     run_daily(market_open, time='every_bar')
