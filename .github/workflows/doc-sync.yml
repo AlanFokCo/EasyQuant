@@ -1,0 +1,40 @@
+name: Doc Sync Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'examples/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'examples/**'
+
+permissions:
+  contents: read
+
+jobs:
+  doc-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check doc sync
+        run: python scripts/check_doc_sync.py
+
+      - name: Run example smoke tests
+        run: |
+          pip install -e .
+          python -m pytest tests/test_examples_smoke.py -v --tb=short
+
+      - name: Build docs
+        run: |
+          pip install mkdocs-material mkdocs-static-i18n pymdown-extensions
+          mkdocs build --strict
