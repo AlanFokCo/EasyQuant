@@ -188,7 +188,7 @@ docs/tutorials/
 | 策略类型 | 教程 | 相关示例 |
 |---------|------|---------|
 | **趋势跟踪（双均线）** | [Tutorial 01](01-first-strategy.md)、[Tutorial 03](03-optimization.md) | [Example 02](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/02_write_strategy.py)、[Example 03](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/03_run_backtest.py) |
-| **均值回归（RSI）** | [Tutorial 05](05-rsi-mean-reversion.md) | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py)、[Example 18](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_strategy_comparison.py) |
+| **均值回归（RSI）** | [Tutorial 05](05-rsi-mean-reversion.md) | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
 | **均值回归（布林带）** | [Tutorial 05 第 8 节](05-rsi-mean-reversion.md#8-与布林带策略的对比) | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
 | **MACD 趋势确认** | [Tutorial 03 第 3.4 节](03-optimization.md#34-macd-辅助确认) | [Example 15](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_macd_volume.py) |
 | **行业轮动** | [Tutorial 06](06-sector-rotation.md) | [Example 10](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py) |
@@ -251,6 +251,5 @@ RSI/布林带/MACD/ATR 技术信号、支撑阻力位和生命周期回调，配
 
 ### 多策略横向对比
 
-**[Example 18: 多策略对比](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_strategy_comparison.py)** —
-在同一只股票、同一时间段内，横向对比买入持有、双均线、RSI 均值回归、布林带四种策略。
-这是检验你对不同策略理解是否到位的最好工具。
+你可以自行在同一只股票、同一时间段内，运行多个策略脚本（如双均线、RSI 均值回归、布林带），横向对比它们的表现。
+这是检验你对不同策略理解是否到位的最好方式。
