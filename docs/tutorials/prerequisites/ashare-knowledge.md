@@ -208,7 +208,7 @@ safe_stocks = filter_st_stocks(candidates)
 
 ### 7.2 单次买卖的实际成本
 
-以 10 万元买卖为例（佣金 0.03%，最低 5 元）：
+以 10 万元买卖为例（佣金 0.025%，最低 5 元）：
 - 买入：10 万 × 0.03% = 30 元
 - 卖出：10 万 × 0.03% + 10 万 × 0.05% = 30 + 50 = 80 元
 - **一个来回总成本：110 元（0.11%）**
@@ -222,8 +222,8 @@ def initialize(context):
     set_order_cost(OrderCost(
         open_tax=0,               # 买入印花税（目前为 0）
         close_tax=0.0005,         # 卖出印花税 0.05%（2024 年现行）
-        open_commission=0.0003,   # 买入佣金 0.03%
-        close_commission=0.0003,  # 卖出佣金 0.03%
+        open_commission=0.00025,   # 买入佣金 0.025%
+        close_commission=0.00025,  # 卖出佣金 0.025%
         min_commission=5,         # 最低佣金 5 元
     ))
 ```

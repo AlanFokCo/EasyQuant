@@ -195,7 +195,7 @@ df['margin_repay'] = df['margin_repay'].fillna(0)
 
 ### Q: 如何导出到 PTrade / QMT？
 
-见 [导出 PTrade/QMT](../how-to/export-ptrade.md) 与示例 `examples/13_ptrade_export.py`。
+见 [导出 PTrade/QMT](../how-to/export-ptrade.md) 与示例 `examples/12_paper_trade.py`。
 
 ---
 

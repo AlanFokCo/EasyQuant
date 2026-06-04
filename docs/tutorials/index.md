@@ -69,8 +69,8 @@ docs/tutorials/
 3. 打开 `reports/*.html` 看指标卡片、回撤曲线、交易记录。
 4. 需要离线快速验证时，先跑本地数据示例（可选）：
    ```bash
-   python examples/19_local_data_backtest.py --download-all
-   python examples/19_local_data_backtest.py
+   python examples/06_local_data.py --download-all
+   python examples/06_local_data.py
    ```
 5. 做最小功能验证（可选）：
    ```bash
