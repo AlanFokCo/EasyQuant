@@ -6,13 +6,13 @@
     |------|------|
     | **目标** | 将选股、轮动、风控等模块整合为可运行的综合策略，并对接回测与模拟盘 |
     | **预计用时** | 2 小时以上（可按目录分次阅读） |
-    | **前置** | Tutorial 03～07 建议至少通读一遍；代码见 [`examples/21_combined_strategy/`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/21_combined_strategy/README.md) |
+    | **前置** | Tutorial 03～07 建议至少通读一遍；代码见 [`examples/20_all_weather_alpha/`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md) |
 
 > 本教程将之前所有教程和示例中的策略技术整合成一个完整的、可投入实盘的综合策略。
 > 我们会逐步讲解每个组件的设计原理、数学公式和代码实现，
 > 并提供完整的回测和模拟盘代码，可直接运行。
 
-**说明：** [`examples/21_combined_strategy/README.md`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/21_combined_strategy/README.md) 目录内脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 的安装方式无关。
+**说明：** [`examples/20_all_weather_alpha/README.md`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md) 目录内脚本会将子目录加入 `sys.path` 以导入 `combined_strategy`，与 `eqlib` 的安装方式无关。
 
 ---
 
@@ -426,7 +426,7 @@ per_stock_value = min(
 
 ## 6. 生命周期回调集成
 
-参考 [Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_lifecycle_callbacks.py)，策略注册了两个生命周期回调。
+参考 [Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)，策略注册了两个生命周期回调。
 
 ### 6.1 开盘前（before_trading_start）
 
@@ -550,7 +550,7 @@ def _before_market_open(context):
 ### 8.1 文件结构
 
 ```
-examples/21_combined_strategy/
+examples/20_all_weather_alpha/
 ├── combined_strategy.py    # 完整策略模块（可导入、可修改）
 ├── run_backtest.py         # 回测运行脚本（直接可运行）
 ├── run_paper_trade.py      # 模拟盘运行脚本（直接可运行）
@@ -615,7 +615,7 @@ initialize(context)                    # 策略入口（必须有）
 
 ```bash
 # 在项目根目录下运行
-python examples/21_combined_strategy/run_backtest.py
+python examples/20_all_weather_alpha/run_backtest.py
 ```
 
 **回测参数：**
@@ -678,7 +678,7 @@ print("Win rate     : %.2f%%" % (metrics["win_rate"] * 100))
 
 ```bash
 # 第一步：预下载数据（只需一次）
-python examples/19_local_data_backtest.py --download-all
+python examples/06_local_data.py --download-all
 
 # 第二步：使用本地数据运行回测（速度更快）
 # 在 run_backtest.py 中修改：
@@ -693,10 +693,10 @@ python examples/19_local_data_backtest.py --download-all
 
 ```bash
 # 默认设置（资金 ¥500,000，每 60 秒刷新一次报价）
-python examples/21_combined_strategy/run_paper_trade.py
+python examples/20_all_weather_alpha/run_paper_trade.py
 
 # 自定义参数
-python examples/21_combined_strategy/run_paper_trade.py \
+python examples/20_all_weather_alpha/run_paper_trade.py \
     --cash 200000 \
     --interval 120
 
@@ -712,7 +712,7 @@ python examples/21_combined_strategy/run_paper_trade.py \
 
 ### 10.3 部署到 PTrade/QMT
 
-参考 [Tutorial 05: 模拟盘到实盘](04-live-trading.md) 和 [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ptrade_export.py)，
+参考 [Tutorial 05: 模拟盘到实盘](04-live-trading.md) 和 [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py)，
 可以将本策略导出为 PTrade/QMT 格式：
 
 ```python
@@ -831,11 +831,11 @@ position_pct = min(kelly_f * 0.5, g.max_single_pct)
 
 | 示例 | 相关代码 |
 |------|---------|
-| [Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/14_bollinger_strategy.py) | Bollinger 均值回归 |
-| [Example 15: MACD 策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_macd_volume_strategy.py) | MACD+成交量+ATR |
-| [Example 16: 多因子策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_multi_factor_strategy.py) | 动量+成交量选股 |
-| [Example 20: 支撑阻力策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_sr_strategy/README.md) | S/R+MACD+ATR 完整案例 |
-| [Example 11: 工具库](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/11_utils_library.py) | 所有技术指标演示 |
+| [Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) | Bollinger 均值回归 |
+| [Example 15: MACD 策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_macd_volume.py) | MACD+成交量+ATR |
+| [Example 16: 多因子策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py) | 动量+成交量选股 |
+| [Example 20: 支撑阻力策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) | S/R+MACD+ATR 完整案例 |
+| [Example 11: 工具库](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py) | 所有技术指标演示 |
 
 ---
 
@@ -850,11 +850,11 @@ pip install easyquant-eqlib
 # pip install .
 
 # 运行回测（约 60 秒）
-python examples/21_combined_strategy/run_backtest.py
+python examples/20_all_weather_alpha/run_backtest.py
 
 # 查看报告（浏览器打开生成的 HTML 文件）
 # 报告路径：reports/backtest_<时间戳>.html
 
 # 模拟盘（需要网络，交易时段内运行效果最佳）
-python examples/21_combined_strategy/run_paper_trade.py
+python examples/20_all_weather_alpha/run_paper_trade.py
 ```

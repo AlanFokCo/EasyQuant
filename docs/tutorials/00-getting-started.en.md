@@ -112,7 +112,7 @@ result = run_strategy(
 )
 ```
 
-It is recommended to run [`examples/19_local_data_backtest.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_local_data_backtest.py) first to validate the offline workflow.
+It is recommended to run [`examples/06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py) first to validate the offline workflow.
 
 > Tip: The date range of your locally downloaded data should cover your backtest period. If the backtest dates extend beyond the local file range, download the missing data first.
 

@@ -10,7 +10,7 @@
 
 > 均值回归是最经典的量化策略思想之一。本教程从 RSI 指标原理出发，系统讲解如何设计、回测和改进一个 RSI 均值回归策略。
 
-**相关示例：** [`examples/14_bollinger_strategy.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/14_bollinger_strategy.py) 等（见 [`Examples.md`](../examples/index.md)）
+**相关示例：** [`examples/15_bollinger_strategy.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) 等（见 [`Examples.md`](../examples/index.md)）
 
 ---
 
@@ -506,7 +506,7 @@ RSI 均值回归和布林带均值回归都是常见的均值回归策略，但�
 | **参数** | RSI 周期、超买/超卖阈值 | Bollinger 周期、标准差倍数 |
 | **信号特点** | 更关注**短期涨跌力度** | 更关注**当前价格相对历史的位置** |
 | **假信号** | 强趋势时频繁触发超卖/超买 | 趋势突破时会在带外停留很长时间 |
-| **相关示例** | 本教程 | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/14_bollinger_strategy.py) |
+| **相关示例** | 本教程 | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
 
 ### 8.1 结合使用
 
@@ -537,7 +537,7 @@ if rsi_val < 30 and current_price <= lower.iloc[-1]:
 - **[Tutorial 06: 行业轮动策略](06-sector-rotation.md)** — 利用 A 股行业轮动特性，通过板块切换赚取超额收益
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 结合动量、价值、质量多个因子，系统化选股
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、避免过拟合、归因分析
-- **[Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/14_bollinger_strategy.py)** — 另一种经典均值回归策略的完整代码
+- **[Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py)** — 另一种经典均值回归策略的完整代码
 - **[Example 18: 多策略对比](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_strategy_comparison.py)** — 在同一股票上横向对比多种策略
 
 ### 练习

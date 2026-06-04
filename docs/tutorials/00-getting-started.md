@@ -112,7 +112,7 @@ result = run_strategy(
 )
 ```
 
-建议先跑 [`examples/19_local_data_backtest.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_local_data_backtest.py) 做离线流程验证。
+建议先跑 [`examples/06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py) 做离线流程验证。
 
 > 提示：本地已下载数据的日期区间应覆盖你的回测区间；若回测起止超出本地文件范围，请先补齐对应日期数据再运行。
 
