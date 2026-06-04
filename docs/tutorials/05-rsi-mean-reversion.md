@@ -538,7 +538,6 @@ if rsi_val < 30 and current_price <= lower.iloc[-1]:
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 结合动量、价值、质量多个因子，系统化选股
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、避免过拟合、归因分析
 - **[Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py)** — 另一种经典均值回归策略的完整代码
-- **[Example 18: 多策略对比](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_strategy_comparison.py)** — 在同一股票上横向对比多种策略
 
 ### 练习
 

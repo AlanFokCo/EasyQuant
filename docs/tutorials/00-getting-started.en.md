@@ -443,7 +443,7 @@ The following three prerequisite files provide more comprehensive learning mater
 | Area | Content | Suggested study time |
 |------|---------|---------------------|
 | Python basics | Variables, functions, loops, conditionals | 1–2 weeks; or consult the [prerequisite file](prerequisites/python-basics.md) directly |
-| pandas | DataFrame, Series, indexing, aggregation | 1–2 weeks; core usage in [prerequisite file §4](prerequisites/python-basics.md#4-pandas-核心用法) |
+| pandas | DataFrame, Series, indexing, aggregation | 1–2 weeks; core usage in [prerequisite file §4](prerequisites/python-basics.md#4-pandas-core-usage) |
 | Technical indicators | Moving averages, MACD, RSI, Bollinger Bands | Learn as you go; systematic overview in the [prerequisite file](prerequisites/technical-concepts.md) |
 | A-share rules | T+1, price limits, transaction fees | Half a day; see the [prerequisite file](prerequisites/ashare-knowledge.md) |
 
