@@ -105,3 +105,50 @@ def apply_matplotlib_brand(fig) -> None:
         transform=fig.transFigure,
         zorder=1000,
     )
+
+
+# ============================================================
+# Dark theme color palette for reports (Bloomberg Terminal style)
+# ============================================================
+
+DARK_COLORS = {
+    # Background layers
+    "bg_primary": "#0c1222",
+    "bg_card": "#131b2e",
+    "bg_elevated": "#1a2438",
+    "bg_input": "#0f1729",
+    # Borders
+    "border": "#1e2a3a",
+    "border_light": "#253042",
+    # Text
+    "text_primary": "#e2e8f0",
+    "text_secondary": "#8b98a9",
+    "text_dim": "#4a5568",
+    # Semantic
+    "up": "#26a69a",
+    "down": "#ef5350",
+    "accent": "#5b8def",
+    "warning": "#faad14",
+    # Chart
+    "chart_strategy": "#5b8def",
+    "chart_hs300": "#f0b90b",
+    "chart_sse": "#e2735a",
+    "chart_ma5": "#f0b90b",
+    "chart_ma20": "#5b8def",
+    "chart_ma60": "#a855f7",
+}
+
+
+def apply_matplotlib_dark_theme(fig):
+    """Apply dark theme styling to a matplotlib Figure for PNG report."""
+    c = DARK_COLORS
+    fig.patch.set_facecolor(c["bg_primary"])
+    for ax in fig.axes:
+        ax.set_facecolor(c["bg_card"])
+        ax.tick_params(colors=c["text_secondary"], labelsize=8)
+        ax.xaxis.label.set_color(c["text_secondary"])
+        ax.yaxis.label.set_color(c["text_secondary"])
+        ax.title.set_color(c["text_primary"])
+        for spine in ax.spines.values():
+            spine.set_color(c["border"])
+        ax.grid(True, alpha=0.15, color=c["border_light"])

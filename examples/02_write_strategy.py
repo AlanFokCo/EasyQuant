@@ -1,181 +1,186 @@
-"""Example 2: Writing strategies.
+"""
+02 - Writing Your First Strategy
+===============================
 
-Demonstrates how to write trading strategies using the eqlib API.
-Strategy framework uses a standard event-driven model:
-- initialize(context): strategy setup
-- handle_data(context, data): executed every bar
-- run_daily(func): scheduled daily execution
-- run_weekly(func): scheduled weekly execution
-- run_monthly(func): scheduled monthly execution
-- g.*: global variables for strategy parameters
-- context.portfolio: account state
+Demonstrates the core pattern for writing an EasyQuant strategy:
+- initialize(context): one-time setup (benchmark, costs, scheduling)
+- market_open(context): daily trading logic (data -> signal -> order)
+- g object: global state shared across callbacks
+- run_daily(): schedule functions to run each trading day
+
+This example implements a dual Moving Average crossover strategy
+on a single stock, which is the "Hello World" of quantitative trading.
+
+Teaching Objectives:
+    - Strategy lifecycle: initialize -> daily callback
+    - The g object for global strategy state
+    - attribute_history() for fetching historical data
+    - order_value() and order_target() for placing trades
+    - record() for charting custom metrics
+
+Expected Output:
+    - Strategy initialization messages
+    - Buy/sell signals logged during backtest
+    - Evaluation panel with Sharpe ratio, max drawdown, etc.
+
+Run:
+    python examples/02_write_strategy.py
 """
 
-from eqlib import *
+import os
+
+from eqlib import (
+    run_strategy, set_benchmark, set_order_cost,
+    run_daily, attribute_history, order_value, order_target,
+    record, log, g,
+)
+from examples._defaults import (
+    STOCKS, STOCKS_TRADE, INDEX_HS300,
+    DEFAULT_ORDER_COST, INITIAL_CASH,
+    START_DATE, END_DATE, verify_data_available, print_evaluation,
+)
 
 
 # ============================================================
-# Strategy 1: Moving Average Crossover
+# Strategy parameters
 # ============================================================
 
-def ma_cross_initialize(context):
-    """MA crossover strategy initialization."""
-    g.security = "601390"
-    g.fast_period = 5
-    g.slow_period = 20
+# Why these periods? 5-day and 20-day are standard practitioner
+# defaults for short-term and medium-term trends respectively.
+# The 5/20 combination captures momentum reversals on a ~2-week lag.
+SECURITY = STOCKS["bank"]              # 601398 ICBC
+SECURITY_TRADE = STOCKS_TRADE["bank"]  # 601398.XSHG for trading
+FAST_PERIOD = 5                        # Short-term moving average
+SLOW_PERIOD = 20                       # Long-term moving average
 
-    set_benchmark("000300.XSHG")
-    set_option("use_real_price", True)
-    set_order_cost(OrderCost(
-        open_tax=0,
-        close_tax=0.001,
-        open_commission=0.0003,
-        close_commission=0.0003,
-        close_today_commission=0,
-        min_commission=5,
-    ))
 
+# ============================================================
+# Strategy code
+# ============================================================
+
+def initialize(context):
+    """One-time strategy setup.
+
+    Called once at the start of the backtest. Use this to:
+    - Set the benchmark for performance comparison
+    - Configure trading costs
+    - Store strategy parameters on the g (global) object
+    - Schedule trading functions via run_daily/run_weekly/run_monthly
+    """
+    # Performance benchmark: CSI 300 index
+    set_benchmark(INDEX_HS300)
+
+    # Trading costs — use shared defaults for consistency
+    set_order_cost(DEFAULT_ORDER_COST)
+
+    # Store parameters on g (global state object)
+    # g persists across all callbacks throughout the backtest
+    g.security = SECURITY
+    g.security_trade = SECURITY_TRADE
+    g.fast_period = FAST_PERIOD
+    g.slow_period = SLOW_PERIOD
+
+    # Define the universe (stocks this strategy trades)
     context.universe = [g.security]
-    run_daily(ma_cross_handle, time="every_bar")
 
-    log.info("MA crossover init: %s, MA%d/MA%d" % (
-        g.security, g.fast_period, g.slow_period))
+    # Schedule the trading function to run every trading day
+    run_daily(market_open, time="every_bar")
+
+    log.info("Strategy initialized: MA %d/%d on %s",
+             g.fast_period, g.slow_period, g.security)
 
 
-def ma_cross_handle(context):
-    """Daily trading logic."""
+def market_open(context):
+    """Daily trading logic: dual MA crossover.
+
+    Called once per trading day. The workflow is:
+    1. Fetch historical data via attribute_history()
+    2. Calculate signals (MA crossover)
+    3. Execute trades via order_value() or order_target()
+    4. Record metrics for charting
+
+    Signal logic:
+    - BUY  when fast MA crosses above slow MA (golden cross)
+    - SELL when fast MA crosses below slow MA (death cross)
+    """
     security = g.security
+    security_trade = g.security_trade
 
-    close_data = attribute_history(security, 25, "1d", ["close"])
-    if close_data.empty or len(close_data) < g.slow_period:
+    # Step 1: Fetch enough history for the slow MA calculation
+    bars_needed = g.slow_period + 5
+    hist = attribute_history(security, bars_needed, "1d", ["close"])
+    if hist is None or hist.empty or len(hist) < g.slow_period:
         return
 
-    fast_ma = close_data["close"].tail(g.fast_period).mean()
-    slow_ma = close_data["close"].tail(g.slow_period).mean()
-    current_price = close_data["close"].iloc[-1]
+    close = hist["close"]
+    current_price = close.iloc[-1]
 
-    prev_fast = close_data["close"].tail(g.fast_period + 1).head(g.fast_period).mean()
-    prev_slow = close_data["close"].tail(g.slow_period + 1).head(g.slow_period).mean()
+    # Step 2: Calculate moving averages
+    fast_ma = close.rolling(g.fast_period).mean()
+    slow_ma = close.rolling(g.slow_period).mean()
 
-    # Golden cross: buy
-    if prev_fast <= prev_slow and fast_ma > slow_ma:
-        if security not in context.portfolio.positions \
-           or context.portfolio.positions[security].amount == 0:
-            order_value(security, context.portfolio.available_cash)
-            log.info("Golden cross BUY: %s @ %.3f" % (security, current_price))
-
-    # Death cross: sell
-    elif prev_fast >= prev_slow and fast_ma < slow_ma:
-        if security in context.portfolio.positions \
-           and context.portfolio.positions[security].amount > 0:
-            order_target(security, 0)
-            log.info("Death cross SELL: %s @ %.3f" % (security, current_price))
-
-    record(price=current_price, fast_ma=fast_ma, slow_ma=slow_ma)
-
-
-# ============================================================
-# Strategy 2: RSI Overbought/Oversold
-# ============================================================
-
-def rsi_initialize(context):
-    """RSI strategy initialization."""
-    g.security = "000001"
-    g.rsi_period = 14
-    g.overbought = 70
-    g.oversold = 30
-
-    set_benchmark("000300.XSHG")
-    set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
-        close_today_commission=0, min_commission=5,
-    ))
-
-    context.universe = [g.security]
-    run_daily(rsi_handle, time="every_bar")
-
-    log.info("RSI strategy init: %s, period=%d" % (g.security, g.rsi_period))
-
-
-def rsi_handle(context):
-    """RSI trading logic."""
-    security = g.security
-    close_data = attribute_history(security, 30, "1d", ["close"])
-
-    if close_data.empty or len(close_data) < g.rsi_period + 1:
+    if len(fast_ma.dropna()) < 2 or len(slow_ma.dropna()) < 2:
         return
 
-    delta = close_data["close"].diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.tail(g.rsi_period).mean()
-    avg_loss = loss.tail(g.rsi_period).mean()
+    # Detect crossover: compare today vs yesterday
+    prev_fast, curr_fast = fast_ma.iloc[-2], fast_ma.iloc[-1]
+    prev_slow, curr_slow = slow_ma.iloc[-2], slow_ma.iloc[-1]
 
-    if avg_loss == 0:
-        rsi = 100
-    else:
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
+    golden_cross = (prev_fast <= prev_slow) and (curr_fast > curr_slow)
+    death_cross = (prev_fast >= prev_slow) and (curr_fast < curr_slow)
 
-    current_price = close_data["close"].iloc[-1]
-    log.info("RSI=%.1f, price=%.3f" % (rsi, current_price))
+    # Step 3: Execute trades
+    has_position = (security_trade in context.portfolio.positions
+                    and context.portfolio.positions[security_trade].amount > 0)
 
-    # Oversold: buy
-    if rsi < g.oversold:
-        if security not in context.portfolio.positions \
-           or context.portfolio.positions[security].amount == 0:
-            order_value(security, context.portfolio.available_cash * 0.9)
-            log.info("RSI oversold BUY: %s @ %.3f, RSI=%.1f" % (security, current_price, rsi))
+    if golden_cross and not has_position:
+        # Buy: invest 95% of available cash (leave buffer for fees)
+        cash = context.portfolio.available_cash
+        if cash > current_price * 100:
+            order_value(security_trade, cash * 0.95)
+            log.info("BUY (golden cross): %s @ %.2f, fast=%.2f > slow=%.2f",
+                     security, current_price, curr_fast, curr_slow)
 
-    # Overbought: sell
-    elif rsi > g.overbought:
-        if security in context.portfolio.positions \
-           and context.portfolio.positions[security].amount > 0:
-            order_target(security, 0)
-            log.info("RSI overbought SELL: %s @ %.3f, RSI=%.1f" % (security, current_price, rsi))
+    elif death_cross and has_position:
+        # Sell: close entire position
+        order_target(security_trade, 0)
+        log.info("SELL (death cross): %s @ %.2f, fast=%.2f < slow=%.2f",
+                 security, current_price, curr_fast, curr_slow)
 
-    record(price=current_price, rsi=rsi)
+    # Step 4: Record metrics for charting
+    record(
+        price=current_price,
+        fast_ma=curr_fast,
+        slow_ma=curr_slow,
+        total_value=context.portfolio.total_value,
+    )
 
 
 # ============================================================
-# Strategy 3: Multi-stock Rotation (equal weight)
+# Run backtest
 # ============================================================
 
-def multi_stock_initialize(context):
-    """Multi-stock strategy initialization."""
-    g.stocks = ["601390", "000001", "600036"]
-    g.lookback = 20
+if __name__ == "__main__":
+    print("=" * 55)
+    print("02 - Writing Your First Strategy (MA Crossover)")
+    print("=" * 55)
 
-    set_benchmark("000300.XSHG")
-    set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
-        close_today_commission=0, min_commission=5,
-    ))
+    # Verify data is available before running
+    actual_start, actual_end = verify_data_available(
+        SECURITY, START_DATE, END_DATE)
 
-    context.universe = g.stocks
-    run_weekly(multi_stock_handle, day_of_week=0, time="09:30")
+    os.makedirs("reports", exist_ok=True)
 
-    log.info("Multi-stock strategy init: %s (rebalance Monday)" % g.stocks)
+    result = run_strategy(
+        initialize_func=initialize,
+        start_date=actual_start,
+        end_date=actual_end,
+        starting_cash=INITIAL_CASH,
+        benchmark=INDEX_HS300,
+        securities=[SECURITY],
+        report_dir="reports",
+        use_local=True,
+    )
 
-
-def multi_stock_handle(context):
-    """Equal-weight rotation logic."""
-    prices = {}
-    for sec in g.stocks:
-        df = attribute_history(sec, g.lookback, "1d", ["close"])
-        if not df.empty:
-            prices[sec] = df["close"].iloc[-1]
-
-    if len(prices) < len(g.stocks):
-        return
-
-    per_stock_cash = context.portfolio.available_cash / len(g.stocks)
-    for sec in g.stocks:
-        if sec not in context.portfolio.positions \
-           or context.portfolio.positions[sec].amount == 0:
-            if per_stock_cash > 1000:
-                order_value(sec, per_stock_cash)
-
-    record(total_value=context.portfolio.total_value)
+    if result:
+        print_evaluation(result, "MA Crossover (5/20)")

@@ -112,7 +112,7 @@ result = run_strategy(
 )
 ```
 
-建议先跑 [`examples/19_local_data_backtest.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_local_data_backtest.py) 做离线流程验证。
+建议先跑 [`examples/06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py) 做离线流程验证。
 
 > 提示：本地已下载数据的日期区间应覆盖你的回测区间；若回测起止超出本地文件范围，请先补齐对应日期数据再运行。
 
@@ -307,14 +307,14 @@ EasyQuant（`eqlib`）是一个面向 **中国 A 股市场** 的轻量级量化�
 
 ```python
 # 错误：没考虑手续费
-# 一天交易 5 次，每次佣金 0.03% + 印花税 0.1%，一年累积成本巨大
+# 一天交易 5 次，每次佣金 0.025% + 印花税 0.05%，一年累积成本巨大
 
 # 正确做法：设置合理的交易成本
 set_order_cost(OrderCost(
     open_tax=0,
-    close_tax=0.001,          # 卖出印花税 0.1%
-    open_commission=0.0003,   # 买入佣金 0.03%
-    close_commission=0.0003,
+    close_tax=0.0005,          # 印花税 0.05%（2023年8月起减半）
+    open_commission=0.00025,   # 买入佣金 0.025%
+    close_commission=0.00025,
     min_commission=5,         # 最低佣金 5 元
 ))
 ```

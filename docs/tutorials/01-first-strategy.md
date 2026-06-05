@@ -103,9 +103,9 @@ def initialize(context):
     # 设置交易成本（A 股标准费率）
     set_order_cost(OrderCost(
         open_tax=0,
-        close_tax=0.001,          # 卖出印花税 0.1%
-        open_commission=0.0003,   # 买入佣金 0.03%
-        close_commission=0.0003,  # 卖出佣金 0.03%
+        close_tax=0.0005,          # 印花税 0.05%（2023年8月起减半）
+        open_commission=0.00025,   # 买入佣金 0.025%
+        close_commission=0.00025,  # 卖出佣金 0.025%
         min_commission=5,         # 最低佣金 5 元
     ))
 

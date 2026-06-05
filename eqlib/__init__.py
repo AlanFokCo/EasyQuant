@@ -210,6 +210,9 @@ from eqlib.attribution import (
     brinson_attribution,
     simple_factor_analysis,
     fama_french_analysis,  # DEPRECATED — use simple_factor_analysis
+    grade_strategy,
+    diagnose_bottleneck,
+    recommend_params,
 )
 
 # Stock selection  [STABLE]
@@ -309,6 +312,7 @@ __all__ = [
     "analyze_returns", "brinson_attribution",
     "simple_factor_analysis",
     "fama_french_analysis",  # deprecated — use simple_factor_analysis
+    "grade_strategy", "diagnose_bottleneck", "recommend_params",
     # Stock selection
     "StockSelector", "TopNSelector", "MultiFactorSelector",
     "filter_st_stocks", "filter_paused_stocks",

@@ -1,104 +1,157 @@
-"""Example 1: Fetching stock data.
-
-Demonstrates eqlib data APIs:
-- Fetch single stock OHLCV history
-- Get full market stock list
-- Download data and save to CSV
-- Load data from local CSV
-- Use get_price / history / attribute_history
-- Scan market and check technical signals
 """
+01 - Data Fetching
+==================
+
+Demonstrates the core data APIs for retrieving A-share market data.
+This is typically the first step in any quantitative workflow:
+get data -> explore -> analyze -> build strategy.
+
+Teaching Objectives:
+    - get_price(): historical OHLCV for a single stock
+    - fetch_stock_data(): raw data interface with multi-source fallback
+    - get_all_securities(): full A-share stock listing
+    - download_stock_data() + load_csv(): local CSV workflow
+    - scan_market(): real-time market screening
+
+Expected Output:
+    - Printed DataFrames showing stock data
+    - CSV file saved to data/ directory
+    - Market scan results (may be empty outside trading hours)
+
+Run:
+    python examples/01_fetch_data.py
+"""
+
+import os
+from datetime import datetime, timedelta
 
 from eqlib import (
     get_price,
-    get_all_securities,
     fetch_stock_data,
+    get_all_securities,
     download_stock_data,
     load_csv,
-    history,
-    attribute_history,
     scan_market,
     log,
 )
-import datetime
+from examples._defaults import STOCKS
 
 
 def demo_get_price():
-    """Fetch historical price data for a single stock."""
-    log.info("=== Historical Prices (get_price) ===")
+    """Fetch historical OHLCV data for a single stock.
 
-    df = get_price("601390", start_date="2024-01-01", end_date="2024-03-01")
-    if not df.empty:
-        log.info(f"ICBC Jan-Feb 2024: {len(df)} bars")
-        log.info(f"Latest close: {df['close'].iloc[-1]:.3f}")
-        log.info(f"Columns: {df.columns.tolist()}")
+    get_price() is the most commonly used data API. It returns a
+    pandas DataFrame with columns: open, high, low, close, volume.
+    """
+    security = STOCKS["liquor"]  # 600519 Kweichow Moutai
+    end = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
+
+    print("--- get_price ---")
+    df = get_price(security, start_date=start, end_date=end)
+    if df is not None and not df.empty:
+        print(f"  {security}: {len(df)} bars from {start} to {end}")
+        print(f"  Latest close: {df['close'].iloc[-1]:.2f}")
+        print(f"  Columns: {df.columns.tolist()}")
+        print(df.tail(3).to_string())
+    else:
+        print(f"  No data for {security}")
+    print()
 
 
 def demo_fetch_stock_data():
-    """Direct access to the underlying data interface."""
-    log.info("=== Raw Data Interface (fetch_stock_data) ===")
+    """Direct data interface with multi-source fallback.
 
-    df = fetch_stock_data("000001", "2024-06-01", "2024-07-01")
-    if not df.empty:
-        log.info(f"Ping An Bank: {len(df)} bars")
-        log.info(df.tail(3))
+    fetch_stock_data() tries multiple data sources (EastMoney,
+    Tencent, Sina, BaoStock) and returns the first successful result.
+    Default adjustment is 'qfq' (forward-adjusted).
+    """
+    security = STOCKS["bank"]  # 601398 ICBC
+    end = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    print("--- fetch_stock_data ---")
+    df = fetch_stock_data(security, start, end)
+    if df is not None and not df.empty:
+        print(f"  {security}: {len(df)} bars (qfq adjusted)")
+        print(df.tail(3).to_string())
+    else:
+        print(f"  No data for {security}")
+    print()
 
 
 def demo_get_all_securities():
-    """Fetch the full A-share stock list."""
-    log.info("=== Full Market Stock List (get_all_securities) ===")
+    """Get the full A-share stock listing.
 
+    Returns a DataFrame with columns: code, name.
+    Useful for iterating over the entire market.
+    """
+    print("--- get_all_securities ---")
     df = get_all_securities()
-    if not df.empty:
-        log.info(f"Total A-shares: {len(df)}")
-        log.info(df.head(5))
+    if df is not None and not df.empty:
+        print(f"  Total A-share stocks: {len(df)}")
+        print(df.head(5).to_string())
+    print()
 
 
 def demo_download_and_load():
-    """Download data to CSV and reload it."""
-    log.info("=== Download and Load CSV ===")
+    """Download data to local CSV and reload it.
 
-    path = download_stock_data(
-        "600519", "2024-01-01", "2024-06-30",
-        output_dir="data",
-    )
+    This workflow is useful for offline analysis or when you need
+    to repeatedly access the same data without hitting the network.
+    """
+    security = STOCKS["ev"]  # 002594 BYD
+    end = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+
+    print("--- download_stock_data + load_csv ---")
+    os.makedirs("data", exist_ok=True)
+    path = download_stock_data(security, start, end, output_dir="data")
     if path:
-        log.info(f"Saved to: {path}")
-
+        print(f"  Saved to: {path}")
         df = load_csv(path)
-        if not df.empty:
-            log.info(f"Loaded {len(df)} bars from CSV")
-            log.info(df.head(3))
+        if df is not None and not df.empty:
+            print(f"  Loaded {len(df)} bars from CSV")
+            print(df.head(3).to_string())
+    else:
+        print(f"  Download failed for {security}")
+    print()
 
 
 def demo_scan_market():
-    """Scan the market for stocks matching criteria."""
-    log.info("=== Market Scan (scan_market) ===")
+    """Real-time market screening with multiple filters.
 
+    scan_market() scans all A-shares and filters by:
+    - min_price / max_price
+    - min_pct_change / max_pct_change (daily %)
+    - max_pe (P/E ratio)
+
+    Note: Results depend on current market conditions. Outside
+    trading hours, the scan may return fewer results.
+    """
+    print("--- scan_market ---")
     candidates = scan_market(
         min_price=20,
         min_pct_change=2,
         max_pct_change=5,
         max_pe=30,
     )
-    if not candidates.empty:
-        log.info(f"Found {len(candidates)} stocks")
-        log.info(candidates.head(10))
+    if candidates is not None and not candidates.empty:
+        print(f"  Found {len(candidates)} matching stocks")
+        print(candidates.head(10).to_string())
     else:
-        log.info("No stocks match the criteria today")
+        print("  No stocks match the criteria (normal outside trading hours)")
+    print()
 
 
 if __name__ == "__main__":
+    print("=" * 55)
+    print("01 - Data Fetching APIs")
+    print("=" * 55)
+    print()
+
     demo_get_price()
-    print()
-
     demo_fetch_stock_data()
-    print()
-
     demo_get_all_securities()
-    print()
-
     demo_download_and_load()
-    print()
-
     demo_scan_market()

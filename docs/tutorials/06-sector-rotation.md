@@ -246,8 +246,8 @@ def score_industries(context):
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         min_commission=5,
     ))
     # 每周一调仓
@@ -428,7 +428,7 @@ def score_industries_with_valuation(context, industry_stocks):
 # 估算年化手续费成本
 trades_per_year = 52    # 每周换仓一次
 avg_trade_value = 50000  # 平均每笔交易金额
-commission_rate = 0.0006  # 往返佣金（买 0.03% + 卖 0.03% + 卖印花税 0.1%）
+commission_rate = 0.001   # 往返成本（买 0.025% + 卖 0.025% + 印花税 0.05%）
 
 annual_cost = trades_per_year * avg_trade_value * commission_rate
 
@@ -466,8 +466,8 @@ MAX_STOCKS = 30         # 从成分股中取前 30 只作为候选（避免数�
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         min_commission=5,
     ))
 
@@ -536,7 +536,7 @@ if __name__ == '__main__':
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 在固定股票池内，用多个因子打分，选出最优标的
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优（轮动周期、持仓数量）、组合优化
 - **[Example 10: 指数与概念策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py)** — 指数成分股轮动的完整代码
-- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_multi_factor_strategy.py)** — 多因子方法的完整代码
+- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 多因子方法的完整代码
 
 ### 练习
 

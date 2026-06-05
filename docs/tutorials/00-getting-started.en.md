@@ -112,7 +112,7 @@ result = run_strategy(
 )
 ```
 
-It is recommended to run [`examples/19_local_data_backtest.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_local_data_backtest.py) first to validate the offline workflow.
+It is recommended to run [`examples/06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py) first to validate the offline workflow.
 
 > Tip: The date range of your locally downloaded data should cover your backtest period. If the backtest dates extend beyond the local file range, download the missing data first.
 
@@ -307,14 +307,14 @@ After paper trading validates the strategy, start live trading with a small posi
 
 ```python
 # Wrong: not accounting for commissions
-# 5 trades/day × (0.03% commission + 0.1% stamp duty) = huge cumulative drag over a year
+# 5 trades/day × (0.025% commission + 0.05% stamp duty) = huge cumulative drag over a year
 
 # Correct: set realistic transaction costs
 set_order_cost(OrderCost(
     open_tax=0,
-    close_tax=0.001,          # 0.1% stamp duty on sell
-    open_commission=0.0003,   # 0.03% commission on buy
-    close_commission=0.0003,
+    close_tax=0.0005,          # 0.05% stamp duty (halved since Aug 2023)
+    open_commission=0.00025,   # 0.025% commission on buy
+    close_commission=0.00025,
     min_commission=5,         # Minimum commission: 5 CNY
 ))
 ```
@@ -443,7 +443,7 @@ The following three prerequisite files provide more comprehensive learning mater
 | Area | Content | Suggested study time |
 |------|---------|---------------------|
 | Python basics | Variables, functions, loops, conditionals | 1–2 weeks; or consult the [prerequisite file](prerequisites/python-basics.md) directly |
-| pandas | DataFrame, Series, indexing, aggregation | 1–2 weeks; core usage in [prerequisite file §4](prerequisites/python-basics.md#4-pandas-核心用法) |
+| pandas | DataFrame, Series, indexing, aggregation | 1–2 weeks; core usage in [prerequisite file §4](prerequisites/python-basics.md#4-pandas-core-usage) |
 | Technical indicators | Moving averages, MACD, RSI, Bollinger Bands | Learn as you go; systematic overview in the [prerequisite file](prerequisites/technical-concepts.md) |
 | A-share rules | T+1, price limits, transaction fees | Half a day; see the [prerequisite file](prerequisites/ashare-knowledge.md) |
 

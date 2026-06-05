@@ -15,7 +15,7 @@
 
 ---
 
-## Installation & Environment
+## Installation & Environment { #installationenvironment }
 
 ### Q: `pip install .` fails with "requires a different Python: 3.9.x not in '>=3.10'"
 
@@ -53,7 +53,7 @@ After installation, `import eqlib` will work from any working directory. Before 
 
 ---
 
-## Data & Network
+## Data & Network { #datanetwork }
 
 ### Q: First backtest is very slow or hangs
 
@@ -133,7 +133,7 @@ df['margin_repay'] = df['margin_repay'].fillna(0)
 
 ---
 
-## Backtest & Strategy
+## Backtest & Strategy { #backteststrategy }
 
 ### Q: HTML is generated after backtest, but PNG is empty or missing equity curve
 
@@ -155,7 +155,7 @@ It's used to calculate **alpha, beta, information ratio, and excess returns**, a
 
 ---
 
-## Reports & Analysis
+## Reports & Analysis { #reportsanalysis }
 
 ### Q: HTML shows different "daily win rate" and "trade win rate"?
 
@@ -187,7 +187,7 @@ Use **`run_backtest`** and manually call `generate_html_report`, `analyze_return
 
 ---
 
-## Paper Trading & Export
+## Paper Trading & Export { #papertradingexport }
 
 ### Q: What's the difference between `run_paper_trade` and backtest?
 
@@ -195,7 +195,7 @@ Paper trading fetches **real-time or latest market data** at configured interval
 
 ### Q: How to export to PTrade / QMT?
 
-See [Export to PTrade/QMT](../how-to/export-ptrade.md) and the example `examples/13_ptrade_export.py`.
+See [Export to PTrade/QMT](../how-to/export-ptrade.md) and the example `examples/12_paper_trade.py`.
 
 ---
 
@@ -225,7 +225,7 @@ For more Web Studio issues, see [Web Strategy Studio](../how-to/web-studio.md).
 
 ---
 
-## Development & Testing
+## Development & Testing { #developmenttesting }
 
 ### Q: How to verify changes after modifying `eqlib` source code?
 
