@@ -332,13 +332,14 @@ def _fetch_benchmark_returns(benchmark_code, start, end, recorded):
 
 
 def generate_chart(result, out_path):
-    """Generate professional backtest chart:
-    - Top: strategy cumulative return (%) vs benchmark (%)
-    - Bottom: portfolio drawdown (%)
-    - Key metrics annotation box
+    """Generate professional backtest chart (dark theme, 4-panel):
+    - Top-left: strategy cumulative return (%) vs benchmark (%)
+    - Top-right: radar chart thumbnail (6-dimension grade)
+    - Bottom-left: portfolio drawdown (%)
+    - Bottom: monthly returns strip
     """
-    from eqlib.attribution import analyze_returns
-    from eqlib.data import fetch_stock_data
+    from eqlib.attribution import analyze_returns, grade_strategy
+    from eqlib.brand import DARK_COLORS, apply_matplotlib_dark_theme, apply_matplotlib_brand
 
     ctx = result["context"]
     trade_log = result["trade_log"]
@@ -346,15 +347,14 @@ def generate_chart(result, out_path):
     benchmark = result.get("benchmark", "000300.XSHG")
 
     analytics = analyze_returns(result)
+    grade_info = grade_strategy(analytics) if analytics else grade_strategy(None)
+    c = DARK_COLORS
 
-    # --- Portfolio value series ---
     pf_entries = sorted(
         recorded.values(), key=lambda x: x.get("date", datetime.date.min)
     ) if isinstance(recorded, dict) else recorded
     pf_records = [r for r in pf_entries if "total_value" in r]
     if not pf_records:
-        from eqlib.logger import log as _log
-        _log.warning("generate_chart: no portfolio value data found in recorded_values")
         plt.close()
         return
 
@@ -365,100 +365,122 @@ def generate_chart(result, out_path):
 
     pf_dates = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in pf_records])
     pf_values = pd.Series([r["total_value"] for r in pf_records], index=pf_dates)
-    strat_cum_ret = (pf_values / initial - 1) * 100  # percentage
+    strat_cum_ret = (pf_values / initial - 1) * 100
 
-    # --- Benchmark cumulative return ---
+    # Benchmark
     bench_cum_ret = None
     try:
         bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
         if not bench_df.empty and "close" in bench_df.columns:
             bench_df = bench_df.sort_index()
-            bench_dates = bench_df.index
             bench_init = bench_df["close"].iloc[0]
             bench_cum_ret = pd.Series(
                 (bench_df["close"] / bench_init - 1) * 100,
-                index=bench_dates,
+                index=bench_df.index,
             )
     except Exception:
         pass
 
-    # --- Figure ---
-    fig, (ax, ax_dd) = plt.subplots(
-        2, 1, figsize=(14, 8),
-        gridspec_kw={"height_ratios": [3, 1]},
-        sharex=True,
-    )
-    fig.subplots_adjust(hspace=0.08, left=0.08, right=0.96, top=0.82, bottom=0.08)
+    # Figure: 2 rows, 2 columns (top-right for radar)
+    fig = plt.figure(figsize=(14, 9), facecolor=c["bg_primary"])
+    gs = fig.add_gridspec(3, 2, height_ratios=[3, 1.5, 0.6],
+                          hspace=0.15, wspace=0.12,
+                          left=0.06, right=0.96, top=0.88, bottom=0.04)
+    ax = fig.add_subplot(gs[0, 0])          # cumulative return
+    ax_radar = fig.add_subplot(gs[0, 1])    # radar chart
+    ax_dd = fig.add_subplot(gs[1, :])       # drawdown (full width)
+    ax_monthly = fig.add_subplot(gs[2, :])  # monthly strip (full width)
 
-    # Strategy return
-    strat_dates_np = pf_dates.to_numpy()
-    ax.plot(strat_dates_np, strat_cum_ret.values, color="#1976D2", linewidth=1.8,
-            label="Strategy", zorder=5)
-
-    # Benchmark return
-    bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
+    # --- Cumulative return ---
+    ax.set_facecolor(c["bg_card"])
+    ax.plot(pf_dates.to_numpy(), strat_cum_ret.values,
+            color=c["chart_strategy"], linewidth=1.8, label="Strategy", zorder=5)
     if bench_cum_ret is not None:
-        ax.plot(bench_cum_ret.index.to_numpy(), bench_cum_ret.values, color="#757575",
-                linewidth=1.2, alpha=0.7, label=bench_label, zorder=4)
-
-    # Zero line
-    ax.axhline(0, color="#555555", linewidth=0.6, linestyle="--", zorder=0)
-
-    # Buy/sell trade markers (sparse if too many)
-    buys = [t for t in trade_log if t["type"] == "BUY"]
-    sells = [t for t in trade_log if t["type"] == "SELL"]
-    if len(buys) <= 50:
-        for b in buys:
-            idx = pf_values.index.get_indexer([pd.Timestamp(b["date"])], method="nearest")[0]
-            ret_at_buy = (pf_values.iloc[idx] / initial - 1) * 100
-            ax.plot(b["date"], ret_at_buy, marker="^", color="#2E7D32",
-                    markersize=5, zorder=3)
-    if len(sells) <= 50:
-        for s in sells:
-            idx = pf_values.index.get_indexer([pd.Timestamp(s["date"])], method="nearest")[0]
-            ret_at_sell = (pf_values.iloc[idx] / initial - 1) * 100
-            ax.plot(s["date"], ret_at_sell, marker="v", color="#C62828",
-                    markersize=5, zorder=3)
-
-    ax.legend(loc="upper left", fontsize=9, framealpha=0.9)
-    ax.set_ylabel("Cumulative Return (%)", fontsize=10)
-    ax.grid(True, alpha=0.3)
+        bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
+        ax.plot(bench_cum_ret.index.to_numpy(), bench_cum_ret.values,
+                color=c["chart_hs300"], linewidth=1.2, alpha=0.7, label=bench_label, zorder=4)
+    ax.axhline(0, color=c["text_dim"], linewidth=0.6, linestyle="--")
+    ax.legend(loc="upper left", fontsize=8, facecolor=c["bg_elevated"],
+              edgecolor=c["border"], labelcolor=c["text_secondary"])
+    ax.set_ylabel("Cumulative Return (%)", fontsize=9, color=c["text_secondary"])
+    ax.tick_params(colors=c["text_secondary"], labelsize=7)
+    ax.grid(True, alpha=0.15, color=c["border_light"])
+    for spine in ax.spines.values():
+        spine.set_color(c["border"])
     ax.set_title(
         f"PnL: {pnl:+,.0f} ({pnl_pct:+.2f}%)  |  Trades: {len(trade_log)}",
-        fontsize=12, fontweight="bold",
+        fontsize=11, fontweight="bold", color=c["text_primary"],
     )
 
     # Metrics annotation
     if analytics:
-        ann_ret = analytics.get("annual_return", 0.0)
-        sharpe = analytics.get("sharpe_ratio", 0.0)
-        max_dd = analytics.get("max_drawdown", 0.0)
-        win = analytics.get("win_rate", 0.0)
-        beta = analytics.get("beta", 1.0)
-        alpha = analytics.get("alpha", 0.0)
+        ann_ret = analytics.get("annual_return", 0)
+        sharpe = analytics.get("sharpe_ratio", 0)
+        max_dd = analytics.get("max_drawdown", 0)
         ax.text(
             0.98, 0.03,
-            f"Ann.Ret  {ann_ret:+.2%}    Sharpe  {sharpe:.2f}    MaxDD  {max_dd:.2%}\n"
-            f"Beta     {beta:.2f}      Alpha   {alpha:+.2%}   Win    {win:.1%}",
-            transform=ax.transAxes, fontsize=9, fontfamily="monospace",
-            ha="right", va="bottom",
-            bbox=dict(boxstyle="round,pad=0.5", facecolor="white",
-                      edgecolor="#bbbbbb", alpha=0.9),
+            f"Ann.Ret {ann_ret:+.1%}  Sharpe {sharpe:.2f}  MaxDD {max_dd:.1%}",
+            transform=ax.transAxes, fontsize=8, fontfamily="monospace",
+            ha="right", va="bottom", color=c["text_secondary"],
+            bbox=dict(boxstyle="round,pad=0.4", facecolor=c["bg_elevated"],
+                      edgecolor=c["border"], alpha=0.9),
         )
 
-    # --- Drawdown panel ---
+    # --- Dimension score bars ---
+    ax_radar.set_facecolor(c["bg_card"])
+    dims = grade_info.get("dimensions", [])
+    if dims:
+        dim_scores = [d["score"] for d in dims]
+        short_names = ["Return", "Risk", "Adj.", "Trade", "Excess", "Stab."]
+        bars = ax_radar.barh(short_names[:len(dims)], dim_scores,
+                             color=c["accent"], alpha=0.7, height=0.6)
+        ax_radar.set_xlim(0, 100)
+        ax_radar.tick_params(colors=c["text_secondary"], labelsize=7)
+        ax_radar.set_title(f"Grade: {grade_info['overall']} ({grade_info['score']:.0f}/100)",
+                          fontsize=10, color=c["text_primary"])
+        for spine in ax_radar.spines.values():
+            spine.set_color(c["border"])
+        ax_radar.grid(True, axis="x", alpha=0.15, color=c["border_light"])
+
+    # --- Drawdown ---
+    ax_dd.set_facecolor(c["bg_card"])
     rolling_max = pf_values.cummax()
     dd_pct = (pf_values - rolling_max) / rolling_max * 100
-    ax_dd.fill_between(dd_pct.index.to_numpy(), dd_pct.values, 0, color="#EF5350",
-                       alpha=0.4, zorder=2)
-    ax_dd.axhline(0, color="#555555", linewidth=0.6, linestyle="--")
-    ax_dd.set_ylabel("Drawdown (%)", fontsize=10)
-    ax_dd.grid(True, alpha=0.3)
+    ax_dd.fill_between(dd_pct.index.to_numpy(), dd_pct.values, 0,
+                       color=c["down"], alpha=0.4, zorder=2)
+    ax_dd.axhline(0, color=c["text_dim"], linewidth=0.6, linestyle="--")
+    ax_dd.set_ylabel("Drawdown (%)", fontsize=9, color=c["text_secondary"])
+    ax_dd.tick_params(colors=c["text_secondary"], labelsize=7)
+    ax_dd.grid(True, alpha=0.15, color=c["border_light"])
+    for spine in ax_dd.spines.values():
+        spine.set_color(c["border"])
     ax_dd.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax_dd.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1, len(pf_dates) // 12)))
+    n_months = max(1, len(pf_dates) // 30)
+    ax_dd.xaxis.set_major_locator(mdates.MonthLocator(interval=n_months))
+
+    # --- Monthly returns strip ---
+    ax_monthly.set_facecolor(c["bg_card"])
+    ax_monthly.axis("off")
+    if analytics and analytics.get("monthly_returns"):
+        mr = analytics["monthly_returns"]
+        month_labels = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+        x_positions = np.linspace(0.02, 0.98, 12)
+        for i, (key, val) in enumerate(sorted(mr.items())):
+            month_idx = int(key.split("-")[1]) - 1
+            if i >= 12:
+                break
+            color = c["up"] if val >= 0 else c["down"]
+            alpha = min(1.0, abs(val) * 10)
+            ax_monthly.text(x_positions[i], 0.5, f"{month_labels[month_idx]}\n{val:+.1%}",
+                           ha="center", va="center", fontsize=7,
+                           color=color, fontweight="600",
+                           bbox=dict(boxstyle="round,pad=0.3",
+                                    facecolor=color, alpha=alpha * 0.15,
+                                    edgecolor="none"))
 
     apply_matplotlib_brand(fig)
-    plt.savefig(out_path, dpi=150, bbox_inches="tight", pad_inches=0.2)
+    plt.savefig(out_path, dpi=150, bbox_inches="tight", pad_inches=0.2,
+                facecolor=c["bg_primary"])
     plt.close()
     print(f"Chart saved: {out_path}")
 
@@ -689,6 +711,19 @@ def _compute_chart_data(result):
     }
 
 
+def _calc_strategy_score(analytics):
+    """Compute grade info for HTML/MD report display.
+
+    Wraps grade_strategy() from attribution with graceful fallback.
+    """
+    from eqlib.attribution import grade_strategy
+    try:
+        return grade_strategy(analytics)
+    except Exception:
+        return {"overall": "N/A", "score": 0, "dimensions": [],
+                "weakest": "", "strongest": "", "summary_text": ""}
+
+
 def generate_html_report(result, out_path):
     """Generate interactive HTML report with TradingView lightweight-charts.
 
@@ -838,6 +873,30 @@ def generate_html_report(result, out_path):
     bench_label = html.escape(bench_label)
     pnl_badge_class = "pos" if pnl >= 0 else "neg"
 
+    # Grade data for new template
+    from eqlib.attribution import analyze_returns as _analyze_returns
+    grade_data = metrics.get("grade_data") or _calc_strategy_score(_analyze_returns(result))
+    grade_overall = grade_data.get("overall", "N/A")
+    grade_score = grade_data.get("score", 0)
+    grade_summary = grade_data.get("summary_text", "")
+    grade_dims_json = json.dumps(grade_data.get("dimensions", []))
+
+    # Monthly returns
+    _ar = _analyze_returns(result)
+    monthly_returns = _ar.get("monthly_returns", {}) if _ar else {}
+    monthly_returns_json = json.dumps(monthly_returns)
+
+    # Rolling metrics
+    rolling_sharpe_json = json.dumps(_ar.get("rolling_sharpe_60d", []) if _ar else [])
+    rolling_vol_json = json.dumps(_ar.get("rolling_volatility_60d", []) if _ar else [])
+
+    # Daily returns stats
+    daily_stats = _ar.get("daily_returns_stats", {}) if _ar else {}
+    daily_stats_json = json.dumps(daily_stats)
+
+    # Drawdown periods
+    dd_periods_json = json.dumps(_ar.get("drawdown_periods", []) if _ar else [])
+
     html_report = _HTML_TEMPLATE.format(
         html_brand_lockup=html_header_brand_lockup(),
         html_footer_brand=html_footer_brand_chip(),
@@ -906,6 +965,15 @@ def generate_html_report(result, out_path):
         tech_json=json.dumps(tech_stats),
         symbols_data_json=json.dumps({sym: data for sym, data in chart.get("symbols_data", {}).items()}),
         symbols_list_json=json.dumps(chart.get("symbols_list", [symbol])),
+        grade_overall=grade_overall,
+        grade_score=f"{grade_score:.0f}",
+        grade_summary=html.escape(grade_summary),
+        grade_dims_json=grade_dims_json,
+        monthly_returns_json=monthly_returns_json,
+        rolling_sharpe_json=rolling_sharpe_json,
+        rolling_vol_json=rolling_vol_json,
+        daily_stats_json=daily_stats_json,
+        dd_periods_json=dd_periods_json,
     )
 
     with open(out_path, "w") as f:
@@ -948,6 +1016,7 @@ def _calc_metrics(result, bench_data):
             "daily_win_rate": "N/A",
             "ann_vol": "N/A", "bm_vol": "N/A",
             "trade_count": "0",
+            "grade_data": None,
         }
 
     total_ret = analytics["total_return"]
@@ -984,6 +1053,8 @@ def _calc_metrics(result, bench_data):
         "trade_count": str(analytics.get("trade_count", 0)),
         # For benchmark return chart (configured benchmark cumulative return %)
         "bench_last": f"{bench_data[-1]['value'] if bench_data else 0:.2f}",
+        # Grade data for HTML template
+        "grade_data": _calc_strategy_score(analytics),
     }
 
 
@@ -993,425 +1064,430 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EasyQuant | 回测报告 · {symbol}</title>
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 if (typeof LightweightCharts === 'undefined') {{
   var s = document.createElement('script');
-  s.src = 'https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js';
+  s.src = 'https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js';
   document.head.appendChild(s);
 }}
 </script>
 <style>
-  :root {{
-    --bg: #f0f2f5; --card: #fff; --border: #e8e8e8;
-    --text: #262626; --text-secondary: #595959; --text-dim: #8c8c8c;
-    --primary: #1890ff; --green: #52c41a; --red: #f5222d; --yellow: #faad14;
-    --green-bg: rgba(82,196,26,.06); --red-bg: rgba(245,34,45,.06);
-    --shadow: 0 1px 4px rgba(0,0,0,.08);
-  }}
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5;
-  }}
-  /* Header */
-  .header {{
-    background: #fff; border-bottom: 1px solid var(--border);
-    padding: 12px 0; box-shadow: var(--shadow);
-  }}
-  .header-inner {{
-    max-width: 98vw; margin: 0 auto; padding: 0 16px;
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  }}
-  .eq-brand {{
-    display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-    text-decoration: none; color: inherit;
-  }}
-  .eq-brand:hover {{ opacity: 0.88; }}
-  .eq-brand svg {{ display: block; flex-shrink: 0; }}
-  .eq-brand-text {{ display: flex; flex-direction: column; line-height: 1.15; }}
-  .eq-brand-name {{
-    font-size: 15px; font-weight: 700; color: #0c1222; letter-spacing: -0.04em;
-  }}
-  .eq-brand-tag {{
-    font-size: 9px; font-weight: 500; color: #64748b; letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }}
-  .header-main {{ flex: 1; min-width: 0; }}
-  .eq-footer-brand {{
-    display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
-  }}
-  .eq-footer-name {{ font-weight: 600; color: #595959; }}
-  h1 {{ font-size: 16px; font-weight: 600; color: var(--text); }}
-  h1 .sym {{ color: var(--primary); }}
-  .header-meta {{ font-size: 11px; color: var(--text-dim); margin-top: 2px; }}
-  .pnl-badge {{
-    padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: 600;
-  }}
-  .pnl-badge.pos {{ background: var(--green-bg); color: var(--green); }}
-  .pnl-badge.neg {{ background: var(--red-bg); color: var(--red); }}
-  /* Container */
-  .container {{ max-width: 98vw; margin: 0 auto; padding: 12px 16px 48px; }}
-  /* Summary cards (like JoinQuant) */
-  .summary {{
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px; margin-bottom: 12px;
-  }}
-  .card {{
-    background: var(--card); border-radius: 4px; padding: 12px;
-    box-shadow: var(--shadow); text-align: center;
-  }}
-  .card .label {{ font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }}
-  .card .value {{ font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }}
-  /* Metric row (JoinQuant style) */
-  .metric-row {{
-    display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 12px;
-    background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
-    overflow: hidden;
-  }}
-  .metric-item {{
-    flex: 1; min-width: 100px; padding: 12px 8px;
-    border-right: 1px solid var(--border); text-align: center;
-    cursor: pointer; transition: background .15s;
-  }}
-  .metric-item:last-child {{ border-right: none; }}
-  .metric-item:hover {{ background: #fafafa; }}
-  .metric-item .m-label {{
-    font-size: 11px; color: var(--text-dim); margin-bottom: 4px;
-    display: flex; align-items: center; justify-content: center; gap: 4px;
-  }}
-  .metric-item .m-label svg {{ width: 12px; height: 12px; fill: currentColor; }}
-  .metric-item .m-value {{
-    font-size: 16px; font-weight: 600; color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }}
-  .metric-item .m-value.pos {{ color: var(--green); }}
-  .metric-item .m-value.neg {{ color: var(--red); }}
-  .metric-item .m-sub {{
-    font-size: 10px; color: var(--text-dim); margin-top: 2px;
-  }}
-  /* Section title */
-  .section-title {{
-    font-size: 13px; font-weight: 600; color: var(--text);
-    padding: 8px 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
-  }}
-  /* Metric cards (used by both primary and secondary grids) */
-  .metrics-grid {{
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0; margin-bottom: 12px;
-    background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
-    overflow: hidden;
-  }}
-  .metric-card {{
-    padding: 10px 8px; text-align: center;
-    border-right: 1px solid var(--border); cursor: pointer;
-    transition: background .15s;
-  }}
-  .metric-card:last-child {{ border-right: none; }}
-  .metric-card:hover {{ background: #fafafa; }}
-  .metric-card .title-row {{
-    display: flex; align-items: center; justify-content: center; gap: 3px;
-    margin-bottom: 4px;
-  }}
-  .metric-card .mc-title {{
-    font-size: 10px; color: var(--text-dim); font-weight: 500;
-  }}
-  .mc-info {{ display: none; }}  /* hide the 'i' badge in light theme */
-  .metric-card .mc-val {{
-    font-size: 16px; font-weight: 600; color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }}
-  .metric-card .mc-val.pos {{ color: var(--green); }}
-  .metric-card .mc-val.neg {{ color: var(--red); }}
-  .mc-grade-row {{ margin-top: 3px; min-height: 14px; }}
-  .mc-grade {{
-    display: inline-block; font-size: 9px; font-weight: 500;
-    padding: 1px 4px; border-radius: 2px;
-  }}
-  .grade-excellent {{ background: rgba(245,34,45,.08); color: var(--green); }}
-  .grade-good      {{ background: rgba(24,144,255,.08); color: var(--primary); }}
-  .grade-fair      {{ background: rgba(250,173,20,.08); color: var(--yellow); }}
-  .grade-poor      {{ background: rgba(82,196,26,.08);  color: #7cb342; }}
-  /* Secondary metrics grid (responsive) */
-  .metrics-grid-secondary {{
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  }}
-  /* Chart panels */
-  .chart-panel {{
-    background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
-    margin-bottom: 8px; overflow: hidden;
-  }}
-  .chart-panel-head {{
-    padding: 8px 16px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-  }}
-  .chart-panel-head h2 {{ font-size: 13px; font-weight: 600; color: var(--text); }}
-  .chart-tabs {{ display: flex; gap: 0; }}
-  .chart-tab {{
-    padding: 3px 10px; font-size: 11px; color: var(--text-dim);
-    cursor: pointer; border: 1px solid var(--border); border-radius: 3px;
-    margin-left: -1px; transition: all .15s;
-  }}
-  .chart-tab.active {{ background: var(--primary); color: #fff; border-color: var(--primary); }}
-  .chart-tab:hover:not(.active) {{ background: #fafafa; }}
-  .chart-body {{ padding: 0; }}
-  .chart-body .desc {{
-    padding: 6px 16px; font-size: 11px; color: var(--text-dim);
-    border-bottom: 1px solid var(--border);
-  }}
-  #kline    {{ width: 100%; height: 480px; }}
-  #returns  {{ width: 100%; height: 300px; }}
-  #drawdown {{ width: 100%; height: 160px; }}
-  #pnlbar   {{ width: 100%; height: 160px; }}
-  #dailyret {{ width: 100%; height: 160px; }}
-  #rsichart  {{ width: 100%; height: 160px; }}
-  #macdchart {{ width: 100%; height: 160px; }}
-  /* Indicator toggle panel */
-  .indicator-panel {{
-    position: absolute; top: 8px; left: 8px; z-index: 10;
-    display: flex; gap: 4px;
-  }}
-  .ind-btn {{
-    padding: 4px 10px; font-size: 11px; font-weight: 500;
-    border: 1px solid var(--border); border-radius: 3px;
-    background: rgba(255,255,255,.85); color: var(--text-dim);
-    cursor: pointer; transition: all .15s; backdrop-filter: blur(4px);
-  }}
-  .ind-btn.active {{ background: var(--primary); color: #fff; border-color: var(--primary); }}
-  .ind-btn:hover:not(.active) {{ background: #fafafa; }}
-  /* Crosshair legend */
-  .chart-legend {{
-    position: absolute; top: 8px; right: 70px; z-index: 10;
-    background: rgba(255,255,255,.92); border: 1px solid var(--border);
-    border-radius: 4px; padding: 6px 10px; font-size: 11px;
-    font-family: "SF Mono", "Menlo", monospace; line-height: 1.6;
-    color: var(--text-secondary); pointer-events: none;
-    backdrop-filter: blur(4px); min-width: 200px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.08);
-    display: none;
-  }}
-  .chart-legend.visible {{ display: block; }}
-  .chart-legend .leg-date {{ font-weight: 600; color: var(--text); margin-bottom: 2px; }}
-  .chart-legend .leg-row {{ display: flex; justify-content: space-between; gap: 12px; }}
-  .chart-legend .leg-label {{ color: var(--text-dim); }}
-  .chart-legend .leg-val {{ font-variant-numeric: tabular-nums; }}
-  .leg-dot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }}
-  /* Legend */
-  .legend {{ display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); align-items: center; }}
-  .legend span {{ display: flex; align-items: center; gap: 4px; }}
-  .legend .dot {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
-  .legend .ln {{ width: 16px; height: 2px; display: inline-block; }}
-  /* Trade table */
-  .trade-section {{
-    background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
-    margin-bottom: 16px;
-  }}
-  .trade-section .tabs {{
-    display: flex; border-bottom: 1px solid var(--border); padding: 0 16px;
-  }}
-  .trade-section .tab {{
-    padding: 10px 16px; font-size: 13px; color: var(--text-dim);
-    cursor: pointer; border-bottom: 2px solid transparent;
-  }}
-  .trade-section .tab.active {{ color: var(--primary); border-bottom-color: var(--primary); }}
-  .trade-section .content {{ padding: 16px; }}
-  /* Generic section */
-  .section {{
-    background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
-    padding: 16px; margin-bottom: 16px;
-  }}
-  .section .section-title {{ padding: 0; margin-bottom: 12px; }}
-  .tab-bar {{ display: flex; border-bottom: 1px solid var(--border); margin-bottom: 12px; }}
-  .tab {{
-    padding: 10px 16px; font-size: 13px; color: var(--text-dim);
-    cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s;
-  }}
-  .tab.active {{ color: var(--primary); border-bottom-color: var(--primary); }}
-  .tab-content {{ display: none; }}
-  .tab-content.active {{ display: block; }}
-  .trade-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-  .trade-table th {{
-    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
-    color: var(--text-dim); font-weight: 500; font-size: 12px;
-  }}
-  .trade-table td {{ padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }}
-  .trade-table tr:hover td {{ background: #fafafa; }}
-  .cal-wrapper {{ max-height: 400px; overflow-y: auto; }}
-  .cal-table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
-  .cal-table th {{
-    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
-    color: var(--text-dim); font-weight: 500; font-size: 12px; position: sticky; top: 0;
-    background: var(--card); z-index: 1;
-  }}
-  .cal-table td {{ padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: top; font-size: 12px; }}
-  .positions ul {{ list-style: none; padding: 0; }}
-  .positions li {{ padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }}
-  .positions li:last-child {{ border-bottom: none; }}
-  .trade-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-  .trade-table th {{
-    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
-    color: var(--text-dim); font-weight: 500; font-size: 12px;
-  }}
-  .trade-table td {{ padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }}
-  .trade-table tr:hover td {{ background: #fafafa; }}
-  /* Positions */
-  .positions {{
-    background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
-    padding: 16px; margin-bottom: 16px;
-  }}
-  .positions h3 {{ font-size: 14px; font-weight: 600; margin-bottom: 12px; }}
-  .positions ul {{ list-style: none; }}
-  .positions li {{ padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }}
-  .positions li:last-child {{ border-bottom: none; }}
-  /* Modal */
-  .modal-overlay {{
-    position: fixed; inset: 0; background: rgba(0,0,0,.45);
-    z-index: 2000; display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none; transition: opacity .2s;
-  }}
-  .modal-overlay.open {{ opacity: 1; pointer-events: all; }}
-  .modal {{
-    background: #fff; border-radius: 8px; padding: 24px;
-    max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;
-    box-shadow: 0 8px 32px rgba(0,0,0,.15); position: relative;
-  }}
-  .modal-close {{
-    position: absolute; top: 12px; right: 12px; background: none; border: none;
-    color: var(--text-dim); font-size: 20px; cursor: pointer;
-  }}
-  .modal h3 {{ font-size: 16px; font-weight: 600; margin-bottom: 8px; padding-right: 24px; }}
-  .modal-cur {{ font-size: 28px; font-weight: 600; color: var(--primary); margin-bottom: 16px; }}
-  .modal-sec {{ margin-bottom: 12px; }}
-  .modal-sec h4 {{ font-size: 12px; color: var(--text-dim); font-weight: 500; margin-bottom: 4px; }}
-  .modal-sec p {{ font-size: 13px; color: var(--text-secondary); line-height: 1.7; }}
-  .modal-formula {{
-    font-family: "SF Mono", monospace; font-size: 12px; background: #f5f5f5;
-    padding: 8px 12px; border-radius: 4px; color: var(--text);
-  }}
-  .modal-ref {{ font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }}
-  /* Footer */
-  .footer {{
-    text-align: center; padding: 16px 0; color: var(--text-dim);
-    font-size: 12px; border-top: 1px solid var(--border); margin-top: 16px;
-  }}
-  .pos {{ color: var(--green); }}
-  .neg {{ color: var(--red); }}
-  /* Tech stats grid */
-  .tech-grid {{
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 8px; margin-bottom: 12px;
-  }}
-  .tech-card {{
-    background: #f5f5f5; border-radius: 4px; padding: 10px 12px; text-align: center;
-  }}
-  .tech-card .title {{ font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }}
-  .tech-card .val {{ font-size: 16px; font-weight: 600; color: var(--text); }}
-  /* Source cards */
-  .sources-grid {{
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 12px;
-  }}
-  .src-card {{
-    background: #f5f5f5; border-radius: 4px; padding: 14px; border-left: 3px solid var(--primary);
-  }}
-  .src-card .src-type {{ font-size: 10px; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }}
-  .src-card .src-name {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; }}
-  .src-card .src-desc {{ font-size: 12px; color: var(--text-secondary); line-height: 1.5; }}
-  .src-card code {{ background: #e8e8e8; padding: 1px 4px; border-radius: 2px; font-size: 12px; }}
-  /* Method list */
-  .method-list {{ padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8; }}
-  .method-list li {{ margin-bottom: 6px; }}
-  /* ═══════════════════════════════════════════════════════════
-     MOBILE RESPONSIVE (≤480px)
-     ═══════════════════════════════════════════════════════════ */
-  @media (max-width: 480px) {{
-    /* Chart heights - reduce ~40% for phones */
-    #kline    {{ height: 280px !important; }}
-    #returns  {{ height: 200px !important; }}
-    #drawdown, #pnlbar, #dailyret, #rsichart, #macdchart {{ height: 120px !important; }}
-    /* Header adjustments */
-    .header {{ padding: 8px 0; }}
-    .header-inner {{ padding: 0 8px; flex-wrap: wrap; gap: 8px; }}
-    .eq-brand-text {{ display: none; }}
-    h1 {{ font-size: 14px; }}
-    .header-meta {{ font-size: 10px; }}
-    .pnl-badge {{ padding: 3px 8px; font-size: 12px; }}
-    /* Summary cards - 2x3 grid */
-    .summary {{ grid-template-columns: repeat(2, 1fr); gap: 6px; }}
-    .card {{ padding: 10px 8px; }}
-    .card .label {{ font-size: 10px; }}
-    .card .value {{ font-size: 16px; }}
-    /* Metrics grid - 2 columns */
-    .metrics-grid {{ grid-template-columns: repeat(2, 1fr); }}
-    .metrics-grid-secondary {{ grid-template-columns: repeat(2, 1fr); }}
-    .metric-card {{ padding: 8px 6px; }}
-    .metric-card .mc-title {{ font-size: 9px; }}
-    .metric-card .mc-val {{ font-size: 14px; }}
-    /* Section titles */
-    .section-title {{ font-size: 12px; padding: 6px 0 4px; }}
-    /* Chart panels */
-    .chart-panel-head {{ padding: 6px 12px; flex-wrap: wrap; gap: 8px; }}
-    .chart-panel-head h2 {{ font-size: 12px; }}
-    .chart-tabs {{ flex-wrap: wrap; gap: 4px; }}
-    .chart-tab {{ padding: 2px 8px; font-size: 10px; }}
-    /* Indicator buttons */
-    .indicator-panel {{ gap: 3px; }}
-    .ind-btn {{ padding: 3px 8px; font-size: 10px; }}
-    /* Crosshair legend */
-    .chart-legend {{ top: 4px; right: 4px; min-width: 150px; font-size: 10px; padding: 4px 8px; }}
-    /* Tables - smaller font */
-    .trade-table {{ font-size: 11px; }}
-    .trade-table th, .trade-table td {{ padding: 6px 8px; }}
-    .cal-wrapper {{ max-height: 300px; }}
-    .cal-table {{ font-size: 11px; }}
-    .cal-table th, .cal-table td {{ padding: 4px 6px; }}
-    /* Modal */
-    .modal {{ padding: 16px; width: 95%; max-height: 85vh; }}
-    .modal h3 {{ font-size: 14px; }}
-    .modal-cur {{ font-size: 22px; }}
-    .modal-sec p {{ font-size: 12px; }}
-    .modal-formula {{ font-size: 11px; padding: 6px 10px; }}
-    /* Sources grid - single column */
-    .sources-grid {{ grid-template-columns: 1fr; gap: 8px; }}
-    .src-card {{ padding: 10px; }}
-    .src-card .src-name {{ font-size: 12px; }}
-    .src-card .src-desc {{ font-size: 11px; }}
-    /* Container padding */
-    .container {{ padding: 8px 8px 32px; }}
-    /* Footer */
-    .footer {{ padding: 12px 0; font-size: 10px; }}
-    /* Tabs */
-    .tab-bar {{ flex-wrap: wrap; }}
-    .tab {{ padding: 8px 12px; font-size: 12px; }}
-    /* Tech grid */
-    .tech-grid {{ grid-template-columns: repeat(2, 1fr); gap: 6px; }}
-    .tech-card {{ padding: 8px 6px; }}
-    .tech-card .title {{ font-size: 10px; }}
-    .tech-card .val {{ font-size: 14px; }}
-  }}
-  /* ═══════════════════════════════════════════════════════════
-     TABLET RESPONSIVE (481px - 768px)
-     ═══════════════════════════════════════════════════════════ */
-  @media (min-width: 481px) and (max-width: 768px) {{
-    /* Chart heights - reduce ~25% for tablets */
-    #kline    {{ height: 360px !important; }}
-    #returns  {{ height: 240px !important; }}
-    #drawdown, #pnlbar, #dailyret, #rsichart, #macdchart {{ height: 140px !important; }}
-    /* Summary - 3x2 grid */
-    .summary {{ grid-template-columns: repeat(3, 1fr); }}
-    /* Metrics - 3 columns */
-    .metrics-grid {{ grid-template-columns: repeat(3, 1fr); }}
-    .metrics-grid-secondary {{ grid-template-columns: repeat(3, 1fr); }}
-    /* Chart panels */
-    .chart-panel-head {{ padding: 8px 14px; }}
-    /* Tables */
-    .trade-table {{ font-size: 12px; }}
-    /* Sources grid - 2 columns */
-    .sources-grid {{ grid-template-columns: repeat(2, 1fr); }}
-    /* Tech grid - 3 columns */
-    .tech-grid {{ grid-template-columns: repeat(3, 1fr); }}
-  }}
+/* ================================================================
+   DARK BLOOMBERG THEME — CSS VARIABLES
+   ================================================================ */
+:root {{
+  --bg: #0c1222;
+  --bg-card: #131b2e;
+  --bg-elevated: #1a2438;
+  --border: #1e2a3a;
+  --border-light: #253042;
+  --text-primary: #e2e8f0;
+  --text-secondary: #8b98a9;
+  --text-dim: #4a5568;
+  --up: #26a69a;
+  --down: #ef5350;
+  --accent: #5b8def;
+  --warning: #faad14;
+  --shadow: 0 2px 8px rgba(0,0,0,.35);
+  --radius: 6px;
+}}
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text-primary); font-size: 13px; line-height: 1.6;
+}}
+a {{ color: var(--accent); text-decoration: none; }}
+a:hover {{ text-decoration: underline; }}
+code {{ background: var(--bg-elevated); padding: 1px 5px; border-radius: 3px; font-size: 12px; color: var(--accent); }}
+
+/* ================================================================
+   HEADER
+   ================================================================ */
+.header {{
+  background: var(--bg-card); border-bottom: 1px solid var(--border);
+  padding: 12px 0; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100;
+}}
+.header-inner {{
+  max-width: 98vw; margin: 0 auto; padding: 0 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}}
+.eq-brand {{ display: flex; align-items: center; gap: 10px; flex-shrink: 0; text-decoration: none; color: inherit; }}
+.eq-brand:hover {{ opacity: 0.88; }}
+.eq-brand svg {{ display: block; flex-shrink: 0; }}
+.eq-brand-text {{ display: flex; flex-direction: column; line-height: 1.15; }}
+.eq-brand-name {{ font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.04em; }}
+.eq-brand-tag {{ font-size: 9px; font-weight: 500; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; }}
+.header-main {{ flex: 1; min-width: 0; }}
+h1 {{ font-size: 16px; font-weight: 600; color: var(--text-primary); }}
+h1 .sym {{ color: var(--accent); }}
+.header-meta {{ font-size: 11px; color: var(--text-dim); margin-top: 2px; }}
+.pnl-badge {{
+  padding: 5px 14px; border-radius: 4px; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}}
+.pnl-badge.pos {{ background: rgba(38,166,154,.12); color: var(--up); }}
+.pnl-badge.neg {{ background: rgba(239,83,80,.12); color: var(--down); }}
+.eq-footer-brand {{ display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }}
+.eq-footer-name {{ font-weight: 600; color: var(--text-secondary); }}
+
+/* ================================================================
+   CONTAINER
+   ================================================================ */
+.container {{ max-width: 98vw; margin: 0 auto; padding: 16px 20px 48px; }}
+
+/* ================================================================
+   HERO — GRADE BADGE
+   ================================================================ */
+.hero {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px 32px; margin-bottom: 16px; display: flex; align-items: center; gap: 32px;
+  box-shadow: var(--shadow);
+}}
+.grade-badge {{
+  width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 42px; font-weight: 800; flex-shrink: 0;
+  letter-spacing: -0.02em; border: 3px solid;
+}}
+.grade-S {{ background: rgba(38,166,154,.15); color: #26a69a; border-color: #26a69a; }}
+.grade-A {{ background: rgba(91,141,239,.15); color: #5b8def; border-color: #5b8def; }}
+.grade-B {{ background: rgba(250,173,20,.15); color: #faad14; border-color: #faad14; }}
+.grade-C {{ background: rgba(255,152,0,.15); color: #ff9800; border-color: #ff9800; }}
+.grade-D {{ background: rgba(239,83,80,.15); color: #ef5350; border-color: #ef5350; }}
+.grade-N\/A {{ background: rgba(74,85,104,.15); color: #4a5568; border-color: #4a5568; }}
+.hero-info {{ flex: 1; min-width: 0; }}
+.hero-score {{ font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }}
+.hero-score span {{ font-size: 14px; color: var(--text-dim); font-weight: 400; }}
+.hero-summary {{ font-size: 13px; color: var(--text-secondary); line-height: 1.6; }}
+.hero-radar {{ width: 160px; height: 160px; flex-shrink: 0; }}
+
+/* ================================================================
+   CORE METRIC CARDS (4 prominent)
+   ================================================================ */
+.core-metrics {{
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;
+}}
+.core-card {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 16px; text-align: center; box-shadow: var(--shadow);
+  cursor: pointer; transition: border-color .2s, background .2s;
+}}
+.core-card:hover {{ border-color: var(--accent); background: var(--bg-elevated); }}
+.core-card .cc-label {{ font-size: 11px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }}
+.core-card .cc-val {{
+  font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums;
+}}
+.core-card .cc-sub {{ font-size: 11px; color: var(--text-dim); margin-top: 2px; font-variant-numeric: tabular-nums; }}
+.core-card .cc-grade {{ margin-top: 4px; }}
+
+/* ================================================================
+   METRIC CARDS (all metrics grid)
+   ================================================================ */
+.section-title {{
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  padding: 10px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+}}
+.metrics-grid {{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0; margin-bottom: 14px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+}}
+.metric-card {{
+  padding: 12px 10px; text-align: center;
+  border-right: 1px solid var(--border); cursor: pointer; transition: background .15s;
+}}
+.metric-card:last-child {{ border-right: none; }}
+.metric-card:hover {{ background: var(--bg-elevated); }}
+.metric-card .title-row {{ display: flex; align-items: center; justify-content: center; gap: 3px; margin-bottom: 4px; }}
+.metric-card .mc-title {{ font-size: 10px; color: var(--text-dim); font-weight: 500; }}
+.mc-info {{ display: none; }}
+.metric-card .mc-val {{
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}}
+.metric-card .mc-val.pos {{ color: var(--up); }}
+.metric-card .mc-val.neg {{ color: var(--down); }}
+.mc-grade-row {{ margin-top: 3px; min-height: 14px; }}
+.mc-grade {{
+  display: inline-block; font-size: 9px; font-weight: 500;
+  padding: 1px 5px; border-radius: 3px;
+}}
+.grade-excellent {{ background: rgba(38,166,154,.12); color: var(--up); }}
+.grade-good      {{ background: rgba(91,141,239,.12); color: var(--accent); }}
+.grade-fair      {{ background: rgba(250,173,20,.12); color: var(--warning); }}
+.grade-poor      {{ background: rgba(239,83,80,.12); color: var(--down); }}
+.metrics-grid-secondary {{ grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }}
+
+/* ================================================================
+   CHART PANELS
+   ================================================================ */
+.chart-panel {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow); position: relative;
+}}
+.chart-panel-head {{
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}}
+.chart-panel-head h2 {{ font-size: 13px; font-weight: 600; color: var(--text-primary); }}
+.chart-tabs {{ display: flex; gap: 0; }}
+.chart-tab {{
+  padding: 3px 10px; font-size: 11px; color: var(--text-dim);
+  cursor: pointer; border: 1px solid var(--border); border-radius: 3px;
+  margin-left: -1px; transition: all .15s; background: transparent;
+}}
+.chart-tab.active {{ background: var(--accent); color: #fff; border-color: var(--accent); }}
+.chart-tab:hover:not(.active) {{ background: var(--bg-elevated); color: var(--text-secondary); }}
+.chart-body {{ padding: 0; }}
+.chart-body .desc {{
+  padding: 8px 16px; font-size: 11px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border); line-height: 1.5;
+}}
+#kline    {{ width: 100%; height: 480px; }}
+#returns  {{ width: 100%; height: 300px; }}
+#drawdown {{ width: 100%; height: 160px; }}
+#pnlbar   {{ width: 100%; height: 160px; }}
+#dailyret {{ width: 100%; height: 160px; }}
+#rsichart  {{ width: 100%; height: 160px; }}
+#macdchart {{ width: 100%; height: 160px; }}
+#rollingChart {{ width: 100%; height: 260px; }}
+
+/* Indicator toggle panel */
+.indicator-panel {{
+  position: absolute; top: 8px; left: 8px; z-index: 10;
+  display: flex; gap: 4px;
+}}
+.ind-btn {{
+  padding: 4px 10px; font-size: 11px; font-weight: 500;
+  border: 1px solid var(--border-light); border-radius: 3px;
+  background: rgba(19,27,46,.85); color: var(--text-dim);
+  cursor: pointer; transition: all .15s; backdrop-filter: blur(4px);
+}}
+.ind-btn.active {{ background: var(--accent); color: #fff; border-color: var(--accent); }}
+.ind-btn:hover:not(.active) {{ background: var(--bg-elevated); color: var(--text-secondary); }}
+
+/* Crosshair legend */
+.chart-legend {{
+  position: absolute; top: 8px; right: 70px; z-index: 10;
+  background: rgba(19,27,46,.92); border: 1px solid var(--border-light);
+  border-radius: 4px; padding: 6px 10px; font-size: 11px;
+  font-family: "SF Mono", "Menlo", monospace; line-height: 1.6;
+  color: var(--text-secondary); pointer-events: none;
+  backdrop-filter: blur(4px); min-width: 200px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  display: none;
+}}
+.chart-legend.visible {{ display: block; }}
+.chart-legend .leg-date {{ font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }}
+.chart-legend .leg-row {{ display: flex; justify-content: space-between; gap: 12px; }}
+.chart-legend .leg-label {{ color: var(--text-dim); }}
+.chart-legend .leg-val {{ font-variant-numeric: tabular-nums; }}
+.leg-dot {{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }}
+
+/* Legend */
+.legend {{ display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }}
+.legend span {{ display: flex; align-items: center; gap: 4px; }}
+.legend .dot {{ width: 8px; height: 8px; border-radius: 50%; display: inline-block; }}
+.legend .ln {{ width: 16px; height: 2px; display: inline-block; }}
+
+/* ================================================================
+   TABBED SECTION (Cumulative / Monthly / Rolling / Distribution)
+   ================================================================ */
+.tabbed-section {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 14px; box-shadow: var(--shadow); overflow: hidden;
+}}
+.tabbed-section .section-title {{ padding: 12px 16px 0; margin-bottom: 0; border-bottom: none; }}
+.tab-bar {{ display: flex; border-bottom: 1px solid var(--border); padding: 0 16px; }}
+.tab {{
+  padding: 10px 16px; font-size: 13px; color: var(--text-dim);
+  cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s;
+}}
+.tab.active {{ color: var(--accent); border-bottom-color: var(--accent); }}
+.tab:hover:not(.active) {{ color: var(--text-secondary); }}
+.tab-content {{ display: none; }}
+.tab-content.active {{ display: block; }}
+
+/* Monthly heatmap */
+.monthly-heatmap {{
+  display: grid; gap: 3px; padding: 16px; font-size: 12px;
+  grid-template-columns: 60px repeat(12, 1fr);
+}}
+.mh-header {{ color: var(--text-dim); font-weight: 500; text-align: center; padding: 4px 0; }}
+.mh-year {{ color: var(--text-secondary); font-weight: 600; padding: 6px 4px; text-align: right; }}
+.mh-cell {{
+  text-align: center; padding: 6px 2px; border-radius: 3px;
+  font-variant-numeric: tabular-nums; font-weight: 500; font-size: 11px;
+}}
+
+/* Distribution canvas */
+#distCanvas {{ width: 100%; height: 260px; display: block; }}
+
+/* ================================================================
+   DRAWDOWN TABLE
+   ================================================================ */
+.dd-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+.dd-table th {{
+  text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text-dim); font-weight: 500; font-size: 12px;
+}}
+.dd-table td {{ padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }}
+.dd-table tr:hover td {{ background: var(--bg-elevated); }}
+.dd-depth {{ color: var(--down); font-weight: 600; }}
+
+/* ================================================================
+   TRADE TABLE / CALENDAR
+   ================================================================ */
+.section {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow);
+}}
+.trade-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+.trade-table th {{
+  text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text-dim); font-weight: 500; font-size: 12px;
+}}
+.trade-table td {{ padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }}
+.trade-table tr:hover td {{ background: var(--bg-elevated); }}
+.cal-wrapper {{ max-height: 400px; overflow-y: auto; }}
+.cal-table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
+.cal-table th {{
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+  color: var(--text-dim); font-weight: 500; font-size: 12px; position: sticky; top: 0;
+  background: var(--bg-card); z-index: 1;
+}}
+.cal-table td {{ padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 12px; color: var(--text-secondary); }}
+.positions ul {{ list-style: none; padding: 0; }}
+.positions li {{ padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-secondary); }}
+.positions li:last-child {{ border-bottom: none; }}
+
+/* ================================================================
+   DETAILS / SUMMARY (collapsible)
+   ================================================================ */
+details {{ margin-bottom: 14px; }}
+details summary {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 16px; cursor: pointer; font-size: 13px; font-weight: 600;
+  color: var(--text-primary); box-shadow: var(--shadow); transition: background .15s;
+  list-style: none;
+}}
+details summary::-webkit-details-marker {{ display: none; }}
+details summary::before {{ content: '▸ '; color: var(--accent); transition: transform .2s; }}
+details[open] summary::before {{ content: '▾ '; }}
+details summary:hover {{ background: var(--bg-elevated); }}
+details .detail-body {{
+  background: var(--bg-card); border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius); padding: 16px;
+}}
+
+/* ================================================================
+   MODAL
+   ================================================================ */
+.modal-overlay {{
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  z-index: 2000; display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}}
+.modal-overlay.open {{ opacity: 1; pointer-events: all; }}
+.modal {{
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 24px;
+  max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4); position: relative;
+}}
+.modal-close {{
+  position: absolute; top: 12px; right: 12px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; cursor: pointer;
+}}
+.modal h3 {{ font-size: 16px; font-weight: 600; margin-bottom: 8px; padding-right: 24px; color: var(--text-primary); }}
+.modal-cur {{ font-size: 28px; font-weight: 600; color: var(--accent); margin-bottom: 16px; }}
+.modal-sec {{ margin-bottom: 12px; }}
+.modal-sec h4 {{ font-size: 12px; color: var(--text-dim); font-weight: 500; margin-bottom: 4px; }}
+.modal-sec p {{ font-size: 13px; color: var(--text-secondary); line-height: 1.7; }}
+.modal-formula {{
+  font-family: "SF Mono", monospace; font-size: 12px; background: var(--bg-elevated);
+  padding: 8px 12px; border-radius: 4px; color: var(--text-primary);
+}}
+.modal-ref {{ font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }}
+
+/* ================================================================
+   SOURCE CARDS / METHOD LIST
+   ================================================================ */
+.sources-grid {{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px;
+}}
+.src-card {{
+  background: var(--bg-elevated); border-radius: 4px; padding: 14px;
+  border-left: 3px solid var(--accent);
+}}
+.src-card .src-type {{ font-size: 10px; color: var(--accent); font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }}
+.src-card .src-name {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--text-primary); }}
+.src-card .src-desc {{ font-size: 12px; color: var(--text-secondary); line-height: 1.5; }}
+.method-list {{ padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8; }}
+.method-list li {{ margin-bottom: 6px; }}
+
+/* ================================================================
+   TECH STATS
+   ================================================================ */
+.tech-grid {{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}}
+.tech-card {{
+  background: var(--bg-elevated); border-radius: 4px; padding: 10px 12px; text-align: center;
+}}
+.tech-card .title {{ font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }}
+.tech-card .val {{ font-size: 16px; font-weight: 600; color: var(--text-primary); }}
+
+/* ================================================================
+   FOOTER
+   ================================================================ */
+.footer {{
+  text-align: center; padding: 20px 0; color: var(--text-dim);
+  font-size: 12px; border-top: 1px solid var(--border); margin-top: 16px;
+}}
+.pos {{ color: var(--up); }}
+.neg {{ color: var(--down); }}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 480px) {{
+  #kline    {{ height: 280px !important; }}
+  #returns  {{ height: 200px !important; }}
+  #drawdown, #pnlbar, #dailyret, #rsichart, #macdchart, #rollingChart {{ height: 120px !important; }}
+  .header {{ padding: 8px 0; }}
+  .header-inner {{ padding: 0 8px; flex-wrap: wrap; gap: 8px; }}
+  .eq-brand-text {{ display: none; }}
+  h1 {{ font-size: 14px; }}
+  .hero {{ flex-direction: column; text-align: center; padding: 20px 16px; gap: 16px; }}
+  .hero-radar {{ width: 120px; height: 120px; }}
+  .core-metrics {{ grid-template-columns: repeat(2, 1fr); gap: 8px; }}
+  .core-card .cc-val {{ font-size: 18px; }}
+  .metrics-grid {{ grid-template-columns: repeat(2, 1fr); }}
+  .metrics-grid-secondary {{ grid-template-columns: repeat(2, 1fr); }}
+  .monthly-heatmap {{ grid-template-columns: 50px repeat(12, 1fr); font-size: 10px; padding: 8px; }}
+  .container {{ padding: 8px 8px 32px; }}
+  .footer {{ padding: 12px 0; font-size: 10px; }}
+  .tab-bar {{ flex-wrap: wrap; }}
+  .tab {{ padding: 8px 12px; font-size: 12px; }}
+  .tech-grid {{ grid-template-columns: repeat(2, 1fr); }}
+  .sources-grid {{ grid-template-columns: 1fr; }}
+  .chart-legend {{ top: 4px; right: 4px; min-width: 150px; font-size: 10px; padding: 4px 8px; }}
+  .trade-table {{ font-size: 11px; }}
+  .trade-table th, .trade-table td {{ padding: 6px 8px; }}
+}}
+@media (min-width: 481px) and (max-width: 768px) {{
+  #kline    {{ height: 360px !important; }}
+  #returns  {{ height: 240px !important; }}
+  #drawdown, #pnlbar, #dailyret, #rsichart, #macdchart, #rollingChart {{ height: 140px !important; }}
+  .core-metrics {{ grid-template-columns: repeat(2, 1fr); }}
+  .metrics-grid {{ grid-template-columns: repeat(3, 1fr); }}
+  .metrics-grid-secondary {{ grid-template-columns: repeat(3, 1fr); }}
+  .sources-grid {{ grid-template-columns: repeat(2, 1fr); }}
+  .tech-grid {{ grid-template-columns: repeat(3, 1fr); }}
+  .monthly-heatmap {{ font-size: 11px; }}
+}}
 </style>
 </head>
 <body>
@@ -1443,155 +1519,91 @@ if (typeof LightweightCharts === 'undefined') {{
 
 <div class="container">
 
-  <!-- Summary cards -->
-  <div class="summary">
-    <div class="card"><div class="label">初始资金</div><div class="value">&yen;{initial_capital}</div></div>
-    <div class="card"><div class="label">期末净值</div><div class="value">&yen;{final_value}</div></div>
-    <div class="card"><div class="label">总盈亏</div><div class="value" style="color:{pnl_color}">{pnl}</div></div>
-    <div class="card"><div class="label">总收益率</div><div class="value" style="color:{pnl_color}">{pnl_pct}</div></div>
-    <div class="card"><div class="label">买入次数</div><div class="value">{buy_count}</div></div>
-    <div class="card"><div class="label">卖出次数</div><div class="value">{sell_count}</div></div>
+  <!-- ==================== HERO SECTION ==================== -->
+  <div class="hero">
+    <div class="grade-badge grade-{grade_overall}">{grade_overall}</div>
+    <div class="hero-info">
+      <div class="hero-score">{grade_score}<span> / 100</span></div>
+      <div class="hero-summary">{grade_summary}</div>
+    </div>
+    <svg class="hero-radar" id="radarSvg" viewBox="0 0 160 160"></svg>
   </div>
 
-  <!-- Performance metrics -->
-  <div class="section-title">绩效指标 <span style="opacity:.45;font-weight:400;font-size:10px">— 点击任意指标卡片可查看定义与解读</span></div>
-  <div class="metrics-grid">
-    <div class="metric-card" onclick="showMetric('ann_ret')">
-      <div class="title-row"><span class="mc-title">年化收益率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-ann_ret">{ann_ret}</div>
-      <div class="mc-grade-row"><div id="grade-ann_ret"></div></div>
+  <!-- ==================== CORE METRICS (4 prominent) ==================== -->
+  <div class="core-metrics">
+    <div class="core-card" onclick="showMetric('ann_ret')">
+      <div class="cc-label">年化收益率</div>
+      <div class="cc-val" id="mv-ann_ret" style="color:{pnl_color}">{ann_ret}</div>
+      <div class="cc-sub">{ann_ret_pct}</div>
+      <div class="cc-grade" id="grade-ann_ret"></div>
     </div>
-    <div class="metric-card" onclick="showMetric('excess_return')">
-      <div class="title-row"><span class="mc-title">超额收益</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-excess_return">{excess_return}</div>
-      <div class="mc-grade-row"><div id="grade-excess_return"></div></div>
+    <div class="core-card" onclick="showMetric('sharpe')">
+      <div class="cc-label">Sharpe 比率</div>
+      <div class="cc-val" id="mv-sharpe">{sharpe}</div>
+      <div class="cc-grade" id="grade-sharpe"></div>
     </div>
-    <div class="metric-card" onclick="showMetric('bm_ret')">
-      <div class="title-row"><span class="mc-title">{benchmark_name} 收益</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-bm_ret">{benchmark_ret}</div>
-      <div class="mc-grade-row"><div id="grade-bm_ret"></div></div>
+    <div class="core-card" onclick="showMetric('max_dd')">
+      <div class="cc-label">最大回撤</div>
+      <div class="cc-val neg" id="mv-max_dd">{max_dd}</div>
+      <div class="cc-sub">{max_dd_pct}</div>
+      <div class="cc-grade" id="grade-max_dd"></div>
     </div>
-    <div class="metric-card" onclick="showMetric('alpha')">
-      <div class="title-row"><span class="mc-title">Alpha（超额收益）</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-alpha">{alpha}</div>
-      <div class="mc-grade-row"><div id="grade-alpha"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('beta')">
-      <div class="title-row"><span class="mc-title">Beta（市场敏感度）</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-beta">{beta}</div>
-      <div class="mc-grade-row"><div id="grade-beta"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('sharpe')">
-      <div class="title-row"><span class="mc-title">Sharpe 比率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-sharpe">{sharpe}</div>
-      <div class="mc-grade-row"><div id="grade-sharpe"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('win_rate')">
-      <div class="title-row"><span class="mc-title">胜率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-win_rate">{win_rate}</div>
-      <div class="mc-grade-row"><div id="grade-win_rate"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('profit_loss_ratio')">
-      <div class="title-row"><span class="mc-title">盈亏比</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-profit_loss_ratio">{profit_loss_ratio}</div>
-      <div class="mc-grade-row"><div id="grade-profit_loss_ratio"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('max_dd')">
-      <div class="title-row"><span class="mc-title">最大回撤</span><span class="mc-info">i</span></div>
-      <div class="mc-val neg" id="mv-max_dd">{max_dd}</div>
-      <div class="mc-grade-row"><div id="grade-max_dd"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('sortino')">
-      <div class="title-row"><span class="mc-title">Sortino 比率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-sortino">{sortino}</div>
-      <div class="mc-grade-row"><div id="grade-sortino"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('calmar')">
-      <div class="title-row"><span class="mc-title">Calmar 比率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-calmar">{calmar}</div>
-      <div class="mc-grade-row"><div id="grade-calmar"></div></div>
+    <div class="core-card" onclick="showMetric('win_rate')">
+      <div class="cc-label">胜率</div>
+      <div class="cc-val" id="mv-win_rate">{win_rate}</div>
+      <div class="cc-grade" id="grade-win_rate"></div>
     </div>
   </div>
 
-  <!-- Secondary metrics row -->
-  <div class="section-title">超额与风险详情</div>
-  <div class="metrics-grid metrics-grid-secondary">
-    <div class="metric-card" onclick="showMetric('daily_excess')">
-      <div class="title-row"><span class="mc-title">日均超额收益</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-daily_excess">{daily_excess}</div>
-      <div class="mc-grade-row"><div id="grade-daily_excess"></div></div>
+  <!-- ==================== SUMMARY CARDS ==================== -->
+  <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-bottom: 14px;">
+    <div class="metric-card">
+      <div class="title-row"><span class="mc-title">初始资金</span></div>
+      <div class="mc-val">&yen;{initial_capital}</div>
     </div>
-    <div class="metric-card" onclick="showMetric('excess_max_dd')">
-      <div class="title-row"><span class="mc-title">超额收益最大回撤</span><span class="mc-info">i</span></div>
-      <div class="mc-val neg" id="mv-excess_max_dd">{excess_max_dd}</div>
-      <div class="mc-grade-row"><div id="grade-excess_max_dd"></div></div>
+    <div class="metric-card">
+      <div class="title-row"><span class="mc-title">期末净值</span></div>
+      <div class="mc-val">&yen;{final_value}</div>
     </div>
-    <div class="metric-card" onclick="showMetric('excess_sharpe')">
-      <div class="title-row"><span class="mc-title">超额收益夏普比率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-excess_sharpe">{excess_sharpe}</div>
-      <div class="mc-grade-row"><div id="grade-excess_sharpe"></div></div>
+    <div class="metric-card">
+      <div class="title-row"><span class="mc-title">总盈亏</span></div>
+      <div class="mc-val" style="color:{pnl_color}">{pnl}</div>
     </div>
-    <div class="metric-card" onclick="showMetric('daily_win_rate')">
-      <div class="title-row"><span class="mc-title">日胜率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-daily_win_rate">{daily_win_rate}</div>
-      <div class="mc-grade-row"><div id="grade-daily_win_rate"></div></div>
+    <div class="metric-card">
+      <div class="title-row"><span class="mc-title">总收益率</span></div>
+      <div class="mc-val" style="color:{pnl_color}">{pnl_pct}</div>
     </div>
-    <div class="metric-card" onclick="showMetric('win_count')">
-      <div class="title-row"><span class="mc-title">盈利次数</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-win_count">{win_count}</div>
-      <div class="mc-grade-row"><div id="grade-win_count"></div></div>
+    <div class="metric-card">
+      <div class="title-row"><span class="mc-title">买入次数</span></div>
+      <div class="mc-val">{buy_count}</div>
     </div>
-    <div class="metric-card" onclick="showMetric('loss_count')">
-      <div class="title-row"><span class="mc-title">亏损次数</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-loss_count">{loss_count}</div>
-      <div class="mc-grade-row"><div id="grade-loss_count"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('info_ratio')">
-      <div class="title-row"><span class="mc-title">信息比率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-info_ratio">{info_ratio}</div>
-      <div class="mc-grade-row"><div id="grade-info_ratio"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('ann_vol')">
-      <div class="title-row"><span class="mc-title">策略波动率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-ann_vol">{ann_vol}</div>
-      <div class="mc-grade-row"><div id="grade-ann_vol"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('bm_vol')">
-      <div class="title-row"><span class="mc-title">基准波动率</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-bm_vol">{bm_vol}</div>
-      <div class="mc-grade-row"><div id="grade-bm_vol"></div></div>
-    </div>
-    <div class="metric-card" onclick="showMetric('trade_count')">
-      <div class="title-row"><span class="mc-title">交易次数</span><span class="mc-info">i</span></div>
-      <div class="mc-val" id="mv-trade_count">{trade_count}</div>
-      <div class="mc-grade-row"><div id="grade-trade_count"></div></div>
+    <div class="metric-card">
+      <div class="title-row"><span class="mc-title">卖出次数</span></div>
+      <div class="mc-val">{sell_count}</div>
     </div>
   </div>
 
-  <!-- Technical stats (populated by JS) -->
+  <!-- ==================== TECH STATS ==================== -->
   <div id="tech-section" style="display:none">
     <div class="section-title">技术指标</div>
     <div class="tech-grid" id="tech-stats"></div>
-    <p class="chart-source" style="margin-bottom:14px">
-      数据来源：AKShare（东方财富行情接口）&middot; 含 MA、ATR(14)、量比等指标，基于回测期间的前复权日线数据计算。
-    </p>
   </div>
 
-  <!-- K-line chart -->
+  <!-- ==================== K-LINE CHART ==================== -->
   <div class="chart-panel" style="position:relative">
     <div class="chart-panel-head">
       <div>
         <h2>K 线图 &middot; 技术指标</h2>
-        <div class="chart-desc">日 K 线含 MA5/MA20/MA60 均线、布林带(20,2)、20日动态支撑/压力位、成交量柱，以及买卖信号标记。<span style="color:var(--primary);font-weight:500">&middot; 使用前复权价格（含分红调整）</span></div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px">日 K 线含 MA/BB/S/R、成交量，买卖信号标记 &middot; 前复权</div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <select id="symbolSelector" onchange="switchSymbol(this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;cursor:pointer"></select>
+        <select id="symbolSelector" onchange="switchSymbol(this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--text-primary);font-size:12px;cursor:pointer"></select>
         <div class="legend">
-          <span><span class="dot" style="background:#f5222d"></span>MA5</span>
-          <span><span class="dot" style="background:#1890ff"></span>MA20</span>
-          <span><span class="dot" style="background:#722ed1"></span>MA60</span>
-          <span><span class="dot" style="background:#f5222d"></span>买入</span>
-          <span><span class="dot" style="background:#52c41a"></span>卖出</span>
+          <span><span class="dot" style="background:#ef5350"></span>MA5</span>
+          <span><span class="dot" style="background:#5b8def"></span>MA20</span>
+          <span><span class="dot" style="background:#ab47bc"></span>MA60</span>
+          <span><span class="dot" style="background:#26a69a"></span>买入</span>
+          <span><span class="dot" style="background:#ef5350"></span>卖出</span>
         </div>
       </div>
     </div>
@@ -1608,10 +1620,10 @@ if (typeof LightweightCharts === 'undefined') {{
   <!-- RSI chart -->
   <div class="chart-panel">
     <div class="chart-panel-head">
-      <h2>RSI(14) 相对强弱指标</h2>
+      <h2>RSI(14)</h2>
       <div class="legend">
-        <span><span class="ln" style="background:#722ed1"></span>RSI(14)</span>
-        <span style="font-size:11px;color:var(--text-dim)">超卖区 &lt;30 / 超买区 &gt;70</span>
+        <span><span class="ln" style="background:#ab47bc"></span>RSI(14)</span>
+        <span style="font-size:11px;color:var(--text-dim)">超卖 &lt;30 / 超买 &gt;70</span>
       </div>
     </div>
     <div id="rsichart"></div>
@@ -1620,81 +1632,212 @@ if (typeof LightweightCharts === 'undefined') {{
   <!-- MACD chart -->
   <div class="chart-panel">
     <div class="chart-panel-head">
-      <h2>MACD(12,26,9) 指数平滑异同移动平均</h2>
+      <h2>MACD(12,26,9)</h2>
       <div class="legend">
-        <span><span class="ln" style="background:#1890ff"></span>MACD</span>
-        <span><span class="ln" style="background:#fa8c16"></span>Signal</span>
+        <span><span class="ln" style="background:#5b8def"></span>MACD</span>
+        <span><span class="ln" style="background:#ffa726"></span>Signal</span>
         <span><span class="dot" style="background:#26a69a"></span>柱状图</span>
       </div>
     </div>
     <div id="macdchart"></div>
   </div>
 
-  <!-- Cumulative returns comparison -->
-  <div class="chart-panel">
-    <div class="chart-panel-head">
-      <h2>累计收益率</h2>
-      <div class="chart-tabs" id="retTabs">
-        <span class="chart-tab active" data-series="all" onclick="toggleReturnSeries('all',this)">策略+基准</span>
-        <span class="chart-tab" data-series="excess" onclick="toggleReturnSeries('excess',this)">超额收益</span>
-        <span class="chart-tab" data-series="strategy" onclick="toggleReturnSeries('strategy',this)">仅策略</span>
-        <span class="chart-tab" data-series="benchmark" onclick="toggleReturnSeries('benchmark',this)">仅基准</span>
+  <!-- ==================== TABBED ANALYSIS ==================== -->
+  <div class="tabbed-section">
+    <div class="tab-bar">
+      <div class="tab active" data-tab="tb-cumret">累计收益</div>
+      <div class="tab" data-tab="tb-monthly">月度收益</div>
+      <div class="tab" data-tab="tb-rolling">滚动指标</div>
+      <div class="tab" data-tab="tb-dist">收益分布</div>
+    </div>
+
+    <!-- Cumulative returns -->
+    <div id="tb-cumret" class="tab-content active">
+      <div class="chart-body">
+        <div class="desc">策略累计收益（%）与<strong>沪深300</strong>、<strong>上证综指</strong>对比；「{benchmark_name} 收益」为 <code>set_benchmark</code> 配置的指数口径。</div>
+      </div>
+      <div id="returns"></div>
+      <div class="legend" style="padding: 8px 16px;">
+        <span><span class="ln" style="background:#ef5350"></span>策略</span>
+        <span><span class="ln" style="background:#5b8def"></span>沪深300</span>
+        <span><span class="ln" style="background:#ffa726"></span>上证指数</span>
+        <span><span class="ln" style="background:#ab47bc"></span>超额(相对沪深300)</span>
+      </div>
+      <div style="padding: 4px 16px 8px;">
+        <div class="chart-tabs" id="retTabs" style="display:inline-flex">
+          <span class="chart-tab active" onclick="toggleReturnSeries('all',this)">策略+基准</span>
+          <span class="chart-tab" onclick="toggleReturnSeries('excess',this)">超额收益</span>
+          <span class="chart-tab" onclick="toggleReturnSeries('strategy',this)">仅策略</span>
+          <span class="chart-tab" onclick="toggleReturnSeries('benchmark',this)">仅基准</span>
+        </div>
       </div>
     </div>
-    <div class="chart-body">
-      <div class="desc">策略累计收益（%）与<strong>沪深300</strong>、<strong>上证综指</strong>在同一回测区间、同一交易日对齐后的累计涨跌幅对比；指标卡片区「{benchmark_name} 收益」仍为 <code>set_benchmark</code> 配置的指数口径。</div>
+
+    <!-- Monthly heatmap -->
+    <div id="tb-monthly" class="tab-content">
+      <div class="monthly-heatmap" id="monthlyHeatmap"></div>
     </div>
-    <div id="returns"></div>
-    <div class="legend" style="padding: 8px 16px;">
-      <span><span class="ln" style="background:#f5222d"></span>策略</span>
-      <span><span class="ln" style="background:#1890ff"></span>沪深300</span>
-      <span><span class="ln" style="background:#fa8c16"></span>上证指数</span>
-      <span><span class="ln" style="background:#722ed1"></span>超额(相对沪深300)</span>
+
+    <!-- Rolling metrics -->
+    <div id="tb-rolling" class="tab-content">
+      <div class="chart-body">
+        <div class="desc">60日滚动 Sharpe 比率与年化波动率，反映策略风险收益特征的时变性。</div>
+      </div>
+      <div id="rollingChart"></div>
+    </div>
+
+    <!-- Distribution -->
+    <div id="tb-dist" class="tab-content">
+      <div class="chart-body">
+        <div class="desc">日度收益率分布直方图，观察策略收益的偏度与尾部风险。</div>
+      </div>
+      <canvas id="distCanvas"></canvas>
     </div>
   </div>
 
-  <!-- Drawdown -->
+  <!-- ==================== DRAWDOWN CHART ==================== -->
   <div class="chart-panel">
     <div class="chart-panel-head">
       <h2>回撤曲线</h2>
     </div>
     <div class="chart-body">
-      <div class="desc">绿色区域为<strong>策略</strong>净值相对自身历史峰值的回撤（%）；<strong>蓝线</strong>为沪深300、<strong>橙线</strong>为上证综指各自相对其区间峰值的回撤，便于对照大盘调整时的策略风险。</div>
+      <div class="desc">策略相对历史峰值的回撤（%），与沪深300、上证综指回撤对比。</div>
     </div>
     <div id="drawdown"></div>
   </div>
 
-  <!-- Daily P&L -->
+  <!-- ==================== DRAWDOWN PERIODS TABLE ==================== -->
+  <details>
+    <summary>最大回撤区间（Top 5）</summary>
+    <div class="detail-body">
+      <table class="dd-table">
+        <thead><tr><th>#</th><th>起始日期</th><th>结束日期</th><th>恢复日期</th><th>回撤深度</th><th>持续天数</th></tr></thead>
+        <tbody id="ddPeriodsBody"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- ==================== DAILY P&L ==================== -->
   <div class="chart-panel">
     <div class="chart-panel-head">
       <h2>每日盈亏</h2>
     </div>
     <div class="chart-body">
-      <div class="desc">每个交易日的资产净值变动额（元）。可直观观察收益分布形态与连续亏损风险。</div>
+      <div class="desc">每个交易日的资产净值变动额（元）。</div>
     </div>
     <div id="pnlbar"></div>
   </div>
 
-  <!-- Daily returns -->
+  <!-- ==================== DAILY RETURNS ==================== -->
   <div class="chart-panel">
     <div class="chart-panel-head">
       <h2>每日收益率</h2>
     </div>
     <div class="chart-body">
-      <div class="desc">日度收益率分布，用于观察策略波动性及收益连续性。</div>
+      <div class="desc">日度收益率分布。</div>
     </div>
     <div id="dailyret"></div>
   </div>
 
-  <!-- Trade details & calendar -->
-  <div class="section">
-    <div class="section-title">交易明细与日历</div>
-    <div class="tab-bar">
-      <div class="tab active" data-tab="tb-trades">交易明细</div>
-      <div class="tab" data-tab="tb-calendar">交易日历</div>
-      <div class="tab" data-tab="tb-positions">当前持仓</div>
+  <!-- ==================== ALL METRICS ==================== -->
+  <div class="section-title">绩效指标 <span style="opacity:.45;font-weight:400;font-size:10px">— 点击卡片查看定义与解读</span></div>
+  <div class="metrics-grid">
+    <div class="metric-card" onclick="showMetric('excess_return')">
+      <div class="title-row"><span class="mc-title">超额收益</span></div>
+      <div class="mc-val" id="mv-excess_return">{excess_return}</div>
+      <div class="mc-grade-row"><div id="grade-excess_return"></div></div>
     </div>
-    <div id="tb-trades" class="tab-content active">
+    <div class="metric-card" onclick="showMetric('bm_ret')">
+      <div class="title-row"><span class="mc-title">{benchmark_name} 收益</span></div>
+      <div class="mc-val" id="mv-bm_ret">{benchmark_ret}</div>
+      <div style="font-size:10px;color:var(--text-dim)">{benchmark_ret_pct}</div>
+      <div class="mc-grade-row"><div id="grade-bm_ret"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('alpha')">
+      <div class="title-row"><span class="mc-title">Alpha</span></div>
+      <div class="mc-val" id="mv-alpha">{alpha}</div>
+      <div class="mc-grade-row"><div id="grade-alpha"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('beta')">
+      <div class="title-row"><span class="mc-title">Beta</span></div>
+      <div class="mc-val" id="mv-beta">{beta}</div>
+      <div class="mc-grade-row"><div id="grade-beta"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('sortino')">
+      <div class="title-row"><span class="mc-title">Sortino 比率</span></div>
+      <div class="mc-val" id="mv-sortino">{sortino}</div>
+      <div class="mc-grade-row"><div id="grade-sortino"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('calmar')">
+      <div class="title-row"><span class="mc-title">Calmar 比率</span></div>
+      <div class="mc-val" id="mv-calmar">{calmar}</div>
+      <div class="mc-grade-row"><div id="grade-calmar"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('profit_loss_ratio')">
+      <div class="title-row"><span class="mc-title">盈亏比</span></div>
+      <div class="mc-val" id="mv-profit_loss_ratio">{profit_loss_ratio}</div>
+      <div class="mc-grade-row"><div id="grade-profit_loss_ratio"></div></div>
+    </div>
+  </div>
+
+  <div class="section-title">超额与风险详情</div>
+  <div class="metrics-grid metrics-grid-secondary">
+    <div class="metric-card" onclick="showMetric('daily_excess')">
+      <div class="title-row"><span class="mc-title">日均超额收益</span></div>
+      <div class="mc-val" id="mv-daily_excess">{daily_excess}</div>
+      <div class="mc-grade-row"><div id="grade-daily_excess"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('excess_max_dd')">
+      <div class="title-row"><span class="mc-title">超额收益最大回撤</span></div>
+      <div class="mc-val neg" id="mv-excess_max_dd">{excess_max_dd}</div>
+      <div class="mc-grade-row"><div id="grade-excess_max_dd"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('excess_sharpe')">
+      <div class="title-row"><span class="mc-title">超额夏普比率</span></div>
+      <div class="mc-val" id="mv-excess_sharpe">{excess_sharpe}</div>
+      <div class="mc-grade-row"><div id="grade-excess_sharpe"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('daily_win_rate')">
+      <div class="title-row"><span class="mc-title">日胜率</span></div>
+      <div class="mc-val" id="mv-daily_win_rate">{daily_win_rate}</div>
+      <div class="mc-grade-row"><div id="grade-daily_win_rate"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('win_count')">
+      <div class="title-row"><span class="mc-title">盈利次数</span></div>
+      <div class="mc-val" id="mv-win_count">{win_count}</div>
+      <div class="mc-grade-row"><div id="grade-win_count"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('loss_count')">
+      <div class="title-row"><span class="mc-title">亏损次数</span></div>
+      <div class="mc-val" id="mv-loss_count">{loss_count}</div>
+      <div class="mc-grade-row"><div id="grade-loss_count"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('info_ratio')">
+      <div class="title-row"><span class="mc-title">信息比率</span></div>
+      <div class="mc-val" id="mv-info_ratio">{info_ratio}</div>
+      <div class="mc-grade-row"><div id="grade-info_ratio"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('ann_vol')">
+      <div class="title-row"><span class="mc-title">策略波动率</span></div>
+      <div class="mc-val" id="mv-ann_vol">{ann_vol}</div>
+      <div class="mc-grade-row"><div id="grade-ann_vol"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('bm_vol')">
+      <div class="title-row"><span class="mc-title">基准波动率</span></div>
+      <div class="mc-val" id="mv-bm_vol">{bm_vol}</div>
+      <div class="mc-grade-row"><div id="grade-bm_vol"></div></div>
+    </div>
+    <div class="metric-card" onclick="showMetric('trade_count')">
+      <div class="title-row"><span class="mc-title">交易次数</span></div>
+      <div class="mc-val" id="mv-trade_count">{trade_count}</div>
+      <div class="mc-grade-row"><div id="grade-trade_count"></div></div>
+    </div>
+  </div>
+
+  <!-- ==================== TRADE DETAILS (collapsible) ==================== -->
+  <details>
+    <summary>交易明细</summary>
+    <div class="detail-body">
       <table class="trade-table">
         <thead><tr>
           <th>#</th><th>日期</th><th>操作</th><th>代码</th>
@@ -1703,7 +1846,12 @@ if (typeof LightweightCharts === 'undefined') {{
         <tbody>{trade_rows}</tbody>
       </table>
     </div>
-    <div id="tb-calendar" class="tab-content">
+  </details>
+
+  <!-- ==================== TRADE CALENDAR (collapsible) ==================== -->
+  <details>
+    <summary>交易日历</summary>
+    <div class="detail-body">
       <div class="cal-wrapper">
         <table class="cal-table">
           <thead><tr>
@@ -1713,12 +1861,17 @@ if (typeof LightweightCharts === 'undefined') {{
         </table>
       </div>
     </div>
-    <div id="tb-positions" class="tab-content">
+  </details>
+
+  <!-- ==================== POSITIONS (collapsible) ==================== -->
+  <details>
+    <summary>当前持仓</summary>
+    <div class="detail-body positions">
       <ul>{positions_html}</ul>
     </div>
-  </div>
+  </details>
 
-  <!-- Data sources & methodology -->
+  <!-- ==================== DATA SOURCES ==================== -->
   <div class="section">
     <div class="section-title">数据来源与计算方法</div>
     <div class="tab-bar">
@@ -1730,7 +1883,7 @@ if (typeof LightweightCharts === 'undefined') {{
         <div class="src-card">
           <div class="src-type">行情数据</div>
           <div class="src-name">AKShare &mdash; 东方财富接口</div>
-          <div class="src-desc">A股日线 OHLCV 行情通过 <code>stock_zh_a_hist</code> 获取，<strong>前复权（qfq）</strong>处理。前复权已将历史分红纳入价格调整，回测收益已反映分红影响。数据由东方财富网提供，仅供研究使用。</div>
+          <div class="src-desc">A股日线 OHLCV 行情通过 <code>stock_zh_a_hist</code> 获取，<strong>前复权（qfq）</strong>处理。数据由东方财富网提供，仅供研究使用。</div>
         </div>
         <div class="src-card">
           <div class="src-type">基准指数</div>
@@ -1740,7 +1893,7 @@ if (typeof LightweightCharts === 'undefined') {{
         <div class="src-card">
           <div class="src-type">无风险利率</div>
           <div class="src-name">固定 3.0% / 年</div>
-          <div class="src-desc">参考近年中国国债市场平均利率水平，用于 Sharpe、Sortino、Alpha 等超额收益指标的计算（日化 = 3% &divide; 252）。</div>
+          <div class="src-desc">参考近年中国国债市场平均利率水平，用于 Sharpe、Sortino、Alpha 等指标计算（日化 = 3% &divide; 252）。</div>
         </div>
         <div class="src-card">
           <div class="src-type">回测引擎</div>
@@ -1751,16 +1904,13 @@ if (typeof LightweightCharts === 'undefined') {{
     </div>
     <div id="tb-method" class="tab-content">
       <ul class="method-list">
-        <li><strong>年化收益率</strong>(1 + 总收益率)^(252/N) &minus; 1，N 为回测交易日数，每年按 252 个交易日折算。</li>
-        <li><strong>Sharpe 比率</strong>(日均收益率 &minus; r_f/252) / 日收益率标准差 &times; &radic;252。参考：Sharpe (1966, 1994)。</li>
-        <li><strong>Sortino 比率</strong>同 Sharpe 但分母仅用下行波动率（仅负收益标准差）。参考：Sortino &amp; Price (1994)。</li>
-        <li><strong>最大回撤</strong>max[(峰值 &minus; 谷值) / 峰值]，反映策略可能面临的最大历史亏损幅度。</li>
-        <li><strong>Calmar 比率</strong>年化收益率 / |最大回撤|，衡量单位回撤的年化回报。参考：Young (1991)。</li>
-        <li><strong>Alpha / Beta</strong>基于 CAPM，以沪深300为市场基准。&beta; = Cov(R_p,R_m)/Var(R_m)；&alpha; = R_p &minus; [r_f + &beta;(R_m &minus; r_f)]（均年化）。参考：Sharpe (1964)，Lintner (1965)。</li>
-        <li><strong>胜率</strong>按先进先出（FIFO）配对买卖，盈利对数 / 全部配对数。注意需结合盈亏比综合评估。</li>
-        <li><strong>ATR(14)</strong>14日平均真实波幅，反映近期价格波动区间均值。参考：Wilder (1978)。</li>
-        <li><strong>支撑/压力位</strong>20日滚动最低/最高价计算，动态非静态水平线。</li>
-        <li><strong>量比</strong>当日成交量 / 近20日成交量均值，&gt;2 通常视为明显放量信号。</li>
+        <li><strong>年化收益率</strong>(1 + 总收益率)^(252/N) &minus; 1，N 为回测交易日数。</li>
+        <li><strong>Sharpe 比率</strong>(日均收益率 &minus; r_f/252) / 日收益率标准差 &times; &radic;252。</li>
+        <li><strong>Sortino 比率</strong>同 Sharpe 但分母仅用下行波动率。</li>
+        <li><strong>最大回撤</strong>max[(峰值 &minus; 谷值) / 峰值]。</li>
+        <li><strong>Calmar 比率</strong>年化收益率 / |最大回撤|。</li>
+        <li><strong>Alpha / Beta</strong>基于 CAPM，以沪深300为市场基准。</li>
+        <li><strong>胜率</strong>按 FIFO 配对买卖，盈利对数 / 全部配对数。</li>
       </ul>
     </div>
   </div>
@@ -1784,9 +1934,9 @@ if (typeof LightweightCharts === 'undefined') {{
     ann_ret: {{
       name: '年化收益率',
       formula: '(1 + 总收益率) ^ (252 / N) − 1',
-      desc: '将回测期间的累计总收益率换算为年化水平，便于与其他资产或指数横向比较。N 为实际回测交易日数（约252个交易日/年）。',
-      interp: '数值越高越好。>15% 为优秀，>8% 为良好，>0% 为正收益，≤0% 为亏损。注意短期高收益不代表长期稳定性。',
-      ref: '标准年化换算公式（Geometric Mean Return Annualization），金融分析行业通用。',
+      desc: '将回测期间的累计总收益率换算为年化水平，N 为实际回测交易日数。',
+      interp: '>15% 优秀，>8% 良好，>0% 正收益，≤0% 亏损。',
+      ref: 'Geometric Mean Return Annualization',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1799,9 +1949,9 @@ if (typeof LightweightCharts === 'undefined') {{
     sharpe: {{
       name: 'Sharpe 比率',
       formula: '(E[R_p] − r_f) / σ_p × √252',
-      desc: '衡量每单位总风险（年化波动率）所获得的超额年化收益。R_p 为策略日收益，r_f 为无风险利率日化值（年化3%÷252），σ_p 为日收益率标准差，公式最终年化。',
-      interp: '>2.0 优秀，>1.0 良好，>0.5 一般，≤0.5 较差，负值表示不如无风险资产。',
-      ref: 'Sharpe, W.F. (1966). Mutual Fund Performance. Journal of Business, 39(1), 119–138.\\nSharpe, W.F. (1994). The Sharpe Ratio. Journal of Portfolio Management.',
+      desc: '衡量每单位总风险所获得的超额年化收益。',
+      interp: '>2.0 优秀，>1.0 良好，>0.5 一般，≤0.5 较差。',
+      ref: 'Sharpe (1966, 1994).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1814,9 +1964,9 @@ if (typeof LightweightCharts === 'undefined') {{
     sortino: {{
       name: 'Sortino 比率',
       formula: '(E[R_p] − r_f) / σ_down × √252',
-      desc: '与 Sharpe 类似，但分母仅计算下行波动率（仅负收益的标准差），对上行收益的波动不作惩罚，更真实反映投资者面临的实际风险。',
-      interp: '>2.0 优秀，>1.0 良好。通常高于 Sharpe；若明显低于 Sharpe，说明策略亏损时波动较大。',
-      ref: 'Sortino, F.A. & Price, L.N. (1994). Performance Measurement in a Downside Risk Framework. Journal of Investing, 3(3), 59–64.',
+      desc: '分母仅计算下行波动率，更真实反映投资者面临的实际风险。',
+      interp: '>2.0 优秀，>1.0 良好。',
+      ref: 'Sortino & Price (1994).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1829,9 +1979,9 @@ if (typeof LightweightCharts === 'undefined') {{
     max_dd: {{
       name: '最大回撤',
       formula: 'max[(峰值 − 谷值) / 峰值] × 100%',
-      desc: '在整个回测期间，净值从历史最高点到随后最低点的最大跌幅百分比。代表持有该策略可能遭遇的最坏亏损情形，是风险控制的核心指标。',
-      interp: '<5% 优秀，<10% 良好，<20% 可接受，>20% 风险偏高。A股高波动性背景下 <15% 被视为良好控制。',
-      ref: 'Magdon-Ismail, M. & Atiya, A. (2004). Maximum Drawdown. Risk Magazine, 17(10), 99–102.',
+      desc: '净值从历史最高点到随后最低点的最大跌幅百分比。',
+      interp: '<5% 优秀，<10% 良好，<20% 可接受，>20% 风险偏高。',
+      ref: 'Magdon-Ismail & Atiya (2004).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1844,9 +1994,9 @@ if (typeof LightweightCharts === 'undefined') {{
     win_rate: {{
       name: '胜率',
       formula: '盈利配对交易数 / 全部配对交易数',
-      desc: '以先进先出（FIFO）方式配对每笔买卖，统计卖出价格高于对应买入价格的比例。注意：高胜率 ≠ 高盈利，还需结合盈亏比（赔率）综合评估策略质量。',
-      interp: '>60% 优秀，>50% 良好，40–50% 一般，<40% 需结合盈亏比判断策略合理性。',
-      ref: 'Van Tharp (1999). Trade Your Way to Financial Freedom. McGraw-Hill.',
+      desc: 'FIFO配对中卖出价格高于买入价格的比例。',
+      interp: '>60% 优秀，>50% 良好，40-50% 一般。',
+      ref: 'Van Tharp (1999).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1857,42 +2007,42 @@ if (typeof LightweightCharts === 'undefined') {{
       }},
     }},
     alpha: {{
-      name: 'Alpha（超额收益）',
-      formula: 'α = R_p(年化) − [r_f + β × (R_m(年化) − r_f)]',
-      desc: '基于 CAPM 模型，衡量策略在承担系统性市场风险（β）之外额外获得的年化超额收益。正 Alpha 表明策略相对基准创造了独立附加价值。',
-      interp: '>5% 优秀，>0% 说明策略相对基准有价值，<0% 表示风险调整后跑输基准，<-5% 则显著落后。',
-      ref: 'Jensen, M.C. (1968). The Performance of Mutual Funds in the Period 1945-1964. Journal of Finance, 23(2), 389–416.\\nCAPM: Sharpe (1964), Lintner (1965), Mossin (1966).',
+      name: 'Alpha',
+      formula: 'α = R_p − [r_f + β × (R_m − r_f)]',
+      desc: '基于 CAPM 的年化超额收益。正 Alpha 表明策略创造了附加价值。',
+      interp: '>5% 优秀，>0% 有价值，<0% 跑输基准。',
+      ref: 'Jensen (1968).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
         if (n > 5)  return ['excellent', '优秀 >5%'];
         if (n > 0)  return ['good',      '正 Alpha'];
-        if (n > -5) return ['fair',      '略低 > −5%'];
+        if (n > -5) return ['fair',      '略低'];
         return ['poor', '负 Alpha'];
       }},
     }},
     beta: {{
-      name: 'Beta（市场敏感度）',
+      name: 'Beta',
       formula: 'β = Cov(R_p, R_m) / Var(R_m)',
-      desc: '衡量策略收益率相对于市场基准（沪深300）变动的敏感程度。β=1 与市场同步；β>1 放大市场波动（进取型）；β<1 减弱市场波动（防御型）；β<0 与市场反向。',
-      interp: '无绝对好坏，取决于策略目标。低波动/防御型：β<0.8；进取型：β>1.2；套利对冲型：β≈0。',
-      ref: 'CAPM: Sharpe, W.F. (1964). Capital Asset Prices: A Theory of Market Equilibrium. Journal of Finance, 19(3), 425–442.',
+      desc: '策略收益率相对市场基准的敏感程度。',
+      interp: 'β=1 与市场同步；β>1 放大波动；β<1 减弱波动。',
+      ref: 'CAPM: Sharpe (1964).',
       grader(v) {{ return null; }},
     }},
     bm_ret: {{
-      name: '{benchmark_name} 收益（基准参考）',
+      name: '{benchmark_name} 收益',
       formula: '(期末收盘价 / 期初收盘价 − 1) × 100%',
-      desc: '沪深300指数在相同回测区间内的累计涨跌幅，作为评估策略主动收益（Alpha）的参照基准。沪深300由沪深两市市值最大的300只A股构成，覆盖约70%的A股总市值。',
-      interp: '将策略收益率与基准对比：策略超越基准则产生正的主动收益；低于基准则为负的主动收益。基准本身的高低不影响策略评价，关键看相对表现。',
-      ref: '沪深300指数（000300.SH），2005年4月8日发布，基日2004年12月31日=1000点，由中证指数有限公司编制。',
+      desc: '基准指数在相同回测区间的累计涨跌幅。',
+      interp: '将策略收益率与基准对比。',
+      ref: '沪深300指数',
       grader(v) {{ return null; }},
     }},
     excess_return: {{
       name: '超额收益',
       formula: '策略总收益率 − 基准总收益率',
-      desc: '策略相对基准指数在相同区间的绝对超额回报。正值表示跑赢基准，负值表示跑输。是最直观的策略附加值指标。',
-      interp: '>10% 优秀，>0% 正超额，<0% 跑输基准。注意需结合风险水平判断超额是否值得承担。',
-      ref: 'Active Return = R_p − R_b，现代投资组合理论通用。',
+      desc: '策略相对基准的绝对超额回报。',
+      interp: '>10% 优秀，>0% 正超额，<0% 跑输基准。',
+      ref: 'Active Return',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1904,9 +2054,9 @@ if (typeof LightweightCharts === 'undefined') {{
     calmar: {{
       name: 'Calmar 比率',
       formula: '年化收益率 / |最大回撤|',
-      desc: '衡量策略年化回报相对最大回撤的性价比。与 Sharpe 类似，但分母用最大回撤而非波动率，更侧重下行风险。',
-      interp: '>1.0 优秀，>0.5 良好，<0.3 偏低。越高说明单位回撤带来的年化收益越大。',
-      ref: 'Young, T.W. (1991). CALMAR Ratio: A Smarter Way to Track Performance. Managed Account Reports.',
+      desc: '年化回报相对最大回撤的性价比。',
+      interp: '>1.0 优秀，>0.5 良好，<0.3 偏低。',
+      ref: 'Young (1991).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1917,10 +2067,10 @@ if (typeof LightweightCharts === 'undefined') {{
     }},
     profit_loss_ratio: {{
       name: '盈亏比',
-      formula: '平均单笔盈利金额 / 平均单笔亏损金额',
-      desc: '衡量每笔交易平均赚多少与赔多少的比率。与胜率配合使用：高盈亏比+中等胜率往往优于低盈亏比+高胜率。',
-      interp: '>3:1 优秀，>2:1 良好，>1:1 盈利覆盖亏损，<1:1 每笔亏损大于盈利。盈亏比×胜率>1 为盈利系统的必要条件。',
-      ref: 'Van Tharp (1999). Trade Your Way to Financial Freedom. McGraw-Hill.',
+      formula: '平均单笔盈利 / 平均单笔亏损',
+      desc: '每笔交易平均盈利与亏损的比率。',
+      interp: '>3:1 优秀，>2:1 良好，>1:1 盈利覆盖亏损。',
+      ref: 'Van Tharp (1999).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n) || n === 0) return null;
@@ -1933,9 +2083,9 @@ if (typeof LightweightCharts === 'undefined') {{
     daily_excess: {{
       name: '日均超额收益',
       formula: 'mean(策略日收益 − 基准日收益) × 252',
-      desc: '策略每日相对基准的超额收益的均值年化值。反映策略平均每天能创造多少超额年化回报。',
-      interp: '>3% 优秀，>0% 日均正超额，<0% 日均跑输基准。',
-      ref: 'Daily Active Return annualized，行业通用。',
+      desc: '策略每日超额收益的年化值。',
+      interp: '>3% 优秀，>0% 正超额。',
+      ref: 'Daily Active Return',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1946,25 +2096,25 @@ if (typeof LightweightCharts === 'undefined') {{
     }},
     excess_max_dd: {{
       name: '超额收益最大回撤',
-      formula: 'max[(超额累积峰值 − 超额累积谷值) / 超额累积峰值]',
-      desc: '超额收益累积曲线的最大回撤。即使策略整体盈利，超额回撤过大说明策略相对基准存在阶段性显著落后。',
-      interp: '<5% 优秀，<10% 良好，>15% 说明策略有较长时间大幅跑输基准。',
-      ref: 'Tracking Error Drawdown，机构投资风控常用指标。',
+      formula: 'max(超额累积峰值 − 超额累积谷值) / 峰值',
+      desc: '超额收益累积曲线的最大回撤。',
+      interp: '<5% 优秀，<10% 良好，>15% 偏高。',
+      ref: 'Tracking Error Drawdown',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
         if (n < 5)  return ['excellent', '优秀 <5%'];
         if (n < 10) return ['good',      '良好 <10%'];
-        if (n < 15) return ['fair',      '可接受 <15%'];
+        if (n < 15) return ['fair',      '可接受'];
         return ['poor', '偏高 >15%'];
       }},
     }},
     excess_sharpe: {{
-      name: '超额收益夏普比率',
+      name: '超额夏普比率',
       formula: '(E[超额日收益] − r_f) / σ(超额日收益) × √252',
-      desc: '以超额日收益（策略 − 基准）为输入计算的 Sharpe 比率。衡量每单位超额波动所获得的风险调整后回报。',
-      interp: '>1.0 优秀，>0.5 良好，>0 正超额收益经风险调整后仍为正值。',
-      ref: 'Information Ratio 的变体，行业通用。',
+      desc: '以超额日收益为输入的 Sharpe 比率。',
+      interp: '>1.0 优秀，>0.5 良好。',
+      ref: 'Information Ratio variant',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1977,9 +2127,9 @@ if (typeof LightweightCharts === 'undefined') {{
     daily_win_rate: {{
       name: '日胜率',
       formula: '盈利交易日数 / 总交易日数',
-      desc: '策略在多少个交易日的日度收益为正。反映策略的每日稳定性，与交易胜率（配对买卖）意义不同。',
-      interp: '>55% 优秀，>50% 良好，<45% 偏弱。日胜率通常高于交易胜率，因为长期趋势向上的策略仍有大量震荡日。',
-      ref: 'Daily Hit Ratio，行业通用。',
+      desc: '策略日度收益为正的比例。',
+      interp: '>55% 优秀，>50% 良好。',
+      ref: 'Daily Hit Ratio',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -1989,27 +2139,19 @@ if (typeof LightweightCharts === 'undefined') {{
       }},
     }},
     win_count: {{
-      name: '盈利次数',
-      formula: 'FIFO配对中盈利交易的对数',
-      desc: '回测期间完成的配对交易中，卖出价高于平均买入成本的次数。',
-      interp: '绝对数值，需与亏损次数结合观察。次数越多说明策略活跃度越高。',
-      ref: 'Trade count，行业通用。',
-      grader(v) {{ return null; }},
+      name: '盈利次数', formula: '', desc: '盈利配对交易次数。',
+      interp: '', ref: '', grader(v) {{ return null; }},
     }},
     loss_count: {{
-      name: '亏损次数',
-      formula: 'FIFO配对中亏损交易的对数',
-      desc: '回测期间完成的配对交易中，卖出价低于平均买入成本的次数。',
-      interp: '越少越好，但需结合盈亏比判断。少量大亏损可能比大量小亏损更致命。',
-      ref: 'Trade count，行业通用。',
-      grader(v) {{ return null; }},
+      name: '亏损次数', formula: '', desc: '亏损配对交易次数。',
+      interp: '', ref: '', grader(v) {{ return null; }},
     }},
     info_ratio: {{
       name: '信息比率',
-      formula: 'mean(策略日收益 − 基准日收益) / std(策略日收益 − 基准日收益) × √252',
-      desc: '衡量每单位跟踪误差所获得的主动年化收益。是主动管理和量化策略评估的核心指标之一。',
-      interp: '>0.5 优秀，>0.3 良好，>0 正主动收益，<0 跑输基准。',
-      ref: 'Grinold & Kahn (1999). Active Portfolio Management. McGraw-Hill.',
+      formula: 'mean(超额日收益) / std(超额日收益) × √252',
+      desc: '每单位跟踪误差的主动年化收益。',
+      interp: '>0.5 优秀，>0.3 良好。',
+      ref: 'Grinold & Kahn (1999).',
       grader(v) {{
         const n = parseFloat(v);
         if (isNaN(n)) return null;
@@ -2020,28 +2162,16 @@ if (typeof LightweightCharts === 'undefined') {{
       }},
     }},
     ann_vol: {{
-      name: '策略波动率',
-      formula: 'σ(策略日收益) × √252',
-      desc: '策略日收益率的年化标准差，衡量策略收益的总体波动水平。',
-      interp: '<10% 低波动，10-20% 中等，20-30% 高波动，>30% 极高波动。低波动不等于低风险，还需看最大回撤。',
-      ref: 'Annualized Volatility，行业通用。',
-      grader(v) {{ return null; }},
+      name: '策略波动率', formula: 'σ(日收益) × √252', desc: '日收益率的年化标准差。',
+      interp: '<10% 低波动，10-20% 中等，>20% 高波动。', ref: '', grader(v) {{ return null; }},
     }},
     bm_vol: {{
-      name: '基准波动率',
-      formula: 'σ(基准日收益) × √252',
-      desc: '基准指数日收益率的年化标准差，用于与策略波动率对比。A股基准波动率通常在 15-25% 之间。',
-      interp: '与策略波动率对比：策略波动率低于基准说明策略更平稳；高于基准说明策略放大了波动。',
-      ref: 'Annualized Volatility，行业通用。',
-      grader(v) {{ return null; }},
+      name: '基准波动率', formula: 'σ(基准日收益) × √252', desc: '基准日收益率的年化标准差。',
+      interp: '与策略波动率对比。', ref: '', grader(v) {{ return null; }},
     }},
     trade_count: {{
-      name: '交易次数',
-      formula: '完成的 FIFO 配对交易数量',
-      desc: '回测期间完成的配对买卖总次数。反映策略的活跃度和信号频率。',
-      interp: '过少可能信号过于严格或缺乏机会，过多可能增加交易成本。需结合盈亏比和胜率综合判断。',
-      ref: 'Trade count，行业通用。',
-      grader(v) {{ return null; }},
+      name: '交易次数', formula: '', desc: '回测期间完成的配对买卖总次数。',
+      interp: '', ref: '', grader(v) {{ return null; }},
     }},
   }};
 
@@ -2056,7 +2186,7 @@ if (typeof LightweightCharts === 'undefined') {{
       const result = def.grader(valEl.textContent);
       if (!result) return;
       const [cls, label] = result;
-      gradeEl.innerHTML = `<span class="mc-grade grade-${{cls}}">${{label}}</span>`;
+      gradeEl.innerHTML = '<span class="mc-grade grade-' + cls + '">' + label + '</span>';
     }});
   }}
 
@@ -2072,13 +2202,13 @@ if (typeof LightweightCharts === 'undefined') {{
     document.getElementById('md-val').textContent   = val;
     let body = '';
     if (def.formula)
-      body += `<div class="modal-sec"><h4>计算公式</h4><div class="modal-formula">${{def.formula}}</div></div>`;
+      body += '<div class="modal-sec"><h4>计算公式</h4><div class="modal-formula">' + def.formula + '</div></div>';
     if (def.desc)
-      body += `<div class="modal-sec"><h4>指标说明</h4><p>${{def.desc}}</p></div>`;
+      body += '<div class="modal-sec"><h4>指标说明</h4><p>' + def.desc + '</p></div>';
     if (def.interp)
-      body += `<div class="modal-sec"><h4>解读指南</h4><p>${{def.interp}}</p></div>`;
+      body += '<div class="modal-sec"><h4>解读指南</h4><p>' + def.interp + '</p></div>';
     if (def.ref)
-      body += `<div class="modal-ref">&#128218; 参考文献：${{def.ref}}</div>`;
+      body += '<div class="modal-ref">&#128218; 参考文献：' + def.ref + '</div>';
     document.getElementById('md-body').innerHTML = body;
     document.getElementById('mdOverlay').classList.add('open');
   }}
@@ -2090,25 +2220,200 @@ if (typeof LightweightCharts === 'undefined') {{
   document.addEventListener('keydown', e => {{ if (e.key === 'Escape') closeModal(); }});
 
   /* =================================================================
-     CHART COMMON OPTIONS
+     RADAR CHART (inline SVG, 6 dimensions)
+     ================================================================= */
+  (function() {{
+    const dims = {grade_dims_json};
+    if (!dims || dims.length === 0) return;
+    const svg = document.getElementById('radarSvg');
+    const cx = 80, cy = 80, r = 60;
+    const n = dims.length;
+    const angleStep = (2 * Math.PI) / n;
+    // Draw grid rings
+    [0.25, 0.5, 0.75, 1.0].forEach(frac => {{
+      let pts = [];
+      for (let i = 0; i < n; i++) {{
+        const a = -Math.PI/2 + i * angleStep;
+        pts.push((cx + r * frac * Math.cos(a)).toFixed(1) + ',' + (cy + r * frac * Math.sin(a)).toFixed(1));
+      }}
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      poly.setAttribute('points', pts.join(' '));
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', '#1e2a3a');
+      poly.setAttribute('stroke-width', '0.5');
+      svg.appendChild(poly);
+    }});
+    // Draw axes + labels
+    dims.forEach((d, i) => {{
+      const a = -Math.PI/2 + i * angleStep;
+      const x2 = cx + r * Math.cos(a);
+      const y2 = cy + r * Math.sin(a);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+      line.setAttribute('x2', x2.toFixed(1)); line.setAttribute('y2', y2.toFixed(1));
+      line.setAttribute('stroke', '#1e2a3a'); line.setAttribute('stroke-width', '0.5');
+      svg.appendChild(line);
+      // Label
+      const lx = cx + (r + 14) * Math.cos(a);
+      const ly = cy + (r + 14) * Math.sin(a);
+      const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      txt.setAttribute('x', lx.toFixed(1)); txt.setAttribute('y', (ly + 3).toFixed(1));
+      txt.setAttribute('text-anchor', 'middle');
+      txt.setAttribute('fill', '#8b98a9'); txt.setAttribute('font-size', '8');
+      txt.textContent = d.label || d.name || '';
+      svg.appendChild(txt);
+    }});
+    // Draw data polygon
+    let dataPts = [];
+    dims.forEach((d, i) => {{
+      const a = -Math.PI/2 + i * angleStep;
+      const score = Math.max(0, Math.min(100, d.score || 0)) / 100;
+      dataPts.push((cx + r * score * Math.cos(a)).toFixed(1) + ',' + (cy + r * score * Math.sin(a)).toFixed(1));
+    }});
+    const dataPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    dataPoly.setAttribute('points', dataPts.join(' '));
+    dataPoly.setAttribute('fill', 'rgba(91,141,239,0.15)');
+    dataPoly.setAttribute('stroke', '#5b8def');
+    dataPoly.setAttribute('stroke-width', '1.5');
+    svg.appendChild(dataPoly);
+    // Data dots
+    dims.forEach((d, i) => {{
+      const a = -Math.PI/2 + i * angleStep;
+      const score = Math.max(0, Math.min(100, d.score || 0)) / 100;
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', (cx + r * score * Math.cos(a)).toFixed(1));
+      dot.setAttribute('cy', (cy + r * score * Math.sin(a)).toFixed(1));
+      dot.setAttribute('r', '3');
+      dot.setAttribute('fill', '#5b8def');
+      svg.appendChild(dot);
+    }});
+  }})();
+
+  /* =================================================================
+     MONTHLY HEATMAP
+     ================================================================= */
+  (function() {{
+    const mr = {monthly_returns_json};
+    const container = document.getElementById('monthlyHeatmap');
+    if (!mr || Object.keys(mr).length === 0) {{
+      container.innerHTML = '<div style="padding:20px;color:var(--text-dim);grid-column:1/-1;text-align:center">暂无月度收益数据</div>';
+      return;
+    }}
+    const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    // Header row
+    container.innerHTML = '<div class="mh-header"></div>' + months.map(m => '<div class="mh-header">' + m + '</div>').join('');
+    // Group by year
+    const byYear = {{}};
+    Object.entries(mr).forEach(([k, v]) => {{
+      const [y, m] = k.split('-');
+      if (!byYear[y]) byYear[y] = {{}};
+      byYear[y][parseInt(m)] = v;
+    }});
+    Object.keys(byYear).sort().forEach(year => {{
+      let row = '<div class="mh-year">' + year + '</div>';
+      for (let m = 1; m <= 12; m++) {{
+        const val = byYear[year][m];
+        if (val === undefined) {{
+          row += '<div class="mh-cell">—</div>';
+        }} else {{
+          const pct = (val * 100).toFixed(1);
+          const intensity = Math.min(Math.abs(val) * 5, 1);
+          let bg, color;
+          if (val >= 0) {{
+            bg = 'rgba(38,166,154,' + (0.08 + intensity * 0.35).toFixed(2) + ')';
+            color = '#26a69a';
+          }} else {{
+            bg = 'rgba(239,83,80,' + (0.08 + intensity * 0.35).toFixed(2) + ')';
+            color = '#ef5350';
+          }}
+          row += '<div class="mh-cell" style="background:' + bg + ';color:' + color + '">' + (val >= 0 ? '+' : '') + pct + '%</div>';
+        }}
+      }}
+      container.innerHTML += row;
+    }});
+  }})();
+
+  /* =================================================================
+     DRAWDOWN PERIODS TABLE
+     ================================================================= */
+  (function() {{
+    const periods = {dd_periods_json};
+    const tbody = document.getElementById('ddPeriodsBody');
+    if (!periods || periods.length === 0) {{
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">暂无回撤数据</td></tr>';
+      return;
+    }}
+    tbody.innerHTML = periods.map((p, i) => {{
+      const depth = (p.depth * 100).toFixed(2);
+      const days = p.recovery_days || p.duration_days || '—';
+      return '<tr><td>' + (i+1) + '</td><td>' + (p.start || '—') + '</td><td>' + (p.end || '—') +
+        '</td><td>' + (p.recovery || '—') + '</td><td class="dd-depth">' + depth + '%</td><td>' + days + '</td></tr>';
+    }}).join('');
+  }})();
+
+  /* =================================================================
+     RETURN DISTRIBUTION HISTOGRAM (Canvas)
+     ================================================================= */
+  (function() {{
+    const stats = {daily_stats_json};
+    const canvas = document.getElementById('distCanvas');
+    if (!stats || !stats.histogram || !canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+    const hist = stats.histogram;
+    const maxCount = Math.max(...hist.map(b => b.count));
+    const barW = (W - 60) / hist.length;
+    const chartH = H - 50;
+    // Background
+    ctx.fillStyle = '#131b2e';
+    ctx.fillRect(0, 0, W, H);
+    // Bars
+    hist.forEach((b, i) => {{
+      const h = (b.count / maxCount) * chartH;
+      const x = 40 + i * barW;
+      const y = H - 30 - h;
+      ctx.fillStyle = b.mid >= 0 ? 'rgba(38,166,154,0.7)' : 'rgba(239,83,80,0.7)';
+      ctx.fillRect(x, y, barW - 1, h);
+    }});
+    // Axis labels
+    ctx.fillStyle = '#4a5568';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    [0, Math.floor(hist.length/4), Math.floor(hist.length/2), Math.floor(3*hist.length/4), hist.length-1].forEach(i => {{
+      if (hist[i]) ctx.fillText((hist[i].mid * 100).toFixed(1) + '%', 40 + i * barW + barW/2, H - 12);
+    }});
+    // Title
+    ctx.fillStyle = '#8b98a9';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('均值: ' + ((stats.mean || 0) * 100).toFixed(3) + '%  标准差: ' + ((stats.std || 0) * 100).toFixed(3) + '%  偏度: ' + (stats.skewness || 0).toFixed(2) + '  峰度: ' + (stats.kurtosis || 0).toFixed(2), 40, 18);
+  }})();
+
+  /* =================================================================
+     CHART COMMON OPTIONS (DARK)
      ================================================================= */
   const cmn = {{
     layout: {{
-      background: {{ type: 'solid', color: '#fff' }},
-      textColor: '#8c8c8c', fontSize: 11,
+      background: {{ type: 'solid', color: '#131b2e' }},
+      textColor: '#8b98a9', fontSize: 11,
       fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
     }},
-    grid: {{ vertLines: {{ color: '#f5f5f5' }}, horzLines: {{ color: '#f5f5f5' }} }},
+    grid: {{ vertLines: {{ color: '#1e2a3a' }}, horzLines: {{ color: '#1e2a3a' }} }},
     timeScale: {{
-      borderColor: '#e8e8e8',
+      borderColor: '#1e2a3a',
       timeVisible: false,
       barSpacing: 6,
     }},
-    rightPriceScale: {{ borderColor: '#e8e8e8' }},
+    rightPriceScale: {{ borderColor: '#1e2a3a' }},
     crosshair: {{
       mode: 1,
-      vertLine: {{ color: '#d9d9d9', width: 1, style: 2, labelBackgroundColor: '#8c8c8c' }},
-      horzLine: {{ color: '#d9d9d9', width: 1, style: 2, labelBackgroundColor: '#8c8c8c' }},
+      vertLine: {{ color: '#4a5568', width: 1, style: 2, labelBackgroundColor: '#253042' }},
+      horzLine: {{ color: '#4a5568', width: 1, style: 2, labelBackgroundColor: '#253042' }},
     }},
   }};
 
@@ -2118,14 +2423,14 @@ if (typeof LightweightCharts === 'undefined') {{
   var chartError = false;
   try {{
     if (typeof LightweightCharts === 'undefined') {{
-      throw new Error('LightweightCharts library not loaded from CDN');
+      throw new Error('LightweightCharts library not loaded');
     }}
 
     // Multi-stock K-line data
     var _symbolsData = {symbols_data_json};
     var _symbolsList = {symbols_list_json};
 
-    // Populate stock selector dropdown
+    // Populate stock selector
     (function() {{
       var sel = document.getElementById('symbolSelector');
       if (sel && _symbolsList.length > 1) {{
@@ -2147,36 +2452,36 @@ if (typeof LightweightCharts === 'undefined') {{
       rightPriceScale: {{ scaleMargins: {{ top: 0.05, bottom: 0.22 }} }},
     }});
     const cSeries = kChart.addCandlestickSeries({{
-      upColor: '#f5222d', downColor: '#52c41a',
-      borderUpColor: '#f5222d', borderDownColor: '#52c41a',
-      wickUpColor: '#f5222d', wickDownColor: '#52c41a',
+      upColor: '#ef5350', downColor: '#26a69a',
+      borderUpColor: '#ef5350', borderDownColor: '#26a69a',
+      wickUpColor: '#ef5350', wickDownColor: '#26a69a',
     }});
     cSeries.setData({candlestick_json});
     cSeries.setMarkers({markers_json});
 
-    // MA series (group: 'ma')
-    const ma5S = kChart.addLineSeries({{ color: '#f5222d', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    // MA series
+    const ma5S = kChart.addLineSeries({{ color: '#ef5350', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     ma5S.setData({ma5_json});
-    const ma20S = kChart.addLineSeries({{ color: '#1890ff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    const ma20S = kChart.addLineSeries({{ color: '#5b8def', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     ma20S.setData({ma20_json});
-    const ma60S = kChart.addLineSeries({{ color: '#722ed1', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    const ma60S = kChart.addLineSeries({{ color: '#ab47bc', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     ma60S.setData({ma60_json});
 
-    // Bollinger Bands (group: 'bb')
-    const bbUpperS = kChart.addLineSeries({{ color: 'rgba(24,144,255,0.5)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    // Bollinger Bands
+    const bbUpperS = kChart.addLineSeries({{ color: 'rgba(91,141,239,0.5)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     bbUpperS.setData({bb_upper_json});
-    const bbMiddleS = kChart.addLineSeries({{ color: 'rgba(24,144,255,0.7)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    const bbMiddleS = kChart.addLineSeries({{ color: 'rgba(91,141,239,0.7)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     bbMiddleS.setData({bb_middle_json});
-    const bbLowerS = kChart.addLineSeries({{ color: 'rgba(24,144,255,0.5)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    const bbLowerS = kChart.addLineSeries({{ color: 'rgba(91,141,239,0.5)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     bbLowerS.setData({bb_lower_json});
 
-    // Support/Resistance (group: 'sr')
-    const supS = kChart.addLineSeries({{ color: 'rgba(82,196,26,0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    // Support/Resistance
+    const supS = kChart.addLineSeries({{ color: 'rgba(38,166,154,0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     supS.setData({support_json});
-    const resS = kChart.addLineSeries({{ color: 'rgba(245,34,45,0.55)',  lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
+    const resS = kChart.addLineSeries({{ color: 'rgba(239,83,80,0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }});
     resS.setData({resistance_json});
 
-    // Volume (group: 'vol')
+    // Volume
     const volS = kChart.addHistogramSeries({{
       priceFormat: {{ type: 'volume' }},
       priceScaleId: 'vol',
@@ -2185,10 +2490,10 @@ if (typeof LightweightCharts === 'undefined') {{
     volS.setData({volume_json});
     kChart.timeScale().fitContent();
 
-    // RSI/MACD chart series (declared here so switchSymbol can access them)
+    // RSI/MACD series refs
     var rsiSeries, macdLineSeries, macdSignalSeries, macdHistSeries;
 
-    // Symbol switch function for multi-stock K-line
+    // Symbol switch
     window.switchSymbol = function(sym) {{
       var d = _symbolsData[sym];
       if (!d) return;
@@ -2204,36 +2509,35 @@ if (typeof LightweightCharts === 'undefined') {{
       resS.setData(d.resistance_data || []);
       volS.setData(d.volume_data || []);
       kChart.timeScale().fitContent();
-      // Update RSI/MACD charts
       if (rsiSeries) rsiSeries.setData(d.rsi_data || []);
       if (macdLineSeries) macdLineSeries.setData(d.macd_data || []);
       if (macdSignalSeries) macdSignalSeries.setData(d.macd_signal_data || []);
       if (macdHistSeries) macdHistSeries.setData(d.macd_hist_data || []);
     }};
 
-    /* Cumulative returns — strategy + 沪深300 + 上证指数 */
+    /* Cumulative returns */
     const rEl = document.getElementById('returns');
     const rChart = LightweightCharts.createChart(rEl, {{ ...cmn, width: rEl.clientWidth, height: 300 }});
     const stratLine = rChart.addLineSeries({{
-      color: '#f5222d', lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+      color: '#ef5350', lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
       crosshairMarkerVisible: true, title: '策略',
     }});
     stratLine.setData({cum_return_json});
     const hs300Line = rChart.addLineSeries({{
-      color: '#1890ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
+      color: '#5b8def', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
       crosshairMarkerVisible: true, title: '沪深300',
     }});
     hs300Line.setData({ret_hs300_json});
     const sseLine = rChart.addLineSeries({{
-      color: '#fa8c16', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, lastValueVisible: true,
+      color: '#ffa726', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, lastValueVisible: true,
       crosshairMarkerVisible: true, title: '上证指数',
     }});
     sseLine.setData({ret_sse_json});
 
-    /* Excess return vs 沪深300 (same convention as broad-market active return) */
+    /* Excess return vs HS300 */
     const excessLine = rChart.addLineSeries({{
-      color: '#722ed1', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
-      crosshairMarkerVisible: false, title: '超额(相对沪深300)',
+      color: '#ab47bc', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+      crosshairMarkerVisible: false, title: '超额',
     }});
     var excessReturnData = [];
     if ({cum_return_json}.length > 0 && {ret_hs300_json}.length > 0) {{
@@ -2248,135 +2552,89 @@ if (typeof LightweightCharts === 'undefined') {{
       }});
     }}
     excessLine.setData(excessReturnData);
-
     rChart.timeScale().fitContent();
 
     var retVis = {{ strat: true, hs300: true, sse: true, excess: false }};
     window.toggleReturnSeries = function(mode, el) {{
-      var tabs = document.querySelectorAll('#retTabs .chart-tab');
-      tabs.forEach(function(t) {{ t.classList.remove('active'); }});
+      document.querySelectorAll('#retTabs .chart-tab').forEach(function(t) {{ t.classList.remove('active'); }});
       if (el) el.classList.add('active');
-
-      if (mode === 'all') {{
-        retVis = {{ strat: true, hs300: true, sse: true, excess: false }};
-      }} else if (mode === 'excess') {{
-        retVis = {{ strat: true, hs300: false, sse: false, excess: true }};
-      }} else if (mode === 'strategy') {{
-        retVis = {{ strat: true, hs300: false, sse: false, excess: false }};
-      }} else if (mode === 'benchmark') {{
-        retVis = {{ strat: false, hs300: true, sse: true, excess: false }};
-      }}
+      if (mode === 'all') {{ retVis = {{ strat: true, hs300: true, sse: true, excess: false }}; }}
+      else if (mode === 'excess') {{ retVis = {{ strat: true, hs300: false, sse: false, excess: true }}; }}
+      else if (mode === 'strategy') {{ retVis = {{ strat: true, hs300: false, sse: false, excess: false }}; }}
+      else if (mode === 'benchmark') {{ retVis = {{ strat: false, hs300: true, sse: true, excess: false }}; }}
       stratLine.applyOptions({{ visible: retVis.strat }});
       hs300Line.applyOptions({{ visible: retVis.hs300 }});
       sseLine.applyOptions({{ visible: retVis.sse }});
       excessLine.applyOptions({{ visible: retVis.excess }});
     }};
 
-    /* RSI(14) chart */
+    /* RSI(14) */
     const rsiEl = document.getElementById('rsichart');
     const rsiChart = LightweightCharts.createChart(rsiEl, {{
       ...cmn, width: rsiEl.clientWidth, height: 160,
       rightPriceScale: {{ scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
     }});
     const rsiLine = rsiChart.addLineSeries({{
-      color: '#722ed1', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+      color: '#ab47bc', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
     }});
     rsiLine.setData({rsi_json});
     rsiSeries = rsiLine;
-    // Overbought line (70)
-    const rsiOB = rsiChart.addLineSeries({{
-      color: 'rgba(245,34,45,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }});
+    const rsiOB = rsiChart.addLineSeries({{ color: 'rgba(239,83,80,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
     rsiOB.setData({rsi_json}.length > 0 ? {rsi_json}.map(d => ({{ time: d.time, value: 70 }})) : []);
-    // Oversold line (30)
-    const rsiOS = rsiChart.addLineSeries({{
-      color: 'rgba(82,196,26,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }});
+    const rsiOS = rsiChart.addLineSeries({{ color: 'rgba(38,166,154,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
     rsiOS.setData({rsi_json}.length > 0 ? {rsi_json}.map(d => ({{ time: d.time, value: 30 }})) : []);
-    // Middle line (50)
-    const rsiMid = rsiChart.addLineSeries({{
-      color: 'rgba(140,140,140,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }});
+    const rsiMid = rsiChart.addLineSeries({{ color: 'rgba(139,152,169,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
     rsiMid.setData({rsi_json}.length > 0 ? {rsi_json}.map(d => ({{ time: d.time, value: 50 }})) : []);
     rsiChart.timeScale().fitContent();
 
-    /* MACD(12,26,9) chart */
+    /* MACD(12,26,9) */
     const macdEl = document.getElementById('macdchart');
     const macdChart = LightweightCharts.createChart(macdEl, {{
       ...cmn, width: macdEl.clientWidth, height: 160,
       rightPriceScale: {{ scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
     }});
-    // Histogram
-    const macdHist = macdChart.addHistogramSeries({{
-      priceFormat: {{ type: 'price' }},
-    }});
+    const macdHist = macdChart.addHistogramSeries({{ priceFormat: {{ type: 'price' }} }});
     macdHist.setData({macd_hist_json});
     macdHistSeries = macdHist;
-    // MACD line
-    const macdLineS = macdChart.addLineSeries({{
-      color: '#1890ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
-    }});
+    const macdLineS = macdChart.addLineSeries({{ color: '#5b8def', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false }});
     macdLineS.setData({macd_json});
     macdLineSeries = macdLineS;
-    // Signal line
-    const macdSigS = macdChart.addLineSeries({{
-      color: '#fa8c16', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
-    }});
+    const macdSigS = macdChart.addLineSeries({{ color: '#ffa726', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }});
     macdSigS.setData({macd_signal_json});
     macdSignalSeries = macdSigS;
-    // Zero line
     const macdZeroData = {macd_json}.length > 0 ? [{{ time: {macd_json}[0].time, value: 0 }}, {{ time: {macd_json}[{macd_json}.length - 1].time, value: 0 }}] : [];
-    macdChart.addLineSeries({{
-      color: '#d9d9d9', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }}).setData(macdZeroData);
+    macdChart.addLineSeries({{ color: '#4a5568', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData(macdZeroData);
     macdChart.timeScale().fitContent();
 
-    /* Drawdown — strategy area + HS300 + SSE lines */
+    /* Drawdown */
     const ddEl = document.getElementById('drawdown');
     const ddChart = LightweightCharts.createChart(ddEl, {{
       ...cmn, width: ddEl.clientWidth, height: 160,
       rightPriceScale: {{ scaleMargins: {{ top: 0.1, bottom: 0.05 }} }},
     }});
     const ddSeries = ddChart.addAreaSeries({{
-      lineColor: '#52c41a', topColor: 'rgba(82,196,26,0.12)', bottomColor: 'rgba(82,196,26,0)',
+      lineColor: '#ef5350', topColor: 'rgba(239,83,80,0.15)', bottomColor: 'rgba(239,83,80,0)',
       lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
     }});
     ddSeries.setData({drawdown_json});
     var ddZeroData = {drawdown_json}.length > 0 ? [{{ time: {drawdown_json}[0].time, value: 0 }}, {{ time: {drawdown_json}[{drawdown_json}.length - 1].time, value: 0 }}] : [];
-    var ddZeroLine = ddChart.addLineSeries({{
-      color: '#d9d9d9', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }});
-    ddZeroLine.setData(ddZeroData);
-    const ddHs300 = ddChart.addLineSeries({{
-      color: '#1890ff', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }});
+    ddChart.addLineSeries({{ color: '#4a5568', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData(ddZeroData);
+    const ddHs300 = ddChart.addLineSeries({{ color: '#5b8def', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
     ddHs300.setData({dd_hs300_json});
-    const ddSse = ddChart.addLineSeries({{
-      color: '#fa8c16', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }});
+    const ddSse = ddChart.addLineSeries({{ color: '#ffa726', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
     ddSse.setData({dd_sse_json});
     ddChart.timeScale().fitContent();
 
     /* Daily P&L */
     const pEl = document.getElementById('pnlbar');
     const pChart = LightweightCharts.createChart(pEl, {{ ...cmn, width: pEl.clientWidth, height: 160 }});
-    // Build histogram with per-bar colors
     var pnlRaw = {pnl_bar_json};
     var pnlHistData = pnlRaw.map(function(d) {{
-      return {{
-        time: d.time,
-        value: d.value,
-        color: d.color || (d.value >= 0 ? '#f5222d' : '#52c41a'),
-      }};
+      return {{ time: d.time, value: d.value, color: d.color || (d.value >= 0 ? '#26a69a' : '#ef5350') }};
     }});
-    pChart.addHistogramSeries({{
-      priceFormat: {{ type: 'volume' }},
-    }}).setData(pnlHistData);
-    // Add zero line
+    pChart.addHistogramSeries({{ priceFormat: {{ type: 'volume' }} }}).setData(pnlHistData);
     var pZeroData = pnlRaw.length > 0 ? [{{ time: pnlRaw[0].time, value: 0 }}, {{ time: pnlRaw[pnlRaw.length - 1].time, value: 0 }}] : [];
-    pChart.addLineSeries({{
-      color: '#d9d9d9', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }}).setData(pZeroData);
+    pChart.addLineSeries({{ color: '#4a5568', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData(pZeroData);
     pChart.timeScale().fitContent();
 
     /* Daily returns */
@@ -2384,21 +2642,31 @@ if (typeof LightweightCharts === 'undefined') {{
     const drChart = LightweightCharts.createChart(drEl, {{ ...cmn, width: drEl.clientWidth, height: 160 }});
     var drRaw = {daily_returns_json};
     var drHistData = drRaw.map(function(d) {{
-      return {{
-        time: d.time,
-        value: d.value,
-        color: d.color || (d.value >= 0 ? '#f5222d' : '#52c41a'),
-      }};
+      return {{ time: d.time, value: d.value, color: d.color || (d.value >= 0 ? '#26a69a' : '#ef5350') }};
     }});
-    drChart.addHistogramSeries({{
-      priceFormat: {{ type: 'percent' }},
-    }}).setData(drHistData);
-    // Add zero line
+    drChart.addHistogramSeries({{ priceFormat: {{ type: 'percent' }} }}).setData(drHistData);
     var drZeroData = drRaw.length > 0 ? [{{ time: drRaw[0].time, value: 0 }}, {{ time: drRaw[drRaw.length - 1].time, value: 0 }}] : [];
-    drChart.addLineSeries({{
-      color: '#d9d9d9', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
-    }}).setData(drZeroData);
+    drChart.addLineSeries({{ color: '#4a5568', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData(drZeroData);
     drChart.timeScale().fitContent();
+
+    /* Rolling metrics chart */
+    var rollingSharpe = {rolling_sharpe_json};
+    var rollingVol = {rolling_vol_json};
+    if (rollingSharpe.length > 0 || rollingVol.length > 0) {{
+      var rollEl = document.getElementById('rollingChart');
+      var rollChart = LightweightCharts.createChart(rollEl, {{ ...cmn, width: rollEl.clientWidth, height: 260 }});
+      if (rollingSharpe.length > 0) {{
+        var rsData = rollingSharpe.map(function(d) {{ return {{ time: d.date, value: d.value }}; }});
+        var rsLine = rollChart.addLineSeries({{ color: '#5b8def', lineWidth: 2, title: 'Sharpe(60d)', priceLineVisible: false, lastValueVisible: true }});
+        rsLine.setData(rsData);
+      }}
+      if (rollingVol.length > 0) {{
+        var rvData = rollingVol.map(function(d) {{ return {{ time: d.date, value: d.value * 100 }}; }});
+        var rvLine = rollChart.addLineSeries({{ color: '#ffa726', lineWidth: 1.5, lineStyle: 2, title: 'Vol%(60d)', priceLineVisible: false, lastValueVisible: true }});
+        rvLine.setData(rvData);
+      }}
+      rollChart.timeScale().fitContent();
+    }}
 
     /* Sync all time scales */
     const allCharts = [kChart, rChart, ddChart, pChart, drChart, rsiChart, macdChart];
@@ -2435,10 +2703,9 @@ if (typeof LightweightCharts === 'undefined') {{
     }};
 
     /* =================================================================
-       CROSSHAIR-LINKED DYNAMIC LEGEND
+       CROSSHAIR LEGEND
        ================================================================= */
     const legendEl = document.getElementById('klineLegend');
-    // Build lookup maps for indicator data
     function buildMap(arr) {{
       const m = {{}};
       arr.forEach(d => {{ m[d.time] = d.value; }});
@@ -2481,35 +2748,29 @@ if (typeof LightweightCharts === 'undefined') {{
       const l = sd ? fmt(sd.low, 3) : '—';
       const c = sd ? fmt(sd.close, 3) : '—';
 
-      let html = `<div class="leg-date">${{t}}</div>`;
-      html += `<div class="leg-row"><span class="leg-label">O/H/L/C</span><span class="leg-val">${{o}} / ${{h}} / ${{l}} / ${{c}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#f5222d"></span>MA5</span><span class="leg-val">${{fmt(ma5Map[t])}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#1890ff"></span>MA20</span><span class="leg-val">${{fmt(ma20Map[t])}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#722ed1"></span>MA60</span><span class="leg-val">${{fmt(ma60Map[t])}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#722ed1"></span>RSI(14)</span><span class="leg-val">${{fmt(rsiMap[t])}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#1890ff"></span>MACD</span><span class="leg-val">${{fmt(macdMap[t], 4)}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#fa8c16"></span>Signal</span><span class="leg-val">${{fmt(sigMap[t], 4)}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#26a69a"></span>MACD Hist</span><span class="leg-val" style="color:${{parseFloat(histMap[t]) >= 0 ? '#f5222d' : '#52c41a'}}">${{fmt(histMap[t], 4)}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:rgba(24,144,255,.7)"></span>BB Upper</span><span class="leg-val">${{fmt(bbUpMap[t], 3)}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:rgba(24,144,255,.7)"></span>BB Middle</span><span class="leg-val">${{fmt(bbMidMap[t], 3)}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:rgba(24,144,255,.7)"></span>BB Lower</span><span class="leg-val">${{fmt(bbLoMap[t], 3)}}</span></div>`;
-      html += `<div class="leg-row"><span class="leg-label">VOL</span><span class="leg-val">${{fmtVol(volMap[t])}}</span></div>`;
-      legendEl.innerHTML = html;
+      let htm = '<div class="leg-date">' + t + '</div>';
+      htm += '<div class="leg-row"><span class="leg-label">O/H/L/C</span><span class="leg-val">' + o + ' / ' + h + ' / ' + l + ' / ' + c + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#ef5350"></span>MA5</span><span class="leg-val">' + fmt(ma5Map[t]) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#5b8def"></span>MA20</span><span class="leg-val">' + fmt(ma20Map[t]) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#ab47bc"></span>MA60</span><span class="leg-val">' + fmt(ma60Map[t]) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#ab47bc"></span>RSI</span><span class="leg-val">' + fmt(rsiMap[t]) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#5b8def"></span>MACD</span><span class="leg-val">' + fmt(macdMap[t], 4) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#ffa726"></span>Signal</span><span class="leg-val">' + fmt(sigMap[t], 4) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label"><span class="leg-dot" style="background:#26a69a"></span>Hist</span><span class="leg-val">' + fmt(histMap[t], 4) + '</span></div>';
+      htm += '<div class="leg-row"><span class="leg-label">VOL</span><span class="leg-val">' + fmtVol(volMap[t]) + '</span></div>';
+      legendEl.innerHTML = htm;
     }});
+
   }} catch(e) {{
     chartError = true;
-    console.error('Chart initialization error:', e);
-    ['kline','returns','drawdown','pnlbar','dailyret'].forEach(function(id) {{
+    console.error('Chart init error:', e);
+    ['kline','returns','drawdown','pnlbar','dailyret','rsichart','macdchart','rollingChart'].forEach(function(id) {{
       var el = document.getElementById(id);
       if (el) {{
-        el.style.display = 'flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-        el.style.background = '#fafafa';
-        el.style.color = '#999';
-        el.style.fontSize = '14px';
+        el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.justifyContent = 'center';
+        el.style.color = '#4a5568'; el.style.fontSize = '14px';
         el.innerHTML = '<div style="text-align:center;padding:40px"><div style="font-size:24px;margin-bottom:8px">&#9888;</div>' +
-          '<div>' + e.message + '</div><div style="font-size:12px;margin-top:8px;color:#bbb">图表库加载失败，请检查网络连接</div></div>';
+          '<div>' + e.message + '</div><div style="font-size:12px;margin-top:8px;color:#4a5568">图表库加载失败</div></div>';
       }}
     }});
   }}
@@ -2519,38 +2780,26 @@ if (typeof LightweightCharts === 'undefined') {{
   if (Object.keys(tech).length > 0) {{
     document.getElementById('tech-section').style.display = '';
     const items = [
-      ['最新价',   tech.latest_price],
-      ['MA5',      tech.ma5],
-      ['MA20',     tech.ma20],
-      ['MA60',     tech.ma60],
-      ['ATR(14)',  tech.atr14],
-      ['RSI(14)',  tech.rsi14],
-      ['MACD',     tech.macd],
-      ['MACD Signal', tech.macd_signal],
-      ['MACD Hist',   tech.macd_hist],
-      ['BB Upper', tech.bb_upper],
-      ['BB Middle',tech.bb_middle],
-      ['BB Lower', tech.bb_lower],
-      ['BB Width(%)', tech.bb_width],
-      ['量比',     tech.vol_ratio],
-      ['期间最高', tech.period_high],
-      ['期间最低', tech.period_low],
+      ['最新价', tech.latest_price], ['MA5', tech.ma5], ['MA20', tech.ma20], ['MA60', tech.ma60],
+      ['ATR(14)', tech.atr14], ['RSI(14)', tech.rsi14], ['MACD', tech.macd],
+      ['Signal', tech.macd_signal], ['Hist', tech.macd_hist],
+      ['BB Upper', tech.bb_upper], ['BB Middle', tech.bb_middle], ['BB Lower', tech.bb_lower],
+      ['BB Width%', tech.bb_width], ['量比', tech.vol_ratio],
+      ['期间最高', tech.period_high], ['期间最低', tech.period_low],
     ].filter(([, v]) => v !== null && v !== undefined);
     document.getElementById('tech-stats').innerHTML = items.map(([lbl, val]) =>
-      `<div class="tech-card"><div class="title">${{lbl}}</div>` +
-      `<div class="val">${{typeof val === 'number' ? val.toLocaleString() : val}}</div></div>`
+      '<div class="tech-card"><div class="title">' + lbl + '</div>' +
+      '<div class="val">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</div></div>'
     ).join('');
   }}
 
   /* Render grade badges */
   renderGrades();
 
-  /* Tabs — works for both .section (trade tabs + data source tabs) and
-     .trade-section (if used independently) */
+  /* Tabs */
   document.querySelectorAll('.tab').forEach(tab => {{
     tab.addEventListener('click', () => {{
-      // Find the nearest container that holds tabs and tab-content
-      const container = tab.closest('.section') || tab.closest('.trade-section');
+      const container = tab.closest('.tabbed-section') || tab.closest('.section') || tab.closest('.trade-section');
       if (!container) return;
       container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -2567,16 +2816,18 @@ if (typeof LightweightCharts === 'undefined') {{
 
 
 
+
 def generate_report_md(result, out_path):
-    """Generate professional Markdown report with risk metrics,
-    trade analysis, benchmark comparison, and per-stock breakdown.
+    """Generate professional Markdown report with grade breakdown,
+    monthly returns, rolling metrics, and top drawdown periods.
     """
-    from eqlib.attribution import analyze_returns, brinson_attribution, fama_french_analysis
+    from eqlib.attribution import (
+        analyze_returns, brinson_attribution, fama_french_analysis, grade_strategy,
+    )
     from eqlib.data import fetch_stock_data
 
     ctx = result["context"]
     trade_log = result["trade_log"]
-    recorded = result["recorded_values"]
     benchmark = result.get("benchmark", "000300.XSHG")
 
     initial = ctx.portfolio.starting_cash
@@ -2585,29 +2836,33 @@ def generate_report_md(result, out_path):
     pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
     analytics = analyze_returns(result)
+    grade_info = grade_strategy(analytics) if analytics else grade_strategy(None)
+
     bench_data = {}
     try:
         bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
         if not bench_df.empty and "close" in bench_df.columns:
             bench_init = bench_df["close"].iloc[0]
             bench_final = bench_df["close"].iloc[-1]
-            bench_ret = (bench_final - bench_init) / bench_init * 100
-            bench_data["return"] = bench_ret
-            bench_data["init"] = bench_init
-            bench_data["final"] = bench_final
+            bench_data["return"] = (bench_final - bench_init) / bench_init * 100
     except Exception:
         pass
 
-    securities = set(t["security"] for t in trade_log)
-    bench_label = html.escape(benchmark.replace(".XSHG", "").replace(".XSHE", ""))
-
+    bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
     lines = []
-    # ============================================================
-    # Header
-    # ============================================================
-    lines.append(f"# Backtest Report")
+
+    # ── Header ──────────────────────────────────────────────────────
+    securities = list(set(t['security'] for t in trade_log) or ['N/A'])
+    lines.append(f"# Backtest Report — {securities[0]}")
     lines.append("")
-    lines.append(f"*Generated by {BRAND_NAME} (eqlib).*")
+    lines.append(f"*Generated by {BRAND_NAME} · {ctx.start_date} to {ctx.end_date} · "
+                 f"Grade: {grade_info['overall']} ({grade_info['score']}/100)*")
+    lines.append("")
+
+    # ── Strategy Summary ────────────────────────────────────────────
+    lines.append("## Strategy Summary")
+    lines.append("")
+    lines.append(f"> {grade_info.get('summary_text', 'N/A')}")
     lines.append("")
     lines.append(f"| | |")
     lines.append(f"|---|---|")
@@ -2617,82 +2872,127 @@ def generate_report_md(result, out_path):
     lines.append(f"| **P&L** | {pnl:+,.2f} ({pnl_pct:+.2f}%) |")
     lines.append(f"| **Benchmark** | {bench_label} |")
     if bench_data:
-        bench_str = f"+{bench_data['return']:.2f}%" if bench_data["return"] >= 0 else f"{bench_data['return']:.2f}%"
-        lines.append(f"| **Benchmark Return** | {bench_str} |")
+        lines.append(f"| **Benchmark Return** | {bench_data['return']:+.2f}% |")
     lines.append("")
 
-    # ============================================================
-    # Risk Metrics
-    # ============================================================
+    # ── Grade Breakdown ─────────────────────────────────────────────
+    lines.append("## Grade Breakdown")
+    lines.append("")
+    lines.append("| Dimension | Score | Grade | Key Metric |")
+    lines.append("|-----------|-------|-------|------------|")
+    for d in grade_info.get("dimensions", []):
+        key_str = ", ".join(f"{k}={v:.3f}" if isinstance(v, float) else f"{k}={v}"
+                           for k, v in d.get("key", {}).items())
+        lines.append(f"| {d['name']} | {d['score']:.0f} | {d.get('grade', 'N/A')} | {key_str} |")
+    lines.append(f"| **Overall** | **{grade_info['score']:.0f}** | **{grade_info['overall']}** | |")
+    lines.append("")
+
+    # ── Performance Metrics ─────────────────────────────────────────
     if analytics:
-        lines.append("## Risk Metrics")
+        lines.append("## Performance Metrics")
         lines.append("")
-        lines.append("| Metric | Value |")
-        lines.append("|--------|-------|")
-        lines.append(f"| Annual Return | {analytics['annual_return']:+.2%} |")
-        lines.append(f"| Annual Volatility | {analytics['annual_volatility']:.2%} |")
-        lines.append(f"| Sharpe Ratio | {analytics['sharpe_ratio']:.2f} |")
-        lines.append(f"| Sortino Ratio | {analytics['sortino_ratio']:.2f} |")
-        lines.append(f"| Max Drawdown | {analytics['max_drawdown']:.2%} |")
-        if analytics.get("max_drawdown_start"):
-            lines.append(f"| Max DD Period | {analytics['max_drawdown_start']} to {analytics['max_drawdown_end']} |")
-        lines.append(f"| Calmar Ratio | {analytics['calmar_ratio']:.2f} |")
-        lines.append(f"| Alpha (annual) | {analytics['alpha']:+.2%} |")
-        lines.append(f"| Beta | {analytics['beta']:.2f} |")
-        lines.append(f"| Information Ratio | {analytics['information_ratio']:.2f} |")
-        lines.append(f"| Win Rate (daily) | {analytics['win_rate']:.1%} |")
-        lines.append(f"| Trading Days | {analytics['trading_days']} |")
-        lines.append("")
-
-        # ── Excess Return Analysis ──────────────────────────────────────
-        lines.append("## Excess Return Analysis")
-        lines.append("")
-        lines.append("| Metric | Value |")
-        lines.append("|--------|-------|")
-        lines.append(f"| Excess Return | {analytics.get('excess_return', 0):+.2%} |")
-        lines.append(f"| Benchmark Return | {analytics.get('benchmark_return', 0):+.2%} |")
-        lines.append(f"| Daily Avg Excess Return | {analytics.get('daily_excess_return', 0):+.4%} |")
-        lines.append(f"| Excess Return Max Drawdown | {analytics.get('excess_return_max_drawdown', 0):.2%} |")
-        lines.append(f"| Excess Return Sharpe | {analytics.get('excess_return_sharpe', 0):.2f} |")
+        lines.append("| Metric | Value | Benchmark | Delta |")
+        lines.append("|--------|-------|-----------|-------|")
+        ann_ret = analytics["annual_return"]
+        bench_ret_pct = bench_data.get("return", 0) / 100
+        lines.append(f"| Annual Return | {ann_ret:+.2%} | {bench_ret_pct:+.2%} | {ann_ret - bench_ret_pct:+.2%} |")
+        lines.append(f"| Annual Volatility | {analytics['annual_volatility']:.2%} | {analytics.get('benchmark_volatility', 0):.2%} | |")
+        lines.append(f"| Sharpe Ratio | {analytics['sharpe_ratio']:.2f} | — | — |")
+        lines.append(f"| Sortino Ratio | {analytics['sortino_ratio']:.2f} | — | — |")
+        lines.append(f"| Max Drawdown | {analytics['max_drawdown']:.2%} | — | — |")
+        lines.append(f"| Calmar Ratio | {analytics['calmar_ratio']:.2f} | — | — |")
+        lines.append(f"| Alpha | {analytics['alpha']:+.2%} | — | — |")
+        lines.append(f"| Beta | {analytics['beta']:.2f} | — | — |")
+        lines.append(f"| Information Ratio | {analytics['information_ratio']:.2f} | — | — |")
+        lines.append(f"| Win Rate (trade) | {analytics['win_rate_trade']:.1%} | — | — |")
+        plr = analytics.get('profit_loss_ratio', 0)
+        plr_str = '∞' if plr == float('inf') else f'{plr:.2f}'
+        lines.append(f"| Profit/Loss Ratio | {plr_str} | — | — |")
+        lines.append(f"| Trade Count | {analytics['trade_count']} | — | — |")
         lines.append("")
 
-        # ── Trade Statistics ────────────────────────────────────────────
-        lines.append("## Trade Statistics")
+    # ── Monthly Returns ─────────────────────────────────────────────
+    if analytics and analytics.get("monthly_returns"):
+        lines.append("## Monthly Returns")
         lines.append("")
-        lines.append("| Metric | Value |")
-        lines.append("|--------|-------|")
-        lines.append(f"| Win Rate (trade) | {analytics['win_rate_trade']:.1%} |")
-        lines.append(f"| Win Count | {analytics.get('win_count', 0)} |")
-        lines.append(f"| Loss Count | {analytics.get('loss_count', 0)} |")
-        _plr = analytics.get('profit_loss_ratio', 0)
-        lines.append(f"| Profit/Loss Ratio | {'∞' if _plr == float('inf') else f'{_plr:.2f}'} |")
-        lines.append(f"| Trade Count | {analytics['trade_count']} |")
-        lines.append(f"| Annual Turnover | {analytics['annual_turnover']:.2%} |")
-        lines.append(f"| Total Commission | {analytics['total_commission']:,.2f} |")
+        mr = analytics["monthly_returns"]
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        lines.append("| Year | " + " | ".join(months) + " | YTD |")
+        lines.append("|------|" + "|".join(["-----"] * 12) + "|-----|")
+        years = sorted(set(k[:4] for k in mr.keys()))
+        for year in years:
+            row = [year]
+            for m in range(1, 13):
+                key = f"{year}-{m:02d}"
+                val = mr.get(key)
+                row.append(f"{val:+.1%}" if val is not None else "—")
+            ytd_vals = [v for k, v in mr.items() if k.startswith(year)]
+            ytd = 1.0
+            for v in ytd_vals:
+                ytd *= (1 + v)
+            ytd -= 1
+            row.append(f"{ytd:+.1%}")
+            lines.append("| " + " | ".join(row) + " |")
         lines.append("")
 
-    # ============================================================
-    # Trade Summary
-    # ============================================================
+    # ── Rolling Metrics ─────────────────────────────────────────────
+    if analytics and analytics.get("rolling_sharpe_60d"):
+        lines.append("## Rolling Metrics (60-day window, quarterly sampled)")
+        lines.append("")
+        lines.append("| Date | Rolling Sharpe | Rolling Vol |")
+        lines.append("|------|---------------|-------------|")
+        rs = analytics["rolling_sharpe_60d"]
+        rv = analytics["rolling_volatility_60d"]
+        step = max(1, len(rs) // 4)
+        for i in range(0, len(rs), step):
+            date = rs[i]["date"]
+            sharpe_val = rs[i]["value"]
+            vol_val = rv[i]["value"] if i < len(rv) else 0
+            lines.append(f"| {date} | {sharpe_val:.2f} | {vol_val:.1%} |")
+        lines.append("")
+
+    # ── Top 5 Drawdown Periods ──────────────────────────────────────
+    if analytics and analytics.get("drawdown_periods"):
+        lines.append("## Top 5 Drawdown Periods")
+        lines.append("")
+        lines.append("| # | Start | Trough | Recovery | Depth | Duration |")
+        lines.append("|---|-------|--------|----------|-------|----------|")
+        for dp in analytics["drawdown_periods"]:
+            recovery = dp.get("recovery") or "ongoing"
+            duration = f"{dp['duration_days']}d"
+            lines.append(f"| {dp['rank']} | {dp['start']} | {dp['trough']} | "
+                        f"{recovery} | {dp['depth']:.1%} | {duration} |")
+        lines.append("")
+
+    # ── Trade Analysis ──────────────────────────────────────────────
+    lines.append("## Trade Analysis")
+    lines.append("")
     buy_count = sum(1 for t in trade_log if t["type"] == "BUY")
     sell_count = sum(1 for t in trade_log if t["type"] == "SELL")
     total_commission = sum(t.get("commission", 0) for t in trade_log)
-    lines.append("## Trade Summary")
-    lines.append("")
     lines.append(f"- Buy orders: {buy_count}")
     lines.append(f"- Sell orders: {sell_count}")
     lines.append(f"- Total commission: {total_commission:,.2f}")
-    lines.append(f"- Securities traded: {len(securities)}")
+    lines.append(f"- Securities traded: {len(set(t['security'] for t in trade_log))}")
     lines.append("")
 
-    # Per-trade P&L (pair buy/sell by security)
+    if analytics and analytics.get("per_stock_pnl"):
+        lines.append("### Per-Stock P&L")
+        lines.append("")
+        lines.append("| Security | P&L |")
+        lines.append("|----------|-----|")
+        for sec, pnl_val in sorted(analytics["per_stock_pnl"].items(), key=lambda x: x[1], reverse=True):
+            lines.append(f"| {sec} | {pnl_val:+,.2f} |")
+        lines.append("")
+
+    # ── Trade P&L ───────────────────────────────────────────────────
     if trade_log:
         lines.append("## Trade P&L")
         lines.append("")
         lines.append("| # | Security | Buy Date | Buy Price | Sell Date | Sell Price | P&L |")
         lines.append("|---|----------|----------|-----------|-----------|------------|-----|")
-
-        trade_pairs: dict = {}  # sec -> list of buys
+        trade_pairs = {}
         trade_num = 0
         for t in trade_log:
             sec = t["security"]
@@ -2705,94 +3005,50 @@ def generate_report_md(result, out_path):
                 buy_val = buy_t["price"] * buy_t["amount"] + buy_t.get("commission", 0)
                 sell_val = t["price"] * t["amount"] - t.get("commission", 0)
                 trade_pnl = sell_val - buy_val
-                pnl_str = f"+{trade_pnl:,.0f}" if trade_pnl >= 0 else f"{trade_pnl:,.0f}"
                 trade_num += 1
                 lines.append(
                     f"| {trade_num} | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
-                    f"| {t['date']} | {t['price']:.3f} | {pnl_str} |"
-                )
-
-        # Open positions (unmatched buys)
-        for sec, buys in trade_pairs.items():
-            for buy_t in buys:
-                lines.append(
-                    f"| - | {sec} | {buy_t['date']} | {buy_t['price']:.3f} "
-                    f"| — open — | — | — |"
+                    f"| {t['date']} | {t['price']:.3f} | {trade_pnl:+,.0f} |"
                 )
         lines.append("")
 
-    # ============================================================
-    # Positions
-    # ============================================================
-    lines.append("## Positions")
-    lines.append("")
-    if ctx.portfolio.positions:
-        lines.append("| Security | Shares | Avg Cost | Market Value |")
-        lines.append("|----------|--------|----------|-------------|")
-        for sec, pos in ctx.portfolio.positions.items():
-            if pos.amount > 0:
-                lines.append(f"| {sec} | {pos.amount:,} | {pos.avg_cost:.3f} | {pos.total_value:,.2f} |")
-    else:
-        lines.append("Flat (no positions).")
-    lines.append("")
-
-    # ============================================================
-    # Factor Analysis
-    # ============================================================
+    # ── Factor Analysis ─────────────────────────────────────────────
     ff = fama_french_analysis(result)
     if ff:
         lines.append("## Factor Analysis")
         lines.append("")
         lines.append("| Factor | Value |")
         lines.append("|--------|-------|")
-        lines.append(f"| Market Beta | {ff['market_beta']:.2f} |")
-        lines.append(f"| Market Exposure | {ff['market_exposure']:+.2f} |")
-        lines.append(f"| Annual Alpha | {ff['alpha_annual']:+.2%} |")
-        lines.append(f"| Momentum Correlation | {ff['momentum_correlation']:.3f} |")
-        lines.append(f"| Residual Volatility | {ff['residual_volatility']:.2%} |")
-        lines.append(f"| Explained Variance (R²) | {ff['explained_variance']:.2%} |")
+        for k, v in ff.items():
+            if isinstance(v, float):
+                lines.append(f"| {k} | {v:.4f} |")
+            else:
+                lines.append(f"| {k} | {v} |")
         lines.append("")
 
-    # ============================================================
-    # Brinson Attribution
-    # ============================================================
+    # ── Brinson Attribution ─────────────────────────────────────────
     br = brinson_attribution(result)
     if br:
         lines.append("## Brinson Attribution")
         lines.append("")
         lines.append("| Component | Effect |")
         lines.append("|-----------|--------|")
-        lines.append(f"| Allocation | {br['allocation_effect']:+.2%} |")
-        lines.append(f"| Selection | {br['selection_effect']:+.2%} |")
-        lines.append(f"| Interaction | {br['interaction_effect']:+.2%} |")
-        lines.append(f"| Total Active Return | {br['total_active_return']:+.2%} |")
+        for k, v in br.items():
+            if isinstance(v, float):
+                lines.append(f"| {k} | {v:+.2%} |")
+            else:
+                lines.append(f"| {k} | {v} |")
         lines.append("")
 
-    # ============================================================
-    # Data Sources & Methodology
-    # ============================================================
+    # ── Data Sources ────────────────────────────────────────────────
     lines.append("## Data Sources")
     lines.append("")
     lines.append("| Source | Details |")
     lines.append("|--------|---------|")
     lines.append("| Market Data | AKShare `stock_zh_a_hist` (EastMoney), forward-adjusted daily OHLCV |")
-    lines.append("| Benchmark | CSI 300 (000300) / SSE Composite (000001) via AKShare `stock_zh_index_daily_em` |")
-    lines.append("| Risk-Free Rate | 3.0% per annum (approximate Chinese government bond rate), daily = 3% ÷ 252 |")
-    lines.append("| Backtest Engine | EasyQuant eqlib — event-driven, T+1, per-leg commission applied |")
-    lines.append("")
-
-    lines.append("## Metric Definitions")
-    lines.append("")
-    lines.append("| Metric | Formula / Method | Reference |")
-    lines.append("|--------|-----------------|-----------|")
-    lines.append("| Annual Return | `(1 + total_return)^(252/N) - 1` | Standard annualization |")
-    lines.append("| Sharpe Ratio | `(E[R_p] - r_f) / σ_p × √252` | Sharpe (1966, 1994) |")
-    lines.append("| Sortino Ratio | `(E[R_p] - r_f) / σ_down × √252` (downside vol only) | Sortino & Price (1994) |")
-    lines.append("| Max Drawdown | `max[(peak - trough) / peak]` | Magdon-Ismail & Atiya (2004) |")
-    lines.append("| Calmar Ratio | `annual_return / |max_drawdown|` | Young (1991) |")
-    lines.append("| Alpha | `R_p(ann) - [r_f + β × (R_m(ann) - r_f)]` | Jensen (1968), CAPM |")
-    lines.append("| Beta | `Cov(R_p, R_m) / Var(R_m)` vs CSI 300 | Sharpe (1964), Lintner (1965) |")
-    lines.append("| Win Rate | Profitable pairs / total FIFO-matched pairs | Van Tharp (1999) |")
+    lines.append("| Benchmark | CSI 300 / SSE Composite via AKShare `stock_zh_index_daily_em` |")
+    lines.append("| Risk-Free Rate | 3.0% per annum, daily = 3% / 252 |")
+    lines.append("| Backtest Engine | EasyQuant eqlib — event-driven, T+1 |")
     lines.append("")
     lines.append("> **Disclaimer:** This report is generated by EasyQuant for research purposes only and")
     lines.append("> does not constitute investment advice. Past performance is not indicative of future results.")
@@ -2804,12 +3060,22 @@ def generate_report_md(result, out_path):
     print(f"Report saved: {out_path}")
 
 
-def generate_report_json(result, out_path):
-    """Generate machine-readable JSON report with risk metrics,
-    benchmark comparison, and full trade/position data.
+def generate_report_json(result, out_path, *,
+                         strategy_params=None,
+                         iteration_context=None):
+    """Generate Agent-First JSON report with verdict/targets/diagnostics/recommendations.
+
+    Args:
+        result: dict from run_backtest()
+        out_path: output file path
+        strategy_params: {"current": {...}, "ranges": {...}} or None
+        iteration_context: {"run_id": "...", "previous_run_id": "...",
+                            "changes_applied": {...}, "previous_metrics": {...}} or None
     """
-    from eqlib.attribution import analyze_returns, brinson_attribution, fama_french_analysis
-    from eqlib.data import fetch_stock_data
+    from eqlib.attribution import (
+        analyze_returns, brinson_attribution, fama_french_analysis,
+        grade_strategy, diagnose_bottleneck, recommend_params,
+    )
 
     ctx = result["context"]
     trade_log = result["trade_log"]
@@ -2822,15 +3088,15 @@ def generate_report_json(result, out_path):
     pnl_pct = (pnl / initial * 100) if initial > 0 else 0.0
 
     analytics = analyze_returns(result)
+    grade_info = grade_strategy(analytics) if analytics else grade_strategy(None)
 
     # Benchmark data
     bench_return = None
     try:
+        from eqlib.data import fetch_stock_data
         bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
         if not bench_df.empty and "close" in bench_df.columns:
-            bench_init = bench_df["close"].iloc[0]
-            bench_final = bench_df["close"].iloc[-1]
-            bench_return = (bench_final - bench_init) / bench_init
+            bench_return = float(bench_df["close"].iloc[-1] / bench_df["close"].iloc[0] - 1)
     except Exception:
         pass
 
@@ -2847,144 +3113,201 @@ def generate_report_json(result, out_path):
                 "cumulative_return": round(r["total_value"] / initial - 1, 6) if initial > 0 else 0.0,
             })
 
-    # Chart data arrays for native Lightweight Charts rendering
+    # Chart data for native rendering
     chart = _compute_chart_data(result)
 
-    report = {
-        "metadata": {
-            "generated_at": str(datetime.datetime.now().replace(microsecond=0)),
-            "generator": "EasyQuant eqlib",
-            "data_sources": {
-                "market_data": "AKShare stock_zh_a_hist (EastMoney), forward-adjusted daily OHLCV",
-                "benchmark_data": "AKShare stock_zh_index_daily_em (EastMoney)",
-                "risk_free_rate": "3.0% per annum (approximate Chinese government bond rate)",
-            },
-            "methodology": {
-                "annual_return": "(1 + total_return)^(252/N) - 1, N = trading days",
-                "sharpe_ratio": "(E[R_p] - r_f) / sigma_p * sqrt(252); ref: Sharpe (1966)",
-                "sortino_ratio": "(E[R_p] - r_f) / sigma_down * sqrt(252); ref: Sortino & Price (1994)",
-                "max_drawdown": "max[(peak - trough) / peak]; ref: Magdon-Ismail & Atiya (2004)",
-                "calmar_ratio": "annual_return / |max_drawdown|; ref: Young (1991)",
-                "alpha_beta": "CAPM vs CSI300; ref: Sharpe (1964), Lintner (1965)",
-                "win_rate": "profitable FIFO-matched pairs / total pairs",
-            },
-            "disclaimer": "For research purposes only. Not investment advice.",
-        },
-        "summary": {
-            "start_date": str(ctx.start_date),
-            "end_date": str(ctx.end_date),
-            "initial_capital": initial,
-            "final_value": round(final, 2),
-            "pnl": round(pnl, 2),
-            "pnl_pct": round(pnl_pct, 2),
-            "num_trades": len(trade_log),
-            "securities": list(set(t["security"] for t in trade_log) or []),
-            "benchmark": benchmark,
-            "benchmark_return": round(bench_return, 4) if bench_return is not None else None,
-        },
-        "risk_metrics": None,
-        "trades": [
-            {
-                "type": t["type"],
-                "date": str(t["date"]),
-                "security": t["security"],
-                "price": t["price"],
-                "amount": t["amount"],
-                "commission": round(t.get("commission", 0), 2),
-            }
-            for t in trade_log
-        ],
-        "positions": {
-            sec: {
-                "amount": pos.amount,
-                "avg_cost": round(pos.avg_cost, 3),
-                "total_value": round(pos.total_value, 2),
-            }
-            for sec, pos in ctx.portfolio.positions.items()
-            if pos.amount > 0
-        },
-        "cumulative_returns": cumulative_returns,
-        # Chart data arrays for native Lightweight Charts rendering (ReportViewer)
-        "candlestick_data": chart["candlestick_data"],
-        "volume_data": chart["volume_data"],
-        "ma5_data": chart["ma5_data"],
-        "ma20_data": chart["ma20_data"],
-        "ma60_data": chart["ma60_data"],
-        "rsi_data": chart["rsi_data"],
-        "macd_data": chart["macd_data"],
-        "macd_signal_data": chart["macd_signal_data"],
-        "macd_hist_data": chart["macd_hist_data"],
-        "bb_upper_data": chart["bb_upper_data"],
-        "bb_middle_data": chart["bb_middle_data"],
-        "bb_lower_data": chart["bb_lower_data"],
-        "support_data": chart["support_data"],
-        "resistance_data": chart["resistance_data"],
-        "markers": chart["markers"],
-        "cum_return_data": chart["cum_return_data"],
-        "ret_hs300_data": chart["ret_hs300_data"],
-        "ret_sse_data": chart["ret_sse_data"],
-        "drawdown_data": chart["drawdown_data"],
-        "pnl_bar_data": chart["pnl_bar_data"],
-        "daily_returns_data": chart["daily_returns_data"],
+    # ── Layer 1: verdict ────────────────────────────────────────────
+    targets_def = {
+        "sharpe_ratio": {"op": ">=", "threshold": 1.0},
+        "max_drawdown": {"op": ">=", "threshold": -0.20},
+        "annual_return": {"op": ">=", "threshold": 0.0},
+        "win_rate_trade": {"op": ">=", "threshold": 0.40},
+        "alpha": {"op": ">=", "threshold": 0.0},
+        "beta": {"op": "between", "threshold": [0.3, 1.3]},
+        "trade_count": {"op": ">=", "threshold": 3},
     }
 
-    # Add risk metrics
+    # ── Layer 2: targets ────────────────────────────────────────────
+    targets = []
+    all_pass = True
+    priority_counter = 0
+    for metric_name, target_def in targets_def.items():
+        value = analytics.get(metric_name, 0) if analytics else 0
+        op = target_def["op"]
+        threshold = target_def["threshold"]
+        if op == ">=":
+            passed = value >= threshold
+            gap = f"{value - threshold:+.4f}" if isinstance(value, (int, float)) else str(value)
+        elif op == "between":
+            lo, hi = threshold
+            passed = lo <= value <= hi
+            gap = "in range" if passed else f"out of [{lo}, {hi}]"
+        else:
+            passed = True
+            gap = "N/A"
+
+        if not passed:
+            all_pass = False
+            priority_counter += 1
+            targets.append({
+                "metric": metric_name, "value": value,
+                "target": target_def, "pass": False,
+                "gap": gap, "priority": priority_counter,
+            })
+        else:
+            targets.append({
+                "metric": metric_name, "value": value,
+                "target": target_def, "pass": True,
+                "gap": gap, "priority": None,
+            })
+
+    # Sort: failing first by priority, then passing
+    targets.sort(key=lambda t: (t["pass"], t.get("priority") or 999))
+
+    bottleneck = grade_info.get("weakest", "") if not all_pass else None
+    action = "complete" if all_pass else "adjust_params"
+    verdict = {
+        "pass": all_pass,
+        "grade": grade_info["overall"],
+        "score": grade_info["score"],
+        "bottleneck": bottleneck,
+        "action": action,
+        "summary": grade_info.get("summary_text", ""),
+    }
+
+    # ── Layer 3: diagnostics ────────────────────────────────────────
+    diagnostics = diagnose_bottleneck(analytics, grade_info) if analytics else []
+
+    # ── Layer 4: recommendations ────────────────────────────────────
+    current_p = strategy_params.get("current", {}) if strategy_params else None
+    ranges_p = strategy_params.get("ranges", {}) if strategy_params else None
+    recommendations = recommend_params(analytics, grade_info, current_p, ranges_p)
+
+    # ── Layer 6: iteration ──────────────────────────────────────────
+    iteration = None
+    if iteration_context:
+        prev_metrics = iteration_context.get("previous_metrics", {})
+        metric_deltas = {}
+        for key in ["annual_return", "sharpe_ratio", "max_drawdown",
+                     "annual_volatility", "win_rate_trade"]:
+            cur_val = analytics.get(key, 0) if analytics else 0
+            prev_val = prev_metrics.get(key, None)
+            if prev_val is not None:
+                delta = cur_val - prev_val
+                improved = (delta > 0) if key != "max_drawdown" else (delta > 0)
+                if key == "annual_volatility":
+                    improved = delta < 0
+                metric_deltas[key] = {
+                    "from": prev_val, "to": cur_val,
+                    "delta": f"{delta:+.4f}", "improved": improved,
+                }
+        prev_score = prev_metrics.get("_grade_score", 0)
+        score_delta = grade_info["score"] - prev_score
+        regression = any(
+            not v["improved"] for k, v in metric_deltas.items()
+            if k in ("annual_return", "sharpe_ratio", "max_drawdown")
+        )
+        iteration = {
+            "run_id": iteration_context.get("run_id", ""),
+            "previous_run_id": iteration_context.get("previous_run_id", ""),
+            "changes_applied": iteration_context.get("changes_applied", {}),
+            "score_delta": score_delta,
+            "previous_grade": prev_metrics.get("_grade", ""),
+            "metric_deltas": metric_deltas,
+            "regression_detected": regression,
+            "convergence_note": "",
+        }
+
+    # ── Build final report ──────────────────────────────────────────
+    report = {
+        "verdict": verdict,
+        "targets": targets,
+        "diagnostics": diagnostics,
+        "recommendations": recommendations,
+    }
+
+    if strategy_params:
+        report["strategy_params"] = strategy_params
+
+    if iteration:
+        report["iteration"] = iteration
+
+    report["grade"] = grade_info
+
+    # Raw metrics
     if analytics:
-        report["risk_metrics"] = {
-            "total_return": round(analytics["total_return"], 4),
-            "annual_return": round(analytics["annual_return"], 4),
-            "annual_volatility": round(analytics["annual_volatility"], 4),
-            "sharpe_ratio": round(analytics["sharpe_ratio"], 2),
-            "sortino_ratio": round(analytics["sortino_ratio"], 2),
-            "max_drawdown": round(analytics["max_drawdown"], 4),
-            "max_drawdown_start": str(analytics["max_drawdown_start"]) if analytics.get("max_drawdown_start") else None,
-            "max_drawdown_end": str(analytics["max_drawdown_end"]) if analytics.get("max_drawdown_end") else None,
-            "calmar_ratio": round(analytics["calmar_ratio"], 2),
-            "alpha": round(analytics["alpha"], 4),
-            "beta": round(analytics["beta"], 2),
-            "information_ratio": round(analytics["information_ratio"], 2),
-            "win_rate_daily": round(analytics["win_rate"], 4),
-            "win_rate_trade": round(analytics["win_rate_trade"], 4),
-            "win_count": analytics.get("win_count", 0),
-            "loss_count": analytics.get("loss_count", 0),
-            "profit_loss_ratio": (None if analytics.get("profit_loss_ratio", 0) == float('inf')
-                                  else round(analytics.get("profit_loss_ratio", 0), 2)),
-            "annual_turnover": round(analytics["annual_turnover"], 4),
-            "total_commission": round(analytics["total_commission"], 2),
-            "net_return": round(analytics["net_return"], 4),
-            "trading_days": analytics["trading_days"],
-            "benchmark_volatility": round(analytics.get("benchmark_volatility", 0), 4),
+        report["metrics"] = {
+            k: round(v, 6) if isinstance(v, float) else v
+            for k, v in analytics.items()
+            if isinstance(v, (int, float, str, bool))
         }
+        report["time_series"] = {
+            "monthly_returns": analytics.get("monthly_returns", {}),
+            "rolling_sharpe_60d": analytics.get("rolling_sharpe_60d", []),
+            "rolling_volatility_60d": analytics.get("rolling_volatility_60d", []),
+            "drawdown_periods": analytics.get("drawdown_periods", []),
+        }
+        report["daily_returns_stats"] = analytics.get("daily_returns_stats", {})
+        report["per_stock_pnl"] = {
+            k: round(v, 2) for k, v in analytics.get("per_stock_pnl", {}).items()
+        }
+    else:
+        report["metrics"] = None
+        report["time_series"] = {}
+        report["daily_returns_stats"] = {}
+        report["per_stock_pnl"] = {}
 
-        # Excess return metrics
-        report["excess_return_metrics"] = {
-            "excess_return": round(analytics.get("excess_return", 0), 4),
-            "benchmark_return": round(analytics.get("benchmark_return", 0), 4),
-            "excess_return_max_drawdown": round(analytics.get("excess_return_max_drawdown", 0), 4),
-            "excess_return_sharpe": round(analytics.get("excess_return_sharpe", 0), 2),
-            "daily_excess_return": round(analytics.get("daily_excess_return", 0), 6),
-        }
+    report["summary"] = {
+        "start_date": str(ctx.start_date),
+        "end_date": str(ctx.end_date),
+        "initial_capital": initial,
+        "final_value": round(final, 2),
+        "pnl": round(pnl, 2),
+        "pnl_pct": round(pnl_pct, 2),
+        "num_trades": len(trade_log),
+        "securities": list(set(t["security"] for t in trade_log) or []),
+        "benchmark": benchmark,
+        "benchmark_return": round(bench_return, 4) if bench_return is not None else None,
+    }
 
-    # Brinson attribution
-    br = brinson_attribution(result)
-    if br:
-        report["brinson_attribution"] = {
-            "allocation_effect": round(br["allocation_effect"], 4),
-            "selection_effect": round(br["selection_effect"], 4),
-            "interaction_effect": round(br["interaction_effect"], 4),
-            "total_active_return": round(br["total_active_return"], 4),
+    report["trades"] = [
+        {
+            "type": t["type"], "date": str(t["date"]),
+            "security": t["security"], "price": t["price"],
+            "amount": t["amount"], "commission": round(t.get("commission", 0), 2),
         }
+        for t in trade_log
+    ]
+
+    report["positions"] = {
+        sec: {
+            "amount": pos.amount,
+            "avg_cost": round(pos.avg_cost, 3),
+            "total_value": round(pos.total_value, 2),
+        }
+        for sec, pos in ctx.portfolio.positions.items()
+        if pos.amount > 0
+    }
+
+    # Chart data
+    report["chart_data"] = {
+        "candlestick_data": chart["candlestick_data"],
+        "volume_data": chart["volume_data"],
+        "cum_return_data": chart["cum_return_data"],
+        "drawdown_data": chart["drawdown_data"],
+    }
 
     # Factor analysis
     ff = fama_french_analysis(result)
     if ff:
         report["factor_analysis"] = {
-            "market_beta": round(ff["market_beta"], 2),
-            "market_exposure": round(ff["market_exposure"], 2),
-            "alpha_annual": round(ff["alpha_annual"], 4),
-            "momentum_correlation": round(ff["momentum_correlation"], 3),
-            "residual_volatility": round(ff["residual_volatility"], 4),
-            "explained_variance": round(ff["explained_variance"], 4),
+            k: round(v, 4) if isinstance(v, float) else v for k, v in ff.items()
+        }
+
+    br = brinson_attribution(result)
+    if br:
+        report["brinson_attribution"] = {
+            k: round(v, 4) if isinstance(v, float) else v for k, v in br.items()
         }
 
     with open(out_path, "w") as f:
