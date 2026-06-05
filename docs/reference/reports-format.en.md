@@ -42,6 +42,16 @@ When `result["recorded_values"]` is insufficient to construct a daily NAV series
 | `excess_return_sharpe` | Excess return Sharpe |
 | `daily_excess_return` | Annualized mean daily excess return |
 | `benchmark_volatility` | Benchmark annualized volatility |
+| `max_drawdown_start` | Start date of the maximum drawdown |
+| `max_drawdown_end` | End date of the maximum drawdown |
+| `trading_days` | Number of trading days |
+| `num_trades` | Total fills (one-sided) |
+| `monthly_returns` | Monthly returns dict (`{"2024-01": 0.03, ...}`) |
+| `rolling_sharpe_60d` | 60-day rolling Sharpe series (`[{"date": "...", "value": ...}]`) |
+| `rolling_volatility_60d` | 60-day rolling volatility series |
+| `daily_returns_stats` | Daily return statistics (mean, std, skewness, kurtosis, best/worst day, histogram) |
+| `per_stock_pnl` | Per-stock P&L dict (FIFO matching, `{"000001": 5000.0, ...}`) |
+| `drawdown_periods` | Top 5 drawdown periods (start/trough/recovery dates, depth, duration days) |
 
 The risk-free rate defaults to **`risk_free_rate=0.03`** (annualized 3%) and can be adjusted as needed.
 
@@ -52,32 +62,29 @@ The risk-free rate defaults to **`risk_free_rate=0.03`** (annualized 3%) and can
 - **Markdown**: Suitable for pasting into notes or version control; provides a quick summary and trade log.
 - **JSON**: Suitable for scripting batch comparisons across parameter sets, plotting custom charts, and integrating with dashboards.
 
-### JSON Top-Level Fields
+### JSON Top-Level Fields (Agent-First Schema)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `metadata` | `object` | Generation time, data source, methodology, disclaimer |
+| `verdict` | `object` | Overall grade (S/A/B/C/D), score, strongest/weakest dimension |
+| `targets` | `object` | Target metric values and pass/fail status |
+| `diagnostics` | `array` | Diagnostic findings (max drawdown, Sharpe, win rate, Alpha violations) |
+| `recommendations` | `array` | Parameter tuning suggestions (priority, parameter, current/suggested value) |
+| `grade` | `object` | 6-dimension score breakdown (return, risk, risk-adjusted, trade quality, excess, stability) |
+| `metrics` | `object` | Full metrics (same as `analyze_returns` output; inf/nan serialized as `null`) |
+| `time_series` | `object` | Monthly returns, rolling Sharpe, rolling volatility, drawdown periods |
+| `daily_returns_stats` | `object` | Daily return statistics (mean, std, skewness, kurtosis) |
+| `per_stock_pnl` | `object` | Per-stock P&L (FIFO matching) |
 | `summary` | `object` | Backtest period, capital, P&L, trade count, benchmark |
-| `risk_metrics` | `object` | Sharpe, Sortino, max drawdown, Alpha/Beta, etc. |
-| `excess_return_metrics` | `object` | Excess return, excess drawdown, excess Sharpe |
-| `brinson_attribution` | `object` | Brinson attribution (allocation / selection / interaction effects) |
-| `factor_analysis` | `object` | Factor exposure analysis |
 | `trades` | `array` | Individual fill records |
 | `positions` | `object` | End-of-period holdings |
-| `cumulative_returns` | `array` | Daily NAV series |
-| `candlestick_data` | `array` | Candlestick data (TradingView format) |
-| `volume_data` | `array` | Volume bar data |
-| `ma5_data` / `ma20_data` / `ma60_data` | `array` | Moving average data |
-| `rsi_data` | `array` | RSI(14) data |
-| `macd_data` / `macd_signal_data` / `macd_hist_data` | `array` | MACD line / signal / histogram |
-| `bb_upper_data` / `bb_middle_data` / `bb_lower_data` | `array` | Bollinger Bands |
-| `support_data` / `resistance_data` | `array` | Support / Resistance |
-| `markers` | `array` | Buy/sell signal markers |
-| `cum_return_data` | `array` | Strategy cumulative returns |
-| `ret_hs300_data` / `ret_sse_data` | `array` | CSI 300 / SSE Index cumulative returns |
-| `drawdown_data` | `array` | Drawdown series |
-| `pnl_bar_data` | `array` | Daily P&L bars |
-| `daily_returns_data` | `array` | Daily returns |
+| `chart_data` | `object` | Candlestick, volume, cumulative return, drawdown chart data (nested) |
+| `factor_analysis` | `object` | Factor analysis (simplified Fama-French) |
+| `brinson_attribution` | `object` | Brinson attribution |
+| `risk_metrics` | `object` | **Backward-compat**: flat metrics dict (Sharpe, drawdown, Alpha, etc.) |
+| `cumulative_returns` | `array` | **Backward-compat**: daily NAV series `[{date, total_value, cumulative_return}]` |
+| `strategy_params` | `object` | (optional) Current parameters and parameter ranges |
+| `iteration` | `object` | (optional) Iteration context (run_id, changes, score delta) |
 
 JSON top-level fields may be extended in future versions; refer to the generated file for the authoritative schema.
 

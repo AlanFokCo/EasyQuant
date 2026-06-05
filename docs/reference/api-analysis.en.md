@@ -34,6 +34,40 @@ metrics = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
 
 Returns a `dict`: `total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`.
 
+## grade_strategy
+
+Strategy scoring across 6 dimensions.
+
+```python
+grade_info = grade_strategy(analytics)
+```
+
+Accepts the dict returned by `analyze_returns()`. Returns a `dict`: `overall` (S/A/B/C/D), `score` (0-100), `dimensions` (list of 6 dimension scores), `weakest`/`strongest` (dimension names), `summary_text` (one-sentence summary).
+
+The 6 scoring dimensions: return capability (20%), risk control (20%), risk-adjusted (20%), trade quality (15%), excess capability (15%), stability (10%).
+
+## diagnose_bottleneck
+
+Identify failing metrics and root causes.
+
+```python
+diagnostics = diagnose_bottleneck(analytics, grade_info)
+```
+
+Returns a `list[dict]`, each with: `metric`, `severity` (critical/warning), `finding` (description), `root_cause`, `affected_period`, `related_metrics`.
+
+Checked metrics: max drawdown (< -20%), Sharpe (< 1.0), win rate (< 40%), Alpha (< 0).
+
+## recommend_params
+
+Parameter tuning recommendations.
+
+```python
+recommendations = recommend_params(analytics, grade_info, current_params, param_ranges)
+```
+
+Suggests parameter adjustments based on diagnostics. `current_params` and `param_ranges` are the `PARAMS` and `PARAM_RANGES` dicts from the strategy file. Returns a `list[dict]`, each with: `priority`, `target_metric`, `action`, `parameter`, `current`, `suggested`, `range`, `rationale`, `expected_effect`, `risk`.
+
 ## brinson_attribution
 
 Brinson attribution analysis. Returns a `dict` (`allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`).

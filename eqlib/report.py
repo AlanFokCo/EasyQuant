@@ -333,10 +333,10 @@ def _fetch_benchmark_returns(benchmark_code, start, end, recorded):
 
 def generate_chart(result, out_path):
     """Generate professional backtest chart (dark theme, 4-panel):
-    - Top-left: strategy cumulative return (%) vs benchmark (%)
-    - Top-right: radar chart thumbnail (6-dimension grade)
-    - Bottom-left: portfolio drawdown (%)
-    - Bottom: monthly returns strip
+    - Top-left: strategy cumulative return (%) vs benchmark (%) with trade markers
+    - Top-right: dimension score bars (6-dimension grade)
+    - Middle: portfolio drawdown (%)
+    - Bottom: monthly returns strip (last 12 months)
     """
     from eqlib.attribution import analyze_returns, grade_strategy
     from eqlib.brand import DARK_COLORS, apply_matplotlib_dark_theme, apply_matplotlib_brand
@@ -381,13 +381,13 @@ def generate_chart(result, out_path):
     except Exception:
         pass
 
-    # Figure: 2 rows, 2 columns (top-right for radar)
+    # Figure: 3 rows, 2 columns (top-right for score bars)
     fig = plt.figure(figsize=(14, 9), facecolor=c["bg_primary"])
     gs = fig.add_gridspec(3, 2, height_ratios=[3, 1.5, 0.6],
                           hspace=0.15, wspace=0.12,
                           left=0.06, right=0.96, top=0.88, bottom=0.04)
     ax = fig.add_subplot(gs[0, 0])          # cumulative return
-    ax_radar = fig.add_subplot(gs[0, 1])    # radar chart
+    ax_radar = fig.add_subplot(gs[0, 1])    # dimension score bars
     ax_dd = fig.add_subplot(gs[1, :])       # drawdown (full width)
     ax_monthly = fig.add_subplot(gs[2, :])  # monthly strip (full width)
 
@@ -400,6 +400,23 @@ def generate_chart(result, out_path):
         ax.plot(bench_cum_ret.index.to_numpy(), bench_cum_ret.values,
                 color=c["chart_hs300"], linewidth=1.2, alpha=0.7, label=bench_label, zorder=4)
     ax.axhline(0, color=c["text_dim"], linewidth=0.6, linestyle="--")
+
+    # Buy/sell trade markers
+    buys = [t for t in trade_log if t["type"] == "BUY"]
+    sells = [t for t in trade_log if t["type"] == "SELL"]
+    if len(buys) <= 50:
+        for b in buys:
+            idx = pf_values.index.get_indexer([pd.Timestamp(b["date"])], method="nearest")[0]
+            ret_at_buy = (pf_values.iloc[idx] / initial - 1) * 100
+            ax.plot(b["date"], ret_at_buy, marker="^", color=c["up"],
+                    markersize=5, zorder=3)
+    if len(sells) <= 50:
+        for s in sells:
+            idx = pf_values.index.get_indexer([pd.Timestamp(s["date"])], method="nearest")[0]
+            ret_at_sell = (pf_values.iloc[idx] / initial - 1) * 100
+            ax.plot(s["date"], ret_at_sell, marker="v", color=c["down"],
+                    markersize=5, zorder=3)
+
     ax.legend(loc="upper left", fontsize=8, facecolor=c["bg_elevated"],
               edgecolor=c["border"], labelcolor=c["text_secondary"])
     ax.set_ylabel("Cumulative Return (%)", fontsize=9, color=c["text_secondary"])
@@ -465,20 +482,23 @@ def generate_chart(result, out_path):
         mr = analytics["monthly_returns"]
         month_labels = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
         x_positions = np.linspace(0.02, 0.98, 12)
-        for i, (key, val) in enumerate(sorted(mr.items())):
+        # Show last 12 months to handle multi-year backtests
+        sorted_keys = sorted(mr.keys())
+        display_keys = sorted_keys[-12:] if len(sorted_keys) > 12 else sorted_keys
+        for key in display_keys:
+            val = mr[key]
             month_idx = int(key.split("-")[1]) - 1
-            if i >= 12:
-                break
             color = c["up"] if val >= 0 else c["down"]
-            alpha = min(1.0, abs(val) * 10)
-            ax_monthly.text(x_positions[i], 0.5, f"{month_labels[month_idx]}\n{val:+.1%}",
+            alpha_val = min(1.0, abs(val) * 10)
+            ax_monthly.text(x_positions[month_idx], 0.5,
+                           f"{month_labels[month_idx]}\n{val:+.1%}",
                            ha="center", va="center", fontsize=7,
                            color=color, fontweight="600",
                            bbox=dict(boxstyle="round,pad=0.3",
-                                    facecolor=color, alpha=alpha * 0.15,
+                                    facecolor=color, alpha=alpha_val * 0.15,
                                     edgecolor="none"))
 
-    apply_matplotlib_brand(fig)
+    apply_matplotlib_brand(fig, text_color=c["text_primary"])
     plt.savefig(out_path, dpi=150, bbox_inches="tight", pad_inches=0.2,
                 facecolor=c["bg_primary"])
     plt.close()
@@ -873,16 +893,18 @@ def generate_html_report(result, out_path):
     bench_label = html.escape(bench_label)
     pnl_badge_class = "pos" if pnl >= 0 else "neg"
 
-    # Grade data for new template
-    from eqlib.attribution import analyze_returns as _analyze_returns
-    grade_data = metrics.get("grade_data") or _calc_strategy_score(_analyze_returns(result))
+    # Grade data for new template (reuse cached analytics from _calc_metrics)
+    grade_data = metrics.get("grade_data") or {"overall": "N/A", "score": 0,
+                                                "dimensions": [], "summary_text": ""}
     grade_overall = grade_data.get("overall", "N/A")
     grade_score = grade_data.get("score", 0)
     grade_summary = grade_data.get("summary_text", "")
     grade_dims_json = json.dumps(grade_data.get("dimensions", []))
 
+    # Reuse raw analytics from _calc_metrics (no redundant analyze_returns call)
+    _ar = metrics.get("_raw_analytics")
+
     # Monthly returns
-    _ar = _analyze_returns(result)
     monthly_returns = _ar.get("monthly_returns", {}) if _ar else {}
     monthly_returns_json = json.dumps(monthly_returns)
 
@@ -1017,6 +1039,7 @@ def _calc_metrics(result, bench_data):
             "ann_vol": "N/A", "bm_vol": "N/A",
             "trade_count": "0",
             "grade_data": None,
+            "_raw_analytics": None,
         }
 
     total_ret = analytics["total_return"]
@@ -1055,6 +1078,8 @@ def _calc_metrics(result, bench_data):
         "bench_last": f"{bench_data[-1]['value'] if bench_data else 0:.2f}",
         # Grade data for HTML template
         "grade_data": _calc_strategy_score(analytics),
+        # Raw analytics for HTML template (avoid redundant analyze_returns call)
+        "_raw_analytics": analytics,
     }
 
 
@@ -3234,10 +3259,15 @@ def generate_report_json(result, out_path, *,
 
     report["grade"] = grade_info
 
-    # Raw metrics
+    # Raw metrics — filter inf/nan for valid JSON output
+    def _safe_val(v):
+        if isinstance(v, float):
+            return round(v, 6) if np.isfinite(v) else None
+        return v
+
     if analytics:
         report["metrics"] = {
-            k: round(v, 6) if isinstance(v, float) else v
+            k: _safe_val(v)
             for k, v in analytics.items()
             if isinstance(v, (int, float, str, bool))
         }
@@ -3297,18 +3327,48 @@ def generate_report_json(result, out_path, *,
         "drawdown_data": chart["drawdown_data"],
     }
 
-    # Factor analysis
+    # Factor analysis — filter inf/nan for valid JSON output
     ff = fama_french_analysis(result)
     if ff:
         report["factor_analysis"] = {
-            k: round(v, 4) if isinstance(v, float) else v for k, v in ff.items()
+            k: (round(v, 4) if isinstance(v, float) and np.isfinite(v) else
+                None if isinstance(v, float) else v)
+            for k, v in ff.items()
         }
 
     br = brinson_attribution(result)
     if br:
         report["brinson_attribution"] = {
-            k: round(v, 4) if isinstance(v, float) else v for k, v in br.items()
+            k: (round(v, 4) if isinstance(v, float) and np.isfinite(v) else
+                None if isinstance(v, float) else v)
+            for k, v in br.items()
         }
+
+    # ── Backward-compatible keys for existing callers ─────────────────
+    # runs.py, ReportViewer.tsx, and examples/05_reports.py depend on
+    # the old top-level keys (risk_metrics, cumulative_returns).
+    if analytics:
+        pl_ratio = analytics.get("profit_loss_ratio", 0)
+        report["risk_metrics"] = {
+            "total_return": _safe_val(analytics.get("total_return", 0)),
+            "annual_return": _safe_val(analytics.get("annual_return", 0)),
+            "annual_volatility": _safe_val(analytics.get("annual_volatility", 0)),
+            "sharpe_ratio": _safe_val(analytics.get("sharpe_ratio", 0)),
+            "sortino_ratio": _safe_val(analytics.get("sortino_ratio", 0)),
+            "max_drawdown": _safe_val(analytics.get("max_drawdown", 0)),
+            "calmar_ratio": _safe_val(analytics.get("calmar_ratio", 0)),
+            "alpha": _safe_val(analytics.get("alpha", 0)),
+            "beta": _safe_val(analytics.get("beta", 0)),
+            "win_rate_trade": _safe_val(analytics.get("win_rate_trade", 0)),
+            "win_rate_daily": _safe_val(analytics.get("win_rate_daily", 0)),
+            "profit_loss_ratio": None if not np.isfinite(pl_ratio) else round(pl_ratio, 2),
+            "trade_count": analytics.get("trade_count", 0),
+            "information_ratio": _safe_val(analytics.get("information_ratio", 0)),
+            "excess_return": _safe_val(analytics.get("excess_return", 0)),
+            "benchmark_return": _safe_val(analytics.get("benchmark_return", 0)),
+        }
+
+    report["cumulative_returns"] = cumulative_returns
 
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)

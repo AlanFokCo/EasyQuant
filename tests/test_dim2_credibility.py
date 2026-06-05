@@ -134,7 +134,7 @@ class TestSortinoRiskFreeRate:
         )
 
     def test_sortino_zero_rf_matches_manual(self):
-        """With rf=0, Sortino should equal (mean / downside_std) * sqrt(TRADING_DAYS_PER_YEAR)."""
+        """With rf=0, Sortino should use LPM2 downside deviation."""
         from eqlib.attribution import analyze_returns
         from eqlib.constants import TRADING_DAYS_PER_YEAR
 
@@ -143,12 +143,12 @@ class TestSortinoRiskFreeRate:
 
         stats = analyze_returns(result, risk_free_rate=0.0)
 
-        # Manually compute expected Sortino with rf=0
+        # Manually compute expected Sortino with rf=0 using correct LPM2 formula
         values = (1 + pd.Series(daily)).cumprod() * 100000
         daily_ret = values.pct_change().dropna()
-        downside = daily_ret[daily_ret < 0]
-        downside_std = downside.std()  # ddof=1
-        expected = (daily_ret.mean() / downside_std) * np.sqrt(TRADING_DAYS_PER_YEAR)
+        downside_diff = daily_ret.clip(upper=0)
+        downside_dev = float((downside_diff ** 2).mean() ** 0.5) * np.sqrt(TRADING_DAYS_PER_YEAR)
+        expected = (daily_ret.mean() * TRADING_DAYS_PER_YEAR) / downside_dev
 
         assert abs(stats["sortino_ratio"] - expected) < 1e-6
 
@@ -160,8 +160,8 @@ class TestSortinoRiskFreeRate:
 class TestConsistentDdof:
     """Sharpe and Sortino must use the same ddof convention."""
 
-    def test_sortino_uses_sample_std(self):
-        """Sortino denominator must use ddof=1 (sample std)."""
+    def test_sortino_uses_lpm2_downside_deviation(self):
+        """Sortino denominator must use LPM2 downside deviation (not std of negatives)."""
         from eqlib.attribution import analyze_returns
 
         daily = list(np.array([0.01, -0.02, 0.005, -0.01, 0.003, -0.015] * 42))
@@ -169,18 +169,19 @@ class TestConsistentDdof:
 
         stats = analyze_returns(result, risk_free_rate=0.0)
 
-        # Manually verify with ddof=1
+        # Manually verify using correct LPM2 formula
         values = (1 + pd.Series(daily)).cumprod() * 100000
         daily_ret = values.pct_change().dropna()
-        downside = daily_ret[daily_ret < 0]
-        downside_std_ddof1 = downside.std()  # default ddof=1
-        downside_std_ddof0 = downside.std(ddof=0)
+        downside_diff = daily_ret.clip(upper=0)
+        downside_dev = float((downside_diff ** 2).mean() ** 0.5)
 
         from eqlib.constants import TRADING_DAYS_PER_YEAR
-        expected_ddof1 = (daily_ret.mean() / downside_std_ddof1) * np.sqrt(TRADING_DAYS_PER_YEAR)
+        expected_lpm2 = (daily_ret.mean() * TRADING_DAYS_PER_YEAR) / (
+            downside_dev * np.sqrt(TRADING_DAYS_PER_YEAR)
+        )
 
-        assert abs(stats["sortino_ratio"] - expected_ddof1) < 1e-6, (
-            f"Sortino {stats['sortino_ratio']} should use ddof=1 ({expected_ddof1})"
+        assert abs(stats["sortino_ratio"] - expected_lpm2) < 1e-6, (
+            f"Sortino {stats['sortino_ratio']} should use LPM2 ({expected_lpm2})"
         )
 
 

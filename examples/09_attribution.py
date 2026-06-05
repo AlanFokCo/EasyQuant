@@ -6,6 +6,9 @@ Demonstrates the full performance attribution pipeline:
 - analyze_returns: comprehensive risk/return metrics
 - brinson_attribution: allocation, selection, interaction effects
 - simple_factor_analysis: market beta, alpha, factor exposure
+- grade_strategy: 6-dimension strategy scoring (S/A/B/C/D)
+- diagnose_bottleneck: identify failing metrics and root causes
+- recommend_params: parameter tuning suggestions
 
 Uses a multi-stock momentum strategy to generate diverse
 trades for meaningful attribution results.
@@ -15,11 +18,14 @@ Teaching Objectives:
     - Interpreting analyze_returns() metric dictionary
     - Understanding Brinson attribution effects
     - Factor analysis: market beta and alpha
+    - Strategy grading and diagnostic workflow
 
 Expected Output:
     - Complete risk/return metrics
     - Brinson allocation/selection/interaction effects
     - Market beta and alpha from factor analysis
+    - Strategy grade with dimension breakdown
+    - Diagnostic findings for failing metrics
     - PNG and MD reports generated
 
 Run:
@@ -33,6 +39,7 @@ from eqlib import (
     run_weekly, attribute_history, order_value, order_target,
     record, log, g,
     analyze_returns, brinson_attribution, simple_factor_analysis,
+    grade_strategy, diagnose_bottleneck, recommend_params,
     generate_chart, generate_report_md,
 )
 from examples._defaults import (
@@ -254,11 +261,44 @@ if __name__ == "__main__":
         print("  Insufficient data for factor analysis")
 
     # ============================================================
-    # 4. Generate Reports (PNG chart + Markdown)
+    # 4. Strategy Grading & Diagnostics (new in v2)
     # ============================================================
 
     print(f"\n{'=' * 60}")
-    print("4. Report Generation")
+    print("4. Strategy Grading & Diagnostics")
+    print(f"{'=' * 60}")
+
+    if metrics:
+        grade_info = grade_strategy(metrics)
+        print(f"  Overall grade:  {grade_info['overall']} ({grade_info['score']:.0f}/100)")
+        print(f"  Strongest:      {grade_info['strongest']}")
+        print(f"  Weakest:        {grade_info['weakest']}")
+        print(f"  Summary:        {grade_info['summary_text']}")
+
+        # Per-dimension breakdown
+        for dim in grade_info["dimensions"]:
+            bar = "█" * int(dim["score"] / 5) + "░" * (20 - int(dim["score"] / 5))
+            print(f"    {dim['name']:<22s} {dim['score']:>5.1f}  [{bar}] {dim['grade']}")
+
+        # Diagnostics
+        diagnostics = diagnose_bottleneck(metrics, grade_info)
+        if diagnostics:
+            print(f"\n  Diagnostics ({len(diagnostics)} issue{'s' if len(diagnostics) > 1 else ''}):")
+            for d in diagnostics:
+                severity = "⚠" if d["severity"] == "warning" else "✗"
+                print(f"    {severity} [{d['severity']}] {d['finding']}")
+                print(f"      Root cause: {d['root_cause']}")
+        else:
+            print("\n  No diagnostics — all metrics meet targets.")
+    else:
+        print("  Skipping grading (no metrics available)")
+
+    # ============================================================
+    # 5. Generate Reports (PNG chart + Markdown)
+    # ============================================================
+
+    print(f"\n{'=' * 60}")
+    print("5. Report Generation")
     print(f"{'=' * 60}")
 
     os.makedirs("reports", exist_ok=True)

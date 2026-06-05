@@ -98,15 +98,14 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         if not np.isfinite(sharpe):
             sharpe = 0.0
 
-    # Sortino ratio — semi-deviation of negative returns
-    # Using ddof=1 (sample std) for consistency with Sharpe above.
-    downside = daily_ret[daily_ret < 0]
-    downside_std = downside.std() if len(downside) >= 2 else 0.0
-    # Handle NaN from single-element downside series
-    if pd.isna(downside_std) or downside_std <= 0:
+    # Sortino ratio — downside deviation (LPM2 around risk-free rate)
+    # Correct formula: sqrt(mean(min(R_t - rf, 0)^2)), not std(negative returns).
+    downside_diff = (daily_ret - daily_rf).clip(upper=0)
+    downside_dev = float((downside_diff ** 2).mean() ** 0.5) * np.sqrt(ann_factor)
+    if downside_dev <= 0 or not np.isfinite(downside_dev):
         sortino = 0.0
     else:
-        sortino = ((daily_ret.mean() - daily_rf) / downside_std * np.sqrt(ann_factor))
+        sortino = ((daily_ret.mean() * ann_factor - risk_free_rate) / downside_dev)
         if not np.isfinite(sortino):
             sortino = 0.0
 
@@ -993,7 +992,10 @@ def diagnose_bottleneck(analytics, grade_info) -> list:
             "related_metrics": {
                 "win_count": analytics.get("win_count", 0),
                 "loss_count": analytics.get("loss_count", 0),
-                "profit_loss_ratio": round(analytics.get("profit_loss_ratio", 0), 2),
+                "profit_loss_ratio": (
+                    None if not np.isfinite(analytics.get("profit_loss_ratio", 0))
+                    else round(analytics.get("profit_loss_ratio", 0), 2)
+                ),
             },
         })
 

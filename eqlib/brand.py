@@ -67,8 +67,15 @@ def html_footer_brand_chip() -> str:
     )
 
 
-def apply_matplotlib_brand(fig) -> None:
-    """Place logo + name in the top margin of a matplotlib Figure."""
+def apply_matplotlib_brand(fig, text_color: str = "#0c1222") -> None:
+    """Place logo + name in the top margin of a matplotlib Figure.
+
+    Args:
+        fig: matplotlib Figure to annotate.
+        text_color: color for the brand name text. Defaults to ``#0c1222``
+            (dark navy, for light backgrounds). Pass ``"#e2e8f0"`` or
+            ``DARK_COLORS["text_primary"]`` for dark-themed figures.
+    """
     from io import BytesIO
 
     from matplotlib import image as mpimg
@@ -101,7 +108,7 @@ def apply_matplotlib_brand(fig) -> None:
         va="center",
         fontsize=11,
         fontweight="600",
-        color="#0c1222",
+        color=text_color,
         transform=fig.transFigure,
         zorder=1000,
     )
