@@ -10,7 +10,7 @@
 
 > A 股市场有其独特的微观结构——北向资金、融资融券、涨跌停板、限售股解禁——这些信号在海外市场并不存在或形态迥异。本篇将逐一讲解如何利用 `eqlib` 提供的四个 A 股特色 API 获取这些信号，并用 `PortfolioRiskMonitor` 构建组合级风控体系。
 
-**文档索引：** [指南总览](../how-to/index.md) | **相关示例：** [Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/25_ashare_market_sentiment.py)
+**文档索引：** [指南总览](../how-to/index.md) | **相关示例：** [Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)
 
 ---
 
@@ -721,8 +721,8 @@ if __name__ == "__main__":
 
 ### 相关示例
 
-- **[Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/25_ashare_market_sentiment.py)**：A 股市场情绪指标——完整演示四个数据 API 的用法
-- **[Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_lifecycle_callbacks.py)**：生命周期回调——`before_trading_start` 与 `after_trading_end` 的详细用法
+- **[Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)**：A 股市场情绪指标——完整演示四个数据 API 的用法
+- **[Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)**：生命周期回调——`before_trading_start` 与 `after_trading_end` 的详细用法
 
 ### 下一步
 

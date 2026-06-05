@@ -73,4 +73,4 @@ order_target_value(security, value, style=None)
 
 ## 手续费说明
 
-通过 [`set_order_cost()`](api-config.md#set_order_cost) 修改（见[配置 API](api-config.md)）。默认：买入印花税 0%、卖出印花税 0.1%、买卖佣金 0.03%、最低佣金 5 元。
+通过 [`set_order_cost()`](api-config.md#set_order_cost) 修改（见[配置 API](api-config.md)）。默认：买入印花税 0%、印花税 0.05%（2023年8月起减半）、买卖佣金 0.025%、最低佣金 5 元。

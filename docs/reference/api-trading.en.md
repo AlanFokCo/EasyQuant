@@ -73,4 +73,4 @@ order_target_value(security, value, style=None)
 
 ## Commission Fees
 
-Configure via [`set_order_cost()`](api-config.md#set_order_cost) (see [Configuration API](api-config.md)). Defaults: buy stamp duty 0%, sell stamp duty 0.1%, buy/sell commission 0.03%, minimum commission 5 yuan.
+Configure via [`set_order_cost()`](api-config.md#set_order_cost) (see [Configuration API](api-config.md)). Defaults: buy stamp duty 0%, sell stamp duty 0.05% (halved since Aug 2023), buy/sell commission 0.025%, minimum commission 5 yuan.

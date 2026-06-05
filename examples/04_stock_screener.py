@@ -1,124 +1,185 @@
-"""Example 4: Real-time stock screening.
+"""
+04 - Stock Screening
+====================
 
-Demonstrates how to scan the A-share market, filter potential buy candidates,
-and confirm with technical indicators (golden cross).
+Demonstrates multiple stock screening approaches:
+- scan_market(): real-time market scanning by price/change/PE
+- check_golden_cross(): technical signal verification
+- get_restriction_release(): A-share specific risk filter
+- query() / valuation / get_fundamentals(): fluent screening API
 
-Usage:
+Teaching Objectives:
+    - Combining multiple data sources for robust screening
+    - Filtering out risky stocks (ST, upcoming restriction releases)
+    - Using the query() API for chainable, type-safe screening
+    - argparse for CLI customization
+
+Expected Output:
+    - Market scan results with golden cross verification
+    - Restriction release warnings for upcoming unlocks
+    - Query API results filtered by PE and market cap
+
+Run:
     python examples/04_stock_screener.py
-
-    Custom parameters:
-    python examples/04_stock_screener.py --min-price 15 --min-pct 2 --max-pct 6 --max-pe 40
+    python examples/04_stock_screener.py --pe-max 20 --min-price 10
 """
 
 import argparse
-from datetime import date, timedelta
-from eqlib import scan_market, check_golden_cross, get_restriction_release, log
+from datetime import datetime, timedelta
+
+from eqlib import (
+    scan_market,
+    check_golden_cross,
+    get_restriction_release,
+    log,
+)
+from examples._defaults import STOCKS
 
 
-def screen_and_check(min_price=10, min_pct=3, max_pct=5, max_pe=50):
-    """Scan the market and check for golden cross signals."""
+def demo_scan_with_golden_cross(min_price=20, max_pe=30):
+    """Scan market and verify golden cross signals.
 
-    # Step 1: fundamental + volume/price filtering
-    log.info("Scanning the full market...")
+    Combines scan_market() (price/PE filter) with check_golden_cross()
+    (technical signal) to find stocks that are both fundamentally
+    reasonable and technically bullish.
+    """
+    print("--- Market Scan + Golden Cross ---")
+
     candidates = scan_market(
         min_price=min_price,
-        min_pct_change=min_pct,
-        max_pct_change=max_pct,
+        min_pct_change=1,
+        max_pct_change=5,
         max_pe=max_pe,
     )
 
-    if candidates.empty:
-        log.info("No stocks match the initial screening criteria")
+    if candidates is None or candidates.empty:
+        print("  No candidates from scan_market (normal outside trading hours)")
         return
 
-    log.info(f"Passed initial screening: {len(candidates)} stocks")
-    for _, row in candidates.iterrows():
-        log.info(f"  {row['name']}({row['code']}) price={row['price']:.2f} "
-                 f"change={row['pct_change']:.2f}% PE={row['pe']:.1f}")
+    print(f"  scan_market found {len(candidates)} candidates")
 
-    # ============================================================
-    # Step 1.5: Restriction release filter (A-share specific)
-    # Exclude stocks with upcoming large restriction releases (>5% of float)
-    # This helps avoid potential price pressure from insider selling
-    # ============================================================
-    log.info("\nChecking restriction releases for the next 30 days...")
+    # Check golden cross on top candidates
+    codes = candidates.head(20).index.tolist() if hasattr(candidates, 'index') else []
+    if not codes and "code" in candidates.columns:
+        codes = candidates.head(20)["code"].tolist()
 
-    release_df = get_restriction_release(days=30)
-    excluded_codes = set()
+    golden_crosses = []
+    for code in codes:
+        try:
+            if check_golden_cross(code):
+                golden_crosses.append(code)
+        except Exception:
+            continue
 
-    if not release_df.empty:
-        for _, row in candidates.iterrows():
-            code = row['code']
-            # Check if this stock has an upcoming release
-            stock_releases = release_df[release_df['code'] == code]
-            for _, release in stock_releases.iterrows():
-                # Exclude if release pct > 5% of float (release_pct is in %)
-                release_pct = release.get('release_pct', 0) or 0
-                if release_pct > 5:
-                    excluded_codes.add(code)
-                    log.warning(f"  Excluding {row['name']}({code}) - "
-                               f"release pct {release_pct:.1f}% on {release['release_date']}")
-                    break
-                # Also exclude if release value > 50亿 CNY (large-cap sell pressure)
-                # release_value is already in 亿元
-                release_value = release.get('release_value', 0) or 0
-                if release_value > 50:
-                    excluded_codes.add(code)
-                    log.warning(f"  Excluding {row['name']}({code}) - "
-                               f"large release value {release_value:.1f}亿 on {release['release_date']}")
-                    break
-
-    if excluded_codes:
-        log.info(f"Excluded {len(excluded_codes)} stocks due to upcoming large releases")
-        candidates = candidates[~candidates['code'].isin(excluded_codes)]
-
-    if candidates.empty:
-        log.info("No stocks remaining after restriction release filter")
-        return
-
-    # Step 2: technical confirmation (golden cross)
-    log.info(f"\nChecking technical indicators for {len(candidates)} stocks...")
-    buy_signals = []
-
-    for _, row in candidates.iterrows():
-        code = row["code"]
-        name = row["name"]
-        price = row["price"]
-
-        if check_golden_cross(code):
-            buy_signals.append((code, name, price))
-            log.info(f"  ** Golden cross: {name}({code}) @ {price:.2f}")
-
-    # Summary
-    print(f"\n{'=' * 60}")
-    print("Screening Results")
-    print(f"{'=' * 60}")
-
-    if buy_signals:
-        print(f"Found {len(buy_signals)} golden cross signals:")
-        for code, name, price in buy_signals:
-            print(f"  {name}({code})  price={price:.2f}")
+    if golden_crosses:
+        print(f"  Golden cross confirmed: {golden_crosses}")
     else:
-        print("No golden cross signals detected")
+        print("  No golden crosses found among top candidates today")
+    print()
 
-    print(f"{'=' * 60}")
+
+def demo_restriction_filter():
+    """Filter out stocks with upcoming large restriction releases.
+
+    Restricted share releases can cause significant selling pressure.
+    get_restriction_release(days=30) returns stocks with upcoming
+    unlocks in the next 30 days.
+
+    Key columns: code, name, release_date, release_amount (万股),
+                 release_value (亿元), release_pct
+    """
+    print("--- Restriction Release Filter ---")
+
+    releases = get_restriction_release(days=30)
+
+    if releases is None or releases.empty:
+        print("  No restriction release data available")
+        print()
+        return
+
+    # Filter for significant releases (> 1% of float)
+    if "release_pct" in releases.columns:
+        significant = releases[releases["release_pct"] > 1.0]
+    else:
+        significant = releases
+
+    if significant.empty:
+        print("  No significant restriction releases in next 30 days")
+    else:
+        print(f"  {len(significant)} stocks with >1% float unlock:")
+        cols = ["code", "name", "release_date", "release_pct"]
+        display_cols = [c for c in cols if c in significant.columns]
+        if display_cols:
+            print(significant[display_cols].head(10).to_string(index=False))
+
+    # Cross-reference with our stock pool
+    pool_codes = list(STOCKS.values())
+    if "code" in releases.columns:
+        at_risk = [c for c in pool_codes
+                   if c in releases["code"].tolist()]
+        if at_risk:
+            print(f"\n  WARNING: Our stock pool has upcoming releases: {at_risk}")
+        else:
+            print(f"\n  Our stock pool is clear — no upcoming releases")
+    print()
+
+
+def demo_query_api():
+    """Fluent stock screening with the query() API.
+
+    The query() API provides a chainable, type-safe interface
+    for stock screening. It's more expressive than scan_market()
+    and supports complex filter combinations.
+
+    Pattern:
+        q = query(valuation.pe, valuation.market_cap) \\
+            .filter(valuation.pe < 20) \\
+            .filter(valuation.market_cap > 50e9) \\
+            .order_by(valuation.pe.asc()) \\
+            .limit(10)
+        result = get_fundamentals(q)
+    """
+    print("--- Query API Screening ---")
+
+    try:
+        from eqlib import query, valuation, get_fundamentals
+
+        # Screen for value stocks: low PE, large market cap
+        q = (query(valuation.pe, valuation.market_cap, valuation.price)
+             .filter(valuation.pe.lt(25))
+             .filter(valuation.pe.gt(0))
+             .filter(valuation.market_cap.gt(50e9))
+             .order_by(valuation.pe.asc())
+             .limit(10))
+
+        result = get_fundamentals(q)
+
+        if result is not None and not result.empty:
+            print(f"  Found {len(result)} value stocks (PE<25, cap>50B):")
+            print(result.to_string())
+        else:
+            print("  No stocks match the query criteria")
+    except ImportError:
+        print("  query() API not available (experimental feature)")
+    except Exception as e:
+        print(f"  Query failed: {e}")
+    print()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Real-time stock screener")
-    parser.add_argument("--min-price", type=float, default=10,
-                        help="Minimum stock price (default 10)")
-    parser.add_argument("--min-pct", type=float, default=3,
-                        help="Minimum daily change % (default 3)")
-    parser.add_argument("--max-pct", type=float, default=5,
-                        help="Maximum daily change % (default 5)")
-    parser.add_argument("--max-pe", type=float, default=50,
-                        help="Maximum dynamic P/E ratio (default 50)")
+    parser = argparse.ArgumentParser(description="Stock Screening Examples")
+    parser.add_argument("--pe-max", type=float, default=30,
+                        help="Maximum P/E ratio for screening")
+    parser.add_argument("--min-price", type=float, default=20,
+                        help="Minimum stock price")
     args = parser.parse_args()
 
-    screen_and_check(
-        min_price=args.min_price,
-        min_pct=args.min_pct,
-        max_pct=args.max_pct,
-        max_pe=args.max_pe,
-    )
+    print("=" * 55)
+    print("04 - Stock Screening")
+    print("=" * 55)
+    print()
+
+    demo_scan_with_golden_cross(
+        min_price=args.min_price, max_pe=args.pe_max)
+    demo_restriction_filter()
+    demo_query_api()

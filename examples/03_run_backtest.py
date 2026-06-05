@@ -1,100 +1,192 @@
-"""Example 3: Running a backtest.
+"""
+03 - Running a Backtest
+=======================
 
-Demonstrates how to run a backtest and generate charts and reports.
+Demonstrates the lower-level run_backtest() API and manual result
+inspection. Unlike run_strategy() (which auto-generates all reports),
+run_backtest() gives you full control over what to do with results.
 
-Usage:
+Teaching Objectives:
+    - run_backtest(): lower-level backtest runner (no auto-reports)
+    - Inspecting trade_log: each trade's date, type, amount, price
+    - Accessing portfolio state via result["context"].portfolio
+    - analyze_returns(): compute risk/return metrics manually
+    - Difference between run_strategy (high-level) and run_backtest
+
+Expected Output:
+    - Trade log printed (each buy/sell with date and price)
+    - Final portfolio value and P&L
+    - Risk/return metrics from analyze_returns
+
+Run:
     python examples/03_run_backtest.py
 """
 
-from eqlib import *
-import datetime
+import os
+
+from eqlib import (
+    run_backtest, set_benchmark, set_order_cost,
+    run_daily, attribute_history, order_value, order_target,
+    record, log, g, analyze_returns,
+)
+from examples._defaults import (
+    STOCKS, STOCKS_TRADE, INDEX_HS300,
+    DEFAULT_ORDER_COST, INITIAL_CASH,
+    START_DATE, END_DATE, verify_data_available,
+)
+
+
+# ============================================================
+# Strategy: same MA crossover as example 02
+# ============================================================
+
+SECURITY = STOCKS["insurance"]              # 601318 Ping An
+SECURITY_TRADE = STOCKS_TRADE["insurance"]  # 601318.XSHG
+FAST_PERIOD = 10   # Slightly longer fast period than example 02
+SLOW_PERIOD = 30   # To demonstrate a different parameter choice
 
 
 def initialize(context):
     """Strategy initialization."""
-    g.security = "601390"
-    g.fast_period = 5
-    g.slow_period = 20
+    set_benchmark(INDEX_HS300)
+    set_order_cost(DEFAULT_ORDER_COST)
 
-    set_benchmark("000300.XSHG")
-    set_order_cost(OrderCost(
-        open_tax=0,
-        close_tax=0.001,
-        open_commission=0.0003,
-        close_commission=0.0003,
-        close_today_commission=0,
-        min_commission=5,
-    ))
+    g.security = SECURITY
+    g.security_trade = SECURITY_TRADE
+    g.fast_period = FAST_PERIOD
+    g.slow_period = SLOW_PERIOD
 
     context.universe = [g.security]
     run_daily(market_open, time="every_bar")
 
-    log.info("Backtest strategy init: %s" % g.security)
-
 
 def market_open(context):
-    """Daily trading logic."""
+    """MA crossover trading logic."""
     security = g.security
-    close_data = attribute_history(security, 25, "1d", ["close"])
+    security_trade = g.security_trade
 
-    if close_data.empty or len(close_data) < g.slow_period:
+    hist = attribute_history(security, g.slow_period + 5, "1d", ["close"])
+    if hist is None or hist.empty or len(hist) < g.slow_period:
         return
 
-    fast_ma = close_data["close"].tail(g.fast_period).mean()
-    slow_ma = close_data["close"].tail(g.slow_period).mean()
-    current_price = close_data["close"].iloc[-1]
+    close = hist["close"]
+    current_price = close.iloc[-1]
 
-    prev_fast = close_data["close"].tail(g.fast_period + 1).head(g.fast_period).mean()
-    prev_slow = close_data["close"].tail(g.slow_period + 1).head(g.slow_period).mean()
+    fast_ma = close.rolling(g.fast_period).mean()
+    slow_ma = close.rolling(g.slow_period).mean()
 
-    cash = context.portfolio.available_cash
+    if len(fast_ma.dropna()) < 2 or len(slow_ma.dropna()) < 2:
+        return
 
-    # Golden cross: buy
-    if prev_fast <= prev_slow and fast_ma > slow_ma:
-        if security not in context.portfolio.positions \
-           or context.portfolio.positions[security].amount == 0:
-            order_value(security, cash)
-            log.info("Golden cross BUY: %s @ %.3f" % (security, current_price))
+    prev_fast, curr_fast = fast_ma.iloc[-2], fast_ma.iloc[-1]
+    prev_slow, curr_slow = slow_ma.iloc[-2], slow_ma.iloc[-1]
 
-    # Death cross: sell
-    elif prev_fast >= prev_slow and fast_ma < slow_ma:
-        if security in context.portfolio.positions \
-           and context.portfolio.positions[security].amount > 0:
-            order_target(security, 0)
-            log.info("Death cross SELL: %s @ %.3f" % (security, current_price))
+    golden_cross = (prev_fast <= prev_slow) and (curr_fast > curr_slow)
+    death_cross = (prev_fast >= prev_slow) and (curr_fast < curr_slow)
 
-    record(price=current_price, fast_ma=fast_ma, slow_ma=slow_ma)
+    has_position = (security_trade in context.portfolio.positions
+                    and context.portfolio.positions[security_trade].amount > 0)
+
+    if golden_cross and not has_position:
+        cash = context.portfolio.available_cash
+        if cash > current_price * 100:
+            order_value(security_trade, cash * 0.95)
+
+    elif death_cross and has_position:
+        order_target(security_trade, 0)
+
+    record(total_value=context.portfolio.total_value)
 
 
 # ============================================================
-# Run backtest
+# Run backtest and inspect results
 # ============================================================
 
 if __name__ == "__main__":
-    import os
+    print("=" * 55)
+    print("03 - Running a Backtest (Manual Inspection)")
+    print("=" * 55)
 
-    os.makedirs("reports", exist_ok=True)
+    actual_start, actual_end = verify_data_available(
+        SECURITY, START_DATE, END_DATE)
 
-    result = run_strategy(
+    # --- run_backtest vs run_strategy ---
+    # run_backtest: returns result dict, NO auto-generated reports
+    # run_strategy: runs backtest + generates PNG/HTML/MD/JSON reports
+    # Use run_backtest when you want full control over output.
+    result = run_backtest(
         initialize_func=initialize,
-        start_date="2024-01-01",
-        end_date="2024-12-31",
-        starting_cash=100000,
-        benchmark="000300.XSHG",
-        report_dir="reports",
-        securities=["601390"],
+        start_date=actual_start,
+        end_date=actual_end,
+        starting_cash=INITIAL_CASH,
+        benchmark=INDEX_HS300,
+        securities=[SECURITY],
         use_local=True,
     )
 
-    if result is not None:
-        ctx = result["context"]
-        trades = result["trade_log"]
+    if result is None:
+        print("Backtest failed — no results.")
+        raise SystemExit(1)
 
-        print(f"\n{'=' * 60}")
-        print("Trade detail:")
-        print(f"{'=' * 60}")
-        for i, t in enumerate(trades, 1):
-            action = "BUY" if t["type"] == "BUY" else "SELL"
-            print(f"  {i}. {t['date']} {action} {t['security']} "
-                  f"amount={t['amount']} price={t['price']:.3f} "
-                  f"commission={t['commission']:.2f}")
+    # --- Inspect the trade log ---
+    print(f"\n{'='*55}")
+    print("Trade Log")
+    print(f"{'='*55}")
+
+    trade_log = result["trade_log"]
+    print(f"  Total trades: {len(trade_log)}")
+
+    if trade_log:
+        print(f"\n  {'Date':<12} {'Type':<6} {'Security':<14} "
+              f"{'Amount':>8} {'Price':>10}")
+        print(f"  {'-'*12} {'-'*6} {'-'*14} {'-'*8} {'-'*10}")
+        for trade in trade_log[:20]:  # Show first 20 trades
+            date = trade.get("date", "")
+            ttype = trade.get("type", "")
+            sec = trade.get("security", "")
+            amount = trade.get("amount", 0)
+            price = trade.get("price", 0)
+            print(f"  {str(date):<12} {ttype:<6} {sec:<14} "
+                  f"{amount:>8} {price:>10.2f}")
+        if len(trade_log) > 20:
+            print(f"  ... and {len(trade_log) - 20} more trades")
+
+    # --- Inspect final portfolio state ---
+    ctx = result["context"]
+    portfolio = ctx.portfolio
+
+    print(f"\n{'='*55}")
+    print("Portfolio Summary")
+    print(f"{'='*55}")
+    print(f"  Starting cash:    {portfolio.starting_cash:>12,.2f}")
+    print(f"  Final value:      {portfolio.total_value:>12,.2f}")
+    print(f"  Available cash:   {portfolio.available_cash:>12,.2f}")
+    print(f"  P&L:              {portfolio.total_value - portfolio.starting_cash:>+12,.2f}")
+    print(f"  Return:           {(portfolio.total_value / portfolio.starting_cash - 1):>+12.2%}")
+
+    # Show open positions
+    if portfolio.positions:
+        print(f"\n  Open positions:")
+        for sec, pos in portfolio.positions.items():
+            print(f"    {sec}: {pos.amount} shares @ avg {pos.avg_cost:.2f}")
+
+    # --- Compute metrics with analyze_returns ---
+    print(f"\n{'='*55}")
+    print("Risk/Return Metrics (analyze_returns)")
+    print(f"{'='*55}")
+
+    metrics = analyze_returns(result, risk_free_rate=0.03)
+    if metrics:
+        print(f"  Total return:      {metrics['total_return']:>10.2%}")
+        print(f"  Annual return:     {metrics['annual_return']:>10.2%}")
+        print(f"  Annual volatility: {metrics['annual_volatility']:>10.2%}")
+        print(f"  Sharpe ratio:      {metrics['sharpe_ratio']:>10.2f}")
+        print(f"  Sortino ratio:     {metrics.get('sortino_ratio', 0):>10.2f}")
+        print(f"  Max drawdown:      {metrics['max_drawdown']:>10.2%}")
+        print(f"  Calmar ratio:      {metrics.get('calmar_ratio', 0):>10.2f}")
+        print(f"  Win rate:          {metrics.get('win_rate_trade', 0):>10.1%}")
+        print(f"  Trade count:       {metrics.get('trade_count', 0):>10.0f}")
+        print(f"  Alpha:             {metrics.get('alpha', 0):>+10.2%}")
+        print(f"  Beta:              {metrics.get('beta', 0):>10.2f}")
+    else:
+        print("  Could not compute metrics (insufficient recorded data)")

@@ -178,6 +178,125 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         daily_excess_ret = 0.0
         bench_total_ret = 0.0
 
+    # ── Monthly returns ─────────────────────────────────────────────
+    monthly_returns = {}
+    monthly_vals = values.resample("ME").last()
+    prev_val = initial
+    for dt, val in monthly_vals.items():
+        if pd.notna(val) and prev_val > 0:
+            monthly_returns[dt.strftime("%Y-%m")] = round(float(val / prev_val - 1), 6)
+            prev_val = val
+
+    # ── Rolling metrics (60 trading-day window) ─────────────────────
+    window = min(60, n_days)
+    rolling_mean = daily_ret.rolling(window).mean()
+    rolling_std = daily_ret.rolling(window).std()
+    rolling_sharpe_60d = []
+    rolling_volatility_60d = []
+    if window >= 10 and not rolling_std.dropna().empty:
+        for dt in rolling_mean.dropna().index:
+            rm = rolling_mean.loc[dt]
+            rs = rolling_std.loc[dt]
+            if rs > 0 and np.isfinite(rm) and np.isfinite(rs):
+                s = float((rm - daily_rf) / rs * np.sqrt(ann_factor))
+                v = float(rs * np.sqrt(ann_factor))
+                rolling_sharpe_60d.append({"date": dt.strftime("%Y-%m-%d"), "value": round(s, 3)})
+                rolling_volatility_60d.append({"date": dt.strftime("%Y-%m-%d"), "value": round(v, 4)})
+
+    # ── Daily returns statistics ─────────────────────────────────────
+    from scipy.stats import skew, kurtosis
+    dr_array = daily_ret.values
+    daily_returns_stats = {
+        "mean": float(daily_ret.mean()),
+        "std": float(daily_ret.std()),
+        "skewness": float(skew(dr_array)) if len(dr_array) > 3 else 0.0,
+        "kurtosis": float(kurtosis(dr_array)) if len(dr_array) > 3 else 0.0,
+        "best_day": float(daily_ret.max()),
+        "worst_day": float(daily_ret.min()),
+        "positive_days": int((daily_ret > 0).sum()),
+        "negative_days": int((daily_ret < 0).sum()),
+        "histogram": [
+            {"bin": round(b, 4), "count": int(((daily_ret >= b) & (daily_ret < b + 0.005)).sum())}
+            for b in np.arange(-0.05, 0.05, 0.005)
+        ],
+    }
+
+    # ── Per-stock P&L ───────────────────────────────────────────────
+    from collections import deque as _deque
+    _buy_q = {}
+    per_stock_pnl = {}
+    for trade in trades:
+        sec = trade["security"]
+        t_type = trade.get("type")
+        if t_type not in ("BUY", "SELL"):
+            continue
+        price = trade["price"]
+        amount = trade["amount"]
+        if t_type == "BUY":
+            _buy_q.setdefault(sec, _deque()).append((price, amount))
+        elif t_type == "SELL":
+            remaining = amount
+            q = _buy_q.get(sec, _deque())
+            total_cost = 0.0
+            total_matched = 0
+            while remaining > 0 and q:
+                bp, ba = q[0]
+                matched = min(ba, remaining)
+                total_cost += bp * matched
+                total_matched += matched
+                remaining -= matched
+                if matched == ba:
+                    q.popleft()
+                else:
+                    q[0] = (bp, ba - matched)
+            if total_matched > 0:
+                avg_buy = total_cost / total_matched
+                pnl = (price - avg_buy) * total_matched
+                per_stock_pnl[sec] = per_stock_pnl.get(sec, 0.0) + pnl
+
+    # ── Top 5 drawdown periods ──────────────────────────────────────
+    _peak = values.cummax()
+    _dd = (values - _peak) / _peak
+    drawdown_periods = []
+    in_dd = False
+    dd_start = dd_trough = None
+    dd_depth = 0.0
+    for dt, dd_val in _dd.items():
+        if dd_val < 0:
+            if not in_dd:
+                in_dd = True
+                dd_start = dt
+                dd_trough = dt
+                dd_depth = dd_val
+            elif dd_val < dd_depth:
+                dd_trough = dt
+                dd_depth = dd_val
+        else:
+            if in_dd and dd_start is not None:
+                drawdown_periods.append({
+                    "start": dd_start.strftime("%Y-%m-%d"),
+                    "trough": dd_trough.strftime("%Y-%m-%d"),
+                    "recovery": dt.strftime("%Y-%m-%d"),
+                    "depth": round(float(dd_depth), 4),
+                    "duration_days": (dt - dd_start).days,
+                    "recovery_days": (dt - dd_trough).days,
+                })
+                in_dd = False
+    if in_dd and dd_start is not None:
+        last_dt = values.index[-1]
+        drawdown_periods.append({
+            "start": dd_start.strftime("%Y-%m-%d"),
+            "trough": dd_trough.strftime("%Y-%m-%d"),
+            "recovery": None,
+            "depth": round(float(dd_depth), 4),
+            "duration_days": (last_dt - dd_start).days,
+            "recovery_days": None,
+        })
+    drawdown_periods.sort(key=lambda x: x["depth"])
+    for i, dp in enumerate(drawdown_periods[:5]):
+        dp["rank"] = i + 1
+    drawdown_periods = drawdown_periods[:5]
+
     return {
         "total_return": total_return,
         "annual_return": ann_return,
@@ -210,6 +329,13 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         "excess_return_sharpe": excess_sharpe,
         "daily_excess_return": daily_excess_ret,
         "benchmark_volatility": bench_ann_vol,
+        # New fields for enhanced reports
+        "monthly_returns": monthly_returns,
+        "rolling_sharpe_60d": rolling_sharpe_60d,
+        "rolling_volatility_60d": rolling_volatility_60d,
+        "daily_returns_stats": daily_returns_stats,
+        "per_stock_pnl": per_stock_pnl,
+        "drawdown_periods": drawdown_periods,
     }
 
 
@@ -646,3 +772,372 @@ def fama_french_analysis(result, factors=None):
         stacklevel=2,
     )
     return simple_factor_analysis(result, factors=factors)
+
+
+def grade_strategy(analytics) -> dict:
+    """Compute 6-dimension scores, overall grade, and summary text.
+
+    See spec: docs/superpowers/specs/2026-06-05-report-enhancement-design.md §4
+
+    Returns:
+        dict with keys: overall (str), score (float), dimensions (list of dicts),
+        weakest (str), strongest (str), summary_text (str).
+    """
+    if analytics is None:
+        return {"overall": "D", "score": 0, "dimensions": [],
+                "weakest": "", "strongest": "", "summary_text": "Insufficient data."}
+
+    dims = []
+
+    # --- Return Capability (weight 0.20) ---
+    ann_ret = analytics.get("annual_return", 0)
+    alpha = analytics.get("alpha", 0)
+    ret_score = max(0, min(100, ann_ret / 0.25 * 100))
+    alpha_bonus = max(0, min(15, alpha / 0.01 * 5))
+    ret_score = min(100, ret_score + alpha_bonus)
+    dims.append({"name": "return_capability", "score": round(ret_score, 1),
+                 "key": {"annual_return": ann_ret, "alpha": alpha}})
+
+    # --- Risk Control (weight 0.20) ---
+    max_dd = abs(analytics.get("max_drawdown", 0))
+    vol = analytics.get("annual_volatility", 0)
+    dd_score = 100 if max_dd < 0.10 else 75 if max_dd < 0.20 else 50 if max_dd < 0.30 else 25
+    vol_score = 100 if vol < 0.12 else 75 if vol < 0.20 else 50 if vol < 0.30 else 25
+    risk_score = (dd_score + vol_score) / 2
+    dims.append({"name": "risk_control", "score": round(risk_score, 1),
+                 "key": {"max_drawdown": analytics.get("max_drawdown", 0),
+                         "volatility": vol}})
+
+    # --- Risk Adjusted (weight 0.20) ---
+    sharpe = analytics.get("sharpe_ratio", 0)
+    sortino = analytics.get("sortino_ratio", 0)
+    calmar = analytics.get("calmar_ratio", 0)
+    adj_score = max(0, min(100, sharpe / 2.0 * 100))
+    if sortino > 2.0:
+        adj_score = min(100, adj_score + 5)
+    if calmar > 1.5:
+        adj_score = min(100, adj_score + 5)
+    dims.append({"name": "risk_adjusted", "score": round(adj_score, 1),
+                 "key": {"sharpe": sharpe, "sortino": sortino, "calmar": calmar}})
+
+    # --- Trade Quality (weight 0.15) ---
+    win_rate = analytics.get("win_rate_trade", 0)
+    pl_ratio = analytics.get("profit_loss_ratio", 0)
+    if pl_ratio == float("inf"):
+        pl_ratio = 10.0
+    trade_count = analytics.get("trade_count", 0)
+    wr_score = max(0, min(100, win_rate / 0.70 * 100))
+    pl_score = max(0, min(100, pl_ratio / 3.0 * 100))
+    tc_score = 100 if trade_count >= 10 else 75 if trade_count >= 5 else 50
+    trade_score = wr_score * 0.5 + pl_score * 0.3 + tc_score * 0.2
+    dims.append({"name": "trade_quality", "score": round(trade_score, 1),
+                 "key": {"win_rate": win_rate, "pl_ratio": pl_ratio,
+                         "trade_count": trade_count}})
+
+    # --- Excess Capability (weight 0.15) ---
+    excess_ret = analytics.get("excess_return", 0)
+    info_ratio = analytics.get("information_ratio", 0)
+    bench_ret = analytics.get("benchmark_return", 0)
+    bench_ref = abs(bench_ret) if abs(bench_ret) > 0.01 else 0.05
+    excess_score = max(0, min(100, excess_ret / (bench_ref * 2.0) * 100))
+    ir_bonus = max(0, min(10, info_ratio / 0.5 * 5))
+    excess_score = min(100, excess_score + ir_bonus)
+    dims.append({"name": "excess_capability", "score": round(excess_score, 1),
+                 "key": {"excess_return": excess_ret, "info_ratio": info_ratio}})
+
+    # --- Stability (weight 0.10) ---
+    monthly_wr = 0.0
+    mr = analytics.get("monthly_returns", {})
+    if mr:
+        positive_months = sum(1 for v in mr.values() if v > 0)
+        monthly_wr = positive_months / len(mr)
+    stab_score = max(0, min(100, monthly_wr / 0.80 * 100))
+    dims.append({"name": "stability", "score": round(stab_score, 1),
+                 "key": {"monthly_win_rate": round(monthly_wr, 3)}})
+
+    # Overall weighted score
+    weights = [0.20, 0.20, 0.20, 0.15, 0.15, 0.10]
+    overall_score = sum(d["score"] * w for d, w in zip(dims, weights))
+
+    def _grade(s):
+        if s >= 85:
+            return "S"
+        if s >= 70:
+            return "A"
+        if s >= 55:
+            return "B"
+        if s >= 40:
+            return "C"
+        return "D"
+
+    for d in dims:
+        d["grade"] = _grade(d["score"])
+
+    overall_grade = _grade(overall_score)
+    weakest = min(dims, key=lambda d: d["score"])
+    strongest = max(dims, key=lambda d: d["score"])
+
+    summary_text = _build_summary_text(analytics, overall_grade, overall_score, dims, weakest)
+
+    return {
+        "overall": overall_grade,
+        "score": round(overall_score, 1),
+        "dimensions": dims,
+        "weakest": weakest["name"],
+        "strongest": strongest["name"],
+        "summary_text": summary_text,
+    }
+
+
+def _build_summary_text(analytics, grade, score, dims, weakest):
+    """Generate one-sentence strategy summary based on grade and metrics."""
+    ann_ret = analytics.get("annual_return", 0)
+    max_dd = analytics.get("max_drawdown", 0)
+    sharpe = analytics.get("sharpe_ratio", 0)
+    bench_ret = analytics.get("benchmark_return", 0)
+    excess = analytics.get("excess_return", 0)
+
+    if grade in ("S", "A"):
+        prefix = "策略表现优异" if grade == "S" else "策略表现良好"
+        body = (f"年化 {ann_ret:+.1%}，最大回撤 {max_dd:.1%}，"
+                f"Sharpe {sharpe:.2f} 体现出色的风险调整收益")
+        if excess > 0:
+            body += f"，超额收益 {excess:+.1%} 跑赢基准"
+        return f"{prefix}：{body}。"
+    elif grade == "B":
+        return (f"策略表现中等：年化 {ann_ret:+.1%}，但回撤 {max_dd:.1%} 偏大。"
+                f"Sharpe {sharpe:.2f}，建议关注{weakest['name']}维度。")
+    else:
+        beat = "跑赢" if excess > 0 else "未能跑赢"
+        return (f"策略表现欠佳：年化 {ann_ret:+.1%} {beat}基准 ({bench_ret:+.1%})，"
+                f"最大回撤 {max_dd:.1%}。优先改善{weakest['name']}维度。")
+
+
+def diagnose_bottleneck(analytics, grade_info) -> list:
+    """Identify failing metrics and root causes.
+
+    Args:
+        analytics: dict from analyze_returns()
+        grade_info: dict from grade_strategy()
+
+    Returns:
+        list of diagnostic dicts with keys: metric, severity, finding,
+        root_cause, affected_period, related_metrics.
+    """
+    if analytics is None or grade_info is None:
+        return []
+
+    diagnostics = []
+
+    targets = {
+        "sharpe_ratio": 1.0,
+        "max_drawdown": -0.20,
+        "annual_return": 0.0,
+        "win_rate_trade": 0.40,
+        "alpha": 0.0,
+    }
+
+    # Max drawdown check
+    max_dd = analytics.get("max_drawdown", 0)
+    if max_dd < targets["max_drawdown"]:
+        dd_start = str(analytics.get("max_drawdown_start", ""))
+        dd_end = str(analytics.get("max_drawdown_end", ""))
+        per_stock = analytics.get("per_stock_pnl", {})
+        worst_stock = min(per_stock.values()) if per_stock else 0
+        consecutive_loss = 0
+        max_consec = 0
+        mr = analytics.get("monthly_returns", {})
+        for v in mr.values():
+            if v < 0:
+                consecutive_loss += 1
+                max_consec = max(max_consec, consecutive_loss)
+            else:
+                consecutive_loss = 0
+        diagnostics.append({
+            "metric": "max_drawdown",
+            "severity": "critical" if max_dd < -0.25 else "warning",
+            "finding": f"最大回撤 {max_dd:.1%} 超出 {abs(targets['max_drawdown']):.0%} 容忍线",
+            "root_cause": "回撤期间未能及时减仓，单笔最大亏损占总资产比例过高",
+            "affected_period": f"{dd_start} to {dd_end}",
+            "related_metrics": {
+                "worst_stock_pnl": round(worst_stock, 2),
+                "max_consecutive_loss_months": max_consec,
+                "max_loss_in_drawdown": round(max_dd, 4),
+            },
+        })
+
+    # Sharpe check
+    sharpe = analytics.get("sharpe_ratio", 0)
+    if sharpe < targets["sharpe_ratio"]:
+        diagnostics.append({
+            "metric": "sharpe_ratio",
+            "severity": "warning",
+            "finding": f"Sharpe {sharpe:.2f} 低于 1.0 目标",
+            "root_cause": "收益波动过大或收益率偏低，需优化入场信号或降低仓位波动",
+            "affected_period": "full period",
+            "related_metrics": {
+                "annual_volatility": round(analytics.get("annual_volatility", 0), 4),
+                "annual_return": round(analytics.get("annual_return", 0), 4),
+            },
+        })
+
+    # Win rate check
+    win_rate = analytics.get("win_rate_trade", 0)
+    if analytics.get("trade_count", 0) >= 3 and win_rate < targets["win_rate_trade"]:
+        diagnostics.append({
+            "metric": "win_rate_trade",
+            "severity": "warning",
+            "finding": f"胜率 {win_rate:.0%} 低于 40% 目标",
+            "root_cause": "入场信号质量不足，建议增加确认指标或收紧入场条件",
+            "affected_period": "full period",
+            "related_metrics": {
+                "win_count": analytics.get("win_count", 0),
+                "loss_count": analytics.get("loss_count", 0),
+                "profit_loss_ratio": round(analytics.get("profit_loss_ratio", 0), 2),
+            },
+        })
+
+    # Alpha check
+    alpha_val = analytics.get("alpha", 0)
+    if alpha_val < 0:
+        diagnostics.append({
+            "metric": "alpha",
+            "severity": "warning",
+            "finding": f"Alpha {alpha_val:+.2%} 为负，策略未能产生超额收益",
+            "root_cause": "入场信号或持仓周期需优化，当前策略相对基准无信息优势",
+            "affected_period": "full period",
+            "related_metrics": {
+                "beta": round(analytics.get("beta", 0), 3),
+                "excess_return": round(analytics.get("excess_return", 0), 4),
+            },
+        })
+
+    return diagnostics
+
+
+def recommend_params(analytics, grade_info, current_params=None, param_ranges=None) -> list:
+    """Suggest parameter adjustments based on diagnostics.
+
+    Args:
+        analytics: dict from analyze_returns()
+        grade_info: dict from grade_strategy()
+        current_params: dict of current PARAMS from strategy file (optional)
+        param_ranges: dict of PARAM_RANGES from strategy file (optional)
+
+    Returns:
+        list of recommendation dicts with keys: priority, target_metric,
+        action, parameter, current, suggested, range, rationale,
+        expected_effect, risk.
+    """
+    if current_params is None or param_ranges is None:
+        return []
+
+    recommendations = []
+    priority = 0
+
+    max_dd = analytics.get("max_drawdown", 0) if analytics else 0
+    sharpe = analytics.get("sharpe_ratio", 0) if analytics else 0
+    win_rate = analytics.get("win_rate_trade", 0) if analytics else 0
+    trade_count = analytics.get("trade_count", 0) if analytics else 0
+
+    # Rule 1: Drawdown too large → tighten stop-loss
+    if max_dd < -0.20 and "stop_loss_pct" in current_params and "stop_loss_pct" in param_ranges:
+        priority += 1
+        cur = current_params["stop_loss_pct"]
+        lo, hi, step = param_ranges["stop_loss_pct"]
+        suggested = max(lo, round(cur - step, 4))
+        if suggested != cur:
+            recommendations.append({
+                "priority": priority,
+                "target_metric": "max_drawdown",
+                "action": "decrease",
+                "parameter": "stop_loss_pct",
+                "current": cur,
+                "suggested": suggested,
+                "range": [lo, hi],
+                "rationale": f"止损线从 {cur:.0%} 收紧至 {suggested:.0%}，在回撤早期截断亏损",
+                "expected_effect": "max_drawdown 预计改善 3-5%",
+                "risk": "可能增加止损触发频率，降低胜率 2-3%",
+            })
+
+    # Rule 2: Drawdown too large → reduce position size
+    if max_dd < -0.20 and "position_pct" in current_params and "position_pct" in param_ranges:
+        priority += 1
+        cur = current_params["position_pct"]
+        lo, hi, step = param_ranges["position_pct"]
+        suggested = max(lo, round(cur - step, 4))
+        if suggested != cur:
+            recommendations.append({
+                "priority": priority,
+                "target_metric": "max_drawdown",
+                "action": "decrease",
+                "parameter": "position_pct",
+                "current": cur,
+                "suggested": suggested,
+                "range": [lo, hi],
+                "rationale": f"单票仓位从 {cur:.0%} 降至 {suggested:.0%}，分散风险",
+                "expected_effect": "max_drawdown 预计改善 4-6%",
+                "risk": "收益绝对值会降低 2-4%",
+            })
+
+    # Rule 3: Sharpe too low → increase volatility confirmation
+    if sharpe < 1.0 and "vol_confirm_mul" in current_params and "vol_confirm_mul" in param_ranges:
+        priority += 1
+        cur = current_params["vol_confirm_mul"]
+        lo, hi, step = param_ranges["vol_confirm_mul"]
+        suggested = min(hi, round(cur + step, 4))
+        if suggested != cur:
+            recommendations.append({
+                "priority": priority,
+                "target_metric": "sharpe_ratio",
+                "action": "increase",
+                "parameter": "vol_confirm_mul",
+                "current": cur,
+                "suggested": suggested,
+                "range": [lo, hi],
+                "rationale": "提高波动确认阈值，过滤低质量入场信号",
+                "expected_effect": "Sharpe 预计提升 0.1-0.3",
+                "risk": "交易次数可能减少",
+            })
+
+    # Rule 4: Win rate too low → widen RSI bands or tighten entry
+    if win_rate < 0.40 and trade_count >= 3 and "rsi_oversold" in current_params and "rsi_oversold" in param_ranges:
+        priority += 1
+        cur = current_params["rsi_oversold"]
+        lo, hi, step = param_ranges["rsi_oversold"]
+        suggested = max(lo, round(cur - step))
+        if suggested != cur:
+            recommendations.append({
+                "priority": priority,
+                "target_metric": "win_rate_trade",
+                "action": "decrease",
+                "parameter": "rsi_oversold",
+                "current": cur,
+                "suggested": suggested,
+                "range": [lo, hi],
+                "rationale": "降低 RSI 超卖阈值，只在更极端的超卖区域入场",
+                "expected_effect": "胜率预计提升 3-5%",
+                "risk": "交易次数可能减少",
+            })
+
+    # Rule 5: Too few trades → decrease vol_confirm_mul
+    if trade_count < 3 and "vol_confirm_mul" in current_params and "vol_confirm_mul" in param_ranges:
+        priority += 1
+        cur = current_params["vol_confirm_mul"]
+        lo, hi, step = param_ranges["vol_confirm_mul"]
+        suggested = max(lo, round(cur - step, 4))
+        if suggested != cur:
+            recommendations.append({
+                "priority": priority,
+                "target_metric": "trade_count",
+                "action": "decrease",
+                "parameter": "vol_confirm_mul",
+                "current": cur,
+                "suggested": suggested,
+                "range": [lo, hi],
+                "rationale": "降低波动确认倍数以产生更多交易信号",
+                "expected_effect": "交易次数预计增加",
+                "risk": "可能引入低质量交易",
+            })
+
+    return recommendations

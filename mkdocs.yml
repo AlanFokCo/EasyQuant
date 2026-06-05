@@ -103,6 +103,8 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.betterem
   - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      base_path: ["."]
   - def_list
 nav:
   - Home: index.md
