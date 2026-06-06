@@ -38,6 +38,8 @@ def market_open(context):
 | **All-in** | `order_value(sec, context.portfolio.available_cash)` | Buy with all available cash |
 | **Proportional** | `order_value(sec, context.portfolio.available_cash * 0.5)` | Buy with 50% of cash |
 | **Fixed amount** | `order_value(sec, 50000)` | Buy 50,000 yuan worth |
+| **By lots** | `order_lots(sec, 5)` | Buy 5 lots (500 shares) |
+| **By percentage** | `order_pct(sec, 0.5)` | Buy with 50% of available cash |
 | **Fixed shares** | `order(sec, 1000)` | Buy 1,000 shares (auto-rounds down to multiples of 100) |
 | **Target shares** | `order_target(sec, 5000)` | Adjust position to 5,000 shares |
 | **Target value** | `order_target_value(sec, 100000)` | Adjust position market value to 100,000 yuan |
@@ -93,6 +95,24 @@ Adjust position to a target market value.
 
 ```python
 order_target_value('601390', 100000)  # Adjust position value to 100,000 yuan
+```
+
+### 2.5 `order_lots(security, lots)`
+
+Place an order by lot count (1 lot = 100 shares). Positive = buy, negative = sell.
+
+```python
+order_lots('601390', 5)     # Buy 5 lots (500 shares)
+order_lots('601390', -2)    # Sell 2 lots (200 shares)
+```
+
+### 2.6 `order_pct(security, pct)`
+
+Place an order using a percentage of available cash. Positive = buy, negative = sell.
+
+```python
+order_pct('601390', 0.5)     # Buy with 50% of available cash
+order_pct('601390', -0.3)    # Sell 30% of current position
 ```
 
 ---

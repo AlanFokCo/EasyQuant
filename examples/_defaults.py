@@ -46,7 +46,8 @@ STOCKS = {
     "shenhua":   "601088",   # China Shenhua — energy / dividend
 }
 
-# Suffixed codes for trading APIs: order(), order_target(), order_value()
+# Trading APIs now accept bare codes (auto-infer exchange suffix).
+# Kept here for backward compatibility; bare codes work identically.
 STOCKS_TRADE = {
     "bank":      "601398.XSHG",
     "insurance": "601318.XSHG",
