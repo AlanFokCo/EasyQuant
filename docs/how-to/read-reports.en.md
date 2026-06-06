@@ -284,41 +284,39 @@ If the chart is missing the NAV curve, check whether `record` / recorded data is
 
 ## 6. Comparing Reports Across Strategies: How to Judge Strategy Quality from Reports
 
-Below are screenshots from 4 different strategies backtested in 2024 — same report structure, different numbers.
+Below are screenshots from 4 different strategies — same report structure, different numbers. Actual results will vary significantly depending on the backtest period, stock selection, and market conditions. These screenshots are for illustration only and do not imply the strategy will perform similarly in all market environments.
 
-### Profitable Strategy: MACD Trend + Volume Confirmation (+103.48%)
+### Strategy 1: MACD Trend + Volume Confirmation
 
 ![MACD + Volume HTML report](../assets/tutorials/example_report_html_macd_volume.png)
 
-- **Sharpe ratio**: High → good risk-adjusted returns
-- **Trade count**: 16 → not too frequent
-- **Cumulative return curve**: Generally upward
-- **Key insight**: Profits come from a few big moves, not from frequent trading
+- **Type**: Trend-following strategy relying on MACD golden cross with volume confirmation
+- **Key observation**: Check whether Sharpe ratio is positive and the cumulative return curve trends upward
+- **Caveat**: Trend strategies may underperform in ranging markets
 
-### Good in Ranging Markets: Bollinger Band Mean Reversion (+57.77%)
+### Strategy 2: Bollinger Band Mean Reversion
 
 ![Bollinger Bands HTML report](../assets/tutorials/example_report_html_bollinger.png)
 
-- **Trade count**: 8 → low-frequency strategy
-- **Drawdown**: Well controlled
-- **Key insight**: Suitable for ranging markets; may underperform in trending markets
+- **Type**: Mean-reversion strategy — buy near lower band, sell near upper band
+- **Key observation**: Low trading frequency; tends to work well in ranging markets
+- **Caveat**: May suffer consecutive losses during strong trending periods
 
-### Portfolio Strategy: Multi-Factor Stock Selection (+5.19%)
+### Strategy 3: Multi-Factor Stock Selection
 
 ![Multi-factor HTML report](../assets/tutorials/example_report_html_multifactor.png)
 
-- **Trade count**: 135 → high turnover
-- **High turnover**: Commission costs need attention
-- **Key insight**: Returns are eroded by high-frequency trading costs
+- **Type**: Portfolio rotation across multiple stocks
+- **Key observation**: Pay attention to turnover rate and commission cost erosion
+- **Caveat**: High-frequency rotation can significantly reduce net returns
 
-### Losing Strategy: Momentum Portfolio (-25.69%)
+### Strategy 4: Momentum Portfolio
 
 ![Portfolio backtest HTML report](../assets/tutorials/example_report_html_portfolio.png)
 
-- **Sharpe ratio**: Negative
-- **Max drawdown**: -33.10%
-- **Daily win rate**: 42.3% → more losses than wins
-- **Key insight**: Momentum strategy repeatedly "chases highs and sells lows" in a ranging market
+- **Type**: Momentum strategy — buy recent outperformers
+- **Key observation**: Check Sharpe ratio, max drawdown, and daily win rate
+- **Caveat**: May perform poorly when trends reverse or markets become choppy
 
 ### How to Judge Strategy Quality from Reports
 
