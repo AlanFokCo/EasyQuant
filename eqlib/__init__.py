@@ -236,7 +236,11 @@ from eqlib.stock_query import (
 )
 
 # Machine Learning  [EXPERIMENTAL]
-from eqlib.ml import FeaturePipeline, BaseMLModel, MLSelector
+from eqlib.ml import (
+    FeaturePipeline, BaseMLModel, MLSelector,
+    optimize_hyperparams, auto_tune_selector,
+    validate_ml_strategy, check_feature_drift,
+)
 
 # Utilities: indicators, statistics, money management  [STABLE]
 from eqlib import utils
@@ -337,6 +341,10 @@ __all__ = [
     "FeaturePipeline",
     "BaseMLModel",
     "MLSelector",
+    "optimize_hyperparams",
+    "auto_tune_selector",
+    "validate_ml_strategy",
+    "check_feature_drift",
     # Utilities
     "utils",
     # Portfolio backtest

@@ -63,6 +63,27 @@ def validate_ml_strategy(
     return report
 
 
+def ml_validation_hook(backtest_result: dict, model: BaseMLModel) -> dict:
+    """Hook for integrating ML validation into the scientific validation pipeline.
+
+    This function can be passed to ``validate_backtest`` as an additional
+    validation step.
+
+    Parameters
+    ----------
+    backtest_result : dict
+        Result from ``run_backtest``.
+    model : BaseMLModel
+        The trained ML model.
+
+    Returns
+    -------
+    dict
+        Validation report.
+    """
+    return validate_ml_strategy(backtest_result, model)
+
+
 def check_feature_drift(
     X_train: pd.DataFrame,
     X_test: pd.DataFrame,
