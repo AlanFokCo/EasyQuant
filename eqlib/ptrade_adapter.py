@@ -11,7 +11,7 @@ Usage in QMT strategy editor:
     def market_open(context):
         close_data = attribute_history(g.security, 5, '1d', ['close'])
         MA5 = close_data['close'].iloc[-1]  # current bar close
-        current_price = close_data['close'][-1]
+        current_price = close_data['close'].iloc[-1]
         if current_price > 1.01 * MA5:
             order_value(g.security, context.portfolio.available_cash)
         elif current_price < MA5 and context.portfolio.positions.get(g.security):
@@ -51,7 +51,18 @@ _handle_data_func = None
 _benchmark = '000300.XSHG'
 _order_cost = None
 _options = {}
-_g = {}  # global variable dict (like eqlib's g)
+class _SimpleG:
+    """Lightweight namespace for user-defined strategy globals.
+
+    Mirrors eqlib's g proxy — users set arbitrary attributes
+    (e.g. g.security = '601390') that persist across callbacks.
+    """
+    def __repr__(self):
+        attrs = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items()
+                          if not k.startswith('_'))
+        return f'_SimpleG({attrs})'
+
+g = _SimpleG()  # user strategy globals (attribute access)
 _last_trade_day = None
 _last_week = None
 _last_month = None
@@ -83,12 +94,16 @@ def _to_qmt_code(code):
         return code.replace('.XSHG', '.SH')
     if code.endswith('.XSHE'):
         return code.replace('.XSHE', '.SZ')
+    if code.endswith('.XBJE'):
+        return code.replace('.XBJE', '.BJ')
 
     # Pure numeric code: determine exchange by prefix
     if code.startswith(('6', '9')):
         return code + '.SH'
     if code.startswith(('0', '3')):
         return code + '.SZ'
+    if code.startswith(('4', '8')):
+        return code + '.BJ'
     # Default: assume SH
     return code + '.SH'
 
@@ -103,8 +118,29 @@ def _to_eq_code(code):
     if code.endswith('.SZ'):
         return code.replace('.SZ', '.XSHE')
     if code.endswith('.BJ'):
-        return code  # keep as-is, BJ is same in both
+        return code.replace('.BJ', '.XBJE')
     return code
+
+
+# =====================================================================
+# QMT builtin function accessor
+# =====================================================================
+
+
+def _call_qmt_builtin(name, *args, **kwargs):
+    """Call a QMT-provided builtin function by name.
+
+    QMT injects trading functions (order_shares, get_trade_detail_data, etc.)
+    into Python's builtins.  We access them via ``__builtins__`` to avoid
+    name collisions with our own module-level wrapper functions.
+    """
+    builtins = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
+    func = builtins.get(name)
+    if func is None:
+        raise RuntimeError(
+            f"QMT builtin '{name}' not found — "
+            f"are you running outside QMT?")
+    return func(*args, **kwargs)
 
 
 # =====================================================================
@@ -114,10 +150,14 @@ def _to_eq_code(code):
 class Position:
     """Simulated position, mirroring eqlib.objects.Position."""
 
-    def __init__(self, security, amount=0, avg_cost=0.0):
+    def __init__(self, security, amount=0, avg_cost=0.0,
+                 closeable_amount=None):
         self.security = security
         self.amount = amount
         self.avg_cost = avg_cost
+        # T+1: shares bought today cannot be sold until next trading day
+        self.closeable_amount = (closeable_amount if closeable_amount
+                                 is not None else amount)
 
     @property
     def total_amount(self):
@@ -152,33 +192,51 @@ class Portfolio:
             return
 
         try:
-            acct_list = get_trade_detail_data(_account, 'STOCK', 'ACCOUNT')
+            acct_list = _call_qmt_builtin(
+                'get_trade_detail_data', _account, 'STOCK', 'ACCOUNT')
             if acct_list and len(acct_list) > 0:
                 acct = acct_list[0]
                 if hasattr(acct, 'm_dAvailable'):
                     self.available_cash = float(acct.m_dAvailable)
-                if hasattr(acct, 'm_dBalance'):
-                    self.total_value = float(acct.m_dBalance)
-                elif hasattr(acct, 'm_dDynBalance'):
+                # Prefer dynamic (real-time) balance over static balance
+                if hasattr(acct, 'm_dDynBalance'):
                     self.total_value = float(acct.m_dDynBalance)
+                elif hasattr(acct, 'm_dBalance'):
+                    self.total_value = float(acct.m_dBalance)
 
-            pos_list = get_trade_detail_data(_account, 'STOCK', 'POSITION')
+            pos_list = _call_qmt_builtin(
+                'get_trade_detail_data', _account, 'STOCK', 'POSITION')
             if pos_list:
+                seen = set()
                 for pos in pos_list:
                     inst_id = getattr(pos, 'm_strInstrumentID', '')
                     if not inst_id:
                         continue
                     eq_code = _to_eq_code(inst_id)
+                    seen.add(eq_code)
                     amount = int(getattr(pos, 'm_nVolume', 0))
                     if amount > 0:
-                        avg_price = float(getattr(pos, 'm_dOpenPrice', 0))
-                        self.positions[eq_code] = Position(eq_code, amount, avg_price)
+                        # m_dCostPrice is weighted avg holding cost;
+                        # m_dOpenPrice is today's open — wrong for avg cost.
+                        avg_price = float(getattr(
+                            pos, 'm_dCostPrice',
+                            getattr(pos, 'm_dOpenPrice', 0)))
+                        closeable = int(getattr(
+                            pos, 'm_nCanUseVolume', amount))
+                        self.positions[eq_code] = Position(
+                            eq_code, amount, avg_price, closeable)
                     elif eq_code in self.positions:
                         del self.positions[eq_code]
+                # Remove positions that QMT no longer reports
+                for eq_code in list(self.positions):
+                    if eq_code not in seen:
+                        del self.positions[eq_code]
 
-            self.returns = (self.total_value - self.starting_cash) / self.starting_cash
-        except Exception:
-            pass
+            if self.starting_cash > 0:
+                self.returns = ((self.total_value - self.starting_cash)
+                                / self.starting_cash)
+        except Exception as e:
+            print(f'[PTrade Adapter] portfolio sync error: {e}')
 
 
 class Context:
@@ -539,10 +597,9 @@ def order(security, amount, price=None, ContextInfo=None):
         style = 'FIX'
 
     # QMT's order_shares: positive shares = buy, negative shares = sell
-    if amount > 0:
-        order_shares(qmt_code, amount, style, price or 0, ci, _account)
-    elif amount < 0:
-        order_shares(qmt_code, amount, style, price or 0, ci, _account)  # keep negative
+    if amount != 0:
+        _call_qmt_builtin(
+            'order_shares', qmt_code, amount, style, price or 0, ci, _account)
 
 
 def order_target(security, amount, price=None, ContextInfo=None):
@@ -574,11 +631,9 @@ def order_value(security, value, price=None, ContextInfo=None):
     if ci is None:
         return
 
-    # QMT's order_value: positive = buy, negative = sell
-    if value > 0:
-        _qmt_order_value(qmt_code, value, 'LATEST', price or 0, ci, _account)
-    elif value < 0:
-        _qmt_order_value(qmt_code, value, 'LATEST', price or 0, ci, _account)  # keep negative
+    if value != 0:
+        _call_qmt_builtin(
+            'order_value', qmt_code, value, 'LATEST', price or 0, ci, _account)
 
 
 def order_target_value(security, target_value, price=None, ContextInfo=None):
@@ -591,7 +646,42 @@ def order_target_value(security, target_value, price=None, ContextInfo=None):
     if ci is None:
         return
 
-    _qmt_order_target_value(qmt_code, target_value, 'LATEST', price or 0, ci, _account)
+    _call_qmt_builtin(
+        'order_target_value', qmt_code, target_value, 'LATEST',
+        price or 0, ci, _account)
+
+
+def order_lots(security, lots, price=None, ContextInfo=None):
+    """Order by lot count (1 lot = 100 shares for A-shares).
+
+    Positive = buy, negative = sell.
+    Maps to QMT's order_lots.
+    """
+    qmt_code = _to_qmt_code(security)
+    ci = ContextInfo if ContextInfo else (_context._qmt if _context else None)
+    if ci is None:
+        return
+
+    if lots != 0:
+        _call_qmt_builtin(
+            'order_lots', qmt_code, lots, 'LATEST', price or 0, ci, _account)
+
+
+def order_pct(security, percent, price=None, ContextInfo=None):
+    """Order by percentage of total portfolio value.
+
+    Positive = buy, negative = sell.  ``percent`` is a fraction (0.5 = 50%).
+    Maps to QMT's order_percent.
+    """
+    qmt_code = _to_qmt_code(security)
+    ci = ContextInfo if ContextInfo else (_context._qmt if _context else None)
+    if ci is None:
+        return
+
+    if percent != 0:
+        _call_qmt_builtin(
+            'order_percent', qmt_code, percent, 'LATEST',
+            price or 0, ci, _account)
 
 
 def record(**kwargs):
@@ -616,10 +706,10 @@ def _qmt_order_shares(stockcode, shares, style='LATEST', price=0,
     if ContextInfo is None:
         return
     try:
-        if accId:
-            order_shares(stockcode, shares, style, price, ContextInfo, accId)
-        else:
-            order_shares(stockcode, shares, style, price, ContextInfo)
+        _call_qmt_builtin(
+            'order_shares', stockcode, shares, style, price,
+            ContextInfo, accId) if accId else _call_qmt_builtin(
+            'order_shares', stockcode, shares, style, price, ContextInfo)
     except Exception as e:
         print(f'[PTrade Adapter] order_shares failed: {e}')
 
@@ -633,10 +723,10 @@ def _qmt_order_value(stockcode, value, style='LATEST', price=0,
     if ContextInfo is None:
         return
     try:
-        if accId:
-            order_value(stockcode, value, style, price, ContextInfo, accId)
-        else:
-            order_value(stockcode, value, style, price, ContextInfo)
+        _call_qmt_builtin(
+            'order_value', stockcode, value, style, price,
+            ContextInfo, accId) if accId else _call_qmt_builtin(
+            'order_value', stockcode, value, style, price, ContextInfo)
     except Exception as e:
         print(f'[PTrade Adapter] order_value failed: {e}')
 
@@ -647,12 +737,11 @@ def _qmt_order_target_value(stockcode, target_value, style='LATEST',
     if ContextInfo is None:
         return
     try:
-        if accId:
-            order_target_value(stockcode, target_value, style, price,
-                               ContextInfo, accId)
-        else:
-            order_target_value(stockcode, target_value, style, price,
-                               ContextInfo)
+        _call_qmt_builtin(
+            'order_target_value', stockcode, target_value, style, price,
+            ContextInfo, accId) if accId else _call_qmt_builtin(
+            'order_target_value', stockcode, target_value, style, price,
+            ContextInfo)
     except Exception as e:
         print(f'[PTrade Adapter] order_target_value failed: {e}')
 
@@ -695,12 +784,8 @@ def start(ContextInfo):
             import traceback
             traceback.print_exc()
 
-    # Run before_trading_start callbacks
-    for func in _before_start_funcs:
-        try:
-            func(_context)
-        except Exception as e:
-            print(f'[PTrade Adapter] before_trading_start() error: {e}')
+    # Note: before_trading_start callbacks are called in on_bar() on each
+    # new trading day, not here during initialization.
 
     # Sync portfolio
     _context.portfolio.update_from_qmt(ContextInfo)
@@ -744,6 +829,10 @@ def on_bar(ContextInfo):
     # on the first bar of each day.  The _last_trade_day flag is updated AFTER
     # both blocks so that the daily functions check still sees the old value.
     if today != _last_trade_day:
+        # Reset daily after_trading_end flag
+        if hasattr(_context, '_after_end_done_today'):
+            _context._after_end_done_today = None
+
         # Run before_trading_start
         for func in _before_start_funcs:
             try:
@@ -751,20 +840,33 @@ def on_bar(ContextInfo):
             except Exception as e:
                 print(f'[PTrade Adapter] before_trading_start() error: {e}')
 
-        # Run daily functions with time != 'every_bar' (once per day on first bar)
-        for t, func in _daily_funcs:
-            if t != 'every_bar':
-                try:
-                    func(_context)
-                except Exception as e:
-                    print(f'[PTrade Adapter] run_daily() error: {e}')
-
         _last_trade_day = today
 
+    # Run daily functions with specific times (check if within ±60 seconds)
+    for t, func in _daily_funcs:
+        if t == 'every_bar':
+            continue
+        try:
+            hour, minute = map(int, t.split(':'))
+            scheduled_dt = datetime.datetime.combine(
+                today, datetime.time(hour, minute))
+            if abs((now - scheduled_dt).total_seconds()) <= 60:
+                # Check if we've already run this scheduled function today
+                done_key = f'_done_{t}_{today}'
+                if not hasattr(_context, done_key):
+                    func(_context)
+                    setattr(_context, done_key, True)
+        except ValueError:
+            # Invalid time format, skip
+            pass
+        except Exception as e:
+            print(f'[PTrade Adapter] run_daily({t}) error: {e}')
+
     # Run weekly functions
-    current_week = now.isocalendar()[:2]
-    if current_week != _last_week:
-        _last_week = current_week
+    # Use (year, week) tuple to handle year boundary correctly
+    current_iso = now.isocalendar()[:2]  # (year, week_number)
+    if current_iso != _last_week:
+        _last_week = current_iso
         weekday = now.weekday()  # 0=Mon
         for day_of_week, _, func in _weekly_funcs:
             if weekday == day_of_week:
@@ -798,16 +900,36 @@ def on_bar(ContextInfo):
             except Exception as e:
                 print(f'[PTrade Adapter] run_daily(bar) error: {e}')
 
-    # Check for last bar — run after_trading_end
+    # Clean up daily done flags at end of day (after 15:30)
+    if now.hour >= 15 and now.minute >= 30:
+        for attr in list(vars(_context)):
+            if attr.startswith('_done_'):
+                delattr(_context, attr)
+
+    # Run after_trading_end at market close (15:00) or on last bar
+    # Track whether we've already run it today to avoid duplicates
+    if not hasattr(_context, '_after_end_done_today'):
+        _context._after_end_done_today = None
+
     try:
-        if ContextInfo.is_last_bar():
-            for func in _after_end_funcs:
-                try:
-                    func(_context)
-                except Exception as e:
-                    print(f'[PTrade Adapter] after_trading_end() error: {e}')
+        is_last = ContextInfo.is_last_bar()
     except Exception:
-        pass
+        is_last = False
+
+    should_run_after_end = False
+    if is_last:
+        should_run_after_end = True
+    elif (now.hour == 15 and now.minute == 0
+          and _context._after_end_done_today != today):
+        should_run_after_end = True
+
+    if should_run_after_end:
+        for func in _after_end_funcs:
+            try:
+                func(_context)
+            except Exception as e:
+                print(f'[PTrade Adapter] after_trading_end() error: {e}')
+        _context._after_end_done_today = today
 
 
 # =====================================================================
