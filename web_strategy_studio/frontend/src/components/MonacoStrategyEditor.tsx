@@ -2,7 +2,7 @@ import type { editor } from "monaco-editor";
 import Editor from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
 
-import { apiOrigin, getToken } from "../api/client";
+import { apiOrigin } from "../api/client";
 
 type Props = {
   value: string;
@@ -123,16 +123,11 @@ export function MonacoStrategyEditor({ value, onChange, onSave, markers, fontSiz
 
     const fetchSuggestions = _makeDebounced(
       async (sourceCode: string, cursorLine: number, cursorCol: number) => {
-        const token = getToken();
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
         const res = await fetch(`${apiOrigin}/api/v1/completion`, {
           method: "POST",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             source_code: sourceCode,
             cursor_line: cursorLine,

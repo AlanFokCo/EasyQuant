@@ -5,10 +5,9 @@
  * Uses the design-system CSS variables and Tailwind utility classes
  * while remaining backward-compatible with the existing AppShell layout.
  */
-import { Code2, Database, GitCompare, History, LogOut, SunMoon } from "lucide-react";
+import { Code2, Database, GitCompare, History, SunMoon } from "lucide-react";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme } from "../hooks/useTheme";
-import { logout } from "../api/client";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -108,23 +107,7 @@ export function Sidebar() {
         <SunMoon size={16} />
       </button>
 
-      {/* Logout */}
-      <button
-        type="button"
-        aria-label="退出登录"
-        title="退出登录"
-        onClick={() => {
-          logout();
-          window.location.reload();
-        }}
-        className={cn(
-          "w-9 h-9 rounded-md flex items-center justify-center",
-          "text-text-muted hover:bg-[var(--state-error-bg)] hover:text-danger",
-          "transition-colors"
-        )}
-      >
-        <LogOut size={16} />
-      </button>
+      {/* Theme toggle moved to top nav */}
     </aside>
   );
 }

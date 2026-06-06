@@ -26,7 +26,7 @@ _report_service = ReportService(artifact_dir=settings.artifact_dir)
 
 # CSP applied to all report content responses (HIGH-14)
 _REPORT_CSP = (
-    "default-src 'none'; script-src 'self' 'unsafe-inline'; "
+    "default-src 'none'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
     "font-src 'self' data:; connect-src 'self'; sandbox allow-scripts"
 )
