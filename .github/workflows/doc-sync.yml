@@ -31,7 +31,7 @@ jobs:
 
       - name: Run example smoke tests
         run: |
-          pip install -e .
+          pip install -e ".[dev]"
           python -m pytest tests/test_examples_smoke.py -v --tb=short
 
       - name: Build docs
