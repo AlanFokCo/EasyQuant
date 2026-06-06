@@ -118,6 +118,7 @@ docs/tutorials/
 | 08 | [全天候 Alpha 综合策略](08-combined-strategy.md) | 综合策略 | 多因子+行业轮动+RSI/布林/MACD+ATR止损 | 30 min |
 | 09 | [策略参数优化与审计](09-param-optimization.md) | 参数化与工具 | PARAMS、`optimizer.py`、审计日志、审查清单 | 20 min |
 | 10 | [A 股数据与风控](10-ashare-data-risk.md) | A 股特色数据 | 北向资金、融资融券、涨跌停、限售股解禁、组合风控 | 25 min |
+| 11 | [机器学习选股](11-ml-selection.md) | ML 选股 | FeaturePipeline、MLSelector、模型对比、自定义特征 | 25 min |
 
 ---
 

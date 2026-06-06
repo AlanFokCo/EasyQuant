@@ -127,6 +127,7 @@ nav:
       - "08 · 综合策略": tutorials/08-combined-strategy.md
       - "09 · 参数优化": tutorials/09-param-optimization.md
       - "10 · A股数据": tutorials/10-ashare-data-risk.md
+      - "11 · 机器学习选股": tutorials/11-ml-selection.md
 
   - 操作指南:
       - how-to/index.md
@@ -160,6 +161,7 @@ nav:
       - reference/api-notification.md
       - reference/utils.md
       - reference/reports-format.md
+      - reference/api-ml.md
 
   - 概念解释:
       - explanation/index.md

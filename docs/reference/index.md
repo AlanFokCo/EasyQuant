@@ -18,6 +18,7 @@
 | 模拟盘通知 | [通知 API](api-notification.md) |
 | 生成报告/计算指标 | [报告与分析](api-analysis.md) |
 | 选股/行业轮动 | [选股策略](api-selection.md) |
+| 机器学习选股 | [ML API](api-ml.md) |
 | 优化仓位权重 | [报告与分析 — 组合优化](api-analysis.md) |
 | A 股特色数据 | [数据 API — A 股特色](api-data.md#a-股特色数据) |
 | 组合风控监测 | [组合风控 API](api-risk.md) |

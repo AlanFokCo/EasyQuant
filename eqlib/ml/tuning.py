@@ -102,6 +102,84 @@ def optimize_hyperparams(
         return {}
 
 
+def auto_tune_selector(
+    selector,
+    context,
+    param_grid: Optional[dict] = None,
+    cv_method: str = "time_series_split",
+    n_splits: int = 3,
+    scoring: str = "roc_auc",
+) -> dict:
+    """Auto-tune hyperparameters for an MLSelector instance.
+
+    Computes features and target from the selector's universe,
+    runs GridSearchCV, and returns the best parameters.
+
+    Parameters
+    ----------
+    selector : MLSelector
+        The selector to tune.
+    context : Context
+        Current backtest context.
+    param_grid : dict or None
+        Parameter grid. If None, uses a default grid for the model type.
+    cv_method : str
+        Cross-validation method.
+    n_splits : int
+        Number of CV splits.
+    scoring : str
+        Scoring metric.
+
+    Returns
+    -------
+    dict
+        Best parameters found.
+    """
+    securities = getattr(context, "universe", [])
+    if not securities:
+        log.warning("No universe available for auto-tuning.")
+        return {}
+
+    # Compute features
+    X = selector.pipeline.compute(securities, context, lookback=selector.lookback)
+
+    # Compute target
+    from .selection import MLSelector
+    if hasattr(selector, "_compute_target"):
+        y = selector._compute_target(securities, context, selector.target)
+    else:
+        log.warning("Selector does not support _compute_target.")
+        return {}
+
+    if X.empty or y.empty:
+        log.warning("Empty features or target for auto-tuning.")
+        return {}
+
+    common = X.index.intersection(y.index)
+    if len(common) == 0:
+        log.warning("No common securities for auto-tuning.")
+        return {}
+
+    X = X.loc[common]
+    y = y.loc[common]
+
+    best_params = optimize_hyperparams(
+        selector.pipeline,
+        selector.model_type,
+        X,
+        y,
+        param_grid=param_grid,
+        cv_method=cv_method,
+        n_splits=n_splits,
+        scoring=scoring,
+    )
+
+    if best_params:
+        log.info("Auto-tuned params: %s", best_params)
+
+    return best_params
+
+
 def _default_param_grid(model_type: str) -> dict:
     """Return a sensible default parameter grid for a given model type."""
     if model_type == "random_forest":
