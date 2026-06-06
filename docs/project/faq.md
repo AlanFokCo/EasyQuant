@@ -131,6 +131,35 @@ df = df.dropna(subset=['margin_repay'])
 df['margin_repay'] = df['margin_repay'].fillna(0)
 ```
 
+### Q: 为什么我在 run_backtest 外设置的 g.xxx 丢失了？
+
+**原因：** `run_backtest`（以及 `run_strategy`）在每次调用时都会**清空 `g` 对象**。这是设计行为——每个回测会话应该有自己的独立状态，避免多次运行之间的数据污染。
+
+**处理：** 在 `initialize()` 内部设置 `g` 的属性，而不是在 `run_backtest` 外部：
+
+```python
+# ❌ 错误
+g.security = '601398'
+result = run_backtest(initialize, ...)
+
+# ✅ 正确
+def initialize(context):
+    g.security = '601398'
+    run_daily(market_open, time='every_bar')
+
+result = run_backtest(initialize, ...)
+```
+
+如果需要模块级别的配置，使用普通 Python 变量而非 `g`：
+
+```python
+# 模块级常量（不会被清空）
+MY_SECURITY = '601398'
+
+def initialize(context):
+    g.security = MY_SECURITY
+```
+
 ---
 
 ## 回测与策略

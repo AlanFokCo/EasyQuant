@@ -14,6 +14,25 @@ from eqlib.logger import log
 
 import numpy as np
 
+
+# ============================================================
+# Custom exceptions for structured error reporting
+# ============================================================
+
+class DataFetchError(Exception):
+    """Raised when all data sources fail to fetch data for a security."""
+    pass
+
+
+class SecurityNotFoundError(Exception):
+    """Raised when a requested security code cannot be found in any data source."""
+    pass
+
+
+class DateRangeError(Exception):
+    """Raised when the requested date range is invalid (e.g. start > end)."""
+    pass
+
 # Chinese calendar — primary source for A-share holiday detection.
 # Falls back to hardcoded holidays + fixed-date rules if unavailable.
 try:

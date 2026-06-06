@@ -57,3 +57,20 @@ def initialize(context):
 def market_open(context):
     hist = attribute_history(g.security, g.ma_period, '1d', ['close'])
 ```
+
+!!! warning "⚠️ 重要提示：run_backtest 启动时会清空 ``g``"
+    `run_backtest`（以及 `run_strategy`）在每次调用时都会**清空 `g` 对象**。因此：
+
+    - **不要**在 `run_backtest` 调用之前设置 `g.xxx`，这些值会在回测启动时被清空。
+    - **应该**在 `initialize(context)` 内部设置 `g.xxx`，这样值会在回测开始时写入。
+    - 对于需要在回测外部共享的配置（如常量、参数），使用 Python 模块级变量而非 `g`。
+
+    ```python
+    # ❌ 错误：run_backtest 会清空 g.universe
+    g.universe = ['601398', '600519']
+    run_backtest(initialize, ...)
+
+    # ✅ 正确：在 initialize 内部设置
+    def initialize(context):
+        g.universe = ['601398', '600519']
+    ```
