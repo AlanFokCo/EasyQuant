@@ -82,6 +82,13 @@ node_modules/
 # Testing
 .pytest_cache/
 
+# Generated artifacts
+artifacts/
+
+# SQLite temporary files
+*.sqlite3-shm
+*.sqlite3-wal
+
 # Screenshot tooling (internal use only)
 screenshot_reports.py
 tools/
