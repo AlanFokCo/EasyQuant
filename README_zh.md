@@ -69,7 +69,7 @@ result = run_strategy(initialize, start_date='2024-01-01',
 | [**教程**](https://AlanFokCo.github.io/EasyQuant/tutorials/) | 从零到实盘，11 篇分步教程 |
 | [**操作指南**](https://AlanFokCo.github.io/EasyQuant/how-to/) | 按场景定位的实用指南 |
 | [**API 参考**](https://AlanFokCo.github.io/EasyQuant/reference/) | 全部公开 API 的参数与示例 |
-| [**示例**](examples/) | 26 个可运行脚本 |
+| [**示例**](examples/) | 20+ 个可运行脚本 + Web Studio  bonus 策略 |
 | [**常见问题**](https://AlanFokCo.github.io/EasyQuant/project/faq/) | 排错与常见疑问 |
 
 ---

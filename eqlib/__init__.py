@@ -262,6 +262,9 @@ from eqlib.portfolio_risk import (
 #   from eqlib.ptrade_adapter import *
 # See doc/ptrade_adapter.md for usage instructions.
 
+# Strategy templates (optional import)  [STABLE]
+from eqlib import strategies
+
 __all__ = [
     # Lifecycle
     "run_backtest", "run_daily", "run_weekly", "run_monthly", "run_selection",
