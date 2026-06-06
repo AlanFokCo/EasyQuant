@@ -25,43 +25,11 @@ export function resolveArtifactUrl(path: string | undefined | null): string | un
   return p;
 }
 
-/** Get stored JWT token from localStorage. */
-export function getToken(): string | null {
-  return localStorage.getItem("eq_studio_token");
-}
-
-/** Store or clear JWT token. */
-export function setToken(token: string | null): void {
-  if (token) {
-    localStorage.setItem("eq_studio_token", token);
-  } else {
-    localStorage.removeItem("eq_studio_token");
-  }
-}
-
-/** Clear all auth-related storage (JWT token, sessionStorage state). */
-export function logout(): void {
-  setToken(null);
-  sessionStorage.removeItem("eq_studio_run_id");
-}
-
-/** Callback fired when authentication expires (401). */
-let _onAuthExpired: (() => void) | null = null;
-
-/** Set callback for auth expiration (called by App.tsx). */
-export function setOnAuthExpired(cb: (() => void) | null): void {
-  _onAuthExpired = cb;
-}
-
 export async function apiJson<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(init?.headers as Record<string, string> || {}),
   };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
   const res = await fetch(`${apiOrigin}${path}`, {
     ...init,
     headers,
@@ -77,24 +45,11 @@ export async function apiJson<T>(path: string, init?: RequestInit & { signal?: A
     } catch {
       /* ignore parse failure */
     }
-    // Support both top-level error and FastAPI's nested detail.error envelope
     const err = body?.error ?? body?.detail?.error;
     const code = err?.code ?? "ERROR";
 
-    // Auto logout on auth expiration (401 with TOKEN_EXPIRED/TOKEN_INVALID/TOKEN_MISSING)
-    if (res.status === 401 && (code === "TOKEN_EXPIRED" || code === "TOKEN_INVALID" || code === "TOKEN_MISSING" || code === "USER_NOT_FOUND")) {
-      logout();
-      if (_onAuthExpired) {
-        _onAuthExpired();
-      }
-    }
-
     if (err?.message) {
-      throw new ApiError(
-        code,
-        err.message,
-        err.details ?? null,
-      );
+      throw new ApiError(code, err.message, err.details ?? null);
     }
     throw new ApiError("HTTP_ERROR", `${res.status} ${res.statusText}`, null);
   }

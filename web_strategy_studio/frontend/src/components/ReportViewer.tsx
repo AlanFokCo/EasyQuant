@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createChart, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import type { IChartApi } from "lightweight-charts";
 
-import { resolveArtifactUrl, getToken } from "../api/client";
+import { resolveArtifactUrl } from "../api/client";
 
 type ReportData = {
   summary: {
@@ -112,12 +112,9 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
   const handleExport = useCallback(async (fmt: string) => {
     setExporting(fmt);
     try {
-      const token = getToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
       const url = resolveArtifactUrl(`/api/v1/reports/${runId}/export/${fmt}`);
       if (!url) throw new Error("Invalid export URL");
-      const res = await fetch(url, { headers });
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
       const blob = await res.blob();
       const a = document.createElement("a");
@@ -165,10 +162,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
         const apiUrl = jsonUrl || `/api/v1/runs/${runId}/report/data`;
         const url = resolveArtifactUrl(apiUrl);
         if (!url) throw new Error("Invalid report URL");
-        const token = getToken();
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(url, { headers });
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (!cancelled) {

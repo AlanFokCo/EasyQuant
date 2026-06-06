@@ -147,9 +147,6 @@ def decode_access_token(token: str) -> dict:
 # ── FastAPI dependency ───────────────────────────────────────────────────────
 
 # ── Short-lived SSE token (E5) ────────────────────────────────────────────────
-# SSE endpoints can't set Authorization headers, so they accept a ?token=
-# query parameter.  Using the main JWT there leaks it to logs.  Instead,
-# issue a short-lived (60 s) token scoped to SSE.
 _SSE_TOKEN_EXPIRE_SECONDS = 60
 
 
@@ -161,6 +158,9 @@ def create_sse_token(user_id: str) -> str:
         JWT_SECRET, algorithm=JWT_ALGORITHM,
     )
 
+# Global default user to avoid DB lookups when auth is disabled
+_default_user: Optional[User] = None
+
 async def get_current_user(
     session: AsyncSession = Depends(get_session),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(
@@ -168,66 +168,24 @@ async def get_current_user(
     ),
     token: Optional[str] = Query(None, description="Short-lived SSE token for EventSource endpoints"),
 ) -> User:
-    """Extract and verify JWT, return the authenticated User.
-
-    Supports both Bearer header (via ``credentials``) and ``?token=`` query
-    parameter — the latter needed by SSE/EventSource which can't set headers.
-    """
-    raw_token = credentials.credentials if credentials else token
-    is_query_token = credentials is None and token is not None
-    if raw_token is None:
-        raise HTTPException(
-            status_code=401,
-            detail={"code": "TOKEN_MISSING", "message": "Authentication required"},
-        )
-    try:
-        payload = decode_access_token(raw_token)
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=401, detail={"code": "TOKEN_EXPIRED", "message": "Token expired"}
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"}
-        )
-
-    # E5: Query-parameter tokens must have scope=sse (short-lived)
-    if is_query_token and payload.get("scope") != "sse":
-        raise HTTPException(
-            status_code=401,
-            detail={"code": "TOKEN_INVALID", "message": "Query tokens must be short-lived SSE tokens"},
-        )
-
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=401, detail={"code": "TOKEN_INVALID", "message": "Invalid token"}
-        )
-
-    user = await session.get(User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=401, detail={"code": "USER_NOT_FOUND", "message": "User not found"}
-        )
-
-    # E6: Check if this session has been revoked (JWT blacklist)
-    sid = payload.get("sid")
-    if sid:
-        from studio_api.services.auth_service import is_token_revoked
-
-        if await is_token_revoked(session, sid):
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "code": "SESSION_REVOKED",
-                    "message": "This session has been revoked. Please log in again.",
-                },
+    """Auth disabled — always returns the default demo user."""
+    global _default_user
+    if _default_user is None:
+        # Ensure demo user exists or create a transient one
+        user = await session.get(User, "demo")
+        if user is None:
+            user = User(
+                id="demo",
+                username="demo",
+                hashed_password="",
+                is_active=True,
+                role=ROLE_USER,
             )
-
-    # E4: Attach role metadata to state for downstream RBAC checks
-    # (the User model already carries `user.role`; no extra state needed)
-
-    return user
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+        _default_user = user
+    return _default_user
 
 
 # ── Optional auth (for routes that work both with and without auth) ──────────
@@ -237,17 +195,8 @@ async def get_current_user_optional(
     ),
     session: AsyncSession = Depends(get_session),
 ) -> Optional[User]:
-    """Return the authenticated User if a valid token is present, else None."""
-    if creds is None:
-        return None
-    try:
-        payload = decode_access_token(creds.credentials)
-    except jwt.InvalidTokenError:
-        return None
-    user_id = payload.get("sub")
-    if user_id is None:
-        return None
-    return await session.get(User, user_id)
+    """Auth disabled — always returns the default demo user."""
+    return await get_current_user(session)
 
 
 # ── Admin seeding ────────────────────────────────────────────────────────────
@@ -267,18 +216,12 @@ async def ensure_admin_user(session: AsyncSession) -> User:
             )
     existing = await session.get(User, admin_id)
     if existing is not None:
-        # E4: ensure the seeded admin always has role=admin
-        if existing.role != ROLE_ADMIN:
-            existing.role = ROLE_ADMIN
-            await session.commit()
-            await session.refresh(existing)
         return existing
     user = User(
         id=admin_id,
         username=admin_id,
         hashed_password=hash_password(admin_pass),
         is_active=True,
-        role=ROLE_ADMIN,
     )
     session.add(user)
     await session.commit()

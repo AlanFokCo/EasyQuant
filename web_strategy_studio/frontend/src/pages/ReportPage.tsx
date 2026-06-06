@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ExternalLink, ArrowLeft, Copy, Check, Download } from "lucide-react";
 
-import { apiJson, getToken, resolveArtifactUrl } from "../api/client";
+import { apiJson, resolveArtifactUrl } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import ReportViewer from "../components/ReportViewer";
 import ReportComparison from "../components/ReportComparison";
@@ -110,10 +110,7 @@ export default function ReportPage() {
 
     async function loadBlob() {
       try {
-        const token = getToken();
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(reportApiUrl!, { headers });
+        const res = await fetch(reportApiUrl!);
         if (!res.ok) return;
         const blob = await res.blob();
         if (!cancelled) {
@@ -144,12 +141,9 @@ export default function ReportPage() {
     if (!run_id) return;
     setExporting(fmt);
     try {
-      const token = getToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
       const url = resolveArtifactUrl(`/api/v1/reports/${run_id}/export/${fmt}`);
       if (!url) throw new Error("Invalid export URL");
-      const res = await fetch(url, { headers });
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
       const blob = await res.blob();
       const a = document.createElement("a");
@@ -355,7 +349,6 @@ export default function ReportPage() {
             <iframe
               title="回测 HTML 报告"
               src={blobSrc}
-              sandbox="allow-scripts"
               style={{
                 width: "100%",
                 height: "100%",
