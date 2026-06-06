@@ -86,6 +86,37 @@ class StrategyTemplateResponse(BaseModel):
     hints: List[str]
 
 
+class TemplateSummary(BaseModel):
+    """Template listing entry (no code)."""
+
+    id: str
+    name: str
+    description: str
+    category: str = "general"
+    tags: List[str] = Field(default_factory=list)
+
+
+class TemplateDetail(BaseModel):
+    """Full template with code."""
+
+    id: str
+    name: str
+    description: str
+    code: str
+    category: str = "general"
+    tags: List[str] = Field(default_factory=list)
+
+
+class DiffResponse(BaseModel):
+    """Diff between two versions."""
+
+    from_version: int
+    to_version: int
+    from_code: str
+    to_code: str
+    diff: List[str]
+
+
 class LintBody(BaseModel):
     source_code: str
     profile: Literal["fast", "strict"] = "fast"

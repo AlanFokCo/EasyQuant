@@ -314,6 +314,7 @@ def test_docker_build_command():
     cmd = runner._build_cmd(
         work_dir="/tmp/test_work",
         artifact_dir="/tmp/test_artifacts",
+        run_id="run_test123",
     )
     assert cmd[0] == "docker"
     assert "run" in cmd

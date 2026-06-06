@@ -8,11 +8,13 @@ type Props = {
   onFontDelta: (d: number) => void;
   onFormat: () => void;
   onRunBacktest: () => void;
+  onOpenTemplates?: () => void;
+  onOpenVersions?: () => void;
   running: boolean;
   onOpenCommandPalette?: () => void;
 };
 
-export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, running, onOpenCommandPalette }: Props) {
+export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, onOpenTemplates, onOpenVersions, running, onOpenCommandPalette }: Props) {
   const setShowHistory = useEditorStore((s) => s.setShowHistory);
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
   const sseConnected = useEditorStore((s) => s.sseConnected);
@@ -102,6 +104,28 @@ export function EditorToolbar({ fontSize, onFontDelta, onFormat, onRunBacktest, 
           >
             对比
           </button>
+          {onOpenVersions && (
+            <button
+              type="button"
+              aria-label="查看版本历史"
+              style={ghostBtn}
+              onClick={onOpenVersions}
+              title="版本历史"
+            >
+              版本
+            </button>
+          )}
+          {onOpenTemplates && (
+            <button
+              type="button"
+              aria-label="选择策略模板"
+              style={ghostBtn}
+              onClick={onOpenTemplates}
+              title="策略模板"
+            >
+              模板
+            </button>
+          )}
         </>
       )}
 

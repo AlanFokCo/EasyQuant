@@ -148,6 +148,7 @@ class StreamHub:
             buf = self._buffers.get(oldest)
             if buf is not None and buf.terminal is None:
                 self._buffers.pop(oldest, None)
+                self._locks.pop(oldest, None)  # clean up lock to prevent leak
                 log.debug("stream_hub.evict_oldest", run_id=oldest)
 
     def format_sse(self, event_id: int, event: str, data: Dict[str, Any]) -> str:
@@ -162,11 +163,16 @@ class StreamHub:
     # ------------------------------------------------------------------
 
     def evict_expired(self) -> None:
-        """Remove expired ring buffers. Call periodically."""
+        """Remove expired ring buffers and associated locks. Call periodically."""
         now = time.monotonic()
         expired = [rid for rid, buf in list(self._buffers.items()) if buf.is_expired(now)]
         for rid in expired:
             self._buffers.pop(rid, None)
+            self._locks.pop(rid, None)  # clean up lock to prevent leak
+            try:
+                self._insert_order.remove(rid)
+            except ValueError:
+                pass
             log.debug("stream_hub.evict", run_id=rid)
 
 

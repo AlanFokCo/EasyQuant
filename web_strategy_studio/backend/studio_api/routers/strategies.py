@@ -18,14 +18,19 @@ from studio_api.db import get_session
 from studio_api.models import Strategy, StrategyVersion, User
 from studio_api.schemas import (
     CreateStrategyBody,
+    DiffResponse,
     PatchStrategyBody,
     SnapshotBody,
     StrategyCreated,
     StrategyDetail,
     StrategyTemplateResponse,
     StrategyVersionItem,
+    TemplateDetail,
+    TemplateSummary,
     api_error,
 )
+from studio_api.services.template_service import TemplateService
+from studio_api.services.version_service import VersionService
 
 router = APIRouter(prefix="/api/v1", tags=["strategies"])
 
@@ -406,7 +411,10 @@ async def restore_strategy_version(
 
 
 @router.get("/strategies/{strategy_id}/template", response_model=StrategyTemplateResponse)
-async def strategy_template(strategy_id: str):
+async def strategy_template(
+    strategy_id: str,
+    current_user: User = Depends(auth_mod.get_current_user),
+):
     _ = strategy_id  # reserved for per-user templates
     return StrategyTemplateResponse(
         source_code=STRATEGY_TEMPLATE,
@@ -416,3 +424,71 @@ async def strategy_template(strategy_id: str):
             "顶层不要写 if __name__ == '__main__'，由运行器加载",
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# Version diff (§3.1 — Module A enhancement)
+# ---------------------------------------------------------------------------
+
+_version_service = VersionService()
+
+
+@router.get(
+    "/strategies/{strategy_id}/versions/{from_version}/diff/{to_version}",
+    response_model=DiffResponse,
+)
+async def diff_versions(
+    strategy_id: str,
+    from_version: int,
+    to_version: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(auth_mod.get_current_user),
+):
+    """Generate a unified diff between two versions of a strategy."""
+    # Verify ownership
+    res = await session.execute(
+        select(Strategy).where(
+            Strategy.id == strategy_id,
+            Strategy.owner_id == current_user.id,
+        )
+    )
+    strat = res.scalar_one_or_none()
+    if strat is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
+
+    result = await _version_service.get_diff(
+        session, strategy_id, from_version, to_version
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Version not found"))
+    return DiffResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# Template endpoints (§3.1 — Module A enhancement)
+# ---------------------------------------------------------------------------
+
+_template_service = TemplateService()
+
+
+@router.get("/templates", response_model=List[TemplateSummary])
+async def list_templates(
+    current_user: User = Depends(auth_mod.get_current_user),
+):
+    """List all available strategy templates (summary only)."""
+    return [TemplateSummary(**t) for t in _template_service.get_templates()]
+
+
+@router.get("/templates/{template_id}", response_model=TemplateDetail)
+async def get_template(
+    template_id: str,
+    current_user: User = Depends(auth_mod.get_current_user),
+):
+    """Get a specific template with full code."""
+    template = _template_service.get_template(template_id)
+    if template is None:
+        raise HTTPException(
+            status_code=404,
+            detail=api_error("NOT_FOUND", f"Template '{template_id}' not found"),
+        )
+    return TemplateDetail(**template)

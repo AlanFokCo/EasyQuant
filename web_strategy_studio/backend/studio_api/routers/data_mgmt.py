@@ -1,30 +1,54 @@
-"""Data management router — list, download, delete local CSV data."""
+"""Data management router -- async, paginated, with batch operations.
+
+Replaces the original synchronous file I/O with the async DataService
+layer. All blocking eqlib.data_cache calls run in a thread pool via
+asyncio.to_thread (inside DataService).
+
+Endpoints:
+  GET  /data/local            -- paginated stock listing with search & sort
+  GET  /data/local/{code}     -- single stock detail
+  POST /data/local/download   -- download & merge stock data
+  POST /data/local/batch-delete -- batch delete local CSV files
+  GET  /data/local/{code}/quality -- data quality report
+  DEL  /data/local/{code}     -- delete single stock (kept for compat)
+"""
 
 from __future__ import annotations
 
-import datetime
 import re
 from typing import Any, Dict, List, Optional
 
-from eqlib import data_cache as dc
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from studio_api import auth as auth_mod
 from studio_api.models import User
+from studio_api.services.data_service import DataService, validate_code
 
 router = APIRouter(prefix="/api/v1", tags=["data"])
 
-# A 股代码严格 6 位数字，任何路径分隔符、URL 编码、前缀后缀都不接受。
-_CODE_RE = re.compile(r"^[0-9]{6}$")
+# Module-level singleton (stateless across requests, cache is instance-level)
+_data_service = DataService()
 
 
-class LocalStockInfo(BaseModel):
+# ---------------------------------------------------------------------------
+# Request / response schemas
+# ---------------------------------------------------------------------------
+
+
+class StockInfo(BaseModel):
     code: str
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     size_bytes: int = 0
     size_human: str = ""
+
+
+class PaginatedStocks(BaseModel):
+    items: List[Dict[str, Any]]
+    total: int
+    page: int
+    per_page: int
 
 
 class DownloadRequestBody(BaseModel):
@@ -41,100 +65,172 @@ class DownloadResponse(BaseModel):
     failed: List[Dict[str, str]] = []
 
 
-@router.get("/data/local")
+class BatchDeleteRequest(BaseModel):
+    codes: List[str]
+    adjust: str = "qfq"
+
+
+class BatchDeleteResponse(BaseModel):
+    deleted: int
+    deleted_codes: List[str] = []
+    failed: List[Dict[str, str]] = []
+
+
+class QualityReport(BaseModel):
+    code: str
+    exists: bool
+    checks: List[Dict[str, Any]]
+    score: int
+    message: str
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/data/local", response_model=PaginatedStocks)
 async def list_local_data(
+    page: int = Query(1, ge=1, description="Page number (1-based)"),
+    per_page: int = Query(50, ge=1, le=500, description="Items per page"),
+    search: Optional[str] = Query(None, description="Filter by code or name"),
+    sort_by: str = Query("code", description="Sort field"),
+    sort_order: str = Query("asc", description="Sort direction", pattern="^(asc|desc)$"),
+    adjust: str = Query("qfq", description="Adjust type"),
     current_user: User = Depends(auth_mod.get_current_user),
-) -> List[LocalStockInfo]:
-    """List all stocks that have local CSV data with date range and file size."""
-    stocks = dc.list_local_stocks(adjust="qfq")
-    result = []
-    for code in stocks:
-        info = dc.get_local_file_info(code, adjust="qfq")
-        if info:
-            result.append(
-                LocalStockInfo(
-                    code=info["code"],
-                    start_date=info["start_date"],
-                    end_date=info["end_date"],
-                    size_bytes=info["size_bytes"],
-                    size_human=info["size_human"],
-                )
-            )
-    return result
+) -> PaginatedStocks:
+    """List all stocks with local CSV data (paginated, searchable, sortable)."""
+    stocks, total = await _data_service.list_stocks(
+        page=page,
+        per_page=per_page,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        adjust=adjust,
+    )
+    return PaginatedStocks(
+        items=stocks,
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
 
 
 @router.get("/data/local/{code}")
 async def get_local_stock_detail(
     code: str,
+    adjust: str = Query("qfq", description="Adjust type"),
     current_user: User = Depends(auth_mod.get_current_user),
 ) -> Dict[str, Any]:
     """Get detailed info for a single stock's local data."""
-    full_code = _normalize_code(code)
-    info = dc.get_local_file_info(full_code, adjust="qfq")
+    try:
+        full_code = validate_code(code)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_CODE", "message": str(exc)},
+        ) from exc
+
+    info = await _data_service.get_stock_detail(full_code, adjust=adjust)
     if not info:
         raise HTTPException(
-            status_code=404, detail={"code": "NOT_FOUND", "message": f"No local data for {code}"}
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": f"No local data for {code}"},
         )
     return info
 
 
-@router.post("/data/local/download")
+@router.get("/data/local/{code}/quality", response_model=QualityReport)
+async def get_data_quality(
+    code: str,
+    adjust: str = Query("qfq", description="Adjust type"),
+    current_user: User = Depends(auth_mod.get_current_user),
+) -> QualityReport:
+    """Get a data quality report for a stock's local CSV data."""
+    try:
+        full_code = validate_code(code)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_CODE", "message": str(exc)},
+        ) from exc
+
+    report = await _data_service.check_data_quality(full_code, adjust=adjust)
+    return QualityReport(**report)
+
+
+@router.post("/data/local/download", response_model=DownloadResponse)
 async def download_local_data(
     body: DownloadRequestBody,
     current_user: User = Depends(auth_mod.get_current_user),
 ) -> DownloadResponse:
     """Download stock data and save to local CSV (merges with existing data)."""
-    result = DownloadResponse(ok=True)
-
-    start = body.start_date or "20000101"
-    end = body.end_date or datetime.date.today().isoformat()
-
+    # Validate all codes up front
+    normalized_codes: list[str] = []
     for code in body.securities:
-        full_code = _normalize_code(code)
-        had_data = dc.has_local_data(full_code, adjust=body.adjust)
-        path = dc.save_stock_local(full_code, start, end, body.adjust)
-        if path:
-            if had_data:
-                result.merged.append(full_code)
-            else:
-                result.downloaded.append(full_code)
-        else:
-            result.failed.append(
-                {"code": full_code, "error": "Download failed or no data returned"}
-            )
+        try:
+            normalized_codes.append(validate_code(code))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_CODE", "message": str(exc)},
+            ) from exc
 
-    result.ok = len(result.downloaded) > 0 or len(result.merged) > 0
-    return result
+    result = await _data_service.download_stocks(
+        normalized_codes,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        adjust=body.adjust,
+    )
+    return DownloadResponse(**result)
+
+
+@router.post("/data/local/batch-delete", response_model=BatchDeleteResponse)
+async def batch_delete_local_data(
+    body: BatchDeleteRequest,
+    current_user: User = Depends(auth_mod.get_current_user),
+) -> BatchDeleteResponse:
+    """Delete local CSV data for multiple stocks at once."""
+    if not body.codes:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "EMPTY_CODES", "message": "No codes provided"},
+        )
+
+    # Validate all codes up front
+    normalized_codes: list[str] = []
+    for code in body.codes:
+        try:
+            normalized_codes.append(validate_code(code))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_CODE", "message": str(exc)},
+            ) from exc
+
+    result = await _data_service.batch_delete(normalized_codes, adjust=body.adjust)
+    return BatchDeleteResponse(**result)
 
 
 @router.delete("/data/local/{code}")
 async def delete_local_stock(
     code: str,
+    adjust: str = Query("qfq", description="Adjust type"),
     current_user: User = Depends(auth_mod.get_current_user),
 ) -> Dict[str, Any]:
-    """Delete local CSV data for a single stock."""
-    full_code = _normalize_code(code)
-    removed = dc.remove_local_data(full_code, adjust="qfq")
-    if removed:
-        return {"ok": True, "message": f"Deleted local data for {full_code}"}
-    raise HTTPException(
-        status_code=404, detail={"code": "NOT_FOUND", "message": f"No local data for {code}"}
-    )
-
-
-def _normalize_code(code: str) -> str:
-    """Validate and normalize a stock code.
-
-    A 股代码严格为 6 位数字。任何路径分隔符、URL 编码、exchange 后缀
-    都会导致 400 错误，防止路径穿越攻击。
-    """
-    raw = code.strip().upper()
-    # Strip known exchange suffixes for validation
-    raw = raw.replace(".XSHG", "").replace(".XSHE", "")
-
-    if not _CODE_RE.match(raw):
+    """Delete local CSV data for a single stock (kept for backward compat)."""
+    try:
+        full_code = validate_code(code)
+    except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_CODE", "message": f"Stock code must be 6 digits, got: {code}"},
-        )
-    return raw
+            detail={"code": "INVALID_CODE", "message": str(exc)},
+        ) from exc
+
+    result = await _data_service.batch_delete([full_code], adjust=adjust)
+    if result["deleted"] > 0:
+        return {"ok": True, "message": f"Deleted local data for {full_code}"}
+    raise HTTPException(
+        status_code=404,
+        detail={"code": "NOT_FOUND", "message": f"No local data for {code}"},
+    )

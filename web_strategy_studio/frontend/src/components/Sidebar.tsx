@@ -1,11 +1,15 @@
 /**
  * Sidebar — left icon-strip navigation.
- * Shows nav items + bottom theme toggle.
+ * Shows nav items + bottom theme toggle and logout.
+ *
+ * Uses the design-system CSS variables and Tailwind utility classes
+ * while remaining backward-compatible with the existing AppShell layout.
  */
 import { Code2, Database, GitCompare, History, LogOut, SunMoon } from "lucide-react";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme } from "../hooks/useTheme";
 import { logout } from "../api/client";
+import { cn } from "@/lib/utils";
 
 type NavItem = {
   id: "editor" | "history" | "data" | "compare";
@@ -24,7 +28,7 @@ export function Sidebar() {
   const showHistory = useEditorStore((s) => s.showHistory);
   const showCompare = useEditorStore((s) => s.showCompare);
   const showData = useEditorStore((s) => s.showData);
-  const { theme, setTheme } = useTheme();
+  const { theme, cycleTheme } = useTheme();
 
   const active = showHistory ? "history" : showCompare ? "compare" : showData ? "data" : "editor";
 
@@ -36,69 +40,21 @@ export function Sidebar() {
     });
   }
 
-  function cycleTheme() {
-    if (theme === "dark") setTheme("light");
-    else if (theme === "light") setTheme("system");
-    else setTheme("dark");
-  }
-
-  const themeLabel = theme === "dark" ? "深色主题" : theme === "light" ? "浅色主题" : "跟随系统";
-
-  const navBtnStyle = (isActive: boolean): React.CSSProperties => ({
-    width: 36,
-    height: 36,
-    borderRadius: "var(--radius-md)",
-    border: "none",
-    background: isActive ? "var(--primary-bg)" : "transparent",
-    color: isActive ? "var(--primary)" : "var(--text-secondary)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "background var(--motion-fast), color var(--motion-fast)",
-  });
-
-  const utilBtnStyle: React.CSSProperties = {
-    width: 36,
-    height: 36,
-    borderRadius: "var(--radius-md)",
-    border: "none",
-    background: "transparent",
-    color: "var(--text-secondary)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "background var(--motion-fast), color var(--motion-fast)",
-  };
+  const themeLabel =
+    theme === "dark" ? "深色主题" : theme === "light" ? "浅色主题" : "跟随系统";
 
   return (
     <aside
       aria-label="导航栏"
-      style={{
-        width: 48,
-        flexShrink: 0,
-        background: "var(--bg-secondary)",
-        borderRight: "1px solid var(--border)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "var(--spacing-sm) 0",
-        gap: 4,
-        position: "relative",
-        zIndex: 100,
-      }}
+      className={cn(
+        "w-12 shrink-0 flex flex-col items-center",
+        "bg-surface border-r border-border",
+        "py-2 gap-1 relative z-100"
+      )}
     >
       {/* Brand mark */}
       <div
-        style={{
-          width: 28,
-          height: 28,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "var(--spacing-sm)",
-        }}
+        className="w-7 h-7 flex items-center justify-center mb-2"
         aria-hidden="true"
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -120,33 +76,22 @@ export function Sidebar() {
           aria-label={item.label}
           title={item.label}
           onClick={() => handleNav(item.id)}
-          style={navBtnStyle(active === item.id)}
-          onMouseEnter={(e) => {
-            if (active !== item.id) {
-              e.currentTarget.style.background = "var(--bg-tertiary)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (active !== item.id) {
-              e.currentTarget.style.background = "transparent";
-            }
-          }}
+          className={cn(
+            "w-9 h-9 rounded-md flex items-center justify-center",
+            "transition-colors",
+            active === item.id
+              ? "bg-primary-bg text-primary"
+              : "text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+          )}
         >
           {item.icon}
         </button>
       ))}
 
-      <div style={{ flex: 1 }} />
+      <div className="flex-1" />
 
       {/* Divider before utility buttons */}
-      <div
-        style={{
-          width: 24,
-          height: 1,
-          background: "var(--border-subtle)",
-          marginBottom: 4,
-        }}
-      />
+      <div className="w-6 h-px bg-border-subtle mb-1" />
 
       {/* Theme toggle */}
       <button
@@ -154,15 +99,11 @@ export function Sidebar() {
         aria-label={`当前: ${themeLabel}，点击切换主题`}
         title={`当前: ${themeLabel} (点击循环切换)`}
         onClick={cycleTheme}
-        style={utilBtnStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--bg-tertiary)";
-          e.currentTarget.style.color = "var(--text)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = "var(--text-secondary)";
-        }}
+        className={cn(
+          "w-9 h-9 rounded-md flex items-center justify-center",
+          "text-text-secondary hover:bg-surface-raised hover:text-text-primary",
+          "transition-colors"
+        )}
       >
         <SunMoon size={16} />
       </button>
@@ -176,15 +117,11 @@ export function Sidebar() {
           logout();
           window.location.reload();
         }}
-        style={{ ...utilBtnStyle, color: "var(--text-dim)" }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--state-error-bg)";
-          e.currentTarget.style.color = "var(--state-error)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = "var(--text-dim)";
-        }}
+        className={cn(
+          "w-9 h-9 rounded-md flex items-center justify-center",
+          "text-text-muted hover:bg-[var(--state-error-bg)] hover:text-danger",
+          "transition-colors"
+        )}
       >
         <LogOut size={16} />
       </button>

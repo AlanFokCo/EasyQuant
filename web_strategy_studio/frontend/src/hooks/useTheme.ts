@@ -1,8 +1,10 @@
 /**
  * useTheme — applies [data-theme] to <html> and syncs Monaco editor theme.
  * Three modes: "dark" | "light" | "system" (follows prefers-color-scheme).
+ *
+ * Also exposes helper to cycle through themes for toggle buttons.
  */
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useEditorStore, type Theme } from "../store/editorStore";
 
 function _resolveTheme(theme: Theme): "dark" | "light" {
@@ -32,7 +34,13 @@ export function useTheme() {
 
   const resolvedTheme = _resolveTheme(theme);
 
-  return { theme, resolvedTheme, setTheme };
+  const cycleTheme = useCallback(() => {
+    if (theme === "dark") setTheme("light");
+    else if (theme === "light") setTheme("system");
+    else setTheme("dark");
+  }, [theme, setTheme]);
+
+  return { theme, resolvedTheme, setTheme, cycleTheme };
 }
 
 export function monacoThemeName(resolvedTheme: "dark" | "light"): string {

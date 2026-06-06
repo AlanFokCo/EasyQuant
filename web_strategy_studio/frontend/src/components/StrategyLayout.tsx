@@ -18,8 +18,10 @@ import { MonacoStrategyEditor } from "./MonacoStrategyEditor";
 import { ReportLinkModal } from "./ReportLinkModal";
 import { RunsHistoryPanel } from "./RunsHistoryPanel";
 import { RunProgressBar } from "./RunProgressBar";
+import { TemplateSelector } from "./TemplateSelector";
 import { ToastContainer } from "./ToastNotification";
 import { StockPicker } from "./StockPicker";
+import { VersionHistory } from "./VersionHistory";
 
 type ParamDef = { name: string; type: string; default: string | number | boolean };
 
@@ -98,10 +100,14 @@ export function StrategyLayout() {
   const showHistory = useEditorStore((s) => s.showHistory);
   const showCompare = useEditorStore((s) => s.showCompare);
   const showData = useEditorStore((s) => s.showData);
+  const showVersions = useEditorStore((s) => s.showVersions);
+  const showTemplates = useEditorStore((s) => s.showTemplates);
   const addToast = useEditorStore((s) => s.addToast);
   const setShowHistory = useEditorStore((s) => s.setShowHistory);
   const setShowCompare = useEditorStore((s) => s.setShowCompare);
   const setShowData = useEditorStore((s) => s.setShowData);
+  const setShowVersions = useEditorStore((s) => s.setShowVersions);
+  const setShowTemplates = useEditorStore((s) => s.setShowTemplates);
   const setCommandPaletteOpen = useEditorStore((s) => s.setCommandPaletteOpen);
   const commandPaletteOpen = useEditorStore((s) => s.commandPaletteOpen);
   const { logs, progress, stage, artifacts, doneStatus, doneError, clearLogs } = useRunStream(runIdStore);
@@ -223,10 +229,44 @@ export function StrategyLayout() {
             addToast("error", e instanceof Error ? e.message : "保存失败");
           }
         }
-      }, 400);
+      }, 3000);
     },
     [strategyId, serverVersion, qc, setDirty, addToast],
   );
+
+  // Manual save (Cmd+S) — creates a named version snapshot + runs lint
+  const snapshotMut = useMutation({
+    mutationFn: async () => {
+      if (!strategyId) throw new Error("no strategy");
+      // First save current code
+      const patchBody: Record<string, unknown> = { source_code: source };
+      if (serverVersion !== null) {
+        patchBody.expected_version = serverVersion;
+      }
+      await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`, {
+        method: "PATCH",
+        body: JSON.stringify(patchBody),
+      });
+      // Then create a snapshot
+      const result = await apiJson<{ id: string; version: number }>(
+        `/api/v1/strategies/${strategyId}/snapshot`,
+        { method: "POST", body: JSON.stringify({}) }
+      );
+      return result;
+    },
+    onSuccess: (result) => {
+      setDirty(false);
+      setServerVersion(result.version);
+      qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+      qc.invalidateQueries({ queryKey: ["versions", strategyId] });
+      addToast("success", `已保存为版本 v${result.version}`);
+      // Run lint on save
+      lintMut.mutate();
+    },
+    onError: (e: unknown) => {
+      addToast("error", e instanceof Error ? e.message : "保存快照失败");
+    },
+  });
 
   // Clear any pending debounced-save when strategyId changes to prevent
   // a late PATCH firing against the wrong strategy (B11).
@@ -341,7 +381,7 @@ export function StrategyLayout() {
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useKeyboardShortcuts({
-    onSave: () => lintMut.mutate(),
+    onSave: () => snapshotMut.mutate(),
     onRun: () => { if (!running) runMut.mutate(); },
     onFormat: () => formatMut.mutate(),
     onTogglePalette: () => setCommandPaletteOpen(!commandPaletteOpen),
@@ -349,7 +389,9 @@ export function StrategyLayout() {
     onShowCompare: () => { setShowCompare(true); setShowHistory(false); },
     onEscape: () => {
       if (commandPaletteOpen) setCommandPaletteOpen(false);
+      else if (showTemplates) setShowTemplates(false);
       else if (reportOpen) setReportOpen(false);
+      else if (showVersions) setShowVersions(false);
       else if (showHistory) setShowHistory(false);
       else if (showCompare) setShowCompare(false);
       else if (showData) setShowData(false);
@@ -358,6 +400,14 @@ export function StrategyLayout() {
 
   // Determine right panel content
   const rightPanel = (() => {
+    if (showVersions) {
+      return (
+        <VersionHistory
+          strategyId={strategyId}
+          currentVersion={serverVersion}
+        />
+      );
+    }
     if (showHistory) {
       return <RunsHistoryPanel strategyId={strategyId} />;
     }
@@ -731,6 +781,8 @@ export function StrategyLayout() {
         onFontDelta={(d) => setFontSize((s) => Math.min(28, Math.max(10, s + d)))}
         onFormat={() => formatMut.mutate()}
         onRunBacktest={() => runMut.mutate()}
+        onOpenTemplates={() => setShowTemplates(true)}
+        onOpenVersions={() => setShowVersions(true)}
         running={running}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       />
@@ -738,6 +790,7 @@ export function StrategyLayout() {
         <MonacoStrategyEditor
           value={source}
           onChange={onCodeChange}
+          onSave={() => snapshotMut.mutate()}
           markers={markers}
           fontSize={fontSize}
           monacoTheme={monacoTheme}
@@ -762,6 +815,17 @@ export function StrategyLayout() {
         onFormat={() => formatMut.mutate()}
         onClearLogs={clearLogs}
       />
+
+      {showTemplates && (
+        <TemplateSelector
+          onSelect={(code, _name) => {
+            setSource(code);
+            if (strategyId) {
+              debouncedSave(code);
+            }
+          }}
+        />
+      )}
 
       <ToastContainer />
     </>

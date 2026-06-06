@@ -58,6 +58,7 @@ reports/*
 .env
 .env.local
 *.local.json
+.jwt_secret
 
 # OS junk
 .DS_Store

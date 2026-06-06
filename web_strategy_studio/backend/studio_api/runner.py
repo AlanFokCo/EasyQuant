@@ -26,7 +26,7 @@ import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
@@ -128,8 +128,14 @@ async def _pump_and_collect(
     run_id: str,
     start,
     end,
-) -> int:
-    """Read stdout/stderr, publish log + progress events. Returns log line count."""
+) -> Tuple[int, Optional[Dict[str, Any]]]:
+    """Read stdout/stderr, publish log + progress events.
+
+    Returns:
+        Tuple of (log_line_count, timeout_payload).
+        timeout_payload is None if the process completed within the timeout,
+        otherwise a dict with error details.
+    """
     import time as _time
 
     log_lines = 0
@@ -235,7 +241,8 @@ def _enrich_result(payload: Dict[str, Any], artifact_sub: Path, run_id: str) -> 
         html_file = artifact_sub / "report.html"
         json_file = artifact_sub / "report.json"
         if html_file.is_file():
-            base = f"/static/reports/{run_id}"
+            # Fixed: use /api/v1/reports/ (auth-gated) instead of /static/reports/
+            base = f"/api/v1/reports/{run_id}"
             payload["html_report_url"] = f"{base}/report.html"
             payload["json_report_url"] = f"{base}/report.json" if json_file.is_file() else None
         else:
@@ -247,6 +254,7 @@ def _enrich_result(payload: Dict[str, Any], artifact_sub: Path, run_id: str) -> 
     else:
         payload.setdefault("html_report_url", None)
         payload.setdefault("json_report_url", None)
+    payload["run_id"] = run_id
     return payload
 
 
@@ -263,43 +271,45 @@ class LocalRunner(Runner):
         params: Dict[str, Any],
     ) -> Dict[str, Any]:
         work = Path(tempfile.mkdtemp(prefix=f"eqrun_{run_id}_"))
-        artifact_sub = settings.artifact_dir / "reports" / run_id
-        artifact_sub.mkdir(parents=True, exist_ok=True)
+        try:
+            artifact_sub = settings.artifact_dir / "reports" / run_id
+            artifact_sub.mkdir(parents=True, exist_ok=True)
 
-        run_config = _make_run_config(params)
-        (work / "run_config.json").write_text(json.dumps(run_config), encoding="utf-8")
-        (work / "user_strategy.py").write_text(source_code, encoding="utf-8")
+            run_config = _make_run_config(params)
+            (work / "run_config.json").write_text(json.dumps(run_config), encoding="utf-8")
+            (work / "user_strategy.py").write_text(source_code, encoding="utf-8")
 
-        cmd = [sys.executable, "-m", "studio_api.isolated_runner", str(work)]
+            cmd = [sys.executable, "-m", "studio_api.isolated_runner", str(work)]
 
-        await stream_hub.publish(
-            run_id,
-            "progress",
-            {"progress": 0.08, "stage": "validate", "message": "Starting isolated runner"},
-        )
+            await stream_hub.publish(
+                run_id,
+                "progress",
+                {"progress": 0.08, "stage": "validate", "message": "Starting isolated runner"},
+            )
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(work),
-            env=_build_env(artifact_sub),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        register_proc(run_id, proc)
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=str(work),
+                env=_build_env(artifact_sub),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            register_proc(run_id, proc)
 
-        start = _parse_iso(str(run_config["start_date"]))
-        end = _parse_iso(str(run_config["end_date"]))
-        _, timeout_payload = await _pump_and_collect(proc, run_id, start, end)
-        unregister_proc(run_id)
+            start = _parse_iso(str(run_config["start_date"]))
+            end = _parse_iso(str(run_config["end_date"]))
+            _, timeout_payload = await _pump_and_collect(proc, run_id, start, end)
+            unregister_proc(run_id)
 
-        if timeout_payload is not None:
+            if timeout_payload is not None:
+                return timeout_payload
+
+            payload = _read_result(artifact_sub, work)
+            payload = _enrich_result(payload, artifact_sub, run_id)
+            return payload
+        finally:
+            # Always clean up temp directory, even on exception
             shutil.rmtree(work, ignore_errors=True)
-            return timeout_payload
-
-        payload = _read_result(artifact_sub, work)
-        payload = _enrich_result(payload, artifact_sub, run_id)
-        shutil.rmtree(work, ignore_errors=True)
-        return payload
 
 
 # ── DockerRunner (sandboxed) ─────────────────────────────────────────────────
@@ -324,8 +334,21 @@ class DockerRunner(Runner):
         self,
         work_dir: str,
         artifact_dir: str,
+        run_id: str,
     ) -> list[str]:
-        """Construct the ``docker run`` command."""
+        """Construct the ``docker run`` command.
+
+        Passes EQ_ARTIFACT_DIR, EQ_REPO_ROOT, and EQ_RUN_ID as environment
+        variables so the isolated runner inside the container can locate
+        outputs and identify the run.
+        """
+        env_vars = [
+            "-e", f"EQ_ARTIFACT_DIR={artifact_dir}",
+            "-e", f"EQ_REPO_ROOT={settings.repo_root.resolve()}",
+            "-e", f"EQ_RUN_ID={run_id}",
+            "-e", "PYTHONUNBUFFERED=1",
+        ]
+
         cmd = [
             "docker",
             "run",
@@ -351,6 +374,7 @@ class DockerRunner(Runner):
             f"{artifact_dir}:/out:rw",
             "--workdir",
             "/work",
+            *env_vars,
         ]
 
         if settings.enable_network:
@@ -369,42 +393,46 @@ class DockerRunner(Runner):
         params: Dict[str, Any],
     ) -> Dict[str, Any]:
         work = Path(tempfile.mkdtemp(prefix=f"eqrun_{run_id}_"))
-        artifact_sub = settings.artifact_dir / "reports" / run_id
-        artifact_sub.mkdir(parents=True, exist_ok=True)
+        try:
+            artifact_sub = settings.artifact_dir / "reports" / run_id
+            artifact_sub.mkdir(parents=True, exist_ok=True)
 
-        run_config = _make_run_config(params)
-        (work / "run_config.json").write_text(json.dumps(run_config), encoding="utf-8")
-        (work / "user_strategy.py").write_text(source_code, encoding="utf-8")
+            run_config = _make_run_config(params)
+            (work / "run_config.json").write_text(json.dumps(run_config), encoding="utf-8")
+            (work / "user_strategy.py").write_text(source_code, encoding="utf-8")
 
-        await stream_hub.publish(
-            run_id,
-            "progress",
-            {"progress": 0.08, "stage": "validate", "message": "Starting Docker sandbox"},
-        )
+            await stream_hub.publish(
+                run_id,
+                "progress",
+                {"progress": 0.08, "stage": "validate", "message": "Starting Docker sandbox"},
+            )
 
-        cmd = self._build_cmd(work_dir=str(work), artifact_dir=str(artifact_sub))
+            cmd = self._build_cmd(
+                work_dir=str(work), artifact_dir=str(artifact_sub), run_id=run_id
+            )
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        register_proc(run_id, proc)
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            register_proc(run_id, proc)
 
-        start = _parse_iso(str(run_config["start_date"]))
-        end = _parse_iso(str(run_config["end_date"]))
-        _, timeout_payload = await _pump_and_collect(proc, run_id, start, end)
-        unregister_proc(run_id)
+            start = _parse_iso(str(run_config["start_date"]))
+            end = _parse_iso(str(run_config["end_date"]))
+            _, timeout_payload = await _pump_and_collect(proc, run_id, start, end)
+            unregister_proc(run_id)
 
-        if timeout_payload is not None:
+            if timeout_payload is not None:
+                return timeout_payload
+
+            # Result is in artifact_sub (mapped to /out in container)
+            payload = _read_result(artifact_sub, work)
+            payload = _enrich_result(payload, artifact_sub, run_id)
+            return payload
+        finally:
+            # Always clean up temp directory, even on exception
             shutil.rmtree(work, ignore_errors=True)
-            return timeout_payload
-
-        # Result is in artifact_sub (mapped to /out in container)
-        payload = _read_result(artifact_sub, work)
-        payload = _enrich_result(payload, artifact_sub, run_id)
-        shutil.rmtree(work, ignore_errors=True)
-        return payload
 
 
 # ── Factory ──────────────────────────────────────────────────────────────────

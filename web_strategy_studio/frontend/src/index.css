@@ -1,6 +1,52 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════
+   Tailwind v4 Theme Tokens
+   These map to the same values as design-tokens.ts and the
+   legacy CSS variables below.  Tailwind utility classes like
+   `bg-background`, `text-primary`, `border-border` resolve
+   through these.
+   ═══════════════════════════════════════════════════════════ */
+@theme inline {
+  /* ── Colors ───────────────────────────────────────────────── */
+  --color-background:     var(--bg);
+  --color-surface:        var(--bg-secondary);
+  --color-surface-raised: var(--bg-tertiary);
+  --color-border:         var(--border);
+  --color-border-subtle:  var(--border-subtle);
+  --color-primary:        var(--primary);
+  --color-primary-hover:  var(--primary-hover);
+  --color-primary-bg:     var(--primary-bg);
+  --color-success:        var(--state-success);
+  --color-warning:        var(--state-warning);
+  --color-danger:         var(--state-error);
+  --color-info:           var(--state-info);
+  --color-market-up:      var(--market-up);
+  --color-market-down:    var(--market-down);
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-dim);
+
+  /* ── Font stacks ──────────────────────────────────────────── */
+  --font-sans: var(--font-stack);
+  --font-mono: var(--mono);
+
+  /* ── Radius ───────────────────────────────────────────────── */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  /* ── Shadows ──────────────────────────────────────────────── */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  /* ── Keyframes ────────────────────────────────────────────── */
+  --animate-fade-in:      eq-fade-in 0.2s ease-out forwards;
+  --animate-fade-in-up:   eq-fade-in-up 0.3s ease-out forwards;
+  --animate-scale-in:     eq-scale-in 0.2s cubic-bezier(0.16,1,0.3,1) forwards;
+  --animate-slide-right:  eq-slide-right 0.3s cubic-bezier(0.16,1,0.3,1) forwards;
+}
 
 /* ═══════════════════════════════════════════════════════════
    DARK THEME (default)
@@ -203,6 +249,110 @@ button {
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
 /* ═══════════════════════════════════════════════════════════
+   COMPONENT CLASSES  (used by legacy inline-style components)
+   ═══════════════════════════════════════════════════════════ */
+@layer components {
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-hover {
+    transition: box-shadow var(--motion-base), border-color var(--motion-base);
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--border);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    transition: all var(--motion-base);
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+
+  .btn-secondary {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover {
+    background: var(--bg-tertiary);
+    color: var(--text);
+  }
+
+  .btn-danger {
+    background: var(--state-error);
+    color: #fff;
+  }
+  .btn-danger:hover {
+    opacity: 0.9;
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 14px;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+  }
+  .input-field::placeholder {
+    color: var(--text-dim);
+  }
+  .input-field:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-bg);
+  }
+
+  .label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .error-text {
+    font-size: 12px;
+    color: var(--state-error);
+    margin-top: 4px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    UTILITY CLASSES
    ═══════════════════════════════════════════════════════════ */
 
@@ -329,9 +479,21 @@ button {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes eq-fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes eq-slide-down {
   from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes eq-slide-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes eq-scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
 }
 @keyframes eq-skeleton {
   0%   { opacity: 0.6; }
@@ -366,4 +528,3 @@ button {
   width: 24px;
   height: 24px;
 }
-

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -226,10 +226,15 @@ async def create_run(
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     current_user: User = Depends(auth_mod.get_current_user),
 ):
-    # B18: per-IP rate limit
-    client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
-        request.client.host if request.client else "unknown"
-    )
+    # B18: per-IP rate limit.
+    # P1: Only trust X-Forwarded-For when trust_proxy_headers is enabled,
+    # otherwise use the direct client IP to prevent spoofing.
+    if settings.trust_proxy_headers:
+        client_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
+            request.client.host if request.client else "unknown"
+        )
+    else:
+        client_ip = request.client.host if request.client else "unknown"
     allowed, _remaining = rate_limiter.is_allowed(client_ip)
     if not allowed:
         raise HTTPException(
@@ -425,11 +430,17 @@ async def delete_run(
 @router.get("/runs/{run_id}/stream")
 async def run_stream(
     run_id: str,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+    last_event_id: Optional[str] = Query(None, alias="last_event_id"),
+    last_event_id_header: Optional[str] = Header(None, alias="Last-Event-ID"),
     current_user: User = Depends(auth_mod.get_current_user),
 ):
-    """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13)."""
+    """SSE endpoint with Last-Event-ID replay and immediate done for terminal runs (B6/B13).
+
+    Supports last_event_id from both query parameter (preferred) and
+    Last-Event-ID header (SSE spec). Query param takes precedence.
+    """
     # Verify ownership before exposing stream data
     res = await session.execute(
         select(Run, Strategy.owner_id)
@@ -441,10 +452,12 @@ async def run_stream(
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Run not found"))
     run = row[0]
     # Resolve last_event_id to an int (default -1 = send everything).
+    # Query param takes precedence; fall back to Last-Event-ID header.
+    effective_last_event_id = last_event_id or last_event_id_header
     resume_from: int = -1
-    if last_event_id:
+    if effective_last_event_id:
         try:
-            resume_from = int(last_event_id)
+            resume_from = int(effective_last_event_id)
         except ValueError:
             resume_from = -1
 

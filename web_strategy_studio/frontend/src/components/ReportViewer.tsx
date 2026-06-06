@@ -89,6 +89,7 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
   const [error, setError] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   // Track viewport width for responsive chart heights
   useEffect(() => {
@@ -106,6 +107,55 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     if (isTablet) return Math.round(base * 0.75);
     return base;
   }, [isPhone, isTablet]);
+
+  // Export handler — downloads report file via authenticated fetch
+  const handleExport = useCallback(async (fmt: string) => {
+    setExporting(fmt);
+    try {
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const url = resolveArtifactUrl(`/api/v1/reports/${runId}/export/${fmt}`);
+      if (!url) throw new Error("Invalid export URL");
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `report_${runId}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error("[ReportViewer] Export failed:", e);
+    } finally {
+      setExporting(null);
+    }
+  }, [runId]);
+
+  // Export report as PNG screenshot of the current chart view
+  const handleExportPng = useCallback(() => {
+    if (!chartsRef.current.length || !containerRef.current) return;
+    setExporting("png");
+    try {
+      // Use the first chart's canvas for PNG export
+      const chartEl = chartsRef.current[0].chartElement();
+      const canvas = chartEl.querySelector("canvas");
+      if (canvas) {
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = `chart_${runId}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (e) {
+      console.error("[ReportViewer] PNG export failed:", e);
+    } finally {
+      setExporting(null);
+    }
+  }, [runId]);
 
   // Fetch report JSON data
   useEffect(() => {
@@ -406,5 +456,63 @@ export default function ReportViewer({ runId, jsonUrl }: { runId: string; jsonUr
     );
   }
 
-  return <div ref={containerRef} style={{ overflow: "auto", padding: "8px 0", height: "100%" }} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* Export toolbar */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 8px",
+          borderBottom: "1px solid var(--border)",
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontSize: 11, color: "var(--text-dim)", marginRight: "auto" }}>
+          {runId.slice(0, 16)}
+        </span>
+        <button
+          type="button"
+          onClick={() => handleExport("html")}
+          disabled={!!exporting}
+          style={exportBtnStyle}
+          title="导出 HTML 报告"
+        >
+          {exporting === "html" ? "..." : "HTML"}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleExport("json")}
+          disabled={!!exporting}
+          style={exportBtnStyle}
+          title="导出 JSON 数据"
+        >
+          {exporting === "json" ? "..." : "JSON"}
+        </button>
+        <button
+          type="button"
+          onClick={handleExportPng}
+          disabled={!!exporting}
+          style={exportBtnStyle}
+          title="导出图表为 PNG"
+        >
+          {exporting === "png" ? "..." : "PNG"}
+        </button>
+      </div>
+      <div ref={containerRef} style={{ overflow: "auto", padding: "8px 0", flex: 1, minHeight: 0 }} />
+    </div>
+  );
 }
+
+const exportBtnStyle: React.CSSProperties = {
+  padding: "3px 10px",
+  borderRadius: 4,
+  border: "1px solid var(--border)",
+  background: "transparent",
+  color: "var(--text-secondary)",
+  fontSize: 11,
+  cursor: "pointer",
+  fontFamily: "var(--mono)",
+};

@@ -14,7 +14,7 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """Authentication user (BLOCKER-7)."""
+    """Authentication user (BLOCKER-7, E-auth)."""
 
     __tablename__ = "users"
 
@@ -22,9 +22,55 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # E4: RBAC role (admin / user / guest)
+    role: Mapped[str] = mapped_column(String(32), default="user", server_default="user")
+    # E5: login lockout — track failed attempts
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     strategies: Mapped[List["Strategy"]] = relationship(back_populates="owner")
+    sessions: Mapped[List["UserSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class UserSession(Base):
+    """E6: Tracks active sessions (one per device) for force-logout."""
+
+    __tablename__ = "user_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    revoked: Mapped[bool] = mapped_column(default=False, server_default="0")
+
+    user: Mapped["User"] = relationship(back_populates="sessions")
+
+
+class RevokedToken(Base):
+    """E6: JWT blacklist — stores jti (session IDs) that have been revoked."""
+
+    __tablename__ = "revoked_tokens"
+
+    jti: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class Strategy(Base):

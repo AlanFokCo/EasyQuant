@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # shared backend such as Redis; that is currently NOT implemented.
     rate_limit_runs_per_window: int = 10
     rate_limit_window_sec: int = 300  # 5 minutes
+    # P1: Only trust X-Forwarded-For when running behind a trusted reverse proxy.
+    # When False (default), the direct client IP (request.client.host) is used,
+    # preventing IP spoofing via forged X-Forwarded-For headers.
+    trust_proxy_headers: bool = False
     # B6: SSE ring buffer retention (seconds) after a run reaches terminal state
     sse_buffer_ttl_sec: int = 1800  # 30 minutes
     # B4: coalescing window — edits within this many seconds reuse the current version row
@@ -56,6 +60,22 @@ class Settings(BaseSettings):
     # BLOCKER-8: runner backend — "local" (subprocess, no sandbox) or "docker"
     # (container with --network none --read-only --memory --pids-limit)
     runner: str = "local"
+
+    # ── Module E: Auth & Permissions ──────────────────────────────────────────
+    # E2: registration control
+    allow_registration: bool = False
+    require_invite_code: bool = False
+    # Comma-separated valid invite codes (env: EQ_STUDIO_VALID_INVITE_CODES)
+    valid_invite_codes: List[str] = []
+    # Default role for newly registered users
+    default_user_role: str = "user"
+    # E5: login lockout
+    max_login_attempts: int = 5
+    lockout_duration_sec: int = 900  # 15 minutes
+    # E6: session management
+    max_sessions_per_user: int = 5
+    # When True, logging in from a new device revokes the oldest session
+    auto_revoke_oldest_session: bool = True
 
 
 settings = Settings()

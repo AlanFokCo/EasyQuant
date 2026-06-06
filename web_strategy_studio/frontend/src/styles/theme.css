@@ -1,0 +1,67 @@
+/**
+ * Theme CSS — re-exports design tokens as CSS custom properties.
+ *
+ * The actual theme definitions live in src/index.css (:root and [data-theme]).
+ * This file provides a programmatic reference for components that need to
+ * read theme values in JavaScript contexts.
+ *
+ * Import this module to ensure theme tokens are tree-shakeable:
+ *   import { themeVars } from "@/styles/theme";
+ */
+
+/** CSS variable names for the current theme (resolved at runtime). */
+export const themeVars = {
+  // Surfaces
+  bg: "var(--bg)",
+  bgSecondary: "var(--bg-secondary)",
+  bgTertiary: "var(--bg-tertiary)",
+
+  // Borders
+  border: "var(--border)",
+  borderSubtle: "var(--border-subtle)",
+
+  // Brand
+  primary: "var(--primary)",
+  primaryHover: "var(--primary-hover)",
+  primaryBg: "var(--primary-bg)",
+
+  // Text
+  text: "var(--text)",
+  textSecondary: "var(--text-secondary)",
+  textDim: "var(--text-dim)",
+
+  // State
+  success: "var(--state-success)",
+  error: "var(--state-error)",
+  warning: "var(--state-warning)",
+  info: "var(--state-info)",
+
+  // Market
+  marketUp: "var(--market-up)",
+  marketDown: "var(--market-down)",
+
+  // Shadows
+  shadowSm: "var(--shadow-sm)",
+  shadowMd: "var(--shadow-md)",
+  shadowLg: "var(--shadow-lg)",
+
+  // Radius
+  radiusSm: "var(--radius-sm)",
+  radiusMd: "var(--radius-md)",
+  radiusLg: "var(--radius-lg)",
+
+  // Motion
+  motionFast: "var(--motion-fast)",
+  motionBase: "var(--motion-base)",
+  motionSlow: "var(--motion-slow)",
+} as const;
+
+/**
+ * Get the current computed value of a theme CSS variable.
+ * Usage: getThemeValue("--primary") → "#58a6ff"
+ */
+export function getThemeValue(varName: string): string {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(varName)
+    .trim();
+}

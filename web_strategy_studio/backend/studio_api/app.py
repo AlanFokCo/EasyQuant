@@ -10,18 +10,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.responses import JSONResponse
 
-from studio_api import auth as auth_mod
 from studio_api.config import settings
-from studio_api.db import SessionLocal, get_session, init_db
-from studio_api.models import User
+from studio_api.db import SessionLocal, init_db
 from studio_api.routers import auth as auth_r
-from studio_api.routers import completion, health, runs, strategies
+from studio_api.routers import completion, health, reports, runs, strategies
 from studio_api.routers import data_mgmt as data_r
 from studio_api.routers import format as fmt
 from studio_api.routers import lint as lint_r
@@ -155,91 +152,33 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request, exc: RequestValidationError):
+    # Pydantic v2 can embed raw ValueError objects in the error `ctx` dict,
+    # which aren't JSON-serializable. Convert them to strings defensively.
+    safe_details = []
+    for err in exc.errors():
+        safe = dict(err)
+        if "ctx" in safe and isinstance(safe["ctx"], dict):
+            safe["ctx"] = {
+                k: (str(v) if isinstance(v, Exception) else v)
+                for k, v in safe["ctx"].items()
+            }
+        # `msg` may carry the original ValueError repr — keep as-is (always str)
+        safe_details.append(safe)
     return JSONResponse(
         status_code=422,
         content={
             "error": {
                 "code": "VALIDATION_ERROR",
                 "message": "Request validation failed",
-                "details": exc.errors(),
+                "details": safe_details,
             }
         },
     )
 
 
+# Backward-compat path constant used by tests (the reports router owns the routes)
 reports_root = settings.artifact_dir / "reports"
 reports_root.mkdir(parents=True, exist_ok=True)
-
-# HIGH-14: CSP header applied to all auth-gated report responses.
-# 'unsafe-inline' in script-src is required because the backtesting report HTML
-# embeds Plotly/chart initialization as inline <script> blocks.
-_REPORT_CSP = (
-    "default-src 'none'; script-src 'self' 'unsafe-inline'; "
-    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-    "font-src 'self' data:; connect-src 'self'; sandbox allow-scripts"
-)
-
-
-# HIGH-15: Authenticated report file endpoints (HTML)
-@app.get("/api/v1/reports/{run_id}/report.html")
-async def get_report_html(
-    run_id: str,
-    current_user: User = Depends(auth_mod.get_current_user),
-    session: AsyncSession = Depends(get_session),
-):
-    """Serve report HTML only to the run owner (HIGH-15)."""
-    from sqlalchemy import select
-
-    from studio_api.models import Run, Strategy
-
-    result = await session.execute(
-        select(Run, Strategy.owner_id)
-        .join(Strategy, Run.strategy_id == Strategy.id)
-        .where(Run.id == run_id)
-    )
-    row = result.first()
-    if row is None or row.owner_id != current_user.id:
-        return Response(status_code=404)
-
-    file_path = reports_root / run_id / "report.html"
-    if not file_path.is_file():
-        return Response(status_code=404)
-
-    # HIGH-14: CSP header on report content
-    resp = FileResponse(str(file_path), media_type="text/html")
-    resp.headers["Content-Security-Policy"] = _REPORT_CSP
-    return resp
-
-
-# HIGH-15: Authenticated report file endpoints (JSON)
-@app.get("/api/v1/reports/{run_id}/report.json")
-async def get_report_json(
-    run_id: str,
-    current_user: User = Depends(auth_mod.get_current_user),
-    session: AsyncSession = Depends(get_session),
-):
-    """Serve report JSON only to the run owner (HIGH-15)."""
-    from sqlalchemy import select
-
-    from studio_api.models import Run, Strategy
-
-    result = await session.execute(
-        select(Run, Strategy.owner_id)
-        .join(Strategy, Run.strategy_id == Strategy.id)
-        .where(Run.id == run_id)
-    )
-    row = result.first()
-    if row is None or row.owner_id != current_user.id:
-        return Response(status_code=404)
-
-    file_path = reports_root / run_id / "report.json"
-    if not file_path.is_file():
-        return Response(status_code=404)
-
-    resp = FileResponse(str(file_path), media_type="application/json")
-    resp.headers["Content-Security-Policy"] = _REPORT_CSP
-    return resp
-
 
 app.include_router(strategies.router)
 app.include_router(runs.router)
@@ -250,3 +189,4 @@ app.include_router(health.router)
 app.include_router(data_r.router)
 app.include_router(auth_r.router)
 app.include_router(symbols_r.router)
+app.include_router(reports.router)

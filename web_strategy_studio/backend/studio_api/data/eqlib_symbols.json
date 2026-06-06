@@ -50,31 +50,31 @@
   {
     "label": "run_backtest",
     "kind": "Function",
-    "insert_text": "run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency: str = 'daily', benchmark: str = '000300.XSHG', securities=None, use_local: bool = False, max_memory_mb: int = 1024, selection_func=None, selection_rebalance: str = 'monthly:1')",
+    "insert_text": "run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0, frequency: str = 'daily', benchmark: str = '000300.XSHG', securities=None, use_local: bool = False, max_memory_mb: int = 1024, selection_func=None, selection_rebalance: str = 'monthly:1', handle_data=None, debug_mode: bool = False)",
     "documentation": "Main backtest runner."
   },
   {
     "label": "order",
     "kind": "Function",
-    "insert_text": "order(security, amount, style=None)",
+    "insert_text": "order(security, amount, style=None) -> eqlib.objects.Order",
     "documentation": "Buy or sell a fixed number of shares (mirrors EasyQuant's order)."
   },
   {
     "label": "order_target",
     "kind": "Function",
-    "insert_text": "order_target(security, amount, style=None)",
+    "insert_text": "order_target(security, amount, style=None) -> eqlib.objects.Order",
     "documentation": "Adjust position to a target share count (mirrors EasyQuant's order_target)."
   },
   {
     "label": "order_value",
     "kind": "Function",
-    "insert_text": "order_value(security, value, style=None)",
+    "insert_text": "order_value(security, value, style=None) -> eqlib.objects.Order",
     "documentation": "Buy or sell a target monetary value (mirrors EasyQuant's order_value)."
   },
   {
     "label": "order_target_value",
     "kind": "Function",
-    "insert_text": "order_target_value(security, value, style=None)",
+    "insert_text": "order_target_value(security, value, style=None) -> eqlib.objects.Order",
     "documentation": "Adjust position to a target monetary value (mirrors EasyQuant's order_target_value)."
   },
   {
@@ -98,13 +98,13 @@
   {
     "label": "get_all_securities",
     "kind": "Function",
-    "insert_text": "get_all_securities(types=None, date=None) -> pandas.DataFrame",
+    "insert_text": "get_all_securities(types=None, date=None) -> pandas.core.frame.DataFrame",
     "documentation": "Get list of all A-share stocks."
   },
   {
     "label": "get_index_stocks",
     "kind": "Function",
-    "insert_text": "get_index_stocks(index_code) -> pandas.DataFrame",
+    "insert_text": "get_index_stocks(index_code) -> pandas.core.frame.DataFrame",
     "documentation": "Get constituent stocks of an index."
   },
   {
@@ -146,7 +146,7 @@
   {
     "label": "get_industry_stocks",
     "kind": "Function",
-    "insert_text": "get_industry_stocks(industry_name) -> pandas.DataFrame",
+    "insert_text": "get_industry_stocks(industry_name) -> pandas.core.frame.DataFrame",
     "documentation": "Get constituent stocks of an industry board."
   },
   {
@@ -158,14 +158,14 @@
   {
     "label": "get_concept_stocks",
     "kind": "Function",
-    "insert_text": "get_concept_stocks(concept_name) -> pandas.DataFrame",
+    "insert_text": "get_concept_stocks(concept_name) -> pandas.core.frame.DataFrame",
     "documentation": "Get constituent stocks of a concept/theme board."
   },
   {
     "label": "fetch_stock_data",
     "kind": "Function",
-    "insert_text": "fetch_stock_data(code: str, start_date, end_date, adjust: str = 'qfq') -> pandas.DataFrame",
-    "documentation": "Fetch daily OHLCV data from akshare for a single stock, ETF, or index."
+    "insert_text": "fetch_stock_data(code: str, start_date, end_date, adjust: str = 'qfq') -> pandas.core.frame.DataFrame",
+    "documentation": "Fetch daily OHLCV data from multiple sources with automatic fallback."
   },
   {
     "label": "download_stock_data",
@@ -236,7 +236,7 @@
   {
     "label": "VolumeSlippage",
     "kind": "Class",
-    "insert_text": "VolumeSlippage(impact: float = 0.05)",
+    "insert_text": "VolumeSlippage(impact: float = 0.05, max_slippage_pct: float = 0.05)",
     "documentation": "Volume-proportional slippage (similar to Zipline's VolumeShareSlippage)."
   },
   {
@@ -326,97 +326,97 @@
   {
     "label": "ma",
     "kind": "Function",
-    "insert_text": "ma(series: pandas.Series, period: int) -> pandas.Series",
+    "insert_text": "ma(series: pandas.core.series.Series, period: int) -> pandas.core.series.Series",
     "documentation": "Indicator: Simple Moving Average."
   },
   {
     "label": "ema",
     "kind": "Function",
-    "insert_text": "ema(series: pandas.Series, period: int) -> pandas.Series",
+    "insert_text": "ema(series: pandas.core.series.Series, period: int) -> pandas.core.series.Series",
     "documentation": "Indicator: Exponential Moving Average."
   },
   {
     "label": "sma",
     "kind": "Function",
-    "insert_text": "sma(series: pandas.Series, period: int) -> pandas.Series",
+    "insert_text": "sma(series: pandas.core.series.Series, period: int) -> pandas.core.series.Series",
     "documentation": "Indicator: Simple Moving Average (identical to ``ma``; alias kept for compatibility)."
   },
   {
     "label": "smma",
     "kind": "Function",
-    "insert_text": "smma(series: pandas.Series, period: int, weight: float = 1.0) -> pandas.Series",
+    "insert_text": "smma(series: pandas.core.series.Series, period: int, weight: float = 1.0) -> pandas.core.series.Series",
     "documentation": "Indicator: Smoothed Moving Average (SMMA / RMA / Wilder MA)."
   },
   {
     "label": "wma",
     "kind": "Function",
-    "insert_text": "wma(series: pandas.Series, period: int) -> pandas.Series",
+    "insert_text": "wma(series: pandas.core.series.Series, period: int) -> pandas.core.series.Series",
     "documentation": "Indicator: Weighted Moving Average (linear weights)."
   },
   {
     "label": "macd",
     "kind": "Function",
-    "insert_text": "macd(close: pandas.Series, fast: int = 12, slow: int = 26, signal: int = 9)",
+    "insert_text": "macd(close: pandas.core.series.Series, fast: int = 12, slow: int = 26, signal: int = 9)",
     "documentation": "Indicator: Moving Average Convergence Divergence."
   },
   {
     "label": "rsi",
     "kind": "Function",
-    "insert_text": "rsi(close: pandas.Series, period: int = 14) -> pandas.Series",
+    "insert_text": "rsi(close: pandas.core.series.Series, period: int = 14) -> pandas.core.series.Series",
     "documentation": "Indicator: Relative Strength Index."
   },
   {
     "label": "kdj",
     "kind": "Function",
-    "insert_text": "kdj(high: pandas.Series, low: pandas.Series, close: pandas.Series, period: int = 9, smooth: int = 3)",
+    "insert_text": "kdj(high: pandas.core.series.Series, low: pandas.core.series.Series, close: pandas.core.series.Series, period: int = 9, smooth: int = 3)",
     "documentation": "Indicator: Stochastic Oscillator (KDJ)."
   },
   {
     "label": "boll",
     "kind": "Function",
-    "insert_text": "boll(close: pandas.Series, period: int = 20, num_std: float = 2.0)",
+    "insert_text": "boll(close: pandas.core.series.Series, period: int = 20, num_std: float = 2.0)",
     "documentation": "Indicator: Bollinger Bands."
   },
   {
     "label": "atr",
     "kind": "Function",
-    "insert_text": "atr(high: pandas.Series, low: pandas.Series, close: pandas.Series, period: int = 14) -> pandas.Series",
+    "insert_text": "atr(high: pandas.core.series.Series, low: pandas.core.series.Series, close: pandas.core.series.Series, period: int = 14) -> pandas.core.series.Series",
     "documentation": "Indicator: Average True Range."
   },
   {
     "label": "cci",
     "kind": "Function",
-    "insert_text": "cci(high: pandas.Series, low: pandas.Series, close: pandas.Series, period: int = 14) -> pandas.Series",
+    "insert_text": "cci(high: pandas.core.series.Series, low: pandas.core.series.Series, close: pandas.core.series.Series, period: int = 14) -> pandas.core.series.Series",
     "documentation": "Indicator: Commodity Channel Index."
   },
   {
     "label": "roc",
     "kind": "Function",
-    "insert_text": "roc(close: pandas.Series, period: int = 12) -> pandas.Series",
+    "insert_text": "roc(close: pandas.core.series.Series, period: int = 12) -> pandas.core.series.Series",
     "documentation": "Indicator: Rate of Change."
   },
   {
     "label": "obv",
     "kind": "Function",
-    "insert_text": "obv(close: pandas.Series, volume: pandas.Series) -> pandas.Series",
+    "insert_text": "obv(close: pandas.core.series.Series, volume: pandas.core.series.Series) -> pandas.core.series.Series",
     "documentation": "Indicator: On Balance Volume."
   },
   {
     "label": "vwap",
     "kind": "Function",
-    "insert_text": "vwap(high, low, close, volume, window: int = None) -> pandas.Series",
+    "insert_text": "vwap(high, low, close, volume, window: int = None) -> pandas.core.series.Series",
     "documentation": "Indicator: Volume Weighted Average Price."
   },
   {
     "label": "golden_cross",
     "kind": "Function",
-    "insert_text": "golden_cross(fast_ma: pandas.Series, slow_ma: pandas.Series) -> pandas.Series",
+    "insert_text": "golden_cross(fast_ma: pandas.core.series.Series, slow_ma: pandas.core.series.Series) -> pandas.core.series.Series",
     "documentation": "Indicator: Detect golden cross: fast MA crosses above slow MA."
   },
   {
     "label": "death_cross",
     "kind": "Function",
-    "insert_text": "death_cross(fast_ma: pandas.Series, slow_ma: pandas.Series) -> pandas.Series",
+    "insert_text": "death_cross(fast_ma: pandas.core.series.Series, slow_ma: pandas.core.series.Series) -> pandas.core.series.Series",
     "documentation": "Indicator: Detect death cross: fast MA crosses below slow MA."
   },
   {
@@ -446,13 +446,13 @@
   {
     "label": "fetch_factor_data",
     "kind": "Function",
-    "insert_text": "fetch_factor_data(securities: list[str], fields: Optional[list[str]] = None, context=None) -> pandas.DataFrame",
+    "insert_text": "fetch_factor_data(securities: list[str], fields: Optional[list[str]] = None, context=None) -> pandas.core.frame.DataFrame",
     "documentation": "Fetch multi-dimensional data for a list of securities."
   },
   {
     "label": "analyze_returns",
     "kind": "Function",
-    "insert_text": "analyze_returns(result, risk_free_rate=0.03, trading_days=252)",
+    "insert_text": "analyze_returns(result, risk_free_rate=0.03, trading_days=244)",
     "documentation": "Calculate comprehensive risk and return metrics from a backtest result."
   },
   {
@@ -465,7 +465,7 @@
     "label": "simple_factor_analysis",
     "kind": "Function",
     "insert_text": "simple_factor_analysis(result, factors=None)",
-    "documentation": "Simplified factor analysis."
+    "documentation": "Market beta and momentum regression."
   },
   {
     "label": "portfolio_optimizer",
@@ -488,19 +488,19 @@
   {
     "label": "generate_report_json",
     "kind": "Function",
-    "insert_text": "generate_report_json(result, out_path)",
-    "documentation": "Generate machine-readable JSON report with risk metrics, benchmark comparison, and full trade/position data."
+    "insert_text": "generate_report_json(result, out_path, *, strategy_params=None, iteration_context=None)",
+    "documentation": "Generate Agent-First JSON report with verdict/targets/diagnostics/recommendations."
   },
   {
     "label": "generate_report_md",
     "kind": "Function",
     "insert_text": "generate_report_md(result, out_path)",
-    "documentation": "Generate professional Markdown report with risk metrics, trade analysis, benchmark comparison, and per-stock breakdown."
+    "documentation": "Generate professional Markdown report with grade breakdown, monthly returns, rolling metrics, and top drawdown periods."
   },
   {
     "label": "generate_chart",
     "kind": "Function",
     "insert_text": "generate_chart(result, out_path)",
-    "documentation": "Generate professional backtest chart: - Top: strategy cumulative return (%) vs benchmark (%) - Bottom: portfolio drawdown (%) - Key metrics annotation box"
+    "documentation": "Generate professional backtest chart (dark theme, 4-panel): - Top-left: strategy cumulative return (%) vs benchmark (%) with trade markers - Top-right: dimension score bars (6-dimension grade) - Middle: portfolio drawdown (%) - Bottom: monthly returns strip (last 12 months)"
   }
 ]

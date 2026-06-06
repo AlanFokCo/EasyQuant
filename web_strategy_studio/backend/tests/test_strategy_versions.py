@@ -19,6 +19,9 @@ def client():
     from studio_api.app import app
 
     _cfg.settings.version_coalesce_sec = 0
+    # Module E: enable registration for backward-compat tests
+    _cfg.settings.allow_registration = True
+    _cfg.settings.require_invite_code = False
 
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
@@ -26,11 +29,12 @@ def client():
 
 @pytest.fixture(scope="module")
 def auth_token(client):
+    pw = "TestPass1!"
     reg = client.post(
         "/api/v1/auth/register",
         json={
             "username": "version_user",
-            "password": "testpass",
+            "password": pw,
         },
     )
     if reg.status_code == 409:
@@ -38,11 +42,24 @@ def auth_token(client):
             "/api/v1/auth/login",
             json={
                 "username": "version_user",
-                "password": "testpass",
+                "password": pw,
             },
         )
+        assert resp.status_code == 200, f"Login failed: {resp.text}"
         return resp.json()["access_token"]
-    return reg.json()["access_token"]
+    # Registration may fail with 422 if password policy changed or 201 on success
+    if reg.status_code in (200, 201):
+        return reg.json()["access_token"]
+    # If registration fails, try login as fallback
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "version_user",
+            "password": pw,
+        },
+    )
+    assert resp.status_code == 200, f"Register: {reg.status_code} {reg.text}; Login: {resp.status_code} {resp.text}"
+    return resp.json()["access_token"]
 
 
 def _create(client, auth_token, name="test"):

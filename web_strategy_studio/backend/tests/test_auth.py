@@ -74,6 +74,11 @@ class TestAuthEndpoints:
         import studio_api.db as db_mod
         from studio_api.models import Base
 
+        # Module E: enable registration for backward-compat tests
+        cfg.settings.allow_registration = True
+        cfg.settings.require_invite_code = False
+        cfg.settings.valid_invite_codes = []
+
         tmp_db = f"sqlite+aiosqlite:///{tmp_path}/test_auth.sqlite3"
         cfg.settings.database_url = tmp_db
 
@@ -101,13 +106,14 @@ class TestAuthEndpoints:
             "/api/v1/auth/register",
             json={
                 "username": "testuser",
-                "password": "secret123",
+                "password": "Secret123!",
             },
         )
         assert resp.status_code == 201
         data = resp.json()
         assert "access_token" in data
         assert data["username"] == "testuser"
+        assert "role" in data
 
     @pytest.mark.asyncio
     async def test_login_with_correct_credentials(self, client):
@@ -115,14 +121,14 @@ class TestAuthEndpoints:
             "/api/v1/auth/register",
             json={
                 "username": "loginuser",
-                "password": "secret456",
+                "password": "Secret456!",
             },
         )
         resp = await client.post(
             "/api/v1/auth/login",
             json={
                 "username": "loginuser",
-                "password": "secret456",
+                "password": "Secret456!",
             },
         )
         assert resp.status_code == 200
@@ -135,14 +141,14 @@ class TestAuthEndpoints:
             "/api/v1/auth/register",
             json={
                 "username": "wronguser",
-                "password": "correct",
+                "password": "Correct1!",
             },
         )
         resp = await client.post(
             "/api/v1/auth/login",
             json={
                 "username": "wronguser",
-                "password": "wrong",
+                "password": "Wrong123!",
             },
         )
         assert resp.status_code == 401
@@ -153,14 +159,14 @@ class TestAuthEndpoints:
             "/api/v1/auth/register",
             json={
                 "username": "dup_user",
-                "password": "pass1",
+                "password": "Pass1234!",
             },
         )
         resp = await client.post(
             "/api/v1/auth/register",
             json={
                 "username": "dup_user",
-                "password": "pass2",
+                "password": "Pass5678!",
             },
         )
         assert resp.status_code == 409
@@ -171,7 +177,7 @@ class TestAuthEndpoints:
             "/api/v1/auth/register",
             json={
                 "username": "meuser",
-                "password": "passme",
+                "password": "Passme123!",
             },
         )
         token = reg.json()["access_token"]
@@ -184,3 +190,5 @@ class TestAuthEndpoints:
         assert resp.status_code == 200
         data = resp.json()
         assert data["username"] == "meuser"
+        assert "role" in data
+        assert "permissions" in data
