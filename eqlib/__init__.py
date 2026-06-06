@@ -235,6 +235,9 @@ from eqlib.stock_query import (
     query, valuation, get_fundamentals, get_current_data_object,
 )
 
+# Machine Learning  [EXPERIMENTAL]
+from eqlib.ml import FeaturePipeline, BaseMLModel, MLSelector
+
 # Utilities: indicators, statistics, money management  [STABLE]
 from eqlib import utils
 
@@ -330,6 +333,10 @@ __all__ = [
     "set_local_data_dir", "save_stock_local", "load_stock_local",
     "has_local_data", "list_local_stocks", "remove_local_data",
     "clear_all_local_data",
+    # Machine Learning
+    "FeaturePipeline",
+    "BaseMLModel",
+    "MLSelector",
     # Utilities
     "utils",
     # Portfolio backtest
