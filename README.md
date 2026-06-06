@@ -69,7 +69,7 @@ result = run_strategy(initialize, start_date='2024-01-01',
 | [**Tutorials**](https://AlanFokCo.github.io/EasyQuant/tutorials/) | Zero to production, 11 step-by-step guides |
 | [**How-to Guides**](https://AlanFokCo.github.io/EasyQuant/how-to/) | Task-oriented guides by scenario |
 | [**API Reference**](https://AlanFokCo.github.io/EasyQuant/reference/) | All public APIs with parameters and examples |
-| [**Examples**](examples/) | 26 runnable example scripts |
+| [**Examples**](examples/) | 20+ runnable example scripts + Web Studio bonus strategies |
 | [**FAQ**](https://AlanFokCo.github.io/EasyQuant/project/faq/) | Troubleshooting and common questions |
 
 ---

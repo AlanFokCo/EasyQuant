@@ -63,6 +63,16 @@ python examples/20_all_weather_alpha/run_backtest.py
 - `examples/_defaults.py` — Trading costs (2024 rates), stock codes, relative dates
 - `tests/test_examples_smoke.py` — Smoke tests: syntax, imports, code standards
 
+## Bonus: Web Studio Ready Strategies
+
+Additional strategies optimized for **Web Strategy Studio** (browser-based editing and backtesting):
+
+| # | File | Strategy | Key Techniques |
+|---|------|----------|----------------|
+| 21 | `eqlib/examples/multi_factor_momentum.py` | Multi-factor momentum rotation | 10-stock universe, daily rebalancing, equal-weight position sizing |
+
+These strategies use `from eqlib import *` directly and are designed to be copy-pasted into the Web Studio editor.
+
 ## Trading Cost Standards
 
 All examples use consistent 2024 rates:
