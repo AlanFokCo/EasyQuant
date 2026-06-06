@@ -98,9 +98,12 @@ def _buffer_order(action: str, **kwargs) -> Order:
         log.warn(f"_buffer_order: no active context (order ignored)")
         return None
 
-    security = _normalize_security(kwargs.pop("security"))
+    security = kwargs.pop("security")
     amount = kwargs.get("amount", kwargs.get("target_amount", 0))
     style = kwargs.get("style")
+
+    # Normalize for conflict detection (bare vs suffixed are the same security)
+    _normalized = _normalize_security(security)
 
     # ── BLOCKER-5: detect mixed absolute / target order types ─────────
     if action in _ABSOLUTE_ACTIONS:
@@ -109,7 +112,7 @@ def _buffer_order(action: str, **kwargs) -> Order:
         conflicting = _ABSOLUTE_ACTIONS
 
     for existing in sess._pending_orders:
-        if existing["security"] == security and existing["action"] in conflicting:
+        if _normalize_security(existing["security"]) == _normalized and existing["action"] in conflicting:
             raise ValueError(
                 f"Cannot mix order/order_target/order_value/order_target_value "
                 f"on same security '{security}' in one callback "
