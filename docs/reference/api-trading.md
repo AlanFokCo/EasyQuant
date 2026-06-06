@@ -71,6 +71,44 @@ order_target_value(security, value, style=None)
 | `value` | `float` | 是 | 目标市值，0 = 清仓 |
 | `style` | — | 否 | 订单类型 |
 
+## order_lots
+
+按手数下单买卖（A 股 1 手 = 100 股）。
+
+```python
+order_lots(security, lots, style=None)
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `security` | `str` | 是 | 股票代码 |
+| `lots` | `int` | 是 | 手数，正数=买入，负数=卖出 |
+| `style` | — | 否 | 订单类型 |
+
+```python
+order_lots('601390', 5)    # 买入 5 手（500 股）
+order_lots('601390', -2)   # 卖出 2 手（200 股）
+```
+
+## order_pct
+
+按可用资金的百分比下单。
+
+```python
+order_pct(security, pct, style=None)
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `security` | `str` | 是 | 股票代码 |
+| `pct` | `float` | 是 | 资金比例，如 `0.5` = 50% 可用资金买入；`-0.3` = 卖出当前持仓 30% |
+| `style` | — | 否 | 订单类型 |
+
+```python
+order_pct('601390', 0.5)    # 用 50% 可用资金买入
+order_pct('601390', -0.3)  # 卖出当前持仓的 30%
+```
+
 ## 手续费说明
 
 通过 [`set_order_cost()`](api-config.md#set_order_cost) 修改（见[配置 API](api-config.md)）。默认：买入印花税 0%、印花税 0.05%（2023年8月起减半）、买卖佣金 0.025%、最低佣金 5 元。

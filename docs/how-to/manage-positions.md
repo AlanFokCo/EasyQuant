@@ -38,6 +38,8 @@ def market_open(context):
 | **全仓买入** | `order_value(sec, context.portfolio.available_cash)` | 用全部可用现金买入 |
 | **按比例买入** | `order_value(sec, context.portfolio.available_cash * 0.5)` | 用 50% 现金买入 |
 | **按固定金额** | `order_value(sec, 50000)` | 买入 5 万元 |
+| **按手数** | `order_lots(sec, 5)` | 买入 5 手（500 股） |
+| **按比例资金** | `order_pct(sec, 0.5)` | 用 50% 可用资金买入 |
 | **按固定股数** | `order(sec, 1000)` | 买入 1000 股（自动取整到 100 的整数倍） |
 | **调到目标股数** | `order_target(sec, 5000)` | 调整持仓到 5000 股 |
 | **调到目标市值** | `order_target_value(sec, 100000)` | 调整持仓市值到 10 万 |
@@ -93,6 +95,24 @@ order_target('601390', 0)      # 清仓
 
 ```python
 order_target_value('601390', 100000)  # 持仓市值调到 10 万
+```
+
+### 2.5 `order_lots(security, lots)`
+
+按手数下单（1 手 = 100 股），正数买入，负数卖出。
+
+```python
+order_lots('601390', 5)    # 买入 5 手（500 股）
+order_lots('601390', -2)   # 卖出 2 手（200 股）
+```
+
+### 2.6 `order_pct(security, pct)`
+
+按可用资金的百分比下单。正数买入，负数卖出。
+
+```python
+order_pct('601390', 0.5)    # 用 50% 可用资金买入
+order_pct('601390', -0.3)   # 卖出当前持仓的 30%
 ```
 
 ---
