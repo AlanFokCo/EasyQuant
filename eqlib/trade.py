@@ -18,6 +18,34 @@ from eqlib.logger import log
 from eqlib.objects import Order, MarketOrder, LimitOrder
 
 
+def _bare_code(security: str) -> str:
+    """Strip exchange suffix (.XSHG / .XSHE) from a security code."""
+    return security.replace(".XSHG", "").replace(".XSHE", "")
+
+
+def _infer_exchange_suffix(code: str) -> str:
+    """Infer .XSHG / .XSHE suffix from a bare A-share code."""
+    if code.startswith(("6", "9")):
+        return ".XSHG"
+    if code.startswith(("0", "3", "2")):
+        return ".XSHE"
+    return ".XSHG"
+
+
+def _normalize_security(security: str) -> str:
+    """Normalize a security code to suffixed form.
+
+    - If already suffixed (e.g. ``601398.XSHG``), return as-is.
+    - If bare (e.g. ``601398``), infer exchange and append suffix.
+    - Non-string inputs are returned untouched (caller will raise later).
+    """
+    if not isinstance(security, str):
+        return security
+    if ".XSHG" in security or ".XSHE" in security:
+        return security
+    return security + _infer_exchange_suffix(security)
+
+
 def _get_pending_price(security):
     """Return a reference price for validation purposes only.
 
@@ -70,7 +98,7 @@ def _buffer_order(action: str, **kwargs) -> Order:
         log.warn(f"_buffer_order: no active context (order ignored)")
         return None
 
-    security = kwargs.pop("security")
+    security = _normalize_security(kwargs.pop("security"))
     amount = kwargs.get("amount", kwargs.get("target_amount", 0))
     style = kwargs.get("style")
 
@@ -235,3 +263,67 @@ def cancel_order(order_obj):
     if order_obj.status in (Order.STATUS_PENDING, Order.STATUS_SUBMITTED):
         order_obj.transition_to(Order.STATUS_CANCELLED, reason="user cancelled")
     return order_obj
+
+
+def order_lots(security, lots, style=None) -> Order:
+    """Buy or sell a number of lots (1 lot = 100 shares in A-share market).
+
+    Convenience wrapper around :func:`order`. Positive lots = buy,
+    negative lots = sell.
+
+    Parameters:
+        security: stock code (bare or suffixed)
+        lots: number of lots (positive = buy, negative = sell)
+        style: order style - MarketOrder() or LimitOrder(limit_price)
+
+    Returns:
+        Order object with status tracking, or None if the request was invalid.
+
+    Example::
+
+        order_lots("601398", 5)   # Buy 5 lots (500 shares)
+    """
+    return order(security, int(lots) * 100, style=style)
+
+
+def order_pct(security, pct, style=None) -> Order:
+    """Buy or sell using a percentage of available cash.
+
+    Convenience wrapper around :func:`order_value`. Positive pct = buy,
+    negative pct = sell (sell pct of current position value).
+
+    Parameters:
+        security: stock code (bare or suffixed)
+        pct: percentage of available cash to use (e.g. 0.5 = 50%%)
+        style: order style - MarketOrder() or LimitOrder(limit_price)
+
+    Returns:
+        Order object with status tracking, or None if the request was invalid.
+
+    Example::
+
+        order_pct("601398", 0.5)   # Use 50%% of available cash to buy
+    """
+    sess = st.get_session()
+    ctx = getattr(sess, "_context", None)
+    if ctx is None:
+        log.warn("order_pct: no active context (order ignored)")
+        return None
+
+    security = _normalize_security(security)
+
+    if pct == 0:
+        return None
+
+    if pct > 0:
+        # Buy: use pct of available cash
+        value = ctx.portfolio.available_cash * pct
+    else:
+        # Sell: sell pct of current position value
+        position = ctx.portfolio.positions.get(security)
+        if position is None or position.amount <= 0:
+            log.warn("order_pct: no position to sell for %s", security)
+            return None
+        value = position.total_value * pct  # pct is negative, so value is negative
+
+    return order_value(security, value, style=style)

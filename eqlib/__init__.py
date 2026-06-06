@@ -68,7 +68,10 @@ from eqlib.slippage import SlippageModel, FixedSlippage, VolumeSlippage
 from eqlib._state import BacktestSession, get_session
 
 # Trading  [STABLE]
-from eqlib.trade import order, order_target, order_value, order_target_value, cancel_order
+from eqlib.trade import (
+    order, order_target, order_value, order_target_value,
+    cancel_order, order_lots, order_pct,
+)
 
 # Data  [STABLE]
 from eqlib.data import (

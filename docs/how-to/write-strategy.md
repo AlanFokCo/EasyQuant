@@ -123,5 +123,12 @@ def market_open(context):
     g.hold_days += 1
 ```
 
+!!! warning "⚠️ 注意：run_backtest 会清空 ``g``"
+    `run_backtest`（以及 `run_strategy`）在每次调用时都会**清空 `g` 对象**。因此：
+
+    - 在 `initialize` 内部设置 `g` 的属性是正确的做法。
+    - 不要在 `run_backtest` 外部设置 `g.xxx`，这些值会被清空。
+    - 对于模块级别的配置（如常量、参数），使用普通 Python 变量而非 `g`。
+
 ---
 

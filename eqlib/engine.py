@@ -1130,7 +1130,7 @@ def run_backtest(initialize_func, start_date, end_date,
                  benchmark: str = "000300.XSHG", securities=None,
                  use_local: bool = False, max_memory_mb: int = 1024,
                  selection_func=None, selection_rebalance: str = "monthly:1",
-                 handle_data=None):
+                 handle_data=None, debug_mode: bool = False):
     """Main backtest runner.
 
     Parameters:
@@ -1152,6 +1152,8 @@ def run_backtest(initialize_func, start_date, end_date,
             - "daily" — every trading day
         handle_data: optional handle_data(context, data) callback.
             Called once per bar during the backtest.
+        debug_mode: if True, print extra diagnostic messages to help
+            debug why a strategy has no trades, empty data, etc.
 
     Returns:
         dict with keys: context, trade_log, recorded_values, benchmark, session
@@ -1173,6 +1175,7 @@ def run_backtest(initialize_func, start_date, end_date,
             session, initialize_func, start_date, end_date, frequency,
             starting_cash, benchmark, securities, handle_data,
             selection_func, selection_rebalance, use_local, max_memory_mb,
+            debug_mode,
         )
     finally:
         _clear_session()
@@ -1180,7 +1183,8 @@ def run_backtest(initialize_func, start_date, end_date,
 
 def _run_backtest_core(session, initialize_func, start_date, end_date, frequency,
                        starting_cash, benchmark, securities, handle_data,
-                       selection_func, selection_rebalance, use_local, max_memory_mb):
+                       selection_func, selection_rebalance, use_local, max_memory_mb,
+                       debug_mode=False):
     """Core backtest logic, called by run_backtest within a try/finally block."""
     from eqlib.objects import OrderCost
     preloaded = PreloadedData()
@@ -1262,6 +1266,15 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
              after_hooks=len(session._after_trading_end_funcs),
              has_handle_data=session._handle_data_func is not None,
              selection=selection_func is not None)
+
+    # ── Debug mode: early diagnostics ───────────────────────────────────────
+    if debug_mode:
+        if not session._scheduled_funcs and session._handle_data_func is None:
+            log.warn("[debug_mode] No callbacks registered: strategy will not trade. "
+                     "Call run_daily(), run_weekly(), run_monthly() or pass handle_data=.")
+        if not getattr(context, 'universe', None):
+            log.warn("[debug_mode] context.universe is empty. "
+                     "Set context.universe = [...] in initialize() so data can be preloaded.")
 
     # ── Main trading loop ──────────────────────────────────────────────────
     for idx, day in enumerate(trading_days, start=1):
@@ -1401,6 +1414,16 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
         attach_chart_dual_indices(result)
     except Exception:
         pass
+
+    # ── Debug mode: post-backtest diagnostics ─────────────────────────────────
+    if debug_mode and not session._trade_log:
+        log.warn("[debug_mode] Backtest completed with ZERO trades. Common causes:\n"
+                 "  1. No callbacks registered (run_daily/run_weekly/run_monthly or handle_data)\n"
+                 "  2. Strategy conditions never met (e.g., price never crossed MA)\n"
+                 "  3. Data unavailable for requested securities\n"
+                 "  4. Orders cancelled (insufficient cash, price limits, etc.)\n"
+                 "  5. context.universe not set, so no data was preloaded\n"
+                 "  Tip: Set debug_mode=True and check logs for 'order buffered' or 'cancelled' messages.")
 
     return result
 
