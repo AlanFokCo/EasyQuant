@@ -2,11 +2,12 @@ import type { editor } from "monaco-editor";
 import Editor from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
 
-import { apiOrigin } from "../api/client";
+import { apiOrigin, getToken } from "../api/client";
 
 type Props = {
   value: string;
   onChange: (v: string) => void;
+  onSave?: () => void;
   markers?: editor.IMarkerData[];
   fontSize: number;
   monacoTheme?: string;
@@ -33,16 +34,24 @@ function _makeDebounced(fn: (sourceCode: string, cursorLine: number, cursorCol: 
     });
 }
 
-export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monacoTheme }: Props) {
+export function MonacoStrategyEditor({ value, onChange, onSave, markers, fontSize, monacoTheme }: Props) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const completionDisposable = useRef<{ dispose(): void } | null>(null);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   const beforeMount = useCallback((monaco: typeof import("monaco-editor")) => {
     monaco.editor.defineTheme("eq-dark", {
       base: "vs-dark",
       inherit: true,
-      rules: [],
+      rules: [
+        { token: "comment", foreground: "6a737d", fontStyle: "italic" },
+        { token: "keyword", foreground: "f97583" },
+        { token: "string", foreground: "9ecbff" },
+        { token: "number", foreground: "79b8ff" },
+        { token: "identifier", foreground: "e6edf3" },
+      ],
       colors: {
         "editor.background": "#0d1117",
         "editor.foreground": "#e6edf3",
@@ -56,6 +65,24 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monac
         "editor.findMatchHighlightBackground": "#ea5c0055",
         "editorBracketMatch.background": "#0d1117",
         "editorBracketMatch.border": "#8b949e",
+        "editorIndentGuide.background": "#2d333b",
+        "editorIndentGuide.activeBackground": "#484f58",
+      },
+    });
+
+    monaco.editor.defineTheme("eq-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "6a737d", fontStyle: "italic" },
+        { token: "keyword", foreground: "d73a49" },
+        { token: "string", foreground: "032f62" },
+        { token: "number", foreground: "005cc5" },
+      ],
+      colors: {
+        "editor.background": "#ffffff",
+        "editor.foreground": "#24292e",
+        "editor.lineHighlightBackground": "#f6f8fa",
       },
     });
   }, []);
@@ -66,6 +93,14 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monac
     // Set theme at mount time only; subsequent theme changes are handled by
     // the monacoTheme useEffect below.
     monaco.editor.setTheme(monacoTheme ?? "eq-dark");
+
+    // Cmd+S / Ctrl+S → manual save (creates version snapshot)
+    ed.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      () => {
+        onSaveRef.current?.();
+      }
+    );
 
     // B20: Register eqlib completion provider backed by /api/v1/completion.
     // Dispose any previous registration first (handles HMR / double-mount).
@@ -88,9 +123,16 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monac
 
     const fetchSuggestions = _makeDebounced(
       async (sourceCode: string, cursorLine: number, cursorCol: number) => {
+        const token = getToken();
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
         const res = await fetch(`${apiOrigin}/api/v1/completion`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             source_code: sourceCode,
             cursor_line: cursorLine,
@@ -176,12 +218,37 @@ export function MonacoStrategyEditor({ value, onChange, markers, fontSize, monac
       options={{
         minimap: { enabled: true },
         fontSize,
+        fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, monospace",
+        fontLigatures: true,
         scrollBeyondLastLine: false,
         automaticLayout: true,
-        renderLineHighlight: "line",
+        renderLineHighlight: "all",
         smoothScrolling: true,
         cursorBlinking: "smooth",
+        cursorSmoothCaretAnimation: "on",
         padding: { top: 8, bottom: 8 },
+        // Code folding
+        folding: true,
+        foldingStrategy: "indentation",
+        showFoldingControls: "mouseover",
+        // Bracket matching
+        bracketPairColorization: { enabled: true },
+        guides: {
+          bracketPairs: true,
+          indentation: true,
+        },
+        // Line numbers
+        lineNumbers: "on",
+        renderLineHighlightOnlyWhenFocus: false,
+        // Word wrap
+        wordWrap: "on",
+        // Indentation
+        tabSize: 4,
+        insertSpaces: true,
+        // Selection
+        roundedSelection: true,
+        // Performance
+        largeFileOptimizations: true,
       }}
     />
   );

@@ -29,7 +29,12 @@ vi.mock("lightweight-charts", () => ({
 }));
 
 vi.mock("../hooks/useTheme", () => ({
-  useTheme: () => ({ theme: "dark", setTheme: vi.fn() }),
+  useTheme: () => ({
+    theme: "dark",
+    resolvedTheme: "dark",
+    setTheme: vi.fn(),
+    cycleTheme: vi.fn(),
+  }),
   monacoThemeName: () => "vs-dark",
 }));
 

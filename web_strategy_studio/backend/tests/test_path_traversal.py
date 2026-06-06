@@ -15,9 +15,9 @@ class TestBlocker9NormalizeCode:
     """_normalize_code must reject anything that is not exactly 6 digits."""
 
     def _get_normalize(self):
-        from studio_api.routers.data_mgmt import _normalize_code
+        from studio_api.services.data_service import validate_code
 
-        return _normalize_code
+        return validate_code
 
     def test_valid_six_digits(self):
         nc = self._get_normalize()

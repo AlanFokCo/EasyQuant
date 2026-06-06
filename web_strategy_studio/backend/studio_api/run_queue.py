@@ -13,6 +13,7 @@ so that:
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Tuple
@@ -31,20 +32,29 @@ _TaskCoro = Callable[[], Awaitable[None]]
 # so tests using different event loops work correctly.
 _queue: Optional[asyncio.Queue] = None
 _worker_task: Optional[asyncio.Task] = None
-# Ordered list of run_ids currently sitting in the queue (not yet started).
-_pending: List[str] = []
+# OrderedDict of run_ids currently sitting in the queue (not yet started).
+# Keys are run_ids; values are None. OrderedDict preserves insertion order
+# and provides O(1) lookup and removal.
+_pending: OrderedDict[str, None] = OrderedDict()
+# Position lookup: maps run_id -> position (1-based) for O(1) access.
+# This is updated when items are added or removed from the queue.
+_pending_positions: Dict[str, int] = {}
 # Set of run_ids currently executing.
 _active: Set[str] = set()
 # Semaphore limiting simultaneous executions (created in _worker()).
 _semaphore: Optional[asyncio.Semaphore] = None
 
 
+def _rebuild_positions() -> None:
+    """Rebuild position map after removal. O(n) but only on dequeue."""
+    _pending_positions.clear()
+    for i, rid in enumerate(_pending.keys()):
+        _pending_positions[rid] = i + 1
+
+
 def queue_position(run_id: str) -> Optional[int]:
-    """Return 1-based queue position of run_id, or None if not in queue."""
-    try:
-        return _pending.index(run_id) + 1
-    except ValueError:
-        return None
+    """Return 1-based queue position of run_id, or None if not in queue. O(1)."""
+    return _pending_positions.get(run_id)
 
 
 def active_run_ids() -> List[str]:
@@ -52,7 +62,7 @@ def active_run_ids() -> List[str]:
 
 
 def pending_run_ids() -> List[str]:
-    return list(_pending)
+    return list(_pending.keys())
 
 
 async def enqueue(run_id: str, coro_factory: _TaskCoro) -> None:
@@ -60,7 +70,8 @@ async def enqueue(run_id: str, coro_factory: _TaskCoro) -> None:
     global _queue
     if _queue is None:
         _queue = asyncio.Queue()
-    _pending.append(run_id)
+    _pending[run_id] = None
+    _pending_positions[run_id] = len(_pending)
     await _queue.put((run_id, coro_factory))
     log.info("run.queued", run_id=run_id, queue_depth=len(_pending))
 
@@ -76,13 +87,13 @@ async def _worker() -> None:
         # This prevents race condition where run_id is removed from pending
         # but the worker crashes before acquiring the slot.
         await _semaphore.acquire()
-        # Remove from pending list (may already be removed if cancelled).
-        try:
-            _pending.remove(run_id)
-        except ValueError:
+        # Remove from pending OrderedDict (O(1); may already be removed if cancelled).
+        if run_id not in _pending:
             # Already removed (e.g., cancelled), release slot and continue.
             _semaphore.release()
             continue
+        del _pending[run_id]
+        _rebuild_positions()
         _active.add(run_id)
         log.info("run.started", run_id=run_id, active=len(_active))
 
@@ -110,6 +121,7 @@ def start_worker() -> None:
     # Create a fresh queue bound to the current running event loop.
     _queue = asyncio.Queue()
     _pending.clear()
+    _pending_positions.clear()
     _active.clear()
     current_loop = asyncio.get_running_loop()
     if _worker_task is not None and not _worker_task.done():

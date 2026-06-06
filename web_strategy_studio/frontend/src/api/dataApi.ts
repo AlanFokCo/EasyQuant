@@ -1,4 +1,4 @@
-/** Data management API client. */
+/** Data management API client — paginated, searchable, with batch operations. */
 
 import { apiJson } from "./client";
 
@@ -10,6 +10,13 @@ export type LocalStockInfo = {
   size_human: string;
 };
 
+export type PaginatedStocks = {
+  items: LocalStockInfo[];
+  total: number;
+  page: number;
+  per_page: number;
+};
+
 export type DownloadResponse = {
   ok: boolean;
   downloaded: string[];
@@ -17,12 +24,57 @@ export type DownloadResponse = {
   failed: Array<{ code: string; error: string }>;
 };
 
-export async function fetchLocalData(): Promise<LocalStockInfo[]> {
-  return apiJson("/api/v1/data/local");
+export type BatchDeleteResponse = {
+  deleted: number;
+  deleted_codes: string[];
+  failed: Array<{ code: string; error: string }>;
+};
+
+export type QualityCheck = {
+  name: string;
+  passed: boolean;
+  message: string;
+};
+
+export type QualityReport = {
+  code: string;
+  exists: boolean;
+  checks: QualityCheck[];
+  score: number;
+  message: string;
+};
+
+export type ListStocksParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
+  adjust?: string;
+};
+
+export async function fetchLocalData(params: ListStocksParams = {}): Promise<PaginatedStocks> {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", String(params.page));
+  if (params.per_page) query.set("per_page", String(params.per_page));
+  if (params.search) query.set("search", params.search);
+  if (params.sort_by) query.set("sort_by", params.sort_by);
+  if (params.sort_order) query.set("sort_order", params.sort_order);
+  if (params.adjust) query.set("adjust", params.adjust);
+
+  const qs = query.toString();
+  return apiJson(`/api/v1/data/local${qs ? `?${qs}` : ""}`);
 }
 
-export async function fetchLocalStockDetail(code: string): Promise<Record<string, unknown>> {
-  return apiJson(`/api/v1/data/local/${code}`);
+export async function fetchLocalStockDetail(
+  code: string,
+  adjust = "qfq"
+): Promise<Record<string, unknown>> {
+  return apiJson(`/api/v1/data/local/${code}?adjust=${adjust}`);
+}
+
+export async function fetchDataQuality(code: string, adjust = "qfq"): Promise<QualityReport> {
+  return apiJson(`/api/v1/data/local/${code}/quality?adjust=${adjust}`);
 }
 
 export async function downloadLocalData(
@@ -40,6 +92,19 @@ export async function downloadLocalData(
   });
 }
 
-export async function deleteLocalStock(code: string): Promise<{ ok: boolean; message: string }> {
-  return apiJson(`/api/v1/data/local/${code}`, { method: "DELETE" });
+export async function batchDeleteLocalStocks(
+  codes: string[],
+  adjust = "qfq"
+): Promise<BatchDeleteResponse> {
+  return apiJson("/api/v1/data/local/batch-delete", {
+    method: "POST",
+    body: JSON.stringify({ codes, adjust }),
+  });
+}
+
+export async function deleteLocalStock(
+  code: string,
+  adjust = "qfq"
+): Promise<{ ok: boolean; message: string }> {
+  return apiJson(`/api/v1/data/local/${code}?adjust=${adjust}`, { method: "DELETE" });
 }

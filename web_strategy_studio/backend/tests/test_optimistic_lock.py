@@ -27,6 +27,8 @@ def client():
 
     # Use a short coalesce window so we can also test the coalesce path
     _cfg.settings.version_coalesce_sec = 30
+    # Module E: enable registration for this test
+    _cfg.settings.allow_registration = True
 
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
@@ -35,11 +37,11 @@ def client():
 @pytest.fixture(scope="module")
 def auth_headers(client):
     reg = client.post(
-        "/api/v1/auth/register", json={"username": "optlock_user", "password": "testpass"}
+        "/api/v1/auth/register", json={"username": "optlock_user", "password": "TestPass1!"}
     )
     if reg.status_code == 409:
         resp = client.post(
-            "/api/v1/auth/login", json={"username": "optlock_user", "password": "testpass"}
+            "/api/v1/auth/login", json={"username": "optlock_user", "password": "TestPass1!"}
         )
         token = resp.json()["access_token"]
     else:

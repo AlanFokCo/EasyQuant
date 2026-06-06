@@ -1,15 +1,18 @@
 /**
  * ReportPage — standalone route for /runs/:run_id/report.
- * Opens a backtest HTML report in a full-page iframe.
- * The iframe uses a blob URL (fetch-then-createObjectURL) so the JWT token
- * is sent via an Authorization header rather than being exposed in the URL.
+ *
+ * Renders the backtest report using the native ReportViewer (lightweight-charts)
+ * or falls back to the iframe-based HTML report. Supports export and comparison.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ExternalLink, ArrowLeft, Copy, Check } from "lucide-react";
+import { ExternalLink, ArrowLeft, Copy, Check, Download } from "lucide-react";
 
 import { apiJson, getToken, resolveArtifactUrl } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
+import ReportViewer from "../components/ReportViewer";
+import ReportComparison from "../components/ReportComparison";
+
 type RunInfo = {
   run_id: string;
   strategy_id: string;
@@ -58,7 +61,11 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<"charts" | "html" | "compare">("charts");
+  const [compareIds] = useState<string[]>([]);
+  const [exporting, setExporting] = useState<string | null>(null);
 
+  // Load run info and metrics
   useEffect(() => {
     if (!run_id) return;
 
@@ -94,11 +101,10 @@ export default function ReportPage() {
     return resolveArtifactUrl(`/api/v1/reports/${run_id}/report.html`);
   })();
 
-  // Blob URL for the iframe — fetch with Authorization header so the JWT token
-  // is never exposed in the src attribute or referer logs.
+  // Blob URL for the iframe fallback
   const [blobSrc, setBlobSrc] = useState<string | undefined>(undefined);
   useEffect(() => {
-    if (!reportApiUrl) return;
+    if (!reportApiUrl || viewMode !== "html") return;
     let objectUrl: string | undefined;
     let cancelled = false;
 
@@ -115,8 +121,6 @@ export default function ReportPage() {
           setBlobSrc(objectUrl);
         }
       } catch (err) {
-        // Silently ignore — the "no report" message will be shown.
-        // Log for debugging (e.g. 401 if token expired, network error).
         console.error("[ReportPage] Failed to load report blob:", err);
       }
     }
@@ -126,7 +130,7 @@ export default function ReportPage() {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [reportApiUrl]);
+  }, [reportApiUrl, viewMode]);
 
   function copyShareLink() {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -134,6 +138,33 @@ export default function ReportPage() {
       setTimeout(() => setCopied(false), 2000);
     });
   }
+
+  // Export handler for HTML/PDF downloads
+  const handleExport = useCallback(async (fmt: string) => {
+    if (!run_id) return;
+    setExporting(fmt);
+    try {
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const url = resolveArtifactUrl(`/api/v1/reports/${run_id}/export/${fmt}`);
+      if (!url) throw new Error("Invalid export URL");
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `report_${run_id}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error("[ReportPage] Export failed:", e);
+    } finally {
+      setExporting(null);
+    }
+  }, [run_id]);
 
   if (loading) {
     return (
@@ -204,6 +235,29 @@ export default function ReportPage() {
           )}
         </div>
 
+        {/* View mode switcher */}
+        <div style={{ display: "flex", gap: 2, background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", padding: 2 }}>
+          {(["charts", "html"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: "3px 10px",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+                background: viewMode === mode ? "var(--bg-secondary)" : "transparent",
+                color: viewMode === mode ? "var(--text)" : "var(--text-secondary)",
+                fontSize: 11,
+                cursor: "pointer",
+                fontWeight: viewMode === mode ? 600 : 400,
+              }}
+            >
+              {mode === "charts" ? "图表" : "HTML"}
+            </button>
+          ))}
+        </div>
+
         {/* Key metric chips */}
         {metrics?.metrics && (
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -232,6 +286,27 @@ export default function ReportPage() {
         )}
 
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {/* Export buttons */}
+          <button
+            type="button"
+            aria-label="导出 HTML"
+            onClick={() => handleExport("html")}
+            disabled={!!exporting}
+            style={btnGhost}
+          >
+            <Download size={14} />
+            {exporting === "html" ? "..." : "HTML"}
+          </button>
+          <button
+            type="button"
+            aria-label="导出 JSON"
+            onClick={() => handleExport("json")}
+            disabled={!!exporting}
+            style={btnGhost}
+          >
+            {exporting === "json" ? "..." : "JSON"}
+          </button>
+
           {/* Copy share link */}
           <button
             type="button"
@@ -240,11 +315,10 @@ export default function ReportPage() {
             style={btnGhost}
           >
             {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? "已复制" : "分享链接"}
+            {copied ? "已复制" : "分享"}
           </button>
 
-          {/* Open in new tab — navigate to the SPA route so the JWT stays in
-              localStorage and never touches the URL or server access logs. */}
+          {/* Open in new tab */}
           {run_id && (
             <button
               type="button"
@@ -255,11 +329,10 @@ export default function ReportPage() {
               style={btnGhost}
             >
               <ExternalLink size={14} />
-              新标签
             </button>
           )}
 
-          {/* Rerun — navigate back and trigger run */}
+          {/* Rerun */}
           <button
             type="button"
             aria-label="返回编辑器重新运行"
@@ -271,24 +344,37 @@ export default function ReportPage() {
         </div>
       </header>
 
-      {/* Report iframe — rendered from a blob URL to avoid exposing the JWT in src */}
+      {/* Content */}
       <div style={{ flex: 1, minHeight: 0 }}>
-        {blobSrc ? (
-          <iframe
-            title="回测 HTML 报告"
-            src={blobSrc}
-            sandbox="allow-scripts"
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "none",
-              background: "#fff",
-            }}
+        {viewMode === "charts" && run_id && (
+          <ReportViewer runId={run_id} jsonUrl={null} />
+        )}
+
+        {viewMode === "html" && (
+          blobSrc ? (
+            <iframe
+              title="回测 HTML 报告"
+              src={blobSrc}
+              sandbox="allow-scripts"
+              style={{
+                width: "100%",
+                height: "100%",
+                border: "none",
+                background: "#fff",
+              }}
+            />
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-secondary)", fontSize: 13 }}>
+              加载 HTML 报告中…
+            </div>
+          )
+        )}
+
+        {viewMode === "compare" && (
+          <ReportComparison
+            runIds={compareIds.length >= 2 ? compareIds : run_id ? [run_id] : []}
+            onClose={() => setViewMode("charts")}
           />
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-secondary)", fontSize: 13 }}>
-            未找到报告文件。请确认回测已成功完成。
-          </div>
         )}
       </div>
     </div>

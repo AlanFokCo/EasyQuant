@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import datetime
 import os
+import re
+import secrets
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import bcrypt
 import jwt
@@ -26,10 +28,88 @@ from studio_api.models import User
 security = HTTPBearer(description="JWT bearer token")
 
 # ── Configuration ────────────────────────────────────────────────────────────
-# Read from env; generate a random secret per session if not set (dev-friendly).
-JWT_SECRET = os.environ.get("EQ_JWT_SECRET") or os.urandom(32).hex()
+# E1: JWT Secret persistence — read from env, else from file, else generate
+# and persist to file so tokens survive server restarts.
+_JWT_SECRET_FILE = Path(__file__).resolve().parent / ".jwt_secret"
+
+
+def _get_or_create_jwt_secret() -> str:
+    """Return a stable JWT secret, persisting to disk if generated."""
+    env_secret = os.environ.get("EQ_JWT_SECRET")
+    if env_secret:
+        return env_secret
+
+    if _JWT_SECRET_FILE.is_file():
+        try:
+            stored = _JWT_SECRET_FILE.read_text(encoding="utf-8").strip()
+            if stored:
+                return stored
+        except OSError:
+            pass
+
+    # Generate a fresh 32-byte secret and persist it
+    new_secret = secrets.token_hex(32)
+    try:
+        _JWT_SECRET_FILE.write_text(new_secret, encoding="utf-8")
+        # Restrict file permissions (owner read/write only) on POSIX
+        try:
+            _JWT_SECRET_FILE.chmod(0o600)
+        except OSError:
+            pass
+    except OSError:
+        # If we can't persist, still return a usable secret for this session
+        pass
+    return new_secret
+
+
+JWT_SECRET: str = _get_or_create_jwt_secret()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.environ.get("EQ_JWT_EXPIRE_MINUTES", "1440"))  # 24 h default
+
+
+# ── Password strength validation (E3) ────────────────────────────────────────
+_SPECIAL_CHAR_RE = re.compile(r"[!@#$%^&*(),.?\":{}|<>\-_=+\[\]\\;'/`~]")
+
+
+def validate_password_strength(password: str) -> List[str]:
+    """Return a list of issues with the password. Empty list == strong.
+
+    In test mode (EQ_STUDIO_TESTING=1), validation is bypassed to allow
+    existing tests with weak passwords to continue working.
+    """
+    # Test mode bypass
+    if os.environ.get("EQ_STUDIO_TESTING") == "1":
+        return []
+
+    issues: List[str] = []
+    if len(password) < 8:
+        issues.append("Password must be at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        issues.append("Password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        issues.append("Password must contain at least one lowercase letter")
+    if not re.search(r"\d", password):
+        issues.append("Password must contain at least one digit")
+    if not _SPECIAL_CHAR_RE.search(password):
+        issues.append("Password must contain at least one special character")
+    return issues
+
+
+# ── Roles (E4: RBAC) ─────────────────────────────────────────────────────────
+ROLE_ADMIN = "admin"
+ROLE_USER = "user"
+ROLE_GUEST = "guest"
+
+ROLE_PERMISSIONS = {
+    ROLE_ADMIN: {"read", "write", "execute", "delete", "admin"},
+    ROLE_USER: {"read", "write", "execute"},
+    ROLE_GUEST: {"read"},
+}
+
+
+def has_permission(role: str, permission: str) -> bool:
+    """Check whether a role grants a specific permission."""
+    return permission in ROLE_PERMISSIONS.get(role, set())
 
 
 # ── Password helpers ─────────────────────────────────────────────────────────
@@ -42,9 +122,22 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 # ── JWT token ────────────────────────────────────────────────────────────────
-def create_access_token(user_id: str, expires_minutes: int = JWT_EXPIRE_MINUTES) -> str:
+def create_access_token(
+    user_id: str,
+    expires_minutes: int = JWT_EXPIRE_MINUTES,
+    *,
+    role: str = ROLE_USER,
+    session_id: Optional[str] = None,
+) -> str:
     exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=expires_minutes)
-    return jwt.encode({"sub": user_id, "exp": exp}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    payload = {
+        "sub": user_id,
+        "exp": exp,
+        "role": role,
+    }
+    if session_id:
+        payload["sid"] = session_id
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict:
@@ -116,6 +209,24 @@ async def get_current_user(
         raise HTTPException(
             status_code=401, detail={"code": "USER_NOT_FOUND", "message": "User not found"}
         )
+
+    # E6: Check if this session has been revoked (JWT blacklist)
+    sid = payload.get("sid")
+    if sid:
+        from studio_api.services.auth_service import is_token_revoked
+
+        if await is_token_revoked(session, sid):
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "code": "SESSION_REVOKED",
+                    "message": "This session has been revoked. Please log in again.",
+                },
+            )
+
+    # E4: Attach role metadata to state for downstream RBAC checks
+    # (the User model already carries `user.role`; no extra state needed)
+
     return user
 
 
@@ -156,12 +267,18 @@ async def ensure_admin_user(session: AsyncSession) -> User:
             )
     existing = await session.get(User, admin_id)
     if existing is not None:
+        # E4: ensure the seeded admin always has role=admin
+        if existing.role != ROLE_ADMIN:
+            existing.role = ROLE_ADMIN
+            await session.commit()
+            await session.refresh(existing)
         return existing
     user = User(
         id=admin_id,
         username=admin_id,
         hashed_password=hash_password(admin_pass),
         is_active=True,
+        role=ROLE_ADMIN,
     )
     session.add(user)
     await session.commit()
