@@ -91,7 +91,7 @@ result = run_strategy(
 
 | MACD 趋势 + 成交量 | 布林带均值回归 | 支撑/阻力位 |
 |:---:|:---:|:---:|
-| **+103.48%** | **+57.77%** | **+119.97%** |
+| 不同策略回测结果因市场环境而异，以上仅为示例 | 不同策略回测结果因市场环境而异，以上仅为示例 | 不同策略回测结果因市场环境而异，以上仅为示例 |
 | [![MACD](assets/tutorials/example_report_macd_volume.png)](assets/tutorials/example_report_macd_volume.png) | [![布林带](assets/tutorials/example_report_bollinger.png)](assets/tutorials/example_report_bollinger.png) | [![支撑阻力](assets/tutorials/example_report_sr_strategy.png)](assets/tutorials/example_report_sr_strategy.png) |
 
 ---

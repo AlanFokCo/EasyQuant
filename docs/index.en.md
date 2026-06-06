@@ -91,7 +91,7 @@ result = run_strategy(
 
 | MACD Trend + Volume | Bollinger Band Mean Reversion | Support/Resistance |
 |:---:|:---:|:---:|
-| **+103.48%** | **+57.77%** | **+119.97%** |
+| Results vary with market conditions | Results vary with market conditions | Results vary with market conditions |
 | [![MACD](assets/tutorials/example_report_macd_volume.png)](assets/tutorials/example_report_macd_volume.png) | [![Bollinger](assets/tutorials/example_report_bollinger.png)](assets/tutorials/example_report_bollinger.png) | [![Support/Resistance](assets/tutorials/example_report_sr_strategy.png)](assets/tutorials/example_report_sr_strategy.png) |
 
 ---

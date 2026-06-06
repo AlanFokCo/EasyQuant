@@ -100,41 +100,43 @@ The abstract "strategy vs benchmark" line chart is still available at: `../asset
 
 Within the same framework, reports from different strategies have the **same structure but different numbers**. Below are 6 completed examples: open each script's corresponding `.html` to see identical page layouts with vastly different metric card values.
 
+> Note: The numbers below are from specific backtest periods and stock selections. **Results will vary significantly** depending on market conditions, time period, and stock selection. These are for illustration only and do not constitute investment advice.
+
 ### Bollinger Bands Mean Reversion (Example 15, stock 601088 China Shenhua)
 
 ![Bollinger Bands strategy HTML report](../assets/tutorials/example_report_html_bollinger.png)
 
-> Result: **+57.77%**, 8 trades. The Bollinger Bands strategy excels in range-bound markets — buy when price touches the lower band, sell at the upper band, a natural buy-low-sell-high logic.
+> The Bollinger Bands strategy excels in range-bound markets — buy when price touches the lower band, sell at the upper band, a natural buy-low-sell-high logic. Actual backtest results will vary with market conditions.
 
 ### MACD Trend + Volume Confirmation (Example 16, stock 600536 China Software)
 
 ![MACD + volume HTML report](../assets/tutorials/example_report_html_macd_volume.png)
 
-> Result: **+103.48%**, 16 trades. Tech stocks are highly volatile; a MACD golden cross confirmed by rising volume effectively captures trend initiation points.
+> Tech stocks are highly volatile; a MACD golden cross confirmed by rising volume effectively captures trend initiation points. Actual backtest results will vary with market conditions.
 
 ### Grid Trading (Example 18, stock 601857 PetroChina)
 
 ![Grid trading HTML report](../assets/tutorials/example_report_html_grid.png)
 
-> Result: **+30.25%**, 10 trades. Grid trading suits low-volatility stocks with clear price ranges — repeatedly "buying low and selling high" within the range.
+> Grid trading suits low-volatility stocks with clear price ranges — repeatedly "buying low and selling high" within the range. Actual backtest results will vary with market conditions.
 
 ### Multi-Factor Stock Selection (Example 17, 10-stock universe)
 
 ![Multi-factor stock selection HTML report](../assets/tutorials/example_report_html_multifactor.png)
 
-> Result: **+5.19%**, 135 trades. The multi-factor model selects the top 3 stocks each week from a pool of 10 based on composite momentum/volume/volatility scores, with high turnover.
+> The multi-factor model selects the top 3 stocks each week from a pool of 10 based on composite momentum/volume/volatility scores, with high turnover. Actual backtest results will vary with market conditions.
 
-### Stock Selection Strategy Interface (Example 22, 14-stock universe)
+### Stock Selection Strategy Interface (Example 10, 14-stock universe)
 
 ![Stock selection strategy HTML report](../assets/tutorials/example_report_html_stock_selection.png)
 
-> Result: **+16.96%**, holding 5 stocks. Selection based on low PE valuation + monthly rebalancing, held through the end of the period. Brinson attribution shows allocation effect +2.84%, selection effect +2.84%.
+> Selection based on low PE valuation + monthly rebalancing, held through the end of the period. Actual backtest results will vary with market conditions.
 
 ### Portfolio Backtest (Example 11, 5 stocks equal-weight)
 
 ![Portfolio backtest HTML report](../assets/tutorials/example_report_html_portfolio.png)
 
-> Result: **-25.69%**, 52 trades. The momentum strategy performed poorly in this period, demonstrating that "chasing winners and selling losers" can lead to repeated losses in certain market environments.
+> The momentum strategy's performance varies significantly depending on market regime — it may perform well in trending markets but poorly in ranging ones. Actual backtest results will vary with market conditions.
 
 **Reading suggestion:** Open each corresponding `.html` file in your browser (see [`reports/README.md`](../how-to/read-reports.md)), and observe how the same page structure presents different metric cards, candlestick charts, drawdown curves, and trade tables across strategies.
 
