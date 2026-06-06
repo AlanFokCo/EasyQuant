@@ -199,6 +199,9 @@ MOMENTUM_LOOKBACK = 20   # 20-day momentum window
 MAX_PICKS = 5            # Buy top-5 stocks each month
 UNIVERSE_SIZE = 20       # Pre-load top-20 CSI 300 constituents
 
+# Module-level storage for universe (avoids g being cleared by run_backtest)
+_rotation_universe = []
+
 
 def initialize_rotation(context):
     """Initialize the rotation strategy."""
@@ -214,7 +217,7 @@ def initialize_rotation(context):
 
 def monthly_rebalance(context):
     """Monthly rebalance: pick top-N by 20-day momentum."""
-    universe = getattr(g, "universe", [])
+    universe = _rotation_universe
     if not universe:
         return
 
@@ -266,8 +269,9 @@ def demo_rotation_strategy(constituent_codes):
     print(f"  Universe: top {len(universe)} CSI 300 constituents")
     print(f"  Strategy: monthly pick top-{MAX_PICKS} by {MOMENTUM_LOOKBACK}-day momentum")
 
-    # Store universe on g for the strategy to access
-    g.universe = universe
+    # Store universe for the strategy to access
+    global _rotation_universe
+    _rotation_universe = universe
 
     actual_start, actual_end = verify_data_available(
         universe[0], START_DATE, END_DATE)

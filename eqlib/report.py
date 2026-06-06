@@ -2379,7 +2379,7 @@ details .detail-body {{
   /* =================================================================
      RETURN DISTRIBUTION HISTOGRAM (Canvas)
      ================================================================= */
-  (function() {{
+  window._drawDistribution = function() {{
     const stats = {daily_stats_json};
     const canvas = document.getElementById('distCanvas');
     if (!stats || !stats.histogram || !canvas) return;
@@ -2417,7 +2417,8 @@ details .detail-body {{
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('均值: ' + ((stats.mean || 0) * 100).toFixed(3) + '%  标准差: ' + ((stats.std || 0) * 100).toFixed(3) + '%  偏度: ' + (stats.skewness || 0).toFixed(2) + '  峰度: ' + (stats.kurtosis || 0).toFixed(2), 40, 18);
-  }})();
+  }};
+  window._drawDistribution();
 
   /* =================================================================
      CHART COMMON OPTIONS (DARK)
@@ -2675,11 +2676,15 @@ details .detail-body {{
     drChart.timeScale().fitContent();
 
     /* Rolling metrics chart */
+    var rollChart = null;
+    window._resizeRolling = function() {{
+      if (rollChart) rollChart.resize(rollEl.clientWidth, 260);
+    }};
     var rollingSharpe = {rolling_sharpe_json};
     var rollingVol = {rolling_vol_json};
     if (rollingSharpe.length > 0 || rollingVol.length > 0) {{
       var rollEl = document.getElementById('rollingChart');
-      var rollChart = LightweightCharts.createChart(rollEl, {{ ...cmn, width: rollEl.clientWidth, height: 260 }});
+      rollChart = LightweightCharts.createChart(rollEl, {{ ...cmn, width: rollEl.clientWidth, height: 260 }});
       if (rollingSharpe.length > 0) {{
         var rsData = rollingSharpe.map(function(d) {{ return {{ time: d.date, value: d.value }}; }});
         var rsLine = rollChart.addLineSeries({{ color: '#5b8def', lineWidth: 2, title: 'Sharpe(60d)', priceLineVisible: false, lastValueVisible: true }});
@@ -2831,6 +2836,8 @@ details .detail-body {{
       tab.classList.add('active');
       const target = document.getElementById(tab.dataset.tab);
       if (target) target.classList.add('active');
+      if (tab.dataset.tab === 'tb-dist' && window._drawDistribution) window._drawDistribution();
+      if (tab.dataset.tab === 'tb-rolling' && window._resizeRolling) window._resizeRolling();
     }});
   }});
 

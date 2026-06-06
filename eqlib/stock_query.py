@@ -102,6 +102,18 @@ class _FieldDescriptor:
     def __le__(self, other):
         return FilterCondition(self.name, "<=", other)
 
+    def lt(self, other):
+        return FilterCondition(self.name, "<", other)
+
+    def gt(self, other):
+        return FilterCondition(self.name, ">", other)
+
+    def le(self, other):
+        return FilterCondition(self.name, "<=", other)
+
+    def ge(self, other):
+        return FilterCondition(self.name, ">=", other)
+
     def between(self, low, high):
         return FilterCondition(self.name, "between", (low, high))
 

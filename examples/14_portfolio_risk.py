@@ -292,12 +292,12 @@ def demo_portfolio_var(monitor):
         return
 
     print("  Confidence level:  95%%")
-    print("  VaR amount:        %12,.2f CNY" % var_amount)
+    print("  VaR amount:        %12.2f CNY" % var_amount)
     print("  VaR percentage:    %12.2f%%" % (var_pct * 100))
     print("")
     print("  Interpretation:")
     print("    At 95%% confidence, the portfolio's maximum expected")
-    print("    single-day loss is approximately %,.0f CNY (%.2f%% of total value)." % (
+    print("    single-day loss is approximately %.0f CNY (%.2f%% of total value)." % (
         var_amount, var_pct * 100))
     print("    On 1 out of every 20 trading days, losses may exceed this amount.")
 
@@ -404,7 +404,7 @@ def demo_daily_check(monitor):
 
     # VaR summary
     if report.portfolio_var is not None:
-        print("\n  Portfolio VaR:  %,.2f CNY (%.2f%%)" % (
+        print("\n  Portfolio VaR:  %.2f CNY (%.2f%%)" % (
             report.portfolio_var,
             (report.portfolio_var_pct or 0) * 100))
 

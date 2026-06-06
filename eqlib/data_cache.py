@@ -549,41 +549,51 @@ class PreloadedData:
 
     def get_close(self, date, security) -> Optional[float]:
         """Get closing price for a given date and security."""
+        # Try both the original security code and its bare variant
+        bare = security.replace(".XSHG", "").replace(".XSHE", "")
+        securities_to_try = [security]
+        if bare != security:
+            securities_to_try.append(bare)
+
         # Fast path: dict cache
         if self._close_dict:
-            sec_dict = self._close_dict.get(security)
-            if sec_dict is not None:
-                try:
-                    val = sec_dict.get(date)
-                    if val is not None and val == val:
-                        return float(val)
-                except Exception:
-                    pass
-                try:
-                    ts = pd.Timestamp(date)
-                    val = sec_dict.get(ts)
-                    if val is not None and val == val:
-                        return float(val)
-                except Exception:
-                    pass
+            for sec in securities_to_try:
+                sec_dict = self._close_dict.get(sec)
+                if sec_dict is not None:
+                    try:
+                        val = sec_dict.get(date)
+                        if val is not None and val == val:
+                            return float(val)
+                    except Exception:
+                        pass
+                    try:
+                        ts = pd.Timestamp(date)
+                        val = sec_dict.get(ts)
+                        if val is not None and val == val:
+                            return float(val)
+                    except Exception:
+                        pass
 
         # Fallback: panel slicing
         if self._close_matrix is not None:
-            try:
-                ts = pd.Timestamp(date)
-                if ts in self._close_matrix.index and security in self._close_matrix.columns:
-                    val = self._close_matrix.at[ts, security]
-                    if pd.notna(val):
-                        return float(val)
-            except Exception:
-                pass
+            for sec in securities_to_try:
+                try:
+                    ts = pd.Timestamp(date)
+                    if ts in self._close_matrix.index and sec in self._close_matrix.columns:
+                        val = self._close_matrix.at[ts, sec]
+                        if pd.notna(val):
+                            return float(val)
+                except Exception:
+                    pass
         return None
 
     def get_close_series(self, security) -> Optional[pd.Series]:
         """Get full close price series for a security."""
-        if self._close_matrix is None or security not in self._close_matrix.columns:
-            return None
-        return self._close_matrix[security].dropna()
+        if self._close_matrix is not None:
+            for sec in [security, security.replace(".XSHG", "").replace(".XSHE", "")]:
+                if sec in self._close_matrix.columns:
+                    return self._close_matrix[sec].dropna()
+        return None
 
     def get_bar(self, date, security) -> Optional[dict]:
         """Get full OHLCV bar for a given date and security.
@@ -591,37 +601,47 @@ class PreloadedData:
         Returns a copy of the cached bar dict so that callers cannot mutate
         the shared cache.
         """
+        # Try both the original security code and its bare variant
+        # (e.g. "601398.XSHG" and "601398") to handle mismatches between
+        # data-loading (bare) and trading (full) code formats.
+        bare = security.replace(".XSHG", "").replace(".XSHE", "")
+        securities_to_try = [security]
+        if bare != security:
+            securities_to_try.append(bare)
+
         # Fast path: dict cache
         if self._bar_cache:
-            sec_dict = self._bar_cache.get(security)
-            if sec_dict is not None:
-                bar = sec_dict.get(date)
-                if bar is not None:
-                    return dict(bar)
-                try:
-                    ts = pd.Timestamp(date)
-                    bar = sec_dict.get(ts)
+            for sec in securities_to_try:
+                sec_dict = self._bar_cache.get(sec)
+                if sec_dict is not None:
+                    bar = sec_dict.get(date)
                     if bar is not None:
                         return dict(bar)
-                except Exception:
-                    pass
+                    try:
+                        ts = pd.Timestamp(date)
+                        bar = sec_dict.get(ts)
+                        if bar is not None:
+                            return dict(bar)
+                    except Exception:
+                        pass
 
         # Fallback: panel slicing
         if self.panel is not None:
-            try:
-                ts = pd.Timestamp(date)
-                if ts in self.panel.index:
-                    bar = {}
-                    for field in ["open", "high", "low", "close", "volume", "money"]:
-                        try:
-                            val = self.panel.loc[ts, (security, field)]
-                            if pd.notna(val):
-                                bar[field] = float(val)
-                        except (KeyError, TypeError):
-                            pass
-                    return bar if bar else None
-            except Exception:
-                pass
+            for sec in securities_to_try:
+                try:
+                    ts = pd.Timestamp(date)
+                    if ts in self.panel.index:
+                        bar = {}
+                        for field in ["open", "high", "low", "close", "volume", "money"]:
+                            try:
+                                val = self.panel.loc[ts, (sec, field)]
+                                if pd.notna(val):
+                                    bar[field] = float(val)
+                            except (KeyError, TypeError):
+                                pass
+                        return bar if bar else None
+                except Exception:
+                    pass
         return None
 
     def get_returns_matrix(self) -> Optional[pd.DataFrame]:

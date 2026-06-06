@@ -56,6 +56,16 @@ docker compose up --build
 cd backend && pip install -e ".[dev]" && pytest tests/ -v
 ```
 
+### Linting & Pre-commit
+
+Pre-commit hooks run automatically on `git commit`. They include:
+
+- **General**: trailing-whitespace, end-of-file-fixer, check-yaml/toml, mixed-line-ending (LF)
+- **Backend (`web_strategy_studio/backend/`)**: ruff (lint + import sort), black (format), mypy (type check)
+- **Frontend (`web_strategy_studio/frontend/src/`)**: ESLint + Prettier
+
+Note: pre-commit hooks do NOT cover `eqlib/` core — use `ruff` manually if needed.
+
 ---
 
 ## Architecture
@@ -68,11 +78,21 @@ Event-driven backtest engine with JoinQuant/Zipline-compatible API.
 - `engine.py` — Backtest engine: `run_backtest`, `run_daily`, `run_paper_trade`
 - `data.py` — Data API: `get_price`, `attribute_history`, `fetch_stock_data`, fundamentals, indices
 - `trade.py` — Order execution: `order`, `order_target`, `order_value`
-- `attribution.py` — Performance analysis: `analyze_returns`, `brinson_attribution`, `fama_french_analysis`
-- `report.py` — HTML/PNG/Markdown/JSON report generation
+- `attribution.py` — Performance analysis: `analyze_returns`, `brinson_attribution`, `simple_factor_analysis`, `grade_strategy`, `diagnose_bottleneck`, `recommend_params`
+- `report.py` — HTML/PNG/Markdown/JSON report generation (dark theme, Agent-First JSON)
 - `notification.py` — DingTalk/Feishu webhook alerts for paper trading
 - `stock_query.py` — Fluent query API: `query()`, `valuation()`, `get_fundamentals()`
 - `selection.py` — Periodic stock selection with factor screening
+- `data_cache.py` — Disk caching + local CSV data store
+- `constants.py` — Single source of truth for `RISK_FREE_RATE` (0.03) and `TRADING_DAYS_PER_YEAR` (244)
+- `portfolio_risk.py` — VaR, correlation, concentration risk, Kill Switch
+- `portfolio.py` — Multi-strategy portfolio backtest mode
+- `wfa.py` — Walk-forward analysis
+- `ptrade_adapter.py` — PTrade/QMT broker platform export
+
+**Subpackages:**
+- `eqlib/scientific/` — Scientific validation layer (overfitting detection, statistical confidence, bias detection, extended risk metrics, platform comparison, unified `validate_backtest()` orchestration)
+- `eqlib/utils/` — Four submodules: `indicators` (MA, MACD, RSI, KDJ, Bollinger, ATR, etc.), `stats` (rolling metrics, regression, VaR, drawdown), `money` (Kelly, ATR sizing, risk parity, volatility normalize), `levels` (pivot points, support/resistance, Fibonacci, trailing stop)
 
 **Strategy lifecycle:**
 ```
@@ -80,6 +100,41 @@ initialize(context) → run_daily(handle_data, time='every_bar') → handle_data
 ```
 
 Orders are filled at the **next trading day's open** to avoid look-ahead bias.
+
+### API Stability Legend
+
+Every export in `eqlib/__init__.py` carries one of three stability markers (visible in the source comments):
+
+| Label | Meaning |
+|-------|---------|
+| `STABLE` | Name and signature won't change in minor/patch releases. Breaking changes require a major bump + deprecation notice. |
+| `EXPERIMENTAL` | API may change in any release. Don't build production code against it. |
+| `DEPRECATED` | Will be removed. A `DeprecationWarning` is emitted. Use the suggested replacement. |
+
+When adding or changing a public API, add the appropriate marker comment. Example:
+```python
+# Data  [STABLE]
+from eqlib.data import get_price, ...
+# Financial data  [EXPERIMENTAL]
+from eqlib.data import get_financial_abstract, ...
+```
+
+### The `g` Proxy (Concurrent Backtests)
+
+`eqlib.g` is a `_GProxy` instance (not a plain `GlobalObject`) that delegates attribute access to the active `BacktestSession._g`. This makes concurrent backtests thread-safe — each session has its own `GlobalObject`, and `g.security = '601398'` routes to the current thread's session.
+
+User code treats `g` as a normal object: `g.security`, `g.lookback = 20`. Internally, `__getattr__`/`__setattr__` delegate through `_state.get_session()`. Don't instantiate `_GProxy` or bypass it — always use the module-level `g`.
+
+### Bare vs Suffixed Stock Codes
+
+A critical convention used throughout the codebase:
+
+| Context | Format | Example |
+|---------|--------|---------|
+| Data APIs (`get_price`, `attribute_history`, `fetch_stock_data`) | Bare code | `"601398"` |
+| Trading APIs (`order`, `order_target`, `order_value`) | Suffixed code | `"601398.XSHG"` |
+
+The suffixes are `.XSHG` (Shanghai) and `.XSHE` (Shenzhen). See `examples/_defaults.py` for both forms (`STOCKS` dict = bare, `STOCKS_TRADE` dict = suffixed). Mixing them up causes silent data misses or trade failures.
 
 ### Web Strategy Studio (`web_strategy_studio/`)
 
@@ -187,14 +242,24 @@ result = run_backtest(
 
 # Analyze returns
 metrics = analyze_returns(result, risk_free_rate=0.03)
-# Returns: sharpe_ratio, max_drawdown, annual_return, alpha, beta, win_rate_trade, etc.
+# Returns: sharpe_ratio, max_drawdown, annual_return, alpha, beta, win_rate_trade,
+#          monthly_returns, rolling_sharpe_60d, per_stock_pnl, drawdown_periods, etc.
+
+# Grade strategy (6-dimension scoring)
+grade_info = grade_strategy(metrics)
+# Returns: overall (S/A/B/C/D), score, dimensions, weakest, strongest, summary_text
+
+# Diagnostics and parameter recommendations
+diagnostics = diagnose_bottleneck(metrics, grade_info)
+recommendations = recommend_params(metrics, grade_info, current_params, param_ranges)
 
 # Paper trading with notifications
 run_paper_trade(initialize, webhook_url="...")
 
 # Factor analysis
 brinson_attribution(result)      # Allocation/selection/interaction
-fama_french_analysis(result)     # Market beta, SMB, HML, alpha
+simple_factor_analysis(result)   # Market beta, alpha, momentum proxy
+# Note: fama_french_analysis(result) is deprecated — use simple_factor_analysis
 
 # Stock screening
 query('000001.XSHE').valuation().pe.lt(20).cap.gt(50e9).get_fundamentals()
@@ -207,12 +272,34 @@ query('000001.XSHE').valuation().pe.lt(20).cap.gt(50e9).get_fundamentals()
 | Metric | Target | Source |
 |--------|--------|--------|
 | `sharpe_ratio` | > 1.0 | `analyze_returns()` |
+| `sortino_ratio` | > 1.5 | `analyze_returns()` |
 | `max_drawdown` | < 20% (i.e., > -0.20) | `analyze_returns()` |
 | `annual_return` | > 0 (beat cash) | `analyze_returns()` |
 | `win_rate_trade` | > 40% | `analyze_returns()` |
-| `alpha` | > 0 | `fama_french_analysis()` |
-| `beta` | 0.3–1.3 | `fama_french_analysis()` |
+| `alpha` | > 0 | `simple_factor_analysis()` |
+| `beta` | 0.3–1.3 | `simple_factor_analysis()` |
 | `trade_count` | ≥ 3 per year | `analyze_returns()` |
+
+---
+
+## Test Structure
+
+The test suite in `tests/` has several organizational patterns:
+
+- **`test_examples_smoke.py`** — Syntax, import, and standard checks for every example file (no star imports, no private API usage, `__main__` guards, `_defaults` usage)
+- **`test_dim1_credibility.py`, `test_dim2_credibility.py`, `test_dim3_credibility.py`** — Backtest credibility fixes organized by dimension (e.g., price-limit caching, Sortino formula, Calmar ratio guard)
+- **`test_p0_fixes.py`, `test_p1_p2_p3_p4_fixes.py`** — Priority-tiered bug fixes (P0 = critical, P1-P4 = lower priority)
+- **`test_scientific_*.py`** — Scientific validation layer tests (overfitting, bias, statistics, risk, comparison, validation runner)
+- **`test_utils_*.py`** — Utility submodule tests (indicators, levels, money, stats)
+- **`conftest.py`** — Adds `web_strategy_studio/backend` to `sys.path` so `studio_api` is importable
+
+Run specific dimensions or tiers:
+```bash
+python -m pytest tests/test_dim2_credibility.py -v     # Sortino/ddof fixes
+python -m pytest tests/test_p0_fixes.py -v              # Critical fixes
+python -m pytest tests/test_scientific_overfitting.py -v  # Overfitting detection
+python -m pytest tests/ -k "sortino" -v                 # All Sortino-related tests
+```
 
 ---
 
@@ -247,6 +334,8 @@ docs/foo.md  →  docs/foo.en.md   (always keep in sync)
 - **If you update example file references** in the Chinese doc → update them in `.en.md`
 - **If you create a new doc** without `.en.md` → create the `.en.md` too (or at minimum add a stub with a `<!-- TODO: translate -->` comment)
 - **Before committing**: run `python scripts/check_doc_sync.py` to catch any drift
+
+The doc site uses `mkdocs-static-i18n` with `docs_structure: suffix`, so the `.en.md` suffix is what drives the English translation build.
 
 ### 2. Example Modification Gate
 
@@ -313,6 +402,12 @@ python -m pytest tests/test_examples_smoke.py -v
 # Build docs (catches broken links, missing pages)
 mkdocs build --strict
 ```
+
+The doc sync script (`scripts/check_doc_sync.py`) validates:
+1. Every `docs/*.md` has a corresponding `.en.md` translation
+2. No stale example file references (renamed/deleted examples)
+3. Trading cost rates in docs match `examples/_defaults.py`
+4. No outdated stamp duty (0.001) or commission (0.0003) values
 
 ### 7. Commit Message Conventions
 

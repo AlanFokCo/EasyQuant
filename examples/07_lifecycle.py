@@ -62,7 +62,7 @@ UNIVERSE_TRADE = [STOCKS_TRADE["bank"], STOCKS_TRADE["liquor"],
 # Lifecycle callbacks
 # ============================================================
 
-def pre_market_check(context):
+def pre_market_check(context, data=None):
     """Pre-market preparation — called before each trading day.
 
     Checks for ST stocks in the universe and removes them.
@@ -86,7 +86,7 @@ def pre_market_check(context):
         log.debug("ST check skipped: %s", e)
 
 
-def post_market_summary(context):
+def post_market_summary(context, data=None):
     """Post-market analysis — called after each trading day.
 
     Logs portfolio summary for monitoring.
