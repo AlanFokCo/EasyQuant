@@ -240,28 +240,28 @@ Bar or curve showing **day-over-day** portfolio value changes; useful for spotti
 
 ### 4.8 Walkthrough Example
 
-Below is a real export (target **000768**, period **2024-01-01 to 2024-12-31**) explaining **what each section means when you open the HTML**. After running `python examples/06_local_data.py`, open the **latest** `*_19_localdata.html` in `reports/` and read along with the table below (values below are a snapshot from that run, same source as the tutorial screenshots).
+Below is a real export (target **601398**, period **2021-06-06 to 2024-06-06**) explaining **what each section means when you open the HTML**. After running `python examples/06_local_data.py`, open the **latest** `*.html` in `reports/` and read along with the table below (values below are a snapshot from that run, same source as the tutorial screenshots).
 
-> **Note:** This example strategy **lost money** in this period, making it great for reading reports — negative Sharpe, negative Calmar, deep drawdown are all "risk metrics talking."
+> **Note:** This example strategy is a simple MA 5/20 crossover strategy that **made a modest profit** in this period — positive Sharpe, controlled drawdown, and a decent win rate make it a good example for understanding what a "normal" strategy report looks like.
 
 | Location in HTML | Approx. Value in This Example (see MD/JSON) | How to Read |
 |-----------------|---------------------------------------------|-------------|
-| **Header / Total P&L** | About **-33.28%** | Total return over the full period (relative to initial capital); matches `summary.pnl_pct` and `risk_metrics.total_return`. |
-| **Summary row** | Initial 100,000 → Final **66,718** | Portfolio NAV after deducting trading costs. |
-| **Annualized Return** | **-34.50%** | Annualized level derived from daily returns; often negative for losing strategies. |
-| **Annualized Volatility** | **21.42%** | Magnitude of return fluctuations; higher means a more "jagged" curve. |
-| **Sharpe Ratio** | **-2.01** | Risk-adjusted return; negative when below the risk-free rate with high volatility. |
-| **Sortino Ratio** | **-2.60** | Downside-risk-only adjusted metric; also negative here. |
-| **Max Drawdown** | **-38.32%** | Largest peak-to-trough decline; deep drawdown in this example means heavy risk-control pressure. |
-| **Calmar Ratio** | **-0.90** | Annualized return / \|max drawdown\|; often negative when returns are negative. |
-| **Daily Win Rate** | **14.1%** | `win_rate_daily`: proportion of profitable trading days; different from "trade win rate." |
-| **Win Rate (Trade)** | **12.5%** | `win_rate_trade`: proportion of profitable round-trips among completed buy–sell pairs; here only 1 out of 8 pairs was profitable. |
-| **Profitable / Losing Trades** | **1 / 7** | Win/loss counts at the paired-trade level. |
-| **Profit/Loss Ratio** | **0.07** | Average winner vs. average loser; far below 1 means losses dominate. |
-| **Trade Count (Paired)** | **8** | Number of completed "buy + sell" round-trips; differs from JSON `summary.num_trades` (one-sided trade count, 16 in this example) — see [FAQ](../project/faq.md#faq-json-num-trades). |
-| **Annualized Turnover** | About **807%** (UI) / JSON `annual_turnover` **8.07** | Annualized measure of trade volume relative to portfolio size; the UI often shows it as a percentage. |
-| **Total Commission** | **716.97** | Aggregated commission in the report; the NAV path already reflects costs — this helps assess cost proportion. |
-| **Alpha / Beta / Information Ratio** | Mostly **0** or **1** in this example | May be placeholders when the benchmark series is misaligned; when `summary.benchmark_return` is `null`, see [FAQ](../project/faq.md#faq-benchmark-null). |
+| **Header / Total P&L** | About **+16.11%** | Total return over the full period (relative to initial capital); matches `summary.pnl_pct` and `risk_metrics.total_return`. |
+| **Summary row** | Initial 100,000 → Final **116,108** | Portfolio NAV after deducting trading costs. |
+| **Annualized Return** | **+5.15%** | Annualized level derived from daily returns; slightly above the risk-free rate (~3%) but not spectacular. |
+| **Annualized Volatility** | **12.83%** | Magnitude of return fluctuations; moderate, the curve is not too "jagged." |
+| **Sharpe Ratio** | **+0.22** | Risk-adjusted return; slightly above 0, indicating modest excess return after accounting for risk. |
+| **Sortino Ratio** | **+0.31** | Downside-risk-only adjusted metric; also positive when Sharpe is positive. |
+| **Max Drawdown** | **-14.45%** | Largest peak-to-trough decline; moderate drawdown in this example means manageable risk-control pressure. |
+| **Calmar Ratio** | **+0.36** | Annualized return / \|max drawdown\|; positive when returns are positive and drawdown is controlled. |
+| **Daily Win Rate** | **29.4%** | `win_rate_daily`: proportion of profitable trading days; this strategy holds positions for longer periods, so daily win rate is low but per-trade gains are substantial. |
+| **Win Rate (Trade)** | **65.3%** | `win_rate_trade`: proportion of profitable round-trips among completed buy–sell pairs; over half of the trades were profitable. |
+| **Profitable / Losing Trades** | ~**125 / 66** | Win/loss counts at the paired-trade level; more winning trades than losing ones. |
+| **Profit/Loss Ratio** | **0.97** | Average winner vs. average loser; close to 1 means winning and losing trades are roughly similar in magnitude. |
+| **Trade Count (Paired)** | ~**95** | Number of completed "buy + sell" round-trips; differs from JSON `summary.num_trades` (one-sided trade count, 191 in this example) — see [FAQ](../project/faq.md#faq-json-num-trades). |
+| **Annualized Turnover** | Low | This is a low-frequency timing strategy with relatively low turnover. |
+| **Total Commission** | **0.00** | This example uses local data backtesting, so commission shows as 0; in real trading, commissions would apply. |
+| **Alpha / Beta / Information Ratio** | Depends on benchmark alignment | May be placeholders when the benchmark series is misaligned; when `summary.benchmark_return` is `null`, see [FAQ](../project/faq.md#faq-benchmark-null). |
 
 **Interactive area (candlestick, cumulative returns, drawdown, daily P&L)**: Drag and zoom with the mouse; compare the strategy line vs. the benchmark line to see "did it beat the index?" If **the entire chart area is blank**, it's most likely due to **CDN scripts being blocked by your network** — you need internet access or a different network (see [FAQ — HTML Charts Blank](../project/faq.md#faq-html-blank)).
 
