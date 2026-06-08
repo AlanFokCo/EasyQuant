@@ -24,12 +24,19 @@ class BaseMLModel:
     model_type : str
         One of ``'random_forest'``, ``'logistic_regression'``,
         ``'gradient_boosting'``, ``'xgboost'``.
+    is_classifier : bool
+        Whether the model should be a classifier (``True``) or regressor
+        (``False``). Default is ``True`` for backward compatibility.
+        Set to ``False`` when the target is continuous (e.g. returns).
     **kwargs
         Additional keyword arguments passed to the underlying estimator.
 
     Examples
     --------
-    >>> model = BaseMLModel('random_forest', n_estimators=100, max_depth=5)
+    >>> # Classification (default)
+    >>> model = BaseMLModel('random_forest')
+    >>> # Regression (continuous target)
+    >>> model = BaseMLModel('random_forest', is_classifier=False)
     >>> model.fit(X_train, y_train)
     >>> predictions = model.predict(X_test)
     >>> importance = model.feature_importances()
@@ -42,85 +49,101 @@ class BaseMLModel:
         "xgboost",
     }
 
-    def __init__(self, model_type: str = "random_forest", **kwargs):
+    def __init__(self, model_type: str = "random_forest", is_classifier: bool = True, **kwargs):
         if model_type not in self._SUPPORTED_TYPES:
             raise ValueError(
                 f"Unsupported model_type '{model_type}'. "
                 f"Choose from {self._SUPPORTED_TYPES}"
             )
         self.model_type = model_type
+        self.is_classifier = is_classifier
         self.kwargs = kwargs
         self._model = None
         self._feature_names: list[str] = []
-        self._is_classifier: bool = False
+        self._is_classifier: bool = is_classifier
         self._build_model()
 
     def _build_model(self):
         """Instantiate the underlying sklearn model."""
         mt = self.model_type
         kw = self.kwargs
+        is_clf = self._is_classifier
 
         if mt == "random_forest":
-            from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-
-            n_estimators = kw.get("n_estimators", 100)
-            max_depth = kw.get("max_depth", 5)
-            min_samples_leaf = kw.get("min_samples_leaf", 5)
-            random_state = kw.get("random_state", 42)
-            # Default to classifier for stock selection (rank by probability)
-            self._model = RandomForestClassifier(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                min_samples_leaf=min_samples_leaf,
-                random_state=random_state,
-                n_jobs=-1,
-            )
-            self._is_classifier = True
+            if is_clf:
+                from sklearn.ensemble import RandomForestClassifier
+                self._model = RandomForestClassifier(
+                    n_estimators=kw.get("n_estimators", 100),
+                    max_depth=kw.get("max_depth", 5),
+                    min_samples_leaf=kw.get("min_samples_leaf", 5),
+                    random_state=kw.get("random_state", 42),
+                    n_jobs=-1,
+                )
+            else:
+                from sklearn.ensemble import RandomForestRegressor
+                self._model = RandomForestRegressor(
+                    n_estimators=kw.get("n_estimators", 100),
+                    max_depth=kw.get("max_depth", 5),
+                    min_samples_leaf=kw.get("min_samples_leaf", 5),
+                    random_state=kw.get("random_state", 42),
+                    n_jobs=-1,
+                )
 
         elif mt == "logistic_regression":
-            from sklearn.linear_model import LogisticRegression
-
-            max_iter = kw.get("max_iter", 1000)
-            C = kw.get("C", 1.0)
-            self._model = LogisticRegression(
-                max_iter=max_iter, C=C, random_state=kw.get("random_state", 42)
-            )
-            self._is_classifier = True
+            if is_clf:
+                from sklearn.linear_model import LogisticRegression
+                self._model = LogisticRegression(
+                    max_iter=kw.get("max_iter", 1000),
+                    C=kw.get("C", 1.0),
+                    random_state=kw.get("random_state", 42),
+                )
+            else:
+                from sklearn.linear_model import LinearRegression
+                self._model = LinearRegression()
 
         elif mt == "gradient_boosting":
-            from sklearn.ensemble import GradientBoostingClassifier
-
-            n_estimators = kw.get("n_estimators", 100)
-            max_depth = kw.get("max_depth", 3)
-            learning_rate = kw.get("learning_rate", 0.1)
-            self._model = GradientBoostingClassifier(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                learning_rate=learning_rate,
-                random_state=kw.get("random_state", 42),
-            )
-            self._is_classifier = True
+            if is_clf:
+                from sklearn.ensemble import GradientBoostingClassifier
+                self._model = GradientBoostingClassifier(
+                    n_estimators=kw.get("n_estimators", 100),
+                    max_depth=kw.get("max_depth", 3),
+                    learning_rate=kw.get("learning_rate", 0.1),
+                    random_state=kw.get("random_state", 42),
+                )
+            else:
+                from sklearn.ensemble import GradientBoostingRegressor
+                self._model = GradientBoostingRegressor(
+                    n_estimators=kw.get("n_estimators", 100),
+                    max_depth=kw.get("max_depth", 3),
+                    learning_rate=kw.get("learning_rate", 0.1),
+                    random_state=kw.get("random_state", 42),
+                )
 
         elif mt == "xgboost":
             try:
-                from xgboost import XGBClassifier
+                if is_clf:
+                    from xgboost import XGBClassifier
+                    self._model = XGBClassifier(
+                        n_estimators=kw.get("n_estimators", 100),
+                        max_depth=kw.get("max_depth", 5),
+                        learning_rate=kw.get("learning_rate", 0.1),
+                        random_state=kw.get("random_state", 42),
+                        use_label_encoder=False,
+                        eval_metric="logloss",
+                    )
+                else:
+                    from xgboost import XGBRegressor
+                    self._model = XGBRegressor(
+                        n_estimators=kw.get("n_estimators", 100),
+                        max_depth=kw.get("max_depth", 5),
+                        learning_rate=kw.get("learning_rate", 0.1),
+                        random_state=kw.get("random_state", 42),
+                    )
             except ImportError as exc:
                 raise ImportError(
                     "xgboost is required for model_type='xgboost'. "
                     "Install with: pip install xgboost"
                 ) from exc
-            n_estimators = kw.get("n_estimators", 100)
-            max_depth = kw.get("max_depth", 5)
-            learning_rate = kw.get("learning_rate", 0.1)
-            self._model = XGBClassifier(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                learning_rate=learning_rate,
-                random_state=kw.get("random_state", 42),
-                use_label_encoder=False,
-                eval_metric="logloss",
-            )
-            self._is_classifier = True
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
         """Fit the underlying model.
@@ -152,10 +175,11 @@ class BaseMLModel:
         self._model.fit(X_clean, y_clean)
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Return model predictions (or probabilities for classifiers).
+        """Return model predictions.
 
         For classifiers, returns the probability of the positive class
         (higher = more likely to have positive return).
+        For regressors, returns the predicted value directly.
         """
         if self._model is None:
             raise RuntimeError("Model has not been trained.")
@@ -204,7 +228,7 @@ class BaseMLModel:
         if hasattr(self._model, "feature_importances_"):
             importances = self._model.feature_importances_
         elif hasattr(self._model, "coef_"):
-            # Logistic regression: use absolute coefficient values
+            # Logistic regression / Linear regression: use absolute coefficient values
             importances = np.abs(self._model.coef_[0])
 
         if importances is not None and self._feature_names:
@@ -225,9 +249,9 @@ class BaseMLModel:
             raise RuntimeError("Model has not been trained.")
         data = {
             "model_type": self.model_type,
+            "is_classifier": self._is_classifier,
             "kwargs": self.kwargs,
             "feature_names": self._feature_names,
-            "is_classifier": self._is_classifier,
             "model": self._model,
         }
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -251,10 +275,10 @@ class BaseMLModel:
         with open(path, "rb") as f:
             data = pickle.load(f)
 
-        instance = cls(data["model_type"], **data["kwargs"])
+        instance = cls(data["model_type"], is_classifier=data.get("is_classifier", True), **data["kwargs"])
         instance._model = data["model"]
         instance._feature_names = data["feature_names"]
-        instance._is_classifier = data["is_classifier"]
+        instance._is_classifier = data.get("is_classifier", True)
         return instance
 
     def _align_columns(self, X: pd.DataFrame) -> pd.DataFrame:

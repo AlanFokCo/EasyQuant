@@ -143,8 +143,7 @@ def auto_tune_selector(
     # Compute features
     X = selector.pipeline.compute(securities, context, lookback=selector.lookback)
 
-    # Compute target
-    from .selection import MLSelector
+    # Compute target using selector's internal method
     if hasattr(selector, "_compute_target"):
         y = selector._compute_target(securities, context, selector.target)
     else:

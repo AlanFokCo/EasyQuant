@@ -15,6 +15,32 @@ from eqlib.data import attribute_history
 log = logging.getLogger(__name__)
 
 
+def _safe_scalar(val: pd.Series, default: float = np.nan) -> float:
+    """Safely extract the last scalar value from a Series."""
+    try:
+        if val is not None and not val.empty and not pd.isna(val.iloc[-1]):
+            return float(val.iloc[-1])
+    except Exception:
+        pass
+    return default
+
+
+def _compute_indicator_safe(name: str, compute_fn, *args, **kwargs) -> dict:
+    """Wrapper that computes an indicator and handles exceptions gracefully.
+
+    Returns a dict ``{name: value}`` with NaN on failure.
+    """
+    try:
+        result = compute_fn(*args, **kwargs)
+        # Support both single Series and tuple returns
+        if isinstance(result, tuple):
+            names = kwargs.pop("names", [])
+            return {n: _safe_scalar(v) for n, v in zip(names, result)}
+        return {name: _safe_scalar(result)}
+    except Exception:
+        return {name: np.nan}
+
+
 class FeaturePipeline:
     """Builds ML-ready feature matrices from OHLCV data.
 
@@ -195,11 +221,7 @@ class FeaturePipeline:
     @staticmethod
     def _compute_rsi(close: pd.Series) -> dict:
         from eqlib.utils.indicators import rsi
-        try:
-            val = rsi(close, 14)
-            return {'rsi': float(val.iloc[-1]) if not val.empty and not pd.isna(val.iloc[-1]) else np.nan}
-        except Exception:
-            return {'rsi': np.nan}
+        return _compute_indicator_safe('rsi', rsi, close, 14)
 
     @staticmethod
     def _compute_macd(close: pd.Series) -> dict:
@@ -207,21 +229,21 @@ class FeaturePipeline:
         try:
             dif, dea, hist = macd(close, fast=12, slow=26, signal=9)
             return {
-                'macd_dif': float(dif.iloc[-1]) if not dif.empty and not pd.isna(dif.iloc[-1]) else np.nan,
-                'macd_dea': float(dea.iloc[-1]) if not dea.empty and not pd.isna(dea.iloc[-1]) else np.nan,
-                'macd_hist': float(hist.iloc[-1]) if not hist.empty and not pd.isna(hist.iloc[-1]) else np.nan,
+                'macd_dif': _safe_scalar(dif),
+                'macd_dea': _safe_scalar(dea),
+                'macd_hist': _safe_scalar(hist),
             }
         except Exception:
-            return {'macd_dif': np.nan, 'macd_dea': np.nan, 'macd_hist': np.nan}
+            return {
+                'macd_dif': np.nan,
+                'macd_dea': np.nan,
+                'macd_hist': np.nan,
+            }
 
     @staticmethod
     def _compute_atr(high: pd.Series, low: pd.Series, close: pd.Series) -> dict:
         from eqlib.utils.indicators import atr
-        try:
-            val = atr(high, low, close, 14)
-            return {'atr': float(val.iloc[-1]) if not val.empty and not pd.isna(val.iloc[-1]) else np.nan}
-        except Exception:
-            return {'atr': np.nan}
+        return _compute_indicator_safe('atr', atr, high, low, close, 14)
 
     @staticmethod
     def _compute_bollinger(close: pd.Series) -> dict:
@@ -229,12 +251,16 @@ class FeaturePipeline:
         try:
             upper, mid, lower = boll(close, period=20, num_std=2.0)
             return {
-                'boll_upper': float(upper.iloc[-1]) if not upper.empty and not pd.isna(upper.iloc[-1]) else np.nan,
-                'boll_mid': float(mid.iloc[-1]) if not mid.empty and not pd.isna(mid.iloc[-1]) else np.nan,
-                'boll_lower': float(lower.iloc[-1]) if not lower.empty and not pd.isna(lower.iloc[-1]) else np.nan,
+                'boll_upper': _safe_scalar(upper),
+                'boll_mid': _safe_scalar(mid),
+                'boll_lower': _safe_scalar(lower),
             }
         except Exception:
-            return {'boll_upper': np.nan, 'boll_mid': np.nan, 'boll_lower': np.nan}
+            return {
+                'boll_upper': np.nan,
+                'boll_mid': np.nan,
+                'boll_lower': np.nan,
+            }
 
     @staticmethod
     def _compute_donchian(high: pd.Series, low: pd.Series, close: pd.Series) -> dict:
@@ -242,30 +268,26 @@ class FeaturePipeline:
         try:
             upper, mid, lower = donchian(high, low, close, period=20)
             return {
-                'donchian_upper': float(upper.iloc[-1]) if not upper.empty and not pd.isna(upper.iloc[-1]) else np.nan,
-                'donchian_mid': float(mid.iloc[-1]) if not mid.empty and not pd.isna(mid.iloc[-1]) else np.nan,
-                'donchian_lower': float(lower.iloc[-1]) if not lower.empty and not pd.isna(lower.iloc[-1]) else np.nan,
+                'donchian_upper': _safe_scalar(upper),
+                'donchian_mid': _safe_scalar(mid),
+                'donchian_lower': _safe_scalar(lower),
             }
         except Exception:
-            return {'donchian_upper': np.nan, 'donchian_mid': np.nan, 'donchian_lower': np.nan}
+            return {
+                'donchian_upper': np.nan,
+                'donchian_mid': np.nan,
+                'donchian_lower': np.nan,
+            }
 
     @staticmethod
     def _compute_cci(high: pd.Series, low: pd.Series, close: pd.Series) -> dict:
         from eqlib.utils.indicators import cci
-        try:
-            val = cci(high, low, close, 14)
-            return {'cci': float(val.iloc[-1]) if not val.empty and not pd.isna(val.iloc[-1]) else np.nan}
-        except Exception:
-            return {'cci': np.nan}
+        return _compute_indicator_safe('cci', cci, high, low, close, 14)
 
     @staticmethod
     def _compute_obv(close: pd.Series, volume: pd.Series) -> dict:
         from eqlib.utils.indicators import obv
-        try:
-            val = obv(close, volume)
-            return {'obv': float(val.iloc[-1]) if not val.empty and not pd.isna(val.iloc[-1]) else np.nan}
-        except Exception:
-            return {'obv': np.nan}
+        return _compute_indicator_safe('obv', obv, close, volume)
 
     @staticmethod
     def _compute_volume_ratio(volume: pd.Series) -> dict:
@@ -299,8 +321,4 @@ class FeaturePipeline:
     def _compute_roc(close: pd.Series) -> dict:
         """Rate of change (12-period)."""
         from eqlib.utils.indicators import roc
-        try:
-            val = roc(close, 12)
-            return {'roc': float(val.iloc[-1]) if not val.empty and not pd.isna(val.iloc[-1]) else np.nan}
-        except Exception:
-            return {'roc': np.nan}
+        return _compute_indicator_safe('roc', roc, close, 12)
