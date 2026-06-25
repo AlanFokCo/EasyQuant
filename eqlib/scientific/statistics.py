@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-TRADING_DAYS_PER_YEAR = 252
+from eqlib.constants import TRADING_DAYS_PER_YEAR
 DEFAULT_BOOTSTRAP_METRICS = [
     "sharpe_ratio",
     "annual_return",

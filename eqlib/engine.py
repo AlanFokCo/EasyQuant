@@ -1194,8 +1194,8 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
     object.__setattr__(session, '_preloaded', preloaded)
 
     session._order_cost = OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         close_today_commission=0, min_commission=5,
     )
     session._benchmark = benchmark
@@ -1564,8 +1564,8 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     object.__setattr__(session, '_preloaded', _preloaded_fallback)
 
     session._order_cost = OrderCost(
-        open_tax=0, close_tax=0.001,
-        open_commission=0.0003, close_commission=0.0003,
+        open_tax=0, close_tax=0.0005,
+        open_commission=0.00025, close_commission=0.00025,
         close_today_commission=0, min_commission=5,
     )
     session._benchmark = benchmark

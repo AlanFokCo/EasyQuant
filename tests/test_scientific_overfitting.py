@@ -116,6 +116,76 @@ class TestWalkForwardAnalysis:
         """walk_forward_analysis requires an initialize_func; just verify import."""
         assert callable(walk_forward_analysis)
 
+    def test_wfa_dict_input_produces_multiple_windows(self):
+        """Slicing a pre-computed result should produce multiple rolling windows."""
+        result = _make_backtest_result(n_days=504)
+        wfa = walk_forward_analysis(
+            result,
+            param_ranges=None,
+            train_window="1Y",
+            test_window="3M",
+            step="3M",
+        )
+        assert isinstance(wfa, WalkForwardResult)
+        assert len(wfa.windows) >= 2, "walk-forward should produce multiple windows, not a single slice"
+        for w in wfa.windows:
+            assert "train_start" in w and "train_end" in w
+            assert "test_start" in w and "test_end" in w
+            assert "is_metrics" in w and "oos_metrics" in w
+            assert "sharpe" in w["is_metrics"]
+            assert "sharpe" in w["oos_metrics"]
+
+    def test_wfa_windows_are_time_ordered(self):
+        """Each window's test_start should be >= train_end (no overlap)."""
+        result = _make_backtest_result(n_days=504)
+        wfa = walk_forward_analysis(
+            result,
+            param_ranges=None,
+            train_window="1Y",
+            test_window="3M",
+            step="3M",
+        )
+        for w in wfa.windows:
+            assert w["test_start"] >= w["train_end"]
+
+    def test_wfa_oos_is_ratio_aggregated(self):
+        """oos_is_ratio is computed from mean of per-window sharpes."""
+        result = _make_backtest_result(n_days=504, annual_return=0.15, seed=42)
+        wfa = walk_forward_analysis(
+            result,
+            param_ranges=None,
+            train_window="1Y",
+            test_window="3M",
+            step="3M",
+        )
+        assert wfa.oos_is_ratio is not None
+        assert isinstance(wfa.oos_is_ratio, float)
+        assert isinstance(wfa.is_sharpe_decay, bool)
+
+    def test_wfa_short_data_returns_empty(self):
+        """Result with too few days should return empty windows."""
+        result = _make_backtest_result(n_days=10)
+        wfa = walk_forward_analysis(
+            result,
+            param_ranges=None,
+            train_window="2Y",
+            test_window="6M",
+            step="6M",
+        )
+        assert wfa.windows == []
+
+    def test_wfa_invalid_window_returns_empty(self):
+        """Unparseable window specifiers should return empty result."""
+        result = _make_backtest_result(n_days=504)
+        wfa = walk_forward_analysis(
+            result,
+            param_ranges=None,
+            train_window="invalid",
+            test_window="6M",
+            step="6M",
+        )
+        assert wfa.windows == []
+
 
 class TestOverfittingWarning:
     """Tests for OverfittingWarning constants."""

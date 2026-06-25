@@ -27,9 +27,9 @@ set_order_cost(OrderCost(open_tax=0, close_tax=0.0005,
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `open_tax` | `0` | Buy-side stamp duty |
-| `close_tax` | `0.001` | Sell-side stamp duty |
-| `open_commission` | `0.0003` | Buy-side commission |
-| `close_commission` | `0.0003` | Sell-side commission |
+| `close_tax` | `0.0005` | Sell-side stamp duty |
+| `open_commission` | `0.00025` | Buy-side commission |
+| `close_commission` | `0.00025` | Sell-side commission |
 | `close_today_commission` | `0` | Intraday sell commission |
 | `min_commission` | `5` | Minimum commission (¥) |
 

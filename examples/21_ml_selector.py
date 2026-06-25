@@ -1,48 +1,63 @@
 """
-Example 21: ML-based stock selection strategy
+21 - ML-based Stock Selection
+=============================
 
-Demonstrates how to use MLSelector to replace hand-tuned factor weights
-with a machine-learning model that learns from historical data.
+Demonstrates using MLSelector to replace hand-tuned factor weights with a
+machine-learning model that learns from historical data. The selector trains
+on past 5-day returns as labels and ranks the universe by predicted
+performance each week.
 
-Run with:
+Teaching Objectives:
+    - MLSelector as a drop-in replacement for rule-based stock selection
+    - Feature pipeline with technical indicators (RSI, MACD, ATR, etc.)
+    - Weekly rebalance flow with ML-driven ranking
+    - Honest target naming: ``past_return_5d`` (not ``forward_return_5d``)
+
+Expected Output:
+    - Weekly ML training logs
+    - Selected top-N stocks for each rebalance
+    - Final portfolio metrics via run_strategy report
+
+Run:
     python examples/21_ml_selector.py
 """
 
-import sys
-sys.path.insert(0, '.')
-
 from eqlib import (
-    run_strategy, set_benchmark, set_order_cost, OrderCost,
+    run_strategy, set_benchmark, set_order_cost,
     run_weekly, before_trading_start, order_target, order_value,
     MLSelector, log, g,
 )
-from examples._defaults import DEFAULT_ORDER_COST
+from examples._defaults import DEFAULT_ORDER_COST, START_DATE, END_DATE
+
+
+UNIVERSE = [
+    '601390', '600519', '000858', '002594', '601398',
+    '000001', '600036', '600887', '601288', '600276',
+]
 
 
 def initialize(context):
     set_benchmark('000300.XSHG')
-    set_order_cost(OrderCost(open_tax=0, close_tax=0.001,
-                              open_commission=0.0003, close_commission=0.0003))
+    set_order_cost(DEFAULT_ORDER_COST)
 
-    # Stock universe
-    context.universe = ['601390', '600519', '000858', '002594', '601398',
-                        '000001', '600036', '600887', '601288', '600276']
+    context.universe = UNIVERSE
 
-    # ML Selector - learns from historical data to pick top stocks
-    # This replaces manual weight tuning with a learned model
+    # ML Selector — learns from historical data to pick top stocks.
+    # target='past_return_5d' uses historical 5-day returns as labels.
+    # For true forward-return prediction, provide label_data (panel).
     g.selector = MLSelector(
         model='random_forest',
         features=['rsi', 'macd_hist', 'atr', 'momentum', 'volatility', 'volume_ratio'],
-        target='forward_return_5d',
+        target='past_return_5d',
         top_n=3,
     )
 
-    # Weekly rebalance
+    before_trading_start(train_model)
     run_weekly(rebalance, day_of_week=0, time='every_bar')
 
 
-def before_trading_start(context):
-    # Train model on available historical data before each rebalance
+def train_model(context, data=None):
+    """Pre-market training hook — refreshes the ML model each trading day."""
     try:
         g.selector.train(context.universe, context)
     except Exception as exc:
@@ -50,16 +65,13 @@ def before_trading_start(context):
 
 
 def rebalance(context):
-    # Get top stocks from ML model
     selected = g.selector.rank(context.universe, context)
     log.info("ML selected: %s", selected)
 
-    # Sell positions not in selected list
     for pos in list(context.portfolio.positions.keys()):
         if pos not in selected:
             order_target(pos, 0)
 
-    # Buy selected stocks with equal weight
     if selected:
         cash_per_stock = context.portfolio.available_cash / len(selected)
         for stock in selected:
@@ -69,9 +81,8 @@ def rebalance(context):
 if __name__ == "__main__":
     result = run_strategy(
         initialize,
-        start_date='2022-01-01',
-        end_date='2024-01-01',
-        securities=['601390', '600519', '000858', '002594', '601398',
-                    '000001', '600036', '600887', '601288', '600276'],
+        start_date=START_DATE,
+        end_date=END_DATE,
+        securities=UNIVERSE,
         report_dir='reports',
     )

@@ -28,6 +28,24 @@ def _is_classification_target(target: str) -> bool:
 class MLSelector(StockSelector):
     """Machine-learning based stock selector.
 
+    .. warning::
+
+        The default training path uses a **single cross-section** (one day's
+        data) to fit the model. With small universes (<50 stocks) this
+        produces few samples and the model cannot learn meaningful patterns.
+        For robust training, provide ``label_data`` as a panel DataFrame
+        with historical features and labels across many dates.
+
+    .. warning::
+
+        ``target='past_return_5d'`` (the default) uses **past** returns as
+        labels, not forward returns. This is a simplification for
+        backward compatibility and does not produce a true forward-looking
+        model. ``target='forward_return_5d'`` is intentionally not
+        implemented — attempting to use it raises ``NotImplementedError``.
+        For true forward-return prediction, provide ``label_data`` with
+        pre-computed forward labels.
+
     Parameters
     ----------
     model : str or BaseMLModel
@@ -58,6 +76,9 @@ class MLSelector(StockSelector):
         with columns ``['security', 'date', 'label']``.
         When ``None``, labels are computed from historical data using
         the selected ``target`` (past returns by default).
+    custom_features : dict or None
+        Optional mapping of ``{name: func(close, high, low, volume) -> float}``
+        for custom feature functions. Names must also appear in ``features``.
     **model_kwargs
         Additional keyword arguments passed to the model constructor.
 
@@ -81,6 +102,7 @@ class MLSelector(StockSelector):
         train_end: Optional[str] = None,
         lookback: int = 60,
         label_data: Optional[pd.DataFrame] = None,
+        custom_features: Optional[dict] = None,
         **model_kwargs,
     ):
         self.model_type = model if isinstance(model, str) else model.model_type
@@ -90,7 +112,7 @@ class MLSelector(StockSelector):
         else:
             self._model = BaseMLModel(model, is_classifier=self.is_classifier, **model_kwargs)
 
-        self.pipeline = FeaturePipeline(features=features)
+        self.pipeline = FeaturePipeline(features=features, custom_features=custom_features)
         self.target = target
         self.top_n = top_n
         self.train_start = train_start
@@ -236,11 +258,18 @@ class MLSelector(StockSelector):
         Uses historical data only — no look-ahead bias.
         **Note:** These are *past* returns, not forward returns.
         """
+        if target_name == "forward_return_5d":
+            raise NotImplementedError(
+                "true forward-return prediction requires label_data panel; "
+                "use past_return_5d for backward-compatible behavior or "
+                "provide label_data"
+            )
+
         results = {}
 
         for sec in securities:
             try:
-                if target_name in ("past_return_5d", "forward_return_5d"):
+                if target_name == "past_return_5d":
                     hist = attribute_history(
                         sec, self.lookback + 10, "1d", fields=["close"]
                     )

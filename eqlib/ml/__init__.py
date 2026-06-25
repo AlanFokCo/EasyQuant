@@ -9,7 +9,7 @@ Usage:
     selector = MLSelector(
         model='random_forest',
         features=['rsi', 'macd_hist', 'atr', 'momentum'],
-        target='forward_return_5d',
+        target='past_return_5d',
         top_n=5
     )
     selected = selector.rank(context.universe, context)

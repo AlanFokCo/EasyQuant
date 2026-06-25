@@ -19,7 +19,7 @@ class TestMLSelectorIntegration:
         selector = MLSelector(
             model='random_forest',
             features=['momentum', 'volatility'],
-            target='forward_return_5d',
+            target='past_return_5d',
             top_n=2,
         )
         assert selector.top_n == 2
@@ -31,7 +31,7 @@ class TestMLSelectorIntegration:
 
         selector = MLSelector(
             features=['momentum'],
-            target='forward_return_5d',
+            target='past_return_5d',
         )
         # Without a proper backtest context, train should handle gracefully
         class FakeContext:
@@ -51,6 +51,20 @@ class TestMLSelectorIntegration:
 
         result = selector.rank(['601390', '600519', '000858'], FakeContext())
         assert result == ['601390', '600519']
+
+    def test_ml_selector_forward_return_raises(self):
+        """forward_return_5d is intentionally not implemented — must raise."""
+        from eqlib.ml.selection import MLSelector
+
+        selector = MLSelector(
+            features=['momentum'],
+            target='forward_return_5d',
+        )
+        class FakeContext:
+            current_dt = pd.Timestamp('2024-01-15')
+
+        with pytest.raises(NotImplementedError):
+            selector._compute_target(['601390'], FakeContext(), 'forward_return_5d')
 
 
 class TestFeaturePipelineIntegration:

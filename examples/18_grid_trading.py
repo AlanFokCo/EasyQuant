@@ -11,8 +11,16 @@ Strategy Design Rationale:
     - Why grid: Works well on stocks that oscillate within a range.
       601398 (ICBC) historically trades within tight ranges due to
       its large market cap and institutional ownership.
-    - Grid construction: Uses recent 60-day high/low to define the
-      range, divided into 10 equal intervals.
+    - Grid construction: Uses recent 30-day high/low to define the
+      range, divided into 8 equal intervals (9 levels).
+    - Trigger logic: Track the grid level the price was in last bar.
+      When price crosses DOWN to a lower level, buy (dip-buying at
+      grid support). When price crosses UP to a higher level, sell
+      (profit-taking at grid resistance). This is the canonical
+      grid-trading pattern — every crossing generates a trade.
+    - Grid stability: Range is rebuilt only when 30-day high/low
+      shifts by more than 5%, so grid_filled state is not wiped
+      out by daily noise.
     - Position sizing: Each grid trade uses 1/N of total capital,
       preventing over-concentration at any single level.
     - Applicable: Range-bound, high-liquidity stocks.
@@ -21,14 +29,14 @@ Strategy Design Rationale:
 
 Teaching Objectives:
     - Grid level construction from price range
-    - Grid state management (which levels are filled)
-    - Proportional position sizing per grid level
-    - Range-bound market detection
+    - Level-crossing detection (last_level vs current_level)
+    - Stable grid rebuild (only on significant range shift)
+    - Proportional position sizing per grid trade
 
 Expected Output:
     - Backtest with evaluation panel
-    - Grid trade log showing level-based buy/sell
-    - Multiple small-profit trades
+    - Grid trade log showing level-crossing buy/sell
+    - Multiple small-profit round-trip trades
 
 Run:
     python examples/18_grid_trading.py
@@ -56,10 +64,11 @@ from examples._defaults import (
 SECURITY = STOCKS["bank"]
 SECURITY_TRADE = STOCKS_TRADE["bank"]
 
-# Grid: 10 levels across the recent price range
-GRID_LEVELS = 10
-RANGE_LOOKBACK = 60  # Use 60-day high/low to define range
+# Grid: 8 intervals (9 levels) across the recent 30-day price range
+GRID_LEVELS = 8
+RANGE_LOOKBACK = 30  # Use 30-day high/low to define range
 RANGE_BUFFER = 0.02  # 2% buffer above high / below low
+REBUILD_THRESHOLD = 0.05  # Rebuild grid only if range shifts >5%
 
 # Each grid trade uses this fraction of capital
 CAPITAL_PER_GRID = 1.0 / (GRID_LEVELS + 2)  # Leave buffer
@@ -79,13 +88,14 @@ def initialize(context):
     g.grid_levels = GRID_LEVELS
     g.range_lookback = RANGE_LOOKBACK
     g.range_buffer = RANGE_BUFFER
+    g.rebuild_threshold = REBUILD_THRESHOLD
     g.capital_per_grid = CAPITAL_PER_GRID
 
     # Grid state
     g.grid_prices = None     # List of grid level prices
-    g.grid_filled = None     # Boolean list: which levels have positions
     g.range_high = None
     g.range_low = None
+    g.last_level = None      # Last bar's grid level (for crossing detection)
 
     context.universe = [g.security]
     run_daily(market_open, time="every_bar")
@@ -100,13 +110,12 @@ def build_grid(high, low):
     buffered_low = low * (1 - g.range_buffer)
 
     if buffered_low <= 0:
-        return None, None, None
+        return None, None
 
     step = (buffered_high - buffered_low) / g.grid_levels
     grid_prices = [buffered_low + i * step for i in range(g.grid_levels + 1)]
-    grid_filled = [False] * (g.grid_levels + 1)
 
-    return grid_prices, grid_filled, (buffered_high, buffered_low)
+    return grid_prices, (buffered_high, buffered_low)
 
 
 def find_grid_level(price, grid_prices):
@@ -124,7 +133,7 @@ def find_grid_level(price, grid_prices):
 
 
 def market_open(context):
-    """Grid trading logic: buy at lower levels, sell at upper levels."""
+    """Grid trading logic: buy on downward crossings, sell on upward crossings."""
     security = g.security
     security_trade = g.security_trade
 
@@ -138,10 +147,16 @@ def market_open(context):
     range_high = hist["high"].tail(g.range_lookback).max()
     range_low = hist["low"].tail(g.range_lookback).min()
 
-    # Build or update grid
-    if g.grid_prices is None or range_high != g.range_high or range_low != g.range_low:
-        g.grid_prices, g.grid_filled, (g.range_high, g.range_low) = build_grid(
-            range_high, range_low)
+    # Build grid on first run, or rebuild only if range has shifted significantly
+    need_rebuild = (
+        g.grid_prices is None
+        or g.range_high is None
+        or abs(range_high - g.range_high) / g.range_high > g.rebuild_threshold
+        or abs(range_low - g.range_low) / (g.range_low or range_low) > g.rebuild_threshold
+    )
+    if need_rebuild:
+        g.grid_prices, (g.range_high, g.range_low) = build_grid(range_high, range_low)
+        g.last_level = None  # Reset crossing tracker after rebuild
         if g.grid_prices is None:
             return
 
@@ -157,28 +172,29 @@ def market_open(context):
     total_value = context.portfolio.total_value
     trade_value = total_value * g.capital_per_grid
 
-    # === Buy: price drops to a grid level that isn't filled ===
-    if not g.grid_filled[level] and level < len(g.grid_prices) // 2:
-        # Only buy at lower half of grid (below midpoint)
-        cash = context.portfolio.available_cash
-        if cash > trade_value * 0.5:
-            order_value(security_trade, min(trade_value, cash * 0.95))
-            g.grid_filled[level] = True
-            log.info("GRID BUY: level %d @ %.2f (grid=%.2f)",
-                     level, current_price, g.grid_prices[level])
+    # First bar after rebuild: just record level, no trade
+    if g.last_level is None:
+        g.last_level = level
+    else:
+        # Price crossed DOWN to a lower level → BUY (dip at grid support)
+        if level < g.last_level:
+            cash = context.portfolio.available_cash
+            if cash > trade_value * 0.5:
+                buy_value = min(trade_value, cash * 0.9)
+                order_value(security_trade, buy_value)
+                log.info("GRID BUY: level %d→%d @ %.2f (grid=%.2f)",
+                         g.last_level, level, current_price, g.grid_prices[level])
 
-    # === Sell: price rises to a filled grid level above current ===
-    elif g.grid_filled[level] and level > len(g.grid_prices) // 2:
-        # Only sell at upper half of grid (above midpoint)
-        if has_position:
+        # Price crossed UP to a higher level → SELL (profit at grid resistance)
+        elif level > g.last_level and has_position:
             position = context.portfolio.positions[security_trade]
-            # Sell proportional to grid level
-            sell_shares = max(100, (position.amount // g.grid_levels) * 100 // 100 * 100)
-            if sell_shares > 0 and sell_shares <= position.amount:
-                order_target(security_trade, position.amount - sell_shares)
-                g.grid_filled[level] = False
-                log.info("GRID SELL: level %d @ %.2f (grid=%.2f)",
-                         level, current_price, g.grid_prices[level])
+            sell_value = min(trade_value, position.value * 0.5)
+            if sell_value > 0:
+                order_value(security_trade, -sell_value)
+                log.info("GRID SELL: level %d→%d @ %.2f (grid=%.2f)",
+                         g.last_level, level, current_price, g.grid_prices[level])
+
+        g.last_level = level
 
     # Record for charting
     mid_price = g.grid_prices[len(g.grid_prices) // 2] if g.grid_prices else 0
@@ -217,4 +233,4 @@ if __name__ == "__main__":
     )
 
     if result:
-        print_evaluation(result, "Grid Trading (10 levels)")
+        print_evaluation(result, "Grid Trading (8 levels)")

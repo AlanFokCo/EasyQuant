@@ -40,9 +40,9 @@ class TestOrderCost:
     def test_order_cost_defaults(self):
         cost = OrderCost()
         assert cost.open_tax == 0
-        assert cost.close_tax == 0.001
-        assert cost.open_commission == 0.0003
-        assert cost.close_commission == 0.0003
+        assert cost.close_tax == 0.0005
+        assert cost.open_commission == 0.00025
+        assert cost.close_commission == 0.00025
         assert cost.min_commission == 5
 
     def test_order_cost_custom(self):

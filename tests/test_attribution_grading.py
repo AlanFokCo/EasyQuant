@@ -29,7 +29,7 @@ def _make_analytics(**overrides):
         "annual_turnover": 3.0,
         "total_commission": 200.0,
         "net_return": 0.15,
-        "trading_days": 252,
+        "trading_days": 244,
         "num_trades": 40,
         "excess_return": 0.07,
         "benchmark_return": 0.08,

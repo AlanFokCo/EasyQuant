@@ -76,7 +76,7 @@ Event-driven backtest engine with JoinQuant/Zipline-compatible API.
 
 **Key files:**
 - `engine.py` — Backtest engine: `run_backtest`, `run_daily`, `run_paper_trade`
-- `data.py` — Data API: `get_price`, `attribute_history`, `fetch_stock_data`, fundamentals, indices
+- `data.py` — Data API: `get_price`, `attribute_history`, `fetch_stock_data`, fundamentals, indices, A-share specifics (`get_north_money_flow`, `get_margin_data`, `get_limit_up_down_stats`, `get_restriction_release`)
 - `trade.py` — Order execution: `order`, `order_target`, `order_value`
 - `attribution.py` — Performance analysis: `analyze_returns`, `brinson_attribution`, `simple_factor_analysis`, `grade_strategy`, `diagnose_bottleneck`, `recommend_params`
 - `report.py` — HTML/PNG/Markdown/JSON report generation (dark theme, Agent-First JSON)
@@ -89,10 +89,14 @@ Event-driven backtest engine with JoinQuant/Zipline-compatible API.
 - `portfolio.py` — Multi-strategy portfolio backtest mode
 - `wfa.py` — Walk-forward analysis
 - `ptrade_adapter.py` — PTrade/QMT broker platform export
+- `brand.py` — Branding constants (name, repo URL, tagline) and HTML header SVG lockup for reports
 
 **Subpackages:**
 - `eqlib/scientific/` — Scientific validation layer (overfitting detection, statistical confidence, bias detection, extended risk metrics, platform comparison, unified `validate_backtest()` orchestration)
 - `eqlib/utils/` — Four submodules: `indicators` (MA, MACD, RSI, KDJ, Bollinger, ATR, etc.), `stats` (rolling metrics, regression, VaR, drawdown), `money` (Kelly, ATR sizing, risk parity, volatility normalize), `levels` (pivot points, support/resistance, Fibonacci, trailing stop)
+- `eqlib/ml/` — Machine-learning stock selection (`[EXPERIMENTAL]`): `FeaturePipeline` (point-in-time feature engineering via `attribute_history` — no look-ahead), `BaseMLModel` (random forest / logistic regression wrappers), `MLSelector` (drop-in replacement for `MultiFactorSelector`), `optimize_hyperparams` / `auto_tune_selector` (hyperparameter search), `validate_ml_strategy` / `check_feature_drift` (out-of-sample validation and drift detection)
+- `eqlib/strategies/` — Built-in strategy templates (`momentum_rotation_strategy`, `ma_crossover_strategy`, `grid_trading_strategy`) designed to be copy-pasted into Web Strategy Studio
+- `eqlib/examples/` — Bundled reference strategies importable via `from eqlib import *` (currently `multi_factor_momentum.py`)
 
 **Strategy lifecycle:**
 ```
@@ -263,6 +267,27 @@ simple_factor_analysis(result)   # Market beta, alpha, momentum proxy
 
 # Stock screening
 query('000001.XSHE').valuation().pe.lt(20).cap.gt(50e9).get_fundamentals()
+
+# ML-based stock selection (alternative to MultiFactorSelector)
+from eqlib.ml import MLSelector, FeaturePipeline
+
+selector = MLSelector(
+    model='random_forest',          # or 'logistic'
+    features=['rsi', 'macd_hist', 'atr', 'momentum', 'volatility', 'volume_ratio'],
+    target='forward_return_5d',     # built-in target; custom callables also supported
+    top_n=3,
+)
+selector.train(context.universe, context)            # point-in-time, no look-ahead
+selected = selector.rank(context.universe, context)  # returns top_n codes
+
+# Hyperparameter tuning + out-of-sample validation
+from eqlib.ml import optimize_hyperparams, validate_ml_strategy, check_feature_drift
+best_params = optimize_hyperparams(
+    selector.pipeline, 'random_forest', X_train, y_train,
+    param_grid={'n_estimators': [50, 100, 200]}, cv_method='time_series_split',
+)
+report = validate_ml_strategy(backtest_result, selector._model)
+drift = check_feature_drift(X_train, X_live, threshold=0.1)
 ```
 
 ---
@@ -290,7 +315,12 @@ The test suite in `tests/` has several organizational patterns:
 - **`test_dim1_credibility.py`, `test_dim2_credibility.py`, `test_dim3_credibility.py`** — Backtest credibility fixes organized by dimension (e.g., price-limit caching, Sortino formula, Calmar ratio guard)
 - **`test_p0_fixes.py`, `test_p1_p2_p3_p4_fixes.py`** — Priority-tiered bug fixes (P0 = critical, P1-P4 = lower priority)
 - **`test_scientific_*.py`** — Scientific validation layer tests (overfitting, bias, statistics, risk, comparison, validation runner)
+- **`test_ml_*.py`** — ML module tests: `test_ml_features.py` (feature pipeline, look-ahead bias), `test_ml_models.py` (model training/prediction), `test_ml_selector.py` (end-to-end selection), `test_ml_tuning.py` (hyperparameter search), `test_ml_integration.py` (full backtest integration)
 - **`test_utils_*.py`** — Utility submodule tests (indicators, levels, money, stats)
+- **`test_high11_*.py`, `test_high12_*.py`, `test_high13_*.py`, `test_med25_*.py`** — Tiered robustness fixes (cash buffer, suspended trading, order_value gap, lazy session)
+- **`test_lookahead.py`** — Look-ahead bias regression tests
+- **`test_concurrent_sessions.py`** — Thread-safety of the `g` proxy across concurrent `BacktestSession`s
+- **`test_ashare_data.py`, `test_attribution_grading.py`, `test_portfolio_risk.py`, `test_ptrade_adapter.py`** — Feature-specific coverage
 - **`conftest.py`** — Adds `web_strategy_studio/backend` to `sys.path` so `studio_api` is importable
 
 Run specific dimensions or tiers:

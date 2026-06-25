@@ -58,16 +58,16 @@ class TestETFStampDuty:
     def test_stock_pays_stamp_duty(self):
         from eqlib.objects import OrderCost
         cost = OrderCost()
-        # close_tax = 0.001; for a stock sell
+        # close_tax = 0.0005; for a stock sell
         close_cost_stock = cost.calc_close_cost(price=10.0, amount=1000, is_etf=False)
-        # stamp duty alone = 0.001 * 10 * 1000 = 10
+        # stamp duty alone = 0.0005 * 10 * 1000 = 5
         assert close_cost_stock > cost.calc_close_cost(10.0, 1000, is_etf=True)
 
     def test_etf_no_stamp_duty(self):
         from eqlib.objects import OrderCost
-        cost = OrderCost(close_tax=0.001, close_commission=0.0003, min_commission=5)
+        cost = OrderCost(close_tax=0.0005, close_commission=0.00025, min_commission=5)
         close_cost_etf = cost.calc_close_cost(price=10.0, amount=1000, is_etf=True)
-        # Only commission: max(0.0003 * 10000, 5) = max(3.0, 5) = 5
+        # Only commission: max(0.00025 * 10000, 5) = max(2.5, 5) = 5
         assert abs(close_cost_etf - 5.0) < 1e-9
 
 

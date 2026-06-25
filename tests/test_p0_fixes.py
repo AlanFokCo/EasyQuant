@@ -233,7 +233,7 @@ class TestC2AlphaBetaIntersection:
         # signature and that it returns a 6-tuple of the right types.
         strat = self._make_strategy_returns(50)
         # Pass an invalid benchmark so it falls back to default (no network needed)
-        result = _calc_alpha_beta(strat, "INVALID_BENCH_CODE_99999", 0.03, 252)
+        result = _calc_alpha_beta(strat, "INVALID_BENCH_CODE_99999", 0.03, 244)
         assert len(result) == 6, "Should return 6-tuple"
         alpha, beta, ir, bench_series, bench_ret, bench_vol = result
         # Default fallback values

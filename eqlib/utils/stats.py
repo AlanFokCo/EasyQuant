@@ -15,6 +15,8 @@ from math import sqrt, log, factorial
 from itertools import combinations, permutations
 from typing import Optional
 
+from eqlib.constants import TRADING_DAYS_PER_YEAR
+
 
 # ============================================================
 # Rolling Statistics
@@ -34,7 +36,7 @@ def rolling_beta(series: pd.Series, benchmark: pd.Series,
 
 
 def rolling_sharpe(returns: pd.Series, window: int,
-                   risk_free: float = 0.0, annualize: int = 252) -> pd.Series:
+                   risk_free: float = 0.0, annualize: int = TRADING_DAYS_PER_YEAR) -> pd.Series:
     """Rolling annualized Sharpe ratio."""
     # mean * annualize = annualized return (daily mean scaled to yearly)
     mean = returns.rolling(window).mean() * annualize
@@ -129,7 +131,7 @@ def linear_regression(x: pd.Series, y: pd.Series):
 # ============================================================
 
 def downside_deviation(returns: pd.Series, target: float = 0.0,
-                       annualize: int = 252) -> float:
+                       annualize: int = TRADING_DAYS_PER_YEAR) -> float:
     """Downside deviation (semi-standard deviation).
 
     Computes ``sqrt(mean(min(r - target, 0)^2)) * sqrt(annualize)``, the
@@ -139,8 +141,8 @@ def downside_deviation(returns: pd.Series, target: float = 0.0,
         returns: series of periodic (e.g. daily) returns
         target: minimum acceptable return per period (default 0.0).
             For the Sortino ratio, pass the risk-free rate expressed in the
-            same frequency as ``returns`` (e.g. ``0.03 / 252`` for daily).
-        annualize: number of periods per year for annualization (default 252)
+            same frequency as ``returns`` (e.g. ``0.03 / 244`` for daily).
+        annualize: number of periods per year for annualization (default 244)
     """
     downside_sq = (returns - target)[returns - target < 0] ** 2
     downside_dev = (downside_sq.mean() ** 0.5) * sqrt(annualize) if len(downside_sq) > 0 else 0.0
@@ -154,7 +156,14 @@ def value_at_risk(returns: pd.Series, confidence: float = 0.05,
     Parameters:
         returns: return series
         confidence: tail probability (default 5%)
-        method: 'historical' or 'parametric'
+        method: one of 'historical', 'parametric', 'cornish_fisher'.
+
+            - 'historical': empirical quantile of the return series.
+            - 'parametric': normal-distribution quantile (underestimates
+              fat tails).
+            - 'cornish_fisher': parametric VaR adjusted for sample skew
+              and excess kurtosis. Better suited for A-share returns,
+              which are typically negatively skewed and heavy-tailed.
 
     Returns:
         VaR as a negative number (loss amount).
@@ -164,6 +173,21 @@ def value_at_risk(returns: pd.Series, confidence: float = 0.05,
         sigma = returns.std()
         from scipy.stats import norm
         return -(mu + norm.ppf(confidence) * sigma)
+    if method == "cornish_fisher":
+        from scipy.stats import norm
+        mu = returns.mean()
+        sigma = returns.std(ddof=1)
+        skew = float(returns.skew())
+        kurt = float(returns.kurtosis())  # Fisher kurtosis (excess)
+        z = norm.ppf(confidence)
+        # Cornish-Fisher expansion
+        z_cf = (
+            z
+            + (z ** 2 - 1) * skew / 6
+            + (z ** 3 - 3 * z) * kurt / 24
+            - (2 * z ** 3 - 5 * z) * skew ** 2 / 36
+        )
+        return -(mu + z_cf * sigma)
     return -returns.quantile(confidence)
 
 

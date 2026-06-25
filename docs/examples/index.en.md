@@ -7,7 +7,7 @@
     | **Goal** | Quickly locate each script under `examples/` by number and find the recommended way to run it |
     | **Prerequisite** | Run `pip install -e .` from the repository root |
 
-20 examples across a three-tier progressive learning path: Foundations (01–07) → Intermediate (08–14) → Real-World Projects (15–20).
+20 examples across a three-tier progressive learning path: Foundations (01–07) → Intermediate (08–14) → Real-World Projects (15–20), plus an ML extension (21–24).
 
 ## Quick Start
 
@@ -65,6 +65,25 @@ All examples use relative dates and a unified trading cost configuration (`examp
 | 18 | `18_grid_trading.py` | Grid trading | Price grids, range-bound oscillation detection | `python examples/18_grid_trading.py` |
 | 19 | `19_sr_portfolio/` | Support/Resistance portfolio | S/R levels, RSI/MACD confirmation | `python examples/19_sr_portfolio/run_backtest.py` |
 | 20 | `20_all_weather_alpha/` | All-Weather Alpha | Multi-factor + sector rotation + risk management | `python examples/20_all_weather_alpha/run_backtest.py` |
+
+---
+
+## Machine Learning (21–24): ML-Driven Selection
+
+| # | File | Strategy | Key Techniques | Run |
+|---|------|----------|----------------|-----|
+| 21 | `21_ml_selector.py` | ML selection | `MLSelector`, `past_return_5d` target, Random Forest | `python examples/21_ml_selector.py` |
+| 22 | `22_feature_pipeline.py` | Feature pipeline standalone | `FeaturePipeline`, RSI/MACD/ATR engineering | `python examples/22_feature_pipeline.py` |
+| 23 | `23_model_comparison.py` | Model comparison | RandomForest vs LogisticRegression | `python examples/23_model_comparison.py` |
+| 24 | `24_custom_features.py` | Custom features | Price/MA ratio, volume surge injected into pipeline | `python examples/24_custom_features.py` |
+
+!!! warning "Single-day training limitation"
+
+    `MLSelector` defaults to training on a **single day's cross-section**.
+    With small universes (<50 stocks) the sample count is too small for
+    the model to learn meaningful patterns. For robust training, pass
+    panel data via `label_data`. See the
+    [ML selection tutorial](../tutorials/11-ml-selection.en.md).
 
 ---
 
