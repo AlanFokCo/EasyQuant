@@ -5,7 +5,7 @@
     | 项目 | 说明 |
     |------|------|
     | **目标** | 使用 MLSelector 替代手工权重，让模型自动学习因子权重与交互 |
-    | **前置** | [运行回测](run-backtest.md)、[选股策略框架](../how-to/selection-strategy.md) |
+    | **前置** | [运行回测](../how-to/run-backtest.md)、[选股策略框架](../how-to/selection-strategy.md) |
 
 ---
 
