@@ -109,13 +109,19 @@ loaded = BaseMLModel.load(path: str)
 
 基于机器学习的股票选择器，继承自 `StockSelector`。
 
+!!! warning "单日横截面训练"
+
+    默认训练路径使用**单日数据**拟合模型。当 universe 较小（<50 只）
+    时样本量很少，模型无法学到有意义的模式。如需稳健训练，请通过
+    `label_data` 传入 panel DataFrame（包含多日特征与标签）。
+
 ### 构造函数
 
 ```python
 MLSelector(
     model: str = 'random_forest',
     features: list[str] | None = None,
-    target: str = 'forward_return_5d',
+    target: str = 'past_return_5d',
     top_n: int = 5,
     train_start: str | None = None,
     train_end: str | None = None,
@@ -128,7 +134,7 @@ MLSelector(
 |------|------|------|
 | `model` | `str` | 模型类型或 `BaseMLModel` 实例 |
 | `features` | `list[str]` | 特征列表 |
-| `target` | `str` | 目标变量：`forward_return_5d`, `forward_return_10d`, `will_rise_5d` |
+| `target` | `str` | 目标变量：`past_return_5d`、`past_return_10d`、`will_rise_5d`。`forward_return_5d` 会抛 `NotImplementedError`——如需真正的 forward-return 预测，请通过 `label_data` 传入预计算标签。 |
 | `top_n` | `int` | 选出股票数量 |
 | `train_start` | `str` | 训练开始日期（`YYYY-MM-DD`） |
 | `train_end` | `str` | 训练结束日期（`YYYY-MM-DD`） |

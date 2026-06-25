@@ -1,7 +1,7 @@
 # EasyQuant Examples
 
-20 examples organized in a progressive learning path: Foundation (01-07),
-Intermediate (08-14), and Practical (15-20).
+24 examples organized in a progressive learning path: Foundation (01-07),
+Intermediate (08-14), Practical (15-20), and ML (21-24).
 
 ## Prerequisites
 
@@ -58,6 +58,22 @@ python examples/19_sr_portfolio/run_backtest.py
 python examples/20_all_weather_alpha/run_backtest.py
 ```
 
+## Machine Learning (21-24): ML-Driven Selection
+
+| # | File | What You'll Learn |
+|---|------|-------------------|
+| 21 | `21_ml_selector.py` | `MLSelector` drop-in for rule-based selection; `past_return_5d` target |
+| 22 | `22_feature_pipeline.py` | `FeaturePipeline` standalone; RSI/MACD/ATR feature engineering |
+| 23 | `23_model_comparison.py` | RandomForest vs LogisticRegression on identical features |
+| 24 | `24_custom_features.py` | Custom feature functions (price/MA ratio, volume surge) injected into pipeline |
+
+```bash
+python examples/21_ml_selector.py
+python examples/22_feature_pipeline.py
+python examples/23_model_comparison.py
+python examples/24_custom_features.py
+```
+
 ## Shared Infrastructure
 
 - `examples/_defaults.py` — Trading costs (2024 rates), stock codes, relative dates
@@ -67,9 +83,9 @@ python examples/20_all_weather_alpha/run_backtest.py
 
 Additional strategies optimized for **Web Strategy Studio** (browser-based editing and backtesting):
 
-| # | File | Strategy | Key Techniques |
-|---|------|----------|----------------|
-| 21 | `eqlib/examples/multi_factor_momentum.py` | Multi-factor momentum rotation | 10-stock universe, daily rebalancing, equal-weight position sizing |
+| File | Strategy | Key Techniques |
+|------|----------|----------------|
+| `eqlib/examples/multi_factor_momentum.py` | Multi-factor momentum rotation | 10-stock universe, daily rebalancing, equal-weight position sizing |
 
 These strategies use `from eqlib import *` directly and are designed to be copy-pasted into the Web Studio editor.
 

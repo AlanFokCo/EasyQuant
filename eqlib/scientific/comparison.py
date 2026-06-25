@@ -13,6 +13,8 @@ from typing import Any, Mapping, Optional
 import numpy as np
 import pandas as pd
 
+from eqlib.constants import TRADING_DAYS_PER_YEAR
+
 
 @dataclass(frozen=True)
 class BenchmarkAlignResult:
@@ -150,10 +152,10 @@ def _extract_metrics_from_result(backtest_result: Mapping[str, Any]) -> dict[str
         return {}
 
     total_return = float((1 + returns).prod() - 1)
-    n_years = len(returns) / 252
+    n_years = len(returns) / TRADING_DAYS_PER_YEAR
     annual_return = float((1 + total_return) ** (1 / max(n_years, 0.01)) - 1)
     std = float(returns.std())
-    sharpe = float(returns.mean() / std * np.sqrt(252)) if std > 0 else 0.0
+    sharpe = float(returns.mean() / std * np.sqrt(TRADING_DAYS_PER_YEAR)) if std > 0 else 0.0
     cumulative = (1 + returns).cumprod()
     max_dd = float(((cumulative - cumulative.cummax()) / cumulative.cummax()).min())
     return {

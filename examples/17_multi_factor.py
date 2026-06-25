@@ -162,8 +162,8 @@ def score_stocks(context):
     momentums = [s["momentum"] for s in scores.values()]
     vol_trends = [s["volume_trend"] for s in scores.values()]
 
-    mom_mean, mom_std = np.mean(momentums), np.std(momentums)
-    vol_mean, vol_std = np.mean(vol_trends), np.std(vol_trends)
+    mom_mean, mom_std = np.mean(momentums), np.std(momentums, ddof=1)
+    vol_mean, vol_std = np.mean(vol_trends), np.std(vol_trends, ddof=1)
 
     ranked = []
     for code, factors in scores.items():

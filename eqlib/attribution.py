@@ -21,7 +21,7 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     Parameters:
         result: dict returned by run_backtest or run_strategy
         risk_free_rate: annual risk-free rate (default 0.03)
-        trading_days: number of trading days per year (default 252)
+        trading_days: number of trading days per year (default 244)
 
     Returns:
         dict with metrics including:
@@ -696,7 +696,7 @@ def simple_factor_analysis(result, factors=None):
         return None
 
     benchmark = result.get("benchmark", "000300.XSHG")
-    alpha_annual, beta, _, _, _, _ = _calc_alpha_beta(strat_ret, benchmark, 0.03, 252)
+    alpha_annual, beta, _, _, _, _ = _calc_alpha_beta(strat_ret, benchmark, 0.03, TRADING_DAYS_PER_YEAR)
 
     arr = strat_ret.values
     if len(arr) > 10:
@@ -727,7 +727,7 @@ def simple_factor_analysis(result, factors=None):
             b = bench_ret.loc[common].values
             if len(s) > 1:
                 residual = s - beta * b
-                residual_vol = float(residual.std(ddof=1)) * np.sqrt(252)
+                residual_vol = float(residual.std(ddof=1)) * np.sqrt(TRADING_DAYS_PER_YEAR)
                 strat_var = s.var(ddof=1)
                 explained_var = float(
                     np.clip(1.0 - residual.var(ddof=1) / strat_var, 0.0, 1.0)

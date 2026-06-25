@@ -7,7 +7,7 @@
     | **目标** | 按编号快速定位 `examples/` 下脚本用途与推荐运行方式 |
     | **前置** | 在仓库根目录执行 `pip install -e .` |
 
-20 个示例，三层递进式学习路径：基础（01-07）→ 进阶（08-14）→ 实战（15-20）。
+20 个示例，三层递进式学习路径：基础（01-07）→ 进阶（08-14）→ 实战（15-20），并扩展 ML 层（21-24）。
 
 ## 快速开始
 
@@ -65,6 +65,24 @@ python examples/<file>.py
 | 18 | `18_grid_trading.py` | 网格交易 | 价格网格、区间震荡检测 | `python examples/18_grid_trading.py` |
 | 19 | `19_sr_portfolio/` | 支撑阻力位组合 | S/R 水平、RSI/MACD 确认 | `python examples/19_sr_portfolio/run_backtest.py` |
 | 20 | `20_all_weather_alpha/` | 全天候 Alpha | 多因子 + 行业轮动 + 风控 | `python examples/20_all_weather_alpha/run_backtest.py` |
+
+---
+
+## 机器学习层（21-24）：ML 驱动选股
+
+| # | 文件 | 策略 | 核心技术 | 运行命令 |
+|---|------|------|----------|----------|
+| 21 | `21_ml_selector.py` | ML 选股 | `MLSelector`、`past_return_5d` 标签、随机森林 | `python examples/21_ml_selector.py` |
+| 22 | `22_feature_pipeline.py` | 特征管道独立使用 | `FeaturePipeline`、RSI/MACD/ATR 工程 | `python examples/22_feature_pipeline.py` |
+| 23 | `23_model_comparison.py` | 模型对比 | RandomForest vs LogisticRegression | `python examples/23_model_comparison.py` |
+| 24 | `24_custom_features.py` | 自定义特征 | 价格/MA 比率、成交量激增注入 pipeline | `python examples/24_custom_features.py` |
+
+!!! warning "ML 单日训练局限"
+
+    `MLSelector` 默认使用**单日横截面数据**训练。当 universe 较小
+    （<50 只）时样本量不足，模型无法学到有意义的模式。如需稳健训练，
+    请通过 `label_data` 传入 panel DataFrame。详见
+    [ML 选股教程](../tutorials/11-ml-selection.md)。
 
 ---
 

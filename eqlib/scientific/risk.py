@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import jarque_bera, kurtosis as scipy_kurtosis, norm, skew as scipy_skew
 
-TRADING_DAYS_PER_YEAR = 252
+from eqlib.constants import TRADING_DAYS_PER_YEAR
 ReturnInput = Optional[Union[Sequence[float], pd.Series, np.ndarray]]
 
 
@@ -216,7 +216,7 @@ def value_at_risk(
 
     alpha = 1.0 - confidence_level
     mean = float(series.mean())
-    sigma = float(series.std(ddof=0))
+    sigma = float(series.std(ddof=1))
 
     if method == "historical" or sigma == 0.0:
         threshold = float(series.quantile(alpha))
@@ -289,7 +289,7 @@ def tail_risk_analysis(returns: ReturnInput) -> dict[str, Any]:
     else:
         jb_stat, jb_pvalue = 0.0, 1.0
 
-    sigma = float(series.std(ddof=0))
+    sigma = float(series.std(ddof=1))
     expected_left_tail = float(norm.cdf(-2.0))
     if sigma > 0:
         observed_left_tail = float((series < (-2.0 * sigma)).mean())

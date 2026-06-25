@@ -18,9 +18,9 @@ class OrderCost:
     def __init__(
         self,
         open_tax=0,
-        close_tax=0.001,
-        open_commission=0.0003,
-        close_commission=0.0003,
+        close_tax=0.0005,
+        open_commission=0.00025,
+        close_commission=0.00025,
         close_today_commission=0,
         min_commission=5,
     ):

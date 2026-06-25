@@ -8,7 +8,7 @@ Provides mathematical optimization for asset allocation:
 
 import numpy as np
 import pandas as pd
-from eqlib.constants import RISK_FREE_RATE
+from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
 
 
 class Bound:
@@ -51,7 +51,7 @@ def _get_returns(prices, days=250):
     return ret
 
 
-def _annual_stats(weights, returns, days=252):
+def _annual_stats(weights, returns, days=TRADING_DAYS_PER_YEAR):
     """Calculate annualized return, volatility, and Sharpe for a weight vector.
 
     Annualized return uses the geometric (compound) formula instead of the
@@ -191,7 +191,7 @@ def portfolio_optimizer(securities, prices, target=None, constraints=None,
             rf = getattr(target, "risk_free_rate", 0.03)
 
             def neg_sharpe(w):
-                ret, vol = _annual_stats(w, returns, days=252)
+                ret, vol = _annual_stats(w, returns, days=TRADING_DAYS_PER_YEAR)
                 if vol < 1e-10:
                     return 1e10   # large penalty pushes optimizer away
                 return -(ret - rf) / vol

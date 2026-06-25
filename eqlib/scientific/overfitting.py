@@ -15,6 +15,8 @@ from typing import Any, Callable, Optional
 import numpy as np
 import pandas as pd
 
+from eqlib.constants import TRADING_DAYS_PER_YEAR
+
 __all__ = [
     "OverfittingWarning",
     "WalkForwardResult",
@@ -104,8 +106,8 @@ def _compute_sharpe(returns, risk_free_rate=0.0):
     std = returns.std()
     if len(returns) < 2 or std <= 1e-12:
         return 0.0
-    excess = returns - risk_free_rate / 252
-    return float(excess.mean() / std * (252 ** 0.5))
+    excess = returns - risk_free_rate / TRADING_DAYS_PER_YEAR
+    return float(excess.mean() / std * (TRADING_DAYS_PER_YEAR ** 0.5))
 
 
 def _compute_max_drawdown(returns):
@@ -119,7 +121,7 @@ def _compute_annual_return(returns):
     if len(returns) == 0:
         return 0.0
     total = (1 + returns).prod()
-    n_years = len(returns) / 252
+    n_years = len(returns) / TRADING_DAYS_PER_YEAR
     if n_years <= 0:
         return 0.0
     return float(total ** (1 / n_years) - 1)
@@ -218,65 +220,225 @@ def walk_forward_analysis(
     start_date: str = "2020-01-01",
     end_date: str = "2024-12-31",
 ) -> WalkForwardResult:
-    """Run a simplified walk-forward style overfitting analysis.
+    """Run a true rolling walk-forward overfitting analysis.
+
+    Slices the ``[start_date, end_date]`` range into multiple train/test
+    windows that slide forward by ``step``. For each window, in-sample
+    (train) and out-of-sample (test) performance are computed separately,
+    allowing detection of performance decay across time.
 
     Parameters
     ----------
     initialize_func:
-        Either a backtest result dict or an EasyQuant ``initialize`` function.
-        When a callable is passed, the backtest is executed once across the full
-        date range and then split into in-sample / out-of-sample segments.
+        Either a backtest result dict (with ``recorded_values`` containing
+        ``date`` and ``total_value`` keys) or an EasyQuant ``initialize``
+        callable. When a callable is passed, a fresh backtest is run on
+        each train and each test segment independently — the canonical
+        walk-forward setup. When a dict is passed, the existing equity
+        curve is sliced by date (note: OOS segments then inherit the IS
+        equity, so callable mode is preferred for true OOS measurement).
     param_ranges:
         Reserved for API compatibility with richer walk-forward optimizers.
-        The simplified implementation stores it in window metadata only.
+        Stored in window metadata only.
     train_window, test_window, step:
-        ``2Y``/``6M`` style settings.  The train/test ratio is approximated from
-        ``train_window`` and ``test_window``.  ``step`` is kept for metadata.
+        ``2Y``/``6M``/``90D`` style specifiers. ``train_window`` is the
+        length of each in-sample segment; ``test_window`` is the length of
+        each out-of-sample segment; ``step`` is how far the window slides
+        forward each iteration (defaults to ``test_window`` when <= 0,
+        producing non-overlapping windows).
     start_date, end_date:
-        Backtest date range used only when ``initialize_func`` is callable.
+        Total date range covered by the walk-forward analysis. Used
+        directly when ``initialize_func`` is callable; for dict input the
+        actual recorded date range is used instead.
 
     Returns
     -------
     WalkForwardResult
-        One-window proxy walk-forward result comparing IS and OOS performance.
+        ``windows`` is a list of per-window dicts (each with
+        ``train_start/end``, ``test_start/end``, ``is_metrics``,
+        ``oos_metrics``). ``oos_is_ratio`` is mean OOS Sharpe / mean IS
+        Sharpe across windows. ``is_sharpe_decay`` is True if mean OOS
+        Sharpe is below mean IS Sharpe.
     """
-    backtest_result = _coerce_backtest_result(initialize_func, start_date, end_date)
-    recorded = list(backtest_result.get("recorded_values", []))
-    if len(recorded) < 4:
-        return WalkForwardResult(windows=[], is_sharpe_decay=False, oos_is_ratio=0.0)
-
     train_days = _parse_window_to_days(train_window)
     test_days = _parse_window_to_days(test_window)
-    total_days = train_days + test_days
-    train_pct = train_days / total_days if total_days > 0 else 0.5
-    split_idx = min(max(int(len(recorded) * train_pct), 2), len(recorded) - 2)
+    step_days = _parse_window_to_days(step) or test_days
+    if train_days <= 0 or test_days <= 0:
+        return WalkForwardResult(windows=[], is_sharpe_decay=False, oos_is_ratio=0.0)
 
-    train_result = _slice_backtest_result(backtest_result, 0, split_idx)
-    test_result = _slice_backtest_result(backtest_result, split_idx, len(recorded))
-    train_metrics = _compute_metrics(train_result)
-    test_metrics = _compute_metrics(test_result)
+    if isinstance(initialize_func, dict):
+        windows = _walk_forward_slice_dict(
+            initialize_func, train_days, test_days, step_days,
+            train_window, test_window, step, param_ranges,
+        )
+    elif callable(initialize_func):
+        windows = _walk_forward_run_callable(
+            initialize_func, start_date, end_date,
+            train_days, test_days, step_days,
+            train_window, test_window, step, param_ranges,
+        )
+    else:
+        raise TypeError(
+            "initialize_func must be a backtest result dict or a callable initialize function"
+        )
 
-    is_sharpe = train_metrics["sharpe"]
-    oos_sharpe = test_metrics["sharpe"]
-    ratio = _safe_ratio(oos_sharpe, is_sharpe)
+    if not windows:
+        return WalkForwardResult(windows=[], is_sharpe_decay=False, oos_is_ratio=0.0)
 
-    window = {
-        "train_start": recorded[0]["date"],
-        "train_end": recorded[split_idx - 1]["date"],
-        "test_start": recorded[split_idx]["date"],
-        "test_end": recorded[-1]["date"],
-        "train_window": train_window,
-        "test_window": test_window,
-        "step": step,
-        "param_ranges": param_ranges or {},
-        "is_metrics": train_metrics,
-        "oos_metrics": test_metrics,
-    }
+    is_sharpes = [w["is_metrics"]["sharpe"] for w in windows]
+    oos_sharpes = [w["oos_metrics"]["sharpe"] for w in windows]
+    mean_is = float(np.mean(is_sharpes)) if is_sharpes else 0.0
+    mean_oos = float(np.mean(oos_sharpes)) if oos_sharpes else 0.0
+    ratio = _safe_ratio(mean_oos, mean_is)
     return WalkForwardResult(
-        windows=[window],
-        is_sharpe_decay=oos_sharpe < is_sharpe,
+        windows=windows,
+        is_sharpe_decay=bool(mean_oos < mean_is),
         oos_is_ratio=ratio,
     )
+
+
+def _walk_forward_slice_dict(
+    backtest_result: dict[str, Any],
+    train_days: int,
+    test_days: int,
+    step_days: int,
+    train_window: str,
+    test_window: str,
+    step: str,
+    param_ranges: Optional[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Slice a pre-computed backtest result into rolling train/test windows."""
+    recorded = list(backtest_result.get("recorded_values", []))
+    if len(recorded) < 4:
+        return []
+
+    dates = [r["date"] for r in recorded]
+    try:
+        ts = pd.to_datetime(pd.Series(dates))
+    except Exception:
+        return []
+
+    full_start = ts.iloc[0]
+    full_end = ts.iloc[-1]
+    train_td = pd.Timedelta(days=train_days)
+    test_td = pd.Timedelta(days=test_days)
+    step_td = pd.Timedelta(days=step_days)
+
+    windows: list[dict[str, Any]] = []
+    cursor = full_start
+    while cursor + train_td + test_td <= full_end + pd.Timedelta(days=1):
+        train_start = cursor
+        train_end = train_start + train_td
+        test_start = train_end
+        test_end = test_start + test_td
+
+        train_mask = (ts >= train_start) & (ts < train_end)
+        test_mask = (ts >= test_start) & (ts < test_end)
+        train_idx = ts.index[train_mask].tolist()
+        test_idx = ts.index[test_mask].tolist()
+
+        if len(train_idx) >= 2 and len(test_idx) >= 2:
+            tr_lo, tr_hi = train_idx[0], train_idx[-1] + 1
+            te_lo, te_hi = test_idx[0], test_idx[-1] + 1
+            train_result = _slice_backtest_result(backtest_result, tr_lo, tr_hi)
+            test_result = _slice_backtest_result(backtest_result, te_lo, te_hi)
+            windows.append({
+                "train_start": dates[tr_lo],
+                "train_end": dates[tr_hi - 1],
+                "test_start": dates[te_lo],
+                "test_end": dates[te_hi - 1],
+                "train_window": train_window,
+                "test_window": test_window,
+                "step": step,
+                "param_ranges": param_ranges or {},
+                "is_metrics": _compute_metrics(train_result),
+                "oos_metrics": _compute_metrics(test_result),
+            })
+
+        cursor = cursor + step_td
+
+    return windows
+
+
+def _walk_forward_run_callable(
+    initialize_func: Callable,
+    start_date: str,
+    end_date: str,
+    train_days: int,
+    test_days: int,
+    step_days: int,
+    train_window: str,
+    test_window: str,
+    step: str,
+    param_ranges: Optional[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Run fresh backtests per train/test window (canonical walk-forward)."""
+    from eqlib.engine import run_backtest
+
+    try:
+        full_start = pd.Timestamp(start_date)
+        full_end = pd.Timestamp(end_date)
+    except Exception:
+        return []
+
+    train_td = pd.Timedelta(days=train_days)
+    test_td = pd.Timedelta(days=test_days)
+    step_td = pd.Timedelta(days=step_days)
+
+    windows: list[dict[str, Any]] = []
+    cursor = full_start
+    while cursor + train_td + test_td <= full_end + pd.Timedelta(days=1):
+        train_start = cursor
+        train_end = train_start + train_td
+        test_start = train_end
+        test_end = test_start + test_td
+
+        train_metrics, train_lo, train_hi = _run_segment(
+            run_backtest, initialize_func, train_start, train_end,
+        )
+        test_metrics, test_lo, test_hi = _run_segment(
+            run_backtest, initialize_func, test_start, test_end,
+        )
+
+        windows.append({
+            "train_start": train_lo,
+            "train_end": train_hi,
+            "test_start": test_lo,
+            "test_end": test_hi,
+            "train_window": train_window,
+            "test_window": test_window,
+            "step": step,
+            "param_ranges": param_ranges or {},
+            "is_metrics": train_metrics,
+            "oos_metrics": test_metrics,
+        })
+
+        cursor = cursor + step_td
+
+    return windows
+
+
+def _run_segment(run_backtest, initialize_func, start_ts, end_ts):
+    """Run a backtest over [start_ts, end_ts] and return metrics + actual dates."""
+    start_str = str(start_ts.date())
+    end_str = str(end_ts.date())
+    try:
+        result = run_backtest(
+            initialize_func,
+            start_date=start_str,
+            end_date=end_str,
+        )
+    except Exception:
+        return (
+            {"sharpe": 0.0, "annual_return": 0.0, "max_drawdown": 0.0},
+            start_str,
+            end_str,
+        )
+    metrics = _compute_metrics(result)
+    recorded = result.get("recorded_values", []) or []
+    actual_start = recorded[0]["date"] if recorded else start_str
+    actual_end = recorded[-1]["date"] if recorded else end_str
+    return metrics, actual_start, actual_end
 
 
 def parameter_sensitivity(
@@ -287,9 +449,15 @@ def parameter_sensitivity(
 ) -> SensitivityResult:
     """Estimate parameter sensitivity using rolling Sharpe stability proxies.
 
-    Because this function does not re-run the strategy under perturbed
-    parameters, it treats instability across rolling time windows as a proxy for
-    likely parameter sensitivity.
+    .. warning::
+
+        This is a **proxy** implementation. It does NOT actually perturb
+        strategy parameters and re-run the backtest. Instead it uses
+        rolling Sharpe stability over time as a stand-in: a strategy
+        whose Sharpe fluctuates wildly across rolling windows is assumed
+        to also be sensitive to parameter perturbations. This is a rough
+        heuristic — for true sensitivity analysis, re-run the backtest
+        with each parameter perturbed and measure the performance delta.
 
     Args ``base_params``, ``param_names``, and ``perturbation_pct`` are
     accepted for API compatibility but unused in the proxy implementation.
@@ -309,7 +477,7 @@ def parameter_sensitivity(
     window = min(63, max(10, len(returns) // 4))
     rolling_mean = returns.rolling(window).mean()
     rolling_std = returns.rolling(window).std().where(lambda s: s > 1e-12)
-    rolling_sharpe = (rolling_mean / rolling_std) * np.sqrt(252)
+    rolling_sharpe = (rolling_mean / rolling_std) * np.sqrt(TRADING_DAYS_PER_YEAR)
     rolling_sharpe = rolling_sharpe.replace([np.inf, -np.inf], np.nan).dropna()
 
     if rolling_sharpe.empty:
