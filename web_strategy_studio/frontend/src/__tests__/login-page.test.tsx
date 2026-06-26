@@ -4,16 +4,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-// Mock framer-motion to avoid animation issues in tests
+// Mock framer-motion: any motion.X renders as a div with stripped animation props
 vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
-      // Strip motion-specific props, pass through the rest
-      const { initial, animate, transition, whileHover, whileTap, ...rest } = props as Record<string, unknown>;
-      void initial; void animate; void transition; void whileHover; void whileTap;
-      return <div {...rest}>{children}</div>;
-    },
-  },
+  motion: new Proxy(
+    {},
+    {
+      get: () => ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
+        const { initial, animate, transition, whileHover, whileTap, ...rest } = props as Record<string, unknown>;
+        void initial; void animate; void transition; void whileHover; void whileTap;
+        return <div {...rest}>{children}</div>;
+      },
+    }
+  ),
 }));
 
 // Mock the API client

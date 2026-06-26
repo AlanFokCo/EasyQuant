@@ -17,9 +17,7 @@ class TemplateService:
 
     def __init__(self, templates_file: Optional[Path] = None):
         if templates_file is None:
-            templates_file = (
-                Path(__file__).parent.parent / "data" / "templates.json"
-            )
+            templates_file = Path(__file__).parent.parent / "data" / "templates.json"
         self.templates_file = templates_file
         self._templates: Dict[str, dict] = self._load_templates()
 

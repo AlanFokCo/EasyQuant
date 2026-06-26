@@ -5,7 +5,7 @@
  * renders a comparison table and overlays equity curves on a shared chart.
  */
 import { useEffect, useRef, useState } from "react";
-import { createChart, LineStyle } from "lightweight-charts";
+import { createChart, ColorType, LineStyle } from "lightweight-charts";
 import type { IChartApi } from "lightweight-charts";
 
 import { apiJson } from "../api/client";
@@ -104,7 +104,7 @@ export default function ReportComparison({ runIds, onClose }: ReportComparisonPr
       width: chartRef.current.clientWidth,
       height: 280,
       layout: {
-        background: { type: "Solid" as any, color: "transparent" },
+        background: { type: ColorType.Solid, color: "transparent" },
         textColor: "#8c8c8c",
         fontSize: 11,
       },
@@ -132,7 +132,7 @@ export default function ReportComparison({ runIds, onClose }: ReportComparisonPr
           lastValueVisible: true,
           title: report.run_id.slice(0, 12),
         });
-        series.setData(cumData as any);
+        series.setData(cumData);
       }
     });
 

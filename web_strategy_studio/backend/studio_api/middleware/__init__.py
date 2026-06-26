@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional
 
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException
 
 from studio_api import auth as auth_mod
 from studio_api.models import User

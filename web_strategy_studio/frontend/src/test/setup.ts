@@ -1,4 +1,9 @@
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+
+afterEach(() => {
+  cleanup();
+});
 
 if (!("ResizeObserver" in globalThis)) {
   class ResizeObserver {
@@ -8,4 +13,18 @@ if (!("ResizeObserver" in globalThis)) {
   }
 
   vi.stubGlobal("ResizeObserver", ResizeObserver);
+}
+
+// jsdom does not implement matchMedia
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }));
 }

@@ -104,9 +104,7 @@ class TestListTemplates:
 
 class TestGetTemplate:
     def test_returns_template_with_code(self, client, auth_token):
-        r = client.get(
-            "/api/v1/templates/double_ma", headers=_headers(auth_token)
-        )
+        r = client.get("/api/v1/templates/double_ma", headers=_headers(auth_token))
         assert r.status_code == 200
         data = r.json()
         assert data["id"] == "double_ma"
@@ -114,18 +112,14 @@ class TestGetTemplate:
         assert "def initialize" in data["code"]
 
     def test_returns_404_for_missing(self, client, auth_token):
-        r = client.get(
-            "/api/v1/templates/nonexistent_xyz", headers=_headers(auth_token)
-        )
+        r = client.get("/api/v1/templates/nonexistent_xyz", headers=_headers(auth_token))
         assert r.status_code == 404
 
     def test_all_builtin_templates_accessible(self, client, auth_token):
         # Get list first
         listing = client.get("/api/v1/templates", headers=_headers(auth_token)).json()
         for t in listing:
-            r = client.get(
-                f"/api/v1/templates/{t['id']}", headers=_headers(auth_token)
-            )
+            r = client.get(f"/api/v1/templates/{t['id']}", headers=_headers(auth_token))
             assert r.status_code == 200
             assert "code" in r.json()
 

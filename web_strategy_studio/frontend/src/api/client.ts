@@ -1,6 +1,33 @@
 export const apiOrigin = import.meta.env.VITE_API_ORIGIN || "";
 export const apiV1 = `${apiOrigin}/api/v1`;
 
+// ---------------------------------------------------------------------------
+// Token management (localStorage-backed)
+// ---------------------------------------------------------------------------
+
+const TOKEN_KEY = "eq_access_token";
+
+/** Store or clear the JWT. Pass null to remove. */
+export function setToken(token: string | null): void {
+  if (typeof localStorage === "undefined") return;
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+/** Read the current JWT, or null if not signed in. */
+export function getToken(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+/** Clear the JWT and sign out. */
+export function logout(): void {
+  setToken(null);
+}
+
 /** Structured API error carrying the backend {error:{code,message,details}} envelope. */
 export class ApiError extends Error {
   readonly code: string;

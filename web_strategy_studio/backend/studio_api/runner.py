@@ -343,10 +343,14 @@ class DockerRunner(Runner):
         outputs and identify the run.
         """
         env_vars = [
-            "-e", f"EQ_ARTIFACT_DIR={artifact_dir}",
-            "-e", f"EQ_REPO_ROOT={settings.repo_root.resolve()}",
-            "-e", f"EQ_RUN_ID={run_id}",
-            "-e", "PYTHONUNBUFFERED=1",
+            "-e",
+            f"EQ_ARTIFACT_DIR={artifact_dir}",
+            "-e",
+            f"EQ_REPO_ROOT={settings.repo_root.resolve()}",
+            "-e",
+            f"EQ_RUN_ID={run_id}",
+            "-e",
+            "PYTHONUNBUFFERED=1",
         ]
 
         cmd = [
@@ -407,9 +411,7 @@ class DockerRunner(Runner):
                 {"progress": 0.08, "stage": "validate", "message": "Starting Docker sandbox"},
             )
 
-            cmd = self._build_cmd(
-                work_dir=str(work), artifact_dir=str(artifact_sub), run_id=run_id
-            )
+            cmd = self._build_cmd(work_dir=str(work), artifact_dir=str(artifact_sub), run_id=run_id)
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,

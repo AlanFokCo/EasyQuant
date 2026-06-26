@@ -7,13 +7,11 @@ token revocation. All DB interactions live here; routers only orchestrate.
 from __future__ import annotations
 
 import datetime
-import hashlib
-import secrets
 import uuid
 from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, Request
-from sqlalchemy import delete, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from studio_api import auth as auth_mod
@@ -164,9 +162,7 @@ async def login_user(
         # Increment failed attempts
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         if user.failed_login_attempts >= settings.max_login_attempts:
-            user.locked_until = now + datetime.timedelta(
-                seconds=settings.lockout_duration_sec
-            )
+            user.locked_until = now + datetime.timedelta(seconds=settings.lockout_duration_sec)
         await session.commit()
         raise HTTPException(
             status_code=401,
@@ -207,9 +203,7 @@ async def login_user(
     return user, token, sid
 
 
-async def _enforce_session_limit(
-    session: AsyncSession, user_id: str, limit: int
-) -> None:
+async def _enforce_session_limit(session: AsyncSession, user_id: str, limit: int) -> None:
     """Revoke the oldest sessions if the user has more than `limit` active sessions."""
     # Flush pending changes (including the newly added session) before querying
     await session.flush()
@@ -245,14 +239,10 @@ async def list_sessions(session: AsyncSession, user_id: str) -> List[UserSession
     return list(res.scalars().all())
 
 
-async def revoke_session(
-    session: AsyncSession, *, user_id: str, session_id: str
-) -> bool:
+async def revoke_session(session: AsyncSession, *, user_id: str, session_id: str) -> bool:
     """Revoke a specific session (and blacklist its JWT). Returns True if revoked."""
     res = await session.execute(
-        select(UserSession).where(
-            UserSession.id == session_id, UserSession.user_id == user_id
-        )
+        select(UserSession).where(UserSession.id == session_id, UserSession.user_id == user_id)
     )
     sess = res.scalar_one_or_none()
     if sess is None or sess.revoked:
@@ -272,17 +262,13 @@ async def revoke_session(
 async def revoke_all_sessions(session: AsyncSession, *, user_id: str) -> int:
     """Revoke every session for a user (force logout everywhere). Returns count."""
     res = await session.execute(
-        select(UserSession).where(
-            UserSession.user_id == user_id, UserSession.revoked.is_(False)
-        )
+        select(UserSession).where(UserSession.user_id == user_id, UserSession.revoked.is_(False))
     )
     sessions_list = res.scalars().all()
     now = _utcnow()
     for s in sessions_list:
         s.revoked = True
-        session.add(
-            RevokedToken(jti=s.id, user_id=user_id, revoked_at=now)
-        )
+        session.add(RevokedToken(jti=s.id, user_id=user_id, revoked_at=now))
     await session.commit()
     return len(sessions_list)
 
@@ -291,16 +277,12 @@ async def is_token_revoked(session: AsyncSession, jti: Optional[str]) -> bool:
     """Return True if the given session id is on the blacklist."""
     if not jti:
         return False
-    res = await session.execute(
-        select(RevokedToken).where(RevokedToken.jti == jti)
-    )
+    res = await session.execute(select(RevokedToken).where(RevokedToken.jti == jti))
     return res.scalar_one_or_none() is not None
 
 
 # ── Admin helpers ────────────────────────────────────────────────────────────
-async def set_user_role(
-    session: AsyncSession, *, user_id: str, role: str
-) -> User:
+async def set_user_role(session: AsyncSession, *, user_id: str, role: str) -> User:
     if role not in auth_mod.ROLE_PERMISSIONS:
         raise HTTPException(
             status_code=400,
@@ -318,9 +300,7 @@ async def set_user_role(
     return user
 
 
-async def set_user_active(
-    session: AsyncSession, *, user_id: str, is_active: bool
-) -> User:
+async def set_user_active(session: AsyncSession, *, user_id: str, is_active: bool) -> User:
     user = await session.get(User, user_id)
     if user is None:
         raise HTTPException(

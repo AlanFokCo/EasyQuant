@@ -41,8 +41,8 @@ from eqlib.ml import MLSelector
 
 def initialize(context):
     set_benchmark('000300.XSHG')
-    set_order_cost(OrderCost(open_tax=0, close_tax=0.001,
-                              open_commission=0.0003, close_commission=0.0003))
+    set_order_cost(OrderCost(open_tax=0, close_tax=0.0005,
+                              open_commission=0.00025, close_commission=0.00025))
 
     context.universe = ['601390', '600519', '000858', '002594', '601398']
 

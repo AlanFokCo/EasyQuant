@@ -136,7 +136,5 @@ class ReportService:
         if not reports_root.is_dir():
             return []
         return sorted(
-            d.name
-            for d in reports_root.iterdir()
-            if d.is_dir() and (d / "report.html").is_file()
+            d.name for d in reports_root.iterdir() if d.is_dir() and (d / "report.html").is_file()
         )

@@ -13,11 +13,13 @@ class TestPasswordStrength:
 
     def setup_method(self):
         import os
+
         self._orig = os.environ.get("EQ_STUDIO_TESTING")
         os.environ["EQ_STUDIO_TESTING"] = "0"
 
     def teardown_method(self):
         import os
+
         if self._orig is None:
             os.environ.pop("EQ_STUDIO_TESTING", None)
         else:

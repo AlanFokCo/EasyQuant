@@ -7,13 +7,11 @@ All tests are synchronous (TemplateService is not async).
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from studio_api.services.template_service import TemplateService
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -190,6 +188,4 @@ class TestTemplateCodeQuality:
         """Every template should define an initialize() function."""
         for t in svc.get_templates():
             full = svc.get_template(t["id"])
-            assert "def initialize" in full["code"], (
-                f"Template '{t['id']}' missing initialize()"
-            )
+            assert "def initialize" in full["code"], f"Template '{t['id']}' missing initialize()"

@@ -39,8 +39,8 @@ async def _fake_get_current_user():
 @pytest_asyncio.fixture
 async def client():
     """Async test client with auth dependency overridden."""
-    from studio_api.app import app
     from studio_api import auth as auth_mod
+    from studio_api.app import app
 
     app.dependency_overrides[auth_mod.get_current_user] = _fake_get_current_user
     transport = ASGITransport(app=app)

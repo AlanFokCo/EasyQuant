@@ -159,8 +159,7 @@ async def validation_handler(request, exc: RequestValidationError):
         safe = dict(err)
         if "ctx" in safe and isinstance(safe["ctx"], dict):
             safe["ctx"] = {
-                k: (str(v) if isinstance(v, Exception) else v)
-                for k, v in safe["ctx"].items()
+                k: (str(v) if isinstance(v, Exception) else v) for k, v in safe["ctx"].items()
             }
         # `msg` may carry the original ValueError repr — keep as-is (always str)
         safe_details.append(safe)

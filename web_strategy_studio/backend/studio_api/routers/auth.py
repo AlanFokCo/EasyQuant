@@ -6,13 +6,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from studio_api import auth as auth_mod
 from studio_api.db import get_session
-from studio_api.middleware.rbac import require_permission, require_role
-from studio_api.models import User, UserSession
+from studio_api.middleware.rbac import require_permission
+from studio_api.models import User
 from studio_api.schemas import api_error
 from studio_api.services import auth_service
 
@@ -209,9 +208,7 @@ async def revoke_session_endpoint(
     session: AsyncSession = Depends(get_session),
 ):
     """Revoke a specific session by id (E6)."""
-    ok = await auth_service.revoke_session(
-        session, user_id=user.id, session_id=body.session_id
-    )
+    ok = await auth_service.revoke_session(session, user_id=user.id, session_id=body.session_id)
     if not ok:
         raise HTTPException(
             status_code=404,
@@ -226,7 +223,7 @@ async def revoke_all_sessions_endpoint(
     session: AsyncSession = Depends(get_session),
 ):
     """Force-logout from all devices (E6)."""
-    count = await auth_service.revoke_all_sessions(session, user_id=user.id)
+    await auth_service.revoke_all_sessions(session, user_id=user.id)
     return None
 
 
@@ -303,9 +300,7 @@ async def admin_set_active(
     _admin: User = Depends(require_permission("admin")),
 ):
     """Enable or disable a user (admin only). Disabling also revokes sessions."""
-    user = await auth_service.set_user_active(
-        session, user_id=user_id, is_active=body.is_active
-    )
+    user = await auth_service.set_user_active(session, user_id=user_id, is_active=body.is_active)
     return UserItem(
         id=user.id,
         username=user.username,
