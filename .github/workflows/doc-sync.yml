@@ -36,5 +36,5 @@ jobs:
 
       - name: Build docs
         run: |
-          pip install mkdocs-material mkdocs-static-i18n pymdown-extensions
+          pip install -e ".[docs]"
           mkdocs build --strict
