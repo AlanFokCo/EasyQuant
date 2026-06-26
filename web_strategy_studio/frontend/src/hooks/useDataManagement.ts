@@ -44,7 +44,7 @@ export function useDataManagement() {
     placeholderData: (prev) => prev, // keep previous data while refetching
   });
 
-  const stocks: LocalStockInfo[] = data?.items ?? [];
+  const stocks: LocalStockInfo[] = useMemo(() => data?.items ?? [], [data?.items]);
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 

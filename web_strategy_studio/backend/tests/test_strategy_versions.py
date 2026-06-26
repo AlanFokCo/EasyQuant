@@ -58,7 +58,9 @@ def auth_token(client):
             "password": pw,
         },
     )
-    assert resp.status_code == 200, f"Register: {reg.status_code} {reg.text}; Login: {resp.status_code} {resp.text}"
+    assert (
+        resp.status_code == 200
+    ), f"Register: {reg.status_code} {reg.text}; Login: {resp.status_code} {resp.text}"
     return resp.json()["access_token"]
 
 

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from studio_api.db import get_session
 from studio_api.models import User
+from studio_api.schemas import api_error
 
 security = HTTPBearer(description="JWT bearer token")
 
@@ -152,40 +153,88 @@ _SSE_TOKEN_EXPIRE_SECONDS = 60
 
 def create_sse_token(user_id: str) -> str:
     """Create a short-lived JWT for SSE connections."""
-    exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=_SSE_TOKEN_EXPIRE_SECONDS)
+    exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+        seconds=_SSE_TOKEN_EXPIRE_SECONDS
+    )
     return jwt.encode(
         {"sub": user_id, "exp": exp, "scope": "sse"},
-        JWT_SECRET, algorithm=JWT_ALGORITHM,
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
     )
+
 
 # Global default user to avoid DB lookups when auth is disabled
 _default_user: Optional[User] = None
+
 
 async def get_current_user(
     session: AsyncSession = Depends(get_session),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(
         HTTPBearer(description="JWT bearer token", auto_error=False)
     ),
-    token: Optional[str] = Query(None, description="Short-lived SSE token for EventSource endpoints"),
+    token: Optional[str] = Query(
+        None, description="Short-lived SSE token for EventSource endpoints"
+    ),
 ) -> User:
-    """Auth disabled — always returns the default demo user."""
-    global _default_user
-    if _default_user is None:
-        # Ensure demo user exists or create a transient one
-        user = await session.get(User, "demo")
-        if user is None:
-            user = User(
-                id="demo",
-                username="demo",
-                hashed_password="",
-                is_active=True,
-                role=ROLE_USER,
+    """Validate JWT bearer token (or SSE query token) and return the user.
+
+    Raises 401 if no/invalid token, or if the user no longer exists / is disabled.
+    """
+    raw_token: Optional[str] = None
+    if credentials is not None and credentials.credentials:
+        raw_token = credentials.credentials
+    elif token:
+        raw_token = token
+
+    if raw_token is None:
+        raise HTTPException(
+            status_code=401,
+            detail=api_error("UNAUTHORIZED", "Authentication required"),
+        )
+
+    try:
+        payload = decode_access_token(raw_token)
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail=api_error("INVALID_TOKEN", "Invalid or expired token"),
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail=api_error("INVALID_TOKEN", "Token missing subject"),
+        )
+
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail=api_error("USER_NOT_FOUND", "User no longer exists"),
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail=api_error("USER_DISABLED", "Account is disabled"),
+        )
+
+    # Session revocation check (E6): if token carries a sid, ensure not revoked
+    sid = payload.get("sid")
+    if sid:
+        from sqlalchemy import select
+
+        from studio_api.models import UserSession
+
+        res = await session.execute(select(UserSession).where(UserSession.id == sid))
+        sess = res.scalar_one_or_none()
+        if sess is None or sess.revoked:
+            raise HTTPException(
+                status_code=401,
+                detail=api_error("SESSION_REVOKED", "Session has been revoked"),
             )
-            session.add(user)
-            await session.commit()
-            await session.refresh(user)
-        _default_user = user
-    return _default_user
+
+    return user
 
 
 # ── Optional auth (for routes that work both with and without auth) ──────────
@@ -216,12 +265,16 @@ async def ensure_admin_user(session: AsyncSession) -> User:
             )
     existing = await session.get(User, admin_id)
     if existing is not None:
+        if existing.role != ROLE_ADMIN:
+            existing.role = ROLE_ADMIN
+            await session.commit()
         return existing
     user = User(
         id=admin_id,
         username=admin_id,
         hashed_password=hash_password(admin_pass),
         is_active=True,
+        role=ROLE_ADMIN,
     )
     session.add(user)
     await session.commit()

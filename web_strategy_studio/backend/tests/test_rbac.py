@@ -8,7 +8,6 @@ from studio_api.auth import (
     ROLE_ADMIN,
     ROLE_GUEST,
     ROLE_USER,
-    ROLE_PERMISSIONS,
     has_permission,
 )
 
@@ -77,11 +76,11 @@ class TestRBACMiddleware:
     async def test_admin_can_list_users(self, auth_client):
         """The seeded admin user can access admin endpoints."""
         # Seed the admin user
-        from studio_api.auth import ensure_admin_user
         import studio_api.db as db_mod
+        from studio_api.auth import ensure_admin_user
 
         async with db_mod.SessionLocal() as session:
-            admin = await ensure_admin_user(session)
+            await ensure_admin_user(session)
 
         # Login as admin
         login = await auth_client.post(
@@ -110,8 +109,8 @@ class TestRBACMiddleware:
         user_id = reg.json()["user_id"]
 
         # Login as admin
-        from studio_api.auth import ensure_admin_user
         import studio_api.db as db_mod
+        from studio_api.auth import ensure_admin_user
 
         async with db_mod.SessionLocal() as session:
             await ensure_admin_user(session)
@@ -134,8 +133,8 @@ class TestRBACMiddleware:
     @pytest.mark.asyncio
     async def test_invalid_role_rejected(self, auth_client):
         # Login as admin
-        from studio_api.auth import ensure_admin_user
         import studio_api.db as db_mod
+        from studio_api.auth import ensure_admin_user
 
         async with db_mod.SessionLocal() as session:
             await ensure_admin_user(session)

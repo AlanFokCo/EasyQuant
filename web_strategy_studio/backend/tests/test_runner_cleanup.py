@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -299,7 +298,7 @@ class TestResourceCleanupGuarantees:
                 "asyncio.create_subprocess_exec",
                 return_value=mock_proc,
             ):
-                result = await local_runner.run(
+                await local_runner.run(
                     run_id="test_no_dup",
                     source_code="# test",
                     params={"start_date": "2024-01-01", "end_date": "2024-12-31"},

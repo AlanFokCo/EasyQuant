@@ -456,9 +456,7 @@ async def diff_versions(
     if strat is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Strategy not found"))
 
-    result = await _version_service.get_diff(
-        session, strategy_id, from_version, to_version
-    )
+    result = await _version_service.get_diff(session, strategy_id, from_version, to_version)
     if result is None:
         raise HTTPException(status_code=404, detail=api_error("NOT_FOUND", "Version not found"))
     return DiffResponse(**result)

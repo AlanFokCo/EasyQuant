@@ -26,9 +26,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), default="user", server_default="user")
     # E5: login lockout — track failed attempts
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    locked_until: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -46,9 +44,7 @@ class UserSession(Base):
     __tablename__ = "user_sessions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("users.id", ondelete="CASCADE")
-    )
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", ondelete="CASCADE"))
     user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -68,9 +64,7 @@ class RevokedToken(Base):
     jti: Mapped[str] = mapped_column(String(128), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Strategy(Base):

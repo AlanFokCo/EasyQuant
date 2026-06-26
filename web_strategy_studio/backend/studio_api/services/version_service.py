@@ -24,6 +24,7 @@ def _hash(source_code: str) -> str:
 
 def _new_id(prefix: str) -> str:
     import secrets
+
     return f"{prefix}_{secrets.token_hex(8)}"
 
 
@@ -119,8 +120,7 @@ class VersionService:
             The StrategyVersion row, or None if not found.
         """
         result = await session.execute(
-            select(StrategyVersion)
-            .where(
+            select(StrategyVersion).where(
                 StrategyVersion.strategy_id == strategy_id,
                 StrategyVersion.version == version_number,
             )
@@ -203,12 +203,14 @@ class VersionService:
         from_lines = from_sv.source_code.splitlines(keepends=True)
         to_lines = to_sv.source_code.splitlines(keepends=True)
 
-        diff = list(difflib.unified_diff(
-            from_lines,
-            to_lines,
-            fromfile=f"v{from_version}",
-            tofile=f"v{to_version}",
-        ))
+        diff = list(
+            difflib.unified_diff(
+                from_lines,
+                to_lines,
+                fromfile=f"v{from_version}",
+                tofile=f"v{to_version}",
+            )
+        )
 
         return {
             "from_version": from_version,

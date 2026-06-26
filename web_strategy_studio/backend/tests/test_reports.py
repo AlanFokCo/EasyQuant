@@ -27,7 +27,6 @@ def client():
     )
 
     import studio_api.db as db_mod
-    from studio_api.models import Base
 
     new_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     db_mod.engine = new_engine
@@ -37,10 +36,12 @@ def client():
 
     # Create tables
     import asyncio
+
     asyncio.run(db_mod.init_db())
 
     # Enable registration for tests
     import studio_api.config as cfg
+
     cfg.settings.allow_registration = True
 
     from studio_api.run_queue import rate_limiter

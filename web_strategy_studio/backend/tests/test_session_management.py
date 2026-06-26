@@ -146,7 +146,7 @@ class TestSessionManagement:
             "/api/v1/auth/login",
             json={"username": "list_sess", "password": "ListSess1!"},
         )
-        token1 = login1.json()["access_token"]
+        _token1 = login1.json()["access_token"]
         login2 = await auth_client.post(
             "/api/v1/auth/login",
             json={"username": "list_sess", "password": "ListSess1!"},
@@ -265,6 +265,7 @@ class TestSessionManagement:
     async def test_max_sessions_enforced(self, auth_client):
         """When max_sessions_per_user is exceeded, oldest are revoked."""
         import asyncio
+
         import studio_api.config as cfg
 
         original_limit = cfg.settings.max_sessions_per_user
@@ -318,8 +319,8 @@ class TestSessionManagement:
         target_token = login.json()["access_token"]
 
         # Seed admin
-        from studio_api.auth import ensure_admin_user
         import studio_api.db as db_mod
+        from studio_api.auth import ensure_admin_user
 
         async with db_mod.SessionLocal() as session:
             await ensure_admin_user(session)

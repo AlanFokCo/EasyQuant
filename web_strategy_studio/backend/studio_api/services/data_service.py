@@ -86,7 +86,9 @@ class DataService:
 
         # Sorting
         reverse = sort_order == "desc"
-        sort_key = sort_by if sort_by in ("code", "start_date", "end_date", "size_bytes") else "code"
+        sort_key = (
+            sort_by if sort_by in ("code", "start_date", "end_date", "size_bytes") else "code"
+        )
         all_stocks.sort(
             key=lambda s: (s.get(sort_key) is None, s.get(sort_key, "")),
             reverse=reverse,
@@ -112,9 +114,7 @@ class DataService:
             self._set_cache(cache_key, info)
         return info
 
-    async def batch_delete(
-        self, codes: List[str], adjust: str = "qfq"
-    ) -> Dict[str, Any]:
+    async def batch_delete(self, codes: List[str], adjust: str = "qfq") -> Dict[str, Any]:
         """Delete local CSV data for multiple stocks.
 
         Returns dict with deleted count and per-code results.
@@ -138,9 +138,7 @@ class DataService:
             "failed": failed_codes,
         }
 
-    async def check_data_quality(
-        self, code: str, adjust: str = "qfq"
-    ) -> Dict[str, Any]:
+    async def check_data_quality(self, code: str, adjust: str = "qfq") -> Dict[str, Any]:
         """Run data quality checks on a stock's local CSV data.
 
         Checks:
@@ -163,34 +161,40 @@ class DataService:
         score = 0
 
         # Check 1: file exists
-        checks.append({
-            "name": "file_exists",
-            "passed": True,
-            "message": "Local CSV file exists",
-        })
+        checks.append(
+            {
+                "name": "file_exists",
+                "passed": True,
+                "message": "Local CSV file exists",
+            }
+        )
         score += 25
 
         # Check 2: has date range
         has_dates = info.get("start_date") and info.get("end_date")
-        checks.append({
-            "name": "date_range",
-            "passed": bool(has_dates),
-            "message": (
-                f"Date range: {info['start_date']} ~ {info['end_date']}"
-                if has_dates
-                else "Date range unavailable"
-            ),
-        })
+        checks.append(
+            {
+                "name": "date_range",
+                "passed": bool(has_dates),
+                "message": (
+                    f"Date range: {info['start_date']} ~ {info['end_date']}"
+                    if has_dates
+                    else "Date range unavailable"
+                ),
+            }
+        )
         if has_dates:
             score += 25
 
         # Check 3: file size is reasonable (> 0)
         size_ok = info.get("size_bytes", 0) > 0
-        checks.append({
-            "name": "file_size",
-            "passed": size_ok,
-            "message": f"File size: {info.get('size_human', 'unknown')}",
-        })
+        checks.append(
+            {
+                "name": "file_size",
+                "passed": size_ok,
+                "message": f"File size: {info.get('size_human', 'unknown')}",
+            }
+        )
         if size_ok:
             score += 25
 
@@ -201,23 +205,29 @@ class DataService:
                 end_dt = datetime.strptime(info["end_date"], "%Y-%m-%d")
                 days_ago = (datetime.now() - end_dt).days
                 fresh = days_ago <= 30
-                checks.append({
-                    "name": "freshness",
-                    "passed": fresh,
-                    "message": f"Last data point {days_ago} days ago",
-                })
+                checks.append(
+                    {
+                        "name": "freshness",
+                        "passed": fresh,
+                        "message": f"Last data point {days_ago} days ago",
+                    }
+                )
             except (ValueError, TypeError):
-                checks.append({
+                checks.append(
+                    {
+                        "name": "freshness",
+                        "passed": False,
+                        "message": "Cannot parse end date",
+                    }
+                )
+        else:
+            checks.append(
+                {
                     "name": "freshness",
                     "passed": False,
-                    "message": "Cannot parse end date",
-                })
-        else:
-            checks.append({
-                "name": "freshness",
-                "passed": False,
-                "message": "No end date available",
-            })
+                    "message": "No end date available",
+                }
+            )
         if fresh:
             score += 25
 
@@ -247,9 +257,7 @@ class DataService:
 
         for code in codes:
             had_data = await asyncio.to_thread(dc.has_local_data, code, adjust=adjust)
-            path = await asyncio.to_thread(
-                dc.save_stock_local, code, start, end, adjust
-            )
+            path = await asyncio.to_thread(dc.save_stock_local, code, start, end, adjust)
             if path:
                 if had_data:
                     merged.append(code)
@@ -293,18 +301,13 @@ class DataService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _gather_stock_info(
-        self, codes: list[str], adjust: str
-    ) -> list[dict[str, Any]]:
+    async def _gather_stock_info(self, codes: list[str], adjust: str) -> list[dict[str, Any]]:
         """Gather file info for a list of codes using concurrent I/O."""
         if not codes:
             return []
 
         # Use asyncio.gather with to_thread for concurrent file reads
-        tasks = [
-            asyncio.to_thread(dc.get_local_file_info, code, adjust=adjust)
-            for code in codes
-        ]
+        tasks = [asyncio.to_thread(dc.get_local_file_info, code, adjust=adjust) for code in codes]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         stocks: list[dict[str, Any]] = []

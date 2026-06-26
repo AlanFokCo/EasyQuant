@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select

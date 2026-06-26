@@ -147,9 +147,8 @@ class TestXForwardedForSpoofingProtection:
         """_client_ip should return the direct client host when trust is off."""
         from unittest.mock import MagicMock
 
-        from studio_api.services.auth_service import _client_ip
-
         import studio_api.config as cfg
+        from studio_api.services.auth_service import _client_ip
 
         original = cfg.settings.trust_proxy_headers
         cfg.settings.trust_proxy_headers = False
@@ -166,9 +165,8 @@ class TestXForwardedForSpoofingProtection:
         """_client_ip should use X-Forwarded-For when trust_proxy_headers=True."""
         from unittest.mock import MagicMock
 
-        from studio_api.services.auth_service import _client_ip
-
         import studio_api.config as cfg
+        from studio_api.services.auth_service import _client_ip
 
         original = cfg.settings.trust_proxy_headers
         cfg.settings.trust_proxy_headers = True
@@ -213,9 +211,8 @@ class TestRateLimiterUsesClientIp:
         Without this fix, an attacker could bypass rate limits by rotating
         the X-Forwarded-For header.
         """
-        from studio_api.run_queue import rate_limiter
-
         import studio_api.config as cfg
+        from studio_api.run_queue import rate_limiter
 
         # Ensure proxy trust is off
         original = cfg.settings.trust_proxy_headers
@@ -224,9 +221,7 @@ class TestRateLimiterUsesClientIp:
 
         try:
             # Create a strategy for run requests
-            tpl = client.get(
-                "/api/v1/strategies/_new/template", headers=_headers(auth_token)
-            )
+            tpl = client.get("/api/v1/strategies/_new/template", headers=_headers(auth_token))
             strat = client.post(
                 "/api/v1/strategies",
                 json={

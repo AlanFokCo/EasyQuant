@@ -3,12 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from studio_api import auth as auth_mod
 from studio_api.db import get_session
 from studio_api.lint_service import lint_source
-from studio_api.models import Strategy
+from studio_api.models import Strategy, User
 from studio_api.schemas import LintBody, LintResponse
-from studio_api import auth as auth_mod
-from studio_api.models import User
 
 router = APIRouter(prefix="/api/v1", tags=["lint"])
 

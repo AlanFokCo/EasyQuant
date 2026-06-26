@@ -191,7 +191,7 @@ async def _test_terminal_lock_cleanup(hub):
     run_id = "run_terminal_lock"
 
     # Subscribe to create a queue entry
-    q = hub.subscribe(run_id)
+    hub.subscribe(run_id)
     assert run_id in hub._queues
 
     # Publish terminal event

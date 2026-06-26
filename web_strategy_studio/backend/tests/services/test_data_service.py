@@ -7,7 +7,7 @@ is needed. All tests are async (pytest-asyncio).
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -60,9 +60,7 @@ class TestValidateCode:
 class TestListStocks:
     @pytest.mark.asyncio
     async def test_empty_directory(self, svc: DataService):
-        with (
-            patch("studio_api.services.data_service.dc.list_local_stocks", return_value=[]),
-        ):
+        with (patch("studio_api.services.data_service.dc.list_local_stocks", return_value=[]),):
             stocks, total = await svc.list_stocks()
             assert stocks == []
             assert total == 0
@@ -141,7 +139,9 @@ class TestListStocks:
         """Second call with same params should return cached result."""
         codes = ["600519"]
         with (
-            patch("studio_api.services.data_service.dc.list_local_stocks", return_value=codes) as mock_list,
+            patch(
+                "studio_api.services.data_service.dc.list_local_stocks", return_value=codes
+            ) as mock_list,
             patch(
                 "studio_api.services.data_service.dc.get_local_file_info",
                 return_value={
@@ -151,7 +151,7 @@ class TestListStocks:
                     "size_bytes": 1024,
                     "size_human": "1.0KB",
                 },
-            ) as mock_info,
+            ) as _mock_info,
         ):
             stocks1, total1 = await svc.list_stocks(page=1, per_page=50)
             stocks2, total2 = await svc.list_stocks(page=1, per_page=50)
@@ -317,7 +317,10 @@ class TestDownloadStocks:
     async def test_new_download(self, svc: DataService):
         with (
             patch("studio_api.services.data_service.dc.has_local_data", return_value=False),
-            patch("studio_api.services.data_service.dc.save_stock_local", return_value="/data/600519.csv"),
+            patch(
+                "studio_api.services.data_service.dc.save_stock_local",
+                return_value="/data/600519.csv",
+            ),
         ):
             result = await svc.download_stocks(["600519"])
             assert result["ok"] is True
@@ -328,7 +331,10 @@ class TestDownloadStocks:
     async def test_merge_existing(self, svc: DataService):
         with (
             patch("studio_api.services.data_service.dc.has_local_data", return_value=True),
-            patch("studio_api.services.data_service.dc.save_stock_local", return_value="/data/600519.csv"),
+            patch(
+                "studio_api.services.data_service.dc.save_stock_local",
+                return_value="/data/600519.csv",
+            ),
         ):
             result = await svc.download_stocks(["600519"])
             assert result["ok"] is True
