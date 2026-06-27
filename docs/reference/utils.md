@@ -444,10 +444,20 @@ DD = √[ mean(r²) for r in returns where r < target ] * √annualize
 
 **计算原理：**
 ```
-历史法: VaR = -quantile(returns, confidence)
-参数法: VaR = -(μ + z_α * σ)    其中 z_α 为标准正态分位数
+历史法:       VaR = -quantile(returns, confidence)
+参数法:       VaR = -(μ + z_α * σ)                     其中 z_α 为标准正态分位数
+Cornish-Fisher: z_cf = z + (z²-1)·s/6 + (z³-3z)·κ/24 - (2z³-5z)·s²/36
+                VaR = -(μ + z_cf · σ)
 ```
-表示在给定置信度下，可能的最大单日亏损。
+其中 `s` 为样本偏度、`κ` 为超额峰度。表示在给定置信度下，可能的最大单日亏损。
+
+**method 选择建议：**
+
+| method | 适用场景 | 注意 |
+|--------|---------|------|
+| `historical` | 默认；不假设分布 | 极端事件需要足够长的样本 |
+| `parametric` | 收益近似正态 | 厚尾分布会**低估**尾部风险 |
+| `cornish_fisher` | A 股日收益等负偏厚尾分布 | 用样本偏度/峰度修正 z 值，比 `parametric` 更准 |
 
 ### 2.9 条件 VaR (CVaR / Expected Shortfall)
 

@@ -128,6 +128,8 @@ MLSelector(
     train_start: str | None = None,
     train_end: str | None = None,
     lookback: int = 60,
+    label_data: pd.DataFrame | None = None,
+    custom_features: dict[str, Callable] | None = None,
     **model_kwargs,
 )
 ```
@@ -141,6 +143,8 @@ MLSelector(
 | `train_start` | `str` | Training start date (`YYYY-MM-DD`) |
 | `train_end` | `str` | Training end date (`YYYY-MM-DD`) |
 | `lookback` | `int` | Historical lookback in days |
+| `label_data` | `pd.DataFrame \| None` | Pre-computed label panel DataFrame. Must contain columns `['security', 'date', 'label']`. When provided, the training stage uses this panel instead of computing labels from `target` — this is the recommended path for true forward-return prediction. |
+| `custom_features` | `dict[str, Callable] \| None` | Custom feature functions: `{name: func(close, high, low, volume) -> float}`. Function names must also appear in `features` to be invoked. |
 | `**model_kwargs` | | Extra model parameters |
 
 ### Methods
@@ -233,6 +237,47 @@ drift = check_feature_drift(X_train, X_live, threshold=0.1)
 | `X_train` | `pd.DataFrame` | Training feature matrix |
 | `X_test` | `pd.DataFrame` | Live / test feature matrix |
 | `threshold` | `float` | KS-statistic threshold above which a feature is flagged as drifted |
+
+**Return fields**:
+- `drift_scores`: per-feature `{ks_stat, p_value}` dict
+- `drifted_features`: list of feature names that exceeded the threshold
+- `drift_detected`: boolean — whether any drift was found
+
+!!! tip "When to use"
+    Call before each daily / weekly live run to compare the day's feature distribution against the training set. Features that drift need model retraining or monitoring alerts.
+
+---
+
+## auto_tune_selector
+
+Auto-tune hyperparameters for an `MLSelector` instance, using time-series-aware cross-validation.
+
+```python
+from eqlib.ml.tuning import auto_tune_selector
+
+best_params = auto_tune_selector(
+    selector,
+    context,
+    param_grid=None,             # default grid by model_type
+    cv_method='time_series_split',
+    n_splits=3,
+    scoring='roc_auc',
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `selector` | `MLSelector` | Configured selector instance |
+| `context` | `Context` | Current backtest context (used to read universe and compute features) |
+| `param_grid` | `dict \| None` | Parameter grid; `None` selects a default grid by `model_type` |
+| `cv_method` | `str` | `'time_series_split'` or `'walk_forward'` (both use `TimeSeriesSplit` underneath) |
+| `n_splits` | `int` | Number of CV folds |
+| `scoring` | `str` | Scoring metric: `roc_auc`, `accuracy`, `neg_log_loss` |
+
+**Returns**: `dict` — best parameters. Returns an empty dict when data is insufficient or no universe is available.
+
+!!! note "Difference from `optimize_hyperparams`"
+    `optimize_hyperparams` requires the caller to prepare `X` / `y`; `auto_tune_selector` pulls data directly from `selector.pipeline.compute(...)` and `selector._compute_target(...)`, suitable for a one-line call inside a strategy's `initialize`.
 
 ---
 

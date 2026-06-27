@@ -444,10 +444,20 @@ Only considers returns below the target value; this is the denominator of the So
 
 **Calculation:**
 ```
-Historical: VaR = -quantile(returns, confidence)
-Parametric: VaR = -(μ + z_α * σ)    where z_α is the standard normal quantile
+Historical:       VaR = -quantile(returns, confidence)
+Parametric:       VaR = -(μ + z_α * σ)                     where z_α is the standard normal quantile
+Cornish-Fisher:   z_cf = z + (z²-1)·s/6 + (z³-3z)·κ/24 - (2z³-5z)·s²/36
+                  VaR = -(μ + z_cf · σ)
 ```
-Represents the maximum expected single-day loss at the given confidence level.
+where `s` is the sample skew and `κ` is the excess kurtosis. Represents the maximum expected single-day loss at the given confidence level.
+
+**Choosing a method:**
+
+| method | When to use | Caveat |
+|--------|-------------|--------|
+| `historical` | Default; makes no distributional assumption | Needs a long enough sample for tail events |
+| `parametric` | Returns are approximately normal | **Underestimates** tail risk for fat-tailed distributions |
+| `cornish_fisher` | A-share daily returns (negatively skewed, heavy-tailed) | Adjusts z by sample skew/kurtosis — more accurate than `parametric` |
 
 ### 2.9 Conditional VaR (CVaR / Expected Shortfall)
 
