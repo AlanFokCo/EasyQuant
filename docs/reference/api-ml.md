@@ -126,6 +126,8 @@ MLSelector(
     train_start: str | None = None,
     train_end: str | None = None,
     lookback: int = 60,
+    label_data: pd.DataFrame | None = None,
+    custom_features: dict[str, Callable] | None = None,
     **model_kwargs,
 )
 ```
@@ -139,6 +141,8 @@ MLSelector(
 | `train_start` | `str` | 训练开始日期（`YYYY-MM-DD`） |
 | `train_end` | `str` | 训练结束日期（`YYYY-MM-DD`） |
 | `lookback` | `int` | 历史数据回看天数 |
+| `label_data` | `pd.DataFrame \| None` | 预计算标签 panel DataFrame，必须包含 `['security', 'date', 'label']` 三列。传入后训练阶段将使用此 panel 而非按 `target` 现算——这是实现真正 forward-return 预测的推荐路径 |
+| `custom_features` | `dict[str, Callable] \| None` | 自定义特征函数映射，格式 `{name: func(close, high, low, volume) -> float}`。函数名必须同时出现在 `features` 列表中才会被调用 |
 | `**model_kwargs` | | 模型额外参数 |
 
 ### 方法
@@ -213,6 +217,69 @@ report = validate_ml_strategy(
 - `feature_importance`: 各特征重要性
 - `concentration_risk`: 特征重要性是否过于集中
 - `model_stability`: 模型稳定性
+
+---
+
+## check_feature_drift
+
+检测训练集与样本外特征分布是否发生漂移（KS 检验）。
+
+```python
+from eqlib.ml.validation import check_feature_drift
+
+drift = check_feature_drift(
+    X_train,
+    X_test,
+    threshold=0.1,
+)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `X_train` | `pd.DataFrame` | 训练集特征矩阵 |
+| `X_test` | `pd.DataFrame` | 样本外 / 实盘特征矩阵 |
+| `threshold` | `float` | KS 统计量阈值，超过则标记为漂移（默认 0.1） |
+
+**返回字段**：
+- `drift_scores`: 各特征的 `{ks_stat, p_value}` 字典
+- `drifted_features`: 超过阈值的特征名列表
+- `drift_detected`: 是否存在漂移（布尔）
+
+!!! tip "何时使用"
+    在每日 / 每周实盘运行前调用，比较当日特征分布与训练集。出现漂移的特征需要重新训练模型或加入监控告警。
+
+---
+
+## auto_tune_selector
+
+基于 `MLSelector` 的 universe 自动调参（时间序列感知交叉验证）。
+
+```python
+from eqlib.ml.tuning import auto_tune_selector
+
+best_params = auto_tune_selector(
+    selector,
+    context,
+    param_grid=None,             # 默认网格按 model_type 选取
+    cv_method='time_series_split',
+    n_splits=3,
+    scoring='roc_auc',
+)
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `selector` | `MLSelector` | 已配置好的选股器实例 |
+| `context` | `Context` | 当前回测上下文（用于取 universe 和计算特征） |
+| `param_grid` | `dict \| None` | 参数网格，`None` 时按 `model_type` 使用默认网格 |
+| `cv_method` | `str` | `'time_series_split'` 或 `'walk_forward'`（底层均使用 `TimeSeriesSplit`） |
+| `n_splits` | `int` | 交叉验证折数 |
+| `scoring` | `str` | 评分指标：`roc_auc`、`accuracy`、`neg_log_loss` |
+
+**返回**：`dict` —— 最优参数。数据量不足或无 universe 时返回空字典。
+
+!!! note "与 `optimize_hyperparams` 的区别"
+    `optimize_hyperparams` 需要调用方自行准备 `X` / `y`；`auto_tune_selector` 直接从 `selector.pipeline.compute(...)` 和 `selector._compute_target(...)` 取数据，适合在策略 `initialize` 中一行调用。
 
 ---
 

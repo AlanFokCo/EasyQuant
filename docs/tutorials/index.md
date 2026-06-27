@@ -189,17 +189,17 @@ docs/tutorials/
 | 策略类型 | 教程 | 相关示例 |
 |---------|------|---------|
 | **趋势跟踪（双均线）** | [Tutorial 01](01-first-strategy.md)、[Tutorial 03](03-optimization.md) | [Example 02](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/02_write_strategy.py)、[Example 03](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/03_run_backtest.py) |
-| **均值回归（RSI）** | [Tutorial 05](05-rsi-mean-reversion.md) | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
-| **均值回归（布林带）** | [Tutorial 05 第 8 节](05-rsi-mean-reversion.md#8-与布林带策略的对比) | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
-| **MACD 趋势确认** | [Tutorial 03 第 3.4 节](03-optimization.md#34-macd-辅助确认) | [Example 15](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_macd_volume.py) |
+| **均值回归（RSI）** | [Tutorial 05](05-rsi-mean-reversion.md) | [Example 15](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
+| **均值回归（布林带）** | [Tutorial 05 第 8 节](05-rsi-mean-reversion.md#8-与布林带策略的对比) | [Example 15](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
+| **MACD 趋势确认** | [Tutorial 03 第 3.4 节](03-optimization.md#34-macd-辅助确认) | [Example 16](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_macd_volume.py) |
 | **行业轮动** | [Tutorial 06](06-sector-rotation.md) | [Example 10](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py) |
-| **多因子选股** | [Tutorial 07](07-multi-factor.md) | [Example 16](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)、[Example 09](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution.py) |
-| **综合策略（全天候 Alpha）** | [Tutorial 08](08-combined-strategy.md) | [Example 21](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md) |
-| **网格交易** | — | [Example 17](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_grid_trading.py) |
-| **支撑阻力位** | — | [Example 11](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py)、[Example 20](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) |
-| **组合回测** | [Tutorial 02 第 8 节](02-backtesting.md#8-组合回测) | [Example 12](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/11_portfolio_backtest.py) |
+| **多因子选股** | [Tutorial 07](07-multi-factor.md) | [Example 17](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)、[Example 09](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution.py) |
+| **综合策略（全天候 Alpha）** | [Tutorial 08](08-combined-strategy.md) | [Example 20](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md) |
+| **网格交易** | — | [Example 18](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_grid_trading.py) |
+| **支撑阻力位** | — | [Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py)、[Example 19](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) |
+| **组合回测** | [Tutorial 02 第 8 节](02-backtesting.md#8-组合回测) | [Example 11](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/11_portfolio_backtest.py) |
 | **参数优化与审计** | [Tutorial 09](09-param-optimization.md) | [agent/optimizer.py](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/optimizer.py)、[agent/strategy_template.py](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/strategy_template.py) |
-| **模拟盘 / 实盘** | [Tutorial 04](04-live-trading.md) | [Example 05](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py)、[Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py) |
+| **模拟盘 / 实盘** | [Tutorial 04](04-live-trading.md) | [Example 12](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py) |
 | **A 股特色数据与风控** | [Tutorial 10](10-ashare-data-risk.md) | — |
 
 ---
@@ -238,12 +238,12 @@ docs/tutorials/
 将所有教程的策略技术融合为一个完整的生产级综合策略，包含多因子选股、行业轮动、
 RSI/布林带/MACD/ATR 技术信号、支撑阻力位和生命周期回调，配有完整的回测和模拟盘代码。
 
-**[Example 21: 全天候 Alpha 综合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md)** —
+**[Example 20: 全天候 Alpha 综合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md)** —
 完整可运行的综合策略代码，包含策略模块、回测脚本和模拟盘脚本。
 
 ### 支撑阻力位组合策略（完整实盘案例）
 
-**[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** —
+**[Example 19: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** —
 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），
 可以直接打开浏览器查看策略表现，也可以运行回测验证。
 

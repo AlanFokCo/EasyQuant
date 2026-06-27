@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### eqlib Core — Correctness (P0)
+
+#### Fixed
+
+- **Annualization basis unified to 244 trading days** — `TRADING_DAYS_PER_YEAR` (244, the A-share correct value) is now imported from `eqlib.constants` everywhere it was previously hardcoded as 252. Affected: `eqlib/scientific/statistics.py`, `eqlib/scientific/risk.py`, `eqlib/scientific/overfitting.py`, `eqlib/utils/stats.py` (`rolling_sharpe`, `downside_deviation`), `eqlib/attribution.py` (`_calc_alpha_beta` and `analyze_returns`). The same backtest now produces matching Sharpe ratios across all modules — previously the same daily returns could yield different annualized values depending on which code path computed them.
+- **OrderCost defaults updated to 2024 fee rates** — `eqlib/objects.py:OrderCost` now defaults to `close_tax=0.0005`, `open_commission=close_commission=0.00025`, aligning with `examples/_defaults.py:DEFAULT_ORDER_COST` and the 2023-08-28 stamp-duty cut. Cascaded to `eqlib/engine.py`, `eqlib/strategies/*.py`, `eqlib/examples/multi_factor_momentum.py`, `web_strategy_studio/backend/studio_api/routers/strategies.py`, `web_strategy_studio/backend/studio_api/data/templates.json`, `web_strategy_studio/backend/studio_api/data/eqlib_symbols.json`, `agent/strategy_template.py`. The historical 0.001 stamp duty is still applied automatically for dates before 2023-08-28 via the existing date-branch logic.
+- **MLSelector honest naming** — `target='forward_return_5d'` now raises `NotImplementedError` instead of silently computing past returns. The default target remains `past_return_5d` (backward-compatible) but its docstring explicitly warns that it uses historical returns as labels — not a true forward-looking model. For true forward-return prediction, users must supply `label_data` as a panel DataFrame.
+- **`MLSelector` constructor signature completed** — `label_data` and `custom_features` parameters are now exposed in the public API (previously only accessible via internals), enabling panel-label training and user-supplied feature functions.
+- **`walk_forward_analysis` is now a true rolling window** — Replaced the previous single-backtest-and-slice proxy with a real walk-forward loop: the `[start_date, end_date]` range is divided into multiple train/test windows that slide forward by `step` days. Each window runs a fresh backtest on the train segment (in-sample) and the test segment (out-of-sample), and per-window Sharpe / return / max-drawdown are aggregated into `oos_is_ratio` and `is_sharpe_decay`. The dict-input path (slicing a pre-computed equity curve) is retained for backward compatibility.
+- **Cornish-Fisher VaR** — `eqlib/utils/stats.py:value_at_risk` and `eqlib/scientific/risk.py:value_at_risk` now accept `method='cornish_fisher'`, adjusting the parametric (normal) VaR for sample skew and excess kurtosis. Better suited for A-share daily returns, which are typically negatively skewed and heavy-tailed — plain `parametric` tends to underestimate tail risk.
+- **Statistical ddof consistency** — `eqlib/scientific/risk.py` now uses `ddof=1` (sample standard deviation) everywhere, matching `eqlib/attribution.py` and `eqlib/scientific/statistics.py`. Previously a few code paths used `ddof=0`, producing slightly different Sharpe/Sortino values for the same input series.
+- **`examples/18_grid_trading.py` fixed** — Original grid strategy generated 0 trades over the test period (MDD 97.4%). Rewrote `market_open` with level-crossing trigger logic (buy when price crosses DOWN to a lower grid level, sell when it crosses UP to a higher level), reduced grid levels from 10 to 8, shortened range lookback from 60 to 30 days, and added a 5% rebuild threshold to refresh the grid when the price range drifts. New result: 146 trades, MDD -19%, win rate 71.9%.
+- **Examples 21-24 normalized** — ML examples now use `examples._defaults` for trading costs and dates (instead of hardcoded values), removed `sys.path.insert(0, '.')` (provided by `pip install -e .`), and added module-level docstrings with number / title / teaching objectives / run command. Example 21 changed `target='forward_return_5d'` → `past_return_5d` to align with the honest naming above.
+
+### Web Strategy Studio
+
+#### Security
+
+- **Real JWT authentication** — `studio_api/auth.py:get_current_user` now validates JWT bearer tokens (or short-lived SSE query tokens), looks up the user in the database, checks `is_active`, and verifies session revocation via `UserSession`. Previously the function was a stub that always returned a demo user, defeating the protected routes.
+- **`ensure_admin_user` sets `role=ROLE_ADMIN`** — Admin user created on startup now actually has admin privileges. Also refuses to start without `EQ_ADMIN_PASSWORD` unless `EQ_STUDIO_TESTING=1`.
+
+### Documentation
+
+#### Added
+
+- Tutorial 11 (ML Selection) — both `docs/tutorials/11-ml-selection.md` and `.en.md` now use the 2024 fee rates.
+- `docs/reference/api-ml.md` — `MLSelector` constructor signature now shows `label_data` and `custom_features`; new sections for `check_feature_drift` and `auto_tune_selector`.
+- `docs/reference/api-scientific.md` — `walk_forward_analysis` documented with the new true rolling-window behavior, including return values (`oos_is_ratio`, `is_sharpe_decay`, per-window `train_start/end` / `test_start/end`).
+- `docs/reference/api-risk.md` — Cornish-Fisher VaR method documented.
+- `docs/tutorials/index.md` and `.en.md` — fixed stale "Example N" numbering that did not match the actual file names.
+
+### CI/CD
+
+#### Fixed
+
+- `doc-sync.yml` now installs docs extras via `pip install -e ".[docs]"` instead of a hardcoded package list — `mkdocs-git-revision-date-localized-plugin` was missing, causing `mkdocs build --strict` to fail.
+- Studio Tests Backend (Python 3.10/3.11), Studio Tests Frontend, and Doc Sync Check workflows all pass.
+
 ---
 
 ## [1.0.3] — 2026-05-23
