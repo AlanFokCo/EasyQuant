@@ -194,6 +194,23 @@ class TestGetStockDetail:
             info = await svc.get_stock_detail("999999")
             assert info is None
 
+    @pytest.mark.asyncio
+    async def test_detail_cache_hit(self, svc: DataService):
+        with patch(
+            "studio_api.services.data_service.dc.get_local_file_info",
+            return_value={
+                "code": "600519",
+                "file": "/data/600519_daily_qfq.csv",
+                "start_date": "2010-01-01",
+                "end_date": "2024-12-31",
+                "size_bytes": 51200,
+                "size_human": "50.0KB",
+            },
+        ) as mock_info:
+            assert await svc.get_stock_detail("600519") is not None
+            assert await svc.get_stock_detail("600519") is not None
+            assert mock_info.call_count == 1
+
 
 # ---------------------------------------------------------------------------
 # batch_delete
@@ -350,6 +367,22 @@ class TestDownloadStocks:
             result = await svc.download_stocks(["999999"])
             assert result["ok"] is False
             assert len(result["failed"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_download_invalidates_cache(self, svc: DataService):
+        svc._cache["stocks"] = "cached"
+        svc._cache_timestamps["stocks"] = datetime.now()
+        with (
+            patch("studio_api.services.data_service.dc.has_local_data", return_value=False),
+            patch(
+                "studio_api.services.data_service.dc.save_stock_local",
+                return_value="/data/600519.csv",
+            ),
+        ):
+            await svc.download_stocks(["600519"])
+
+        assert svc._cache == {}
+        assert svc._cache_timestamps == {}
 
 
 # ---------------------------------------------------------------------------

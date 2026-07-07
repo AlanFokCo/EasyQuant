@@ -12,11 +12,14 @@ import os
 import hashlib
 import datetime
 import threading
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+from eqlib.logger import log as _log
 
 # Disk cache directory (relative to project root or configurable)
 _CACHE_DIR = os.environ.get("EQLIB_CACHE_DIR", None)
@@ -26,6 +29,22 @@ _LOCAL_DATA_DIR = os.environ.get("EQLIB_LOCAL_DATA_DIR", None)
 
 # Default memory limit for preload (1 GB in MB)
 _DEFAULT_MAX_MEMORY_MB = 1024
+
+
+def _empty_load_stats() -> dict:
+    """Return a fresh diagnostics payload for a preload attempt."""
+    return {
+        "requested": 0,
+        "loaded": 0,
+        "failed": [],
+        "sources": {"local": 0, "disk_cache": 0, "network": 0},
+        "elapsed_seconds": 0.0,
+        "memory_mode": None,
+        "memory_estimate_mb": None,
+        "max_memory_mb": None,
+        "use_local": None,
+        "adjust": None,
+    }
 
 # Per-file locks to ensure thread-safe read-merge-write in _save_to_disk.
 # Capped at _MAX_FILE_LOCKS entries; when the limit is reached the dict is
@@ -268,6 +287,8 @@ class PreloadedData:
         # rsi, bb_upper, bb_mid, bb_lower, macd_dif, macd_dea, macd_hist,
         # atr, dc_upper, dc_mid, dc_lower
         self._indicators: dict = {}
+        # Diagnostics for scientific/reliability review of a preload run.
+        self.load_stats: dict = _empty_load_stats()
 
     def load(
         self,
@@ -298,6 +319,16 @@ class PreloadedData:
         """
         start_str = str(start_date).replace("-", "")[:8]
         end_str = str(end_date).replace("-", "")[:8]
+        started_at = time.perf_counter()
+        self.load_stats = _empty_load_stats()
+        self.load_stats.update(
+            {
+                "requested": len(securities),
+                "max_memory_mb": max_memory_mb,
+                "use_local": use_local,
+                "adjust": adjust,
+            }
+        )
 
         # --- Parallel loading using ThreadPoolExecutor ---
         import concurrent.futures
@@ -308,34 +339,28 @@ class PreloadedData:
             if use_local:
                 df = load_stock_local(sec, start_str, end_str, adjust)
                 if df is not None:
-                    return (sec, df)
+                    return (sec, df, "local", None)
                 # Local file missing, try network download first then save to local
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
                     _save_to_disk(df, sec, adjust)
                     save_stock_local(sec, start_date, end_date, adjust)
-                    if progress:
-                        print(f"  Downloaded {sec} from network and saved to local")
-                    return (sec, df)
+                    return (sec, df, "network", None)
                 else:
-                    if progress:
-                        print(f"  WARNING: No data for {sec}: local file not found and network fetch failed")
-                    return (sec, None)
+                    return (sec, None, None, "local file not found and network fetch failed")
             else:
                 df = _load_from_disk(sec, start_str, end_str, adjust)
                 if df is not None:
-                    return (sec, df)
+                    return (sec, df, "disk_cache", None)
                 # Disk cache miss, try network fetch
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
                     _save_to_disk(df, sec, adjust)
-                    return (sec, df)
+                    return (sec, df, "network", None)
                 else:
-                    if progress:
-                        print(f"  WARNING: No data for {sec}: disk cache miss and network fetch failed")
-                    return (sec, None)
+                    return (sec, None, None, "disk cache miss and network fetch failed")
 
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=min(8, total)
@@ -345,35 +370,41 @@ class PreloadedData:
             load_errors = []
             for future in concurrent.futures.as_completed(future_to_sec):
                 try:
-                    sec, df = future.result()
+                    sec, df, source, failure_reason = future.result()
                 except Exception as e:
                     failed_sec = future_to_sec[future]
-                    print(f"[EasyQuant] Warning: failed to load {failed_sec}: {type(e).__name__}: {e}")
-                    load_errors.append(failed_sec)
+                    failure_reason = f"{type(e).__name__}: {e}"
+                    _log.warning("Failed to load %s: %s", failed_sec, failure_reason)
+                    load_errors.append({"security": failed_sec, "reason": failure_reason})
                     done_count += 1
                     if progress and total > 5:
-                        pct = done_count / total * 100
-                        print(f"\r  Loading data: {done_count}/{total} ({pct:.0f}%)", end="", flush=True)
+                        _log.progress(done_count, total, label="Loading data")
                     continue
                 if df is not None and not df.empty:
                     if not isinstance(df.index, pd.DatetimeIndex):
                         try:
                             df.index = pd.to_datetime(df.index)
                         except Exception:
+                            failure_reason = "index cannot be converted to DatetimeIndex"
+                            load_errors.append({"security": sec, "reason": failure_reason})
                             continue
                     frames[sec] = df
+                    if source in self.load_stats["sources"]:
+                        self.load_stats["sources"][source] += 1
+                elif failure_reason:
+                    load_errors.append({"security": sec, "reason": failure_reason})
                 done_count += 1
                 if progress and total > 5:
-                    pct = done_count / total * 100
-                    print(f"\r  Loading data: {done_count}/{total} ({pct:.0f}%)", end="", flush=True)
-
-        if progress and total > 5:
-            print()  # newline after progress
+                    _log.progress(done_count, total, label="Loading data")
 
         if load_errors:
-            print(f"[EasyQuant] Warning: failed to load {len(load_errors)} securities: {', '.join(load_errors)}")
+            self.load_stats["failed"] = load_errors
+            if progress:
+                failed_codes = ", ".join(item["security"] for item in load_errors)
+                _log.warning("Failed to load %s securities: %s", len(load_errors), failed_codes)
 
         if not frames:
+            self.load_stats["elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
             missing = ', '.join(securities)
             if use_local:
                 raise RuntimeError(
@@ -404,12 +435,23 @@ class PreloadedData:
 
         can_build_dicts = mem["total_mb"] <= max_memory_mb
         self._use_panel_fallback = not can_build_dicts
+        memory_mode = "dict_cache" if can_build_dicts else "panel_fallback"
+        self.load_stats.update(
+            {
+                "loaded": len(frames),
+                "memory_mode": memory_mode,
+                "memory_estimate_mb": mem["total_mb"],
+            }
+        )
 
         if progress and total > 5:
-            if can_build_dicts:
-                print(f"  Memory estimate: {mem['total_mb']} MB (within {max_memory_mb} MB limit, using dict caches)")
-            else:
-                print(f"  Memory estimate: {mem['total_mb']} MB (exceeds {max_memory_mb} MB limit, using panel fallback)")
+            _log.step(
+                "Preload memory mode",
+                "OK" if can_build_dicts else "WARN",
+                mode=memory_mode,
+                estimate_mb=mem["total_mb"],
+                max_memory_mb=max_memory_mb,
+            )
 
         if can_build_dicts:
             # Build fast-lookup dicts (O(1) Python dict lookups)
@@ -452,6 +494,18 @@ class PreloadedData:
 
             # Precompute all technical indicators once per stock
             self._compute_indicators(frames)
+
+        self.load_stats["elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
+        if progress:
+            _log.step(
+                "Preloaded market data",
+                "OK",
+                requested=total,
+                loaded=len(frames),
+                failed=len(self.load_stats["failed"]),
+                elapsed_seconds=self.load_stats["elapsed_seconds"],
+                memory_mode=self.load_stats["memory_mode"],
+            )
 
     def _compute_indicators(self, frames: dict):
         """Precompute technical indicators for all securities at once.
@@ -701,6 +755,7 @@ class PreloadedData:
         self._use_panel_fallback = False
         self._field_series = {}
         self._indicators = {}
+        self.load_stats = _empty_load_stats()
 
 
 # ============================================================
