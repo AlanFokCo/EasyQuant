@@ -28,6 +28,7 @@ ENV/
 
 # AI / editor orchestration (local only)
 .claude/
+.codex/
 CLAUDE.md
 
 # Jupyter Notebook

@@ -1398,6 +1398,7 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
         "benchmark_values": benchmark_values,
         "session": session,
         "ohlcv_data": {},
+        "data_diagnostics": dict(getattr(preloaded, "load_stats", {}) or {}),
     }
 
     # Export preloaded OHLCV data for report generation

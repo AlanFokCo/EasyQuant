@@ -1,10 +1,9 @@
-import type { editor } from "monaco-editor";
-import { MarkerSeverity } from "monaco-editor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiJson, ApiError, resolveArtifactUrl } from "../api/client";
 import { useRunStream } from "../hooks/useRunStream";
+import { useLintMarkers } from "../hooks/useLintMarkers";
 import { useEditorStore } from "../store/editorStore";
 import { useTheme, monacoThemeName } from "../hooks/useTheme";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
@@ -22,6 +21,14 @@ import { TemplateSelector } from "./TemplateSelector";
 import { ToastContainer } from "./ToastNotification";
 import { StockPicker } from "./StockPicker";
 import { VersionHistory } from "./VersionHistory";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 type ParamDef = { name: string; type: string; default: string | number | boolean };
 
@@ -41,42 +48,6 @@ type StrategyDetail = {
 };
 
 const LS_KEY = "eq_studio_strategy_id";
-
-function buildMarkers(lint: LintResponse | null): editor.IMarkerData[] {
-  if (!lint) return [];
-  const m: editor.IMarkerData[] = [];
-  for (const s of lint.syntax_errors) {
-    m.push({
-      severity: MarkerSeverity.Error,
-      message: s.message,
-      startLineNumber: s.line,
-      startColumn: Math.max(1, s.col),
-      endLineNumber: s.line,
-      endColumn: Math.max(s.col + 1, s.col + 2),
-    });
-  }
-  for (const i of lint.lint_issues) {
-    m.push({
-      severity: MarkerSeverity.Warning,
-      message: `${i.code}: ${i.message}`,
-      startLineNumber: i.line,
-      startColumn: Math.max(1, i.col),
-      endLineNumber: i.line,
-      endColumn: i.col + 8,
-    });
-  }
-  for (const n of lint.security_notes) {
-    m.push({
-      severity: MarkerSeverity.Warning,
-      message: `${n.code}: ${n.message}`,
-      startLineNumber: n.line,
-      startColumn: 1,
-      endLineNumber: n.line,
-      endColumn: 40,
-    });
-  }
-  return m;
-}
 
 export function StrategyLayout() {
   const qc = useQueryClient();
@@ -112,12 +83,13 @@ export function StrategyLayout() {
   const commandPaletteOpen = useEditorStore((s) => s.commandPaletteOpen);
   const { logs, progress, stage, artifacts, doneStatus, doneError, clearLogs } = useRunStream(runIdStore);
   const [reportOpen, setReportOpen] = useState(false);
+  const [conflictCode, setConflictCode] = useState<string | null>(null);
 
   // Theme — apply data-theme + get resolved Monaco theme name
   const { resolvedTheme } = useTheme();
   const monacoTheme = monacoThemeName(resolvedTheme);
 
-  const markers = useMemo(() => buildMarkers(lint), [lint]);
+  const markers = useLintMarkers(lint);
 
   const bootRef = useRef(false);
   const hydrated = useRef(false);
@@ -205,26 +177,8 @@ export function StrategyLayout() {
         } catch (e) {
           // HIGH-19: 409 VERSION_CONFLICT — ask the user what to do.
           if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
-            const overwrite = window.confirm(
-              "远端有改动，你的保存会覆盖它。\n\n点「确定」强制覆盖，点「取消」放弃本次保存并刷新。"
-            );
-            if (overwrite) {
-              // Force-write without expected_version
-              try {
-                const result = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`, {
-                  method: "PATCH",
-                  body: JSON.stringify({ source_code: code }),
-                });
-                setDirty(false);
-                setServerVersion(result.version);
-                qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
-              } catch (e2) {
-                addToast("error", e2 instanceof Error ? e2.message : "强制保存失败");
-              }
-            } else {
-              setDirty(false);
-              qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
-            }
+            setConflictCode(code);
+            addToast("error", "保存冲突：远端策略已有更新");
           } else {
             addToast("error", e instanceof Error ? e.message : "保存失败");
           }
@@ -233,6 +187,32 @@ export function StrategyLayout() {
     },
     [strategyId, serverVersion, qc, setDirty, addToast],
   );
+
+  const resolveConflictOverwrite = useCallback(async () => {
+    if (!strategyId || conflictCode === null) return;
+    try {
+      const result = await apiJson<StrategyDetail>(`/api/v1/strategies/${strategyId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ source_code: conflictCode }),
+      });
+      setDirty(false);
+      setServerVersion(result.version);
+      setConflictCode(null);
+      qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+      addToast("success", "已覆盖远端版本");
+    } catch (e) {
+      addToast("error", e instanceof Error ? e.message : "强制保存失败");
+    }
+  }, [strategyId, conflictCode, qc, setDirty, addToast]);
+
+  const resolveConflictRefresh = useCallback(() => {
+    if (!strategyId) return;
+    setDirty(false);
+    setConflictCode(null);
+    qc.invalidateQueries({ queryKey: ["strategy", strategyId] });
+    hydrated.current = false;
+    addToast("info", "已刷新远端版本");
+  }, [strategyId, qc, setDirty, addToast]);
 
   // Manual save (Cmd+S) — creates a named version snapshot + runs lint
   const snapshotMut = useMutation({
@@ -826,6 +806,61 @@ export function StrategyLayout() {
           }}
         />
       )}
+
+      <Dialog open={conflictCode !== null} onOpenChange={(open) => !open && setConflictCode(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>保存冲突</DialogTitle>
+            <DialogDescription>
+              远端策略版本已经更新。请选择覆盖远端、刷新远端版本，或取消并继续保留本地编辑。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setConflictCode(null)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text)",
+                cursor: "pointer",
+              }}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={resolveConflictRefresh}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--primary)",
+                background: "transparent",
+                color: "var(--primary)",
+                cursor: "pointer",
+              }}
+            >
+              刷新远端
+            </button>
+            <button
+              type="button"
+              onClick={resolveConflictOverwrite}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+                background: "var(--state-error)",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              覆盖保存
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ToastContainer />
     </>

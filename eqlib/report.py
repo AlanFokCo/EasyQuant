@@ -14,6 +14,7 @@ plt.rcParams["axes.unicode_minus"] = False
 
 from eqlib.data import fetch_stock_data, get_price
 from eqlib.constants import RISK_FREE_RATE, TRADING_DAYS_PER_YEAR
+from eqlib.reporting.diagnostics import collect_data_diagnostics
 from eqlib.brand import (
     BRAND_NAME,
     apply_matplotlib_brand,
@@ -3306,6 +3307,8 @@ def generate_report_json(result, out_path, *,
         "benchmark": benchmark,
         "benchmark_return": round(bench_return, 4) if bench_return is not None else None,
     }
+
+    report["data_diagnostics"] = collect_data_diagnostics(result)
 
     report["trades"] = [
         {

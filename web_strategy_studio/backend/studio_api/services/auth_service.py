@@ -189,6 +189,8 @@ async def login_user(
         user_id=user.id,
         user_agent=_client_user_agent(request),
         ip_address=_client_ip(request),
+        created_at=now,
+        last_used_at=now,
     )
     session.add(sess)
 
