@@ -45,8 +45,9 @@ class StrategyParams:
     strong_market_exposure: float = 0.90
     neutral_market_exposure: float = 0.65
     weak_market_exposure: float = 0.35
-    min_price: float = 3.0
-    min_avg_volume: float = 1_000_000.0
+    min_price: float = 0.0
+    min_avg_volume: float = 100_000.0
+    rebalance_threshold: float = 0.08
 
 
 @dataclass(frozen=True)
@@ -398,6 +399,51 @@ def target_weights(
     return weights
 
 
+def choose_portfolio_candidates(
+    selections: list[tuple[str, SignalSnapshot | None, float]],
+    held_codes: list[str],
+    top_n: int,
+) -> list[tuple[str, SignalSnapshot | None, float]]:
+    """Keep valid existing holdings first, then fill empty slots with new names."""
+
+    by_code = {code: (code, snapshot, score) for code, snapshot, score in selections}
+    held_items = [
+        by_code.get(code, (code, None, 0.0))
+        for code in held_codes
+    ]
+    held_items.sort(key=lambda item: item[2], reverse=True)
+    chosen = held_items[:top_n]
+    chosen_codes = {code for code, _snapshot, _score in chosen}
+
+    for item in selections:
+        code = item[0]
+        if code in chosen_codes:
+            continue
+        if len(chosen) >= top_n:
+            break
+        chosen.append(item)
+        chosen_codes.add(code)
+    return chosen
+
+
+def should_rebalance_position(
+    current_value: float,
+    target_value: float,
+    total_value: float,
+    params: StrategyParams,
+) -> bool:
+    """Return True when target drift is large enough to justify a trade."""
+
+    if target_value <= 0:
+        return current_value > 0
+    if current_value <= 0:
+        return True
+    if total_value <= 0:
+        return True
+    drift = abs(target_value - current_value) / total_value
+    return drift >= params.rebalance_threshold
+
+
 def _set_costs():
     from eqlib import OrderCost, set_order_cost
 
@@ -466,15 +512,30 @@ def rebalance_portfolio(
 
     from eqlib import order_target, order_target_value, record
 
-    weights = target_weights(selections, exposure, params)
+    held_codes = list(context.portfolio.positions.keys())
+    final_selections = choose_portfolio_candidates(
+        selections,
+        held_codes=held_codes,
+        top_n=params.top_n,
+    )
+    weights = target_weights(final_selections, exposure, params)
     target_codes = set(weights)
-    for code in list(context.portfolio.positions.keys()):
+    for code in held_codes:
         if code not in target_codes:
             order_target(code, 0)
 
     total_value = context.portfolio.total_value
     for code, weight in weights.items():
         target_value = total_value * weight
+        position = context.portfolio.positions.get(code)
+        current_value = position.total_value if position is not None else 0.0
+        if not should_rebalance_position(
+            current_value=current_value,
+            target_value=target_value,
+            total_value=total_value,
+            params=params,
+        ):
+            continue
         if target_value >= 1000:
             order_target_value(code, target_value)
 

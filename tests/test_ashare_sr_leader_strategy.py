@@ -10,6 +10,7 @@ from eqlib.strategies.ashare_sr_leader import (
     StrategyKind,
     StrategyParams,
     build_signal_snapshot,
+    choose_portfolio_candidates,
     classify_market,
     compute_atr,
     get_default_leader_universe,
@@ -17,8 +18,10 @@ from eqlib.strategies.ashare_sr_leader import (
     market_exposure,
     rolling_levels,
     score_snapshot,
+    should_rebalance_position,
     target_weights,
 )
+from scripts.run_ashare_sr_leader_research import candidate_param_grid, stability_score
 
 
 def _frame(close_values):
@@ -117,6 +120,44 @@ def test_breakout_snapshot_requires_atr_buffer_and_relative_strength():
     assert score_snapshot(snapshot, StrategyKind.RESISTANCE_BREAKOUT) > 0
 
 
+def test_default_liquidity_threshold_keeps_high_price_leaders():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+    )
+    stock = _ohlcv_from_close(
+        list(np.linspace(100, 115, 50)) + [116],
+        volume_start=150_000,
+        volume_end=180_000,
+    )
+    benchmark = _ohlcv_from_close(
+        list(np.linspace(100, 105, 51)),
+        volume_start=200_000,
+        volume_end=220_000,
+    )
+    assert build_signal_snapshot(stock, benchmark, params) is not None
+
+
+def test_default_price_filter_accepts_qfq_scaled_leader_prices():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+    )
+    stock = _ohlcv_from_close(
+        list(np.linspace(0.4, 0.6, 50)) + [0.62],
+        volume_start=200_000,
+        volume_end=250_000,
+    )
+    benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
+    assert build_signal_snapshot(stock, benchmark, params) is not None
+
+
 def test_defensive_score_prefers_near_support_without_breakdown():
     params = StrategyParams(
         level_window=20,
@@ -166,3 +207,98 @@ def test_target_weights_respect_stock_and_industry_caps():
     assert all(weight <= 0.12 for weight in weights.values())
     liquor_weight = weights["600519"] + weights["000858"] + weights["000568"]
     assert liquor_weight <= 0.30
+
+
+def test_choose_portfolio_candidates_keeps_existing_positive_holdings():
+    selections = [
+        ("new_a", None, 10.0),
+        ("new_b", None, 9.0),
+        ("held_a", None, 3.0),
+        ("held_b", None, 2.0),
+    ]
+    result = choose_portfolio_candidates(
+        selections=selections,
+        held_codes=["held_a", "held_b"],
+        top_n=3,
+    )
+    assert [code for code, _snapshot, _score in result] == ["held_a", "held_b", "new_a"]
+
+
+def test_choose_portfolio_candidates_sells_lowest_held_when_over_limit():
+    selections = [
+        ("held_a", None, 3.0),
+        ("held_b", None, 2.0),
+        ("held_c", None, 1.0),
+        ("new_a", None, 10.0),
+    ]
+    result = choose_portfolio_candidates(
+        selections=selections,
+        held_codes=["held_a", "held_b", "held_c"],
+        top_n=2,
+    )
+    assert [code for code, _snapshot, _score in result] == ["held_a", "held_b"]
+
+
+def test_choose_portfolio_candidates_keeps_held_even_when_not_currently_ranked():
+    selections = [
+        ("new_a", None, 10.0),
+        ("new_b", None, 9.0),
+    ]
+    result = choose_portfolio_candidates(
+        selections=selections,
+        held_codes=["held_a"],
+        top_n=3,
+    )
+    assert [code for code, _snapshot, _score in result] == ["held_a", "new_a", "new_b"]
+
+
+def test_candidate_param_grid_contains_three_strategy_kinds():
+    grid = candidate_param_grid(quick=True)
+    kinds = {kind for kind, _params in grid}
+    assert kinds == {
+        StrategyKind.DEFENSIVE_SUPPORT,
+        StrategyKind.RESISTANCE_BREAKOUT,
+        StrategyKind.PULLBACK_MARKET_GATE,
+    }
+
+
+def test_stability_score_penalizes_drawdown_and_trade_count():
+    good = {
+        "annual_return": 0.12,
+        "sharpe_ratio": 1.2,
+        "max_drawdown": -0.12,
+        "trade_count": 40,
+        "excess_return": 0.05,
+    }
+    overtraded = dict(good, trade_count=300)
+    deep_drawdown = dict(good, max_drawdown=-0.45)
+    assert stability_score(good) > stability_score(overtraded)
+    assert stability_score(good) > stability_score(deep_drawdown)
+
+
+def test_should_rebalance_position_ignores_small_weight_drift():
+    params = StrategyParams()
+    assert should_rebalance_position(
+        current_value=0,
+        target_value=100_000,
+        total_value=1_000_000,
+        params=params,
+    )
+    assert not should_rebalance_position(
+        current_value=101_000,
+        target_value=100_000,
+        total_value=1_000_000,
+        params=params,
+    )
+    assert not should_rebalance_position(
+        current_value=150_000,
+        target_value=100_000,
+        total_value=1_000_000,
+        params=params,
+    )
+    assert should_rebalance_position(
+        current_value=200_000,
+        target_value=100_000,
+        total_value=1_000_000,
+        params=params,
+    )
