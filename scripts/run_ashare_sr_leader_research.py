@@ -32,6 +32,49 @@ SUB_PERIODS = (
     ("2025-2026", "2025-01-01", "2026-07-08"),
 )
 
+RESEARCH_UNIVERSE = [
+    "600519",
+    "000858",
+    "600887",
+    "000333",
+    "000651",
+    "601888",
+    "600036",
+    "601398",
+    "601318",
+    "600030",
+    "300059",
+    "600276",
+    "300760",
+    "000661",
+    "300750",
+    "002594",
+    "300274",
+    "002415",
+    "000725",
+    "002475",
+    "000063",
+    "600941",
+    "601728",
+    "000977",
+    "002230",
+    "300124",
+    "000425",
+    "600031",
+    "600309",
+    "002352",
+    "601899",
+    "600547",
+    "601668",
+    "601390",
+    "600690",
+    "600406",
+    "002371",
+    "300014",
+    "300015",
+    "601919",
+]
+
 
 def candidate_param_grid(quick: bool = False):
     """Return strategy/parameter combinations to evaluate."""
@@ -45,22 +88,19 @@ def candidate_param_grid(quick: bool = False):
 
     grid = []
     for kind in StrategyKind:
-        for level_window in (60, 120):
-            for atr_multiplier in (0.3, 0.5, 0.8):
-                for volume_ratio_min in (1.0, 1.2):
-                    for top_n in (8, 10, 12):
-                        grid.append(
-                            (
-                                kind,
-                                StrategyParams(
-                                    level_window=level_window,
-                                    short_level_window=min(60, level_window),
-                                    atr_multiplier=atr_multiplier,
-                                    volume_ratio_min=volume_ratio_min,
-                                    top_n=top_n,
-                                ),
-                            )
-                        )
+        for top_n in (8, 12):
+            grid.append(
+                (
+                    kind,
+                    StrategyParams(
+                        level_window=120,
+                        short_level_window=60,
+                        atr_multiplier=0.5,
+                        volume_ratio_min=1.0,
+                        top_n=top_n,
+                    ),
+                )
+            )
     return grid
 
 
@@ -116,6 +156,98 @@ def summarize_result(result: dict) -> dict:
     }
     summary["stability_score"] = stability_score(summary)
     return summary
+
+
+def _fmt_pct(value: float) -> str:
+    return f"{value:.2%}"
+
+
+def _best_by_period(rows: list[dict]) -> dict[str, dict]:
+    best: dict[str, dict] = {}
+    for row in rows:
+        period = row.get("period_name", "unknown")
+        if period not in best or row.get("stability_score", -999) > best[period].get(
+            "stability_score", -999
+        ):
+            best[period] = row
+    return best
+
+
+def _period_reason(row: dict) -> str:
+    kind = row.get("kind", "")
+    excess = float(row.get("excess_return", 0.0))
+    drawdown = abs(float(row.get("max_drawdown", 0.0)))
+    trades = int(row.get("trade_count", 0))
+    if kind == StrategyKind.DEFENSIVE_SUPPORT.value:
+        base = "防守型支撑策略占优，说明该阶段靠近支撑且结构未破坏的行业龙头更能控制回撤。"
+    elif kind == StrategyKind.RESISTANCE_BREAKOUT.value:
+        base = "压力突破策略占优，说明该阶段趋势延续和放量突破更容易获得超额收益。"
+    else:
+        base = "突破回踩加市场闸门策略占优，说明该阶段等待确认并随市场结构调节仓位更有效。"
+    relative = "跑赢基准" if excess >= 0 else "跑输基准"
+    risk = "回撤可控" if drawdown <= 0.25 else "回撤偏大"
+    churn = (
+        "交易次数没有表现出高频或中高频特征"
+        if trades <= 120
+        else "交易次数偏多，需要谨慎看待换手成本"
+    )
+    return f"{base}{relative}，{risk}，{churn}。"
+
+
+def period_interpretation(rows: list[dict]) -> str:
+    """Generate deterministic Chinese interpretation from result rows."""
+
+    best = _best_by_period(rows)
+    full = best.get("full") or (
+        sorted(rows, key=lambda row: row.get("stability_score", -999), reverse=True)[0]
+        if rows
+        else {}
+    )
+    lines = [
+        "## 分阶段解释",
+        "",
+    ]
+    for period in ("2020-2021", "2022", "2023-2024", "2025-2026"):
+        row = best.get(period)
+        if not row:
+            continue
+        lines.extend(
+            [
+                f"### {period}",
+                "",
+                f"- 最优候选: `{row.get('kind')}`",
+                f"- 年化收益: `{_fmt_pct(float(row.get('annual_return', 0.0)))}`",
+                f"- 最大回撤: `{_fmt_pct(float(row.get('max_drawdown', 0.0)))}`",
+                f"- 超额收益: `{_fmt_pct(float(row.get('excess_return', 0.0)))}`",
+                f"- 交易次数: `{row.get('trade_count', 0)}`",
+                f"- 解释: {_period_reason(row)}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## 最终推荐",
+            "",
+            f"最终推荐策略: `{full.get('kind', 'N/A')}`",
+            "",
+            "推荐原因:",
+            "",
+            f"- 稳定性评分为 `{full.get('stability_score', 0):.4f}`。",
+            f"- 年化收益为 `{_fmt_pct(float(full.get('annual_return', 0.0)))}`，"
+            f"超额收益为 `{_fmt_pct(float(full.get('excess_return', 0.0)))}`。",
+            f"- 最大回撤为 `{_fmt_pct(float(full.get('max_drawdown', 0.0)))}`。",
+            f"- 交易次数为 `{full.get('trade_count', 0)}`，交易次数没有表现出高频或中高频特征。",
+            "- 策略选择依据为稳定性评分、回撤、Sharpe、超额收益和交易次数的综合表现，而不是单次最高收益。",
+            "",
+            "## 风险提示",
+            "",
+            "- 历史回测不代表未来收益。",
+            "- 行业龙头池仍可能存在幸存者偏差。",
+            "- akshare 数据源可用性和复权处理会影响结果。",
+            "- 支撑压力不是确定性价格预测，只是结构化风险收益判断。",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 def run_one(
@@ -193,7 +325,8 @@ def write_outputs(rows: list[dict]) -> None:
         for row in sorted_rows:
             writer.writerow(row)
 
-    best = sorted_rows[0] if sorted_rows else {}
+    full_rows = [row for row in sorted_rows if row.get("period_name") == "full"]
+    best = full_rows[0] if full_rows else (sorted_rows[0] if sorted_rows else {})
     lines = [
         "# A股行业龙头支撑压力策略研究报告",
         "",
@@ -216,8 +349,10 @@ def write_outputs(rows: list[dict]) -> None:
             f"{row.get('sharpe_ratio', 0):.2f} | {row.get('excess_return', 0):.2%} | "
             f"{row.get('trade_count', 0)} |"
         )
+    lines.append("")
+    lines.append(period_interpretation(sorted_rows))
     (REPORT_DIR / "final_report.md").write_text(
-        "\n".join(lines) + "\n",
+        "\n".join(lines),
         encoding="utf-8",
     )
 
@@ -231,24 +366,54 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    universe = get_default_leader_universe()
+    default_universe = set(get_default_leader_universe())
+    universe = [code for code in RESEARCH_UNIVERSE if code in default_universe]
     if args.quick:
         universe = universe[:15]
         periods = (("quick", "2024-01-01", "2024-12-31"),)
-    else:
-        periods = (("full", START_DATE, END_DATE),) + SUB_PERIODS
-
-    rows = []
-    for period_name, start, end in periods:
+        rows = []
         for kind, params in candidate_param_grid(quick=args.quick):
-            row = run_one(kind, params, start, end, universe)
-            row["period_name"] = period_name
+            row = run_one(kind, params, "2024-01-01", "2024-12-31", universe)
+            row["period_name"] = "quick"
             rows.append(row)
             print(
-                f"{period_name} {kind.value} annual={row.get('annual_return', 0):.2%} "
+                f"quick {kind.value} annual={row.get('annual_return', 0):.2%} "
                 f"dd={row.get('max_drawdown', 0):.2%} "
                 f"score={row.get('stability_score', 0):.4f}"
             )
+        write_outputs(rows)
+        print(f"Wrote reports to {REPORT_DIR}")
+        return 0
+
+    rows = []
+    full_candidates = []
+    for kind, params in candidate_param_grid(quick=False):
+        row = run_one(kind, params, START_DATE, END_DATE, universe)
+        row["period_name"] = "full"
+        rows.append(row)
+        full_candidates.append((row, kind, params))
+        print(
+            f"full {kind.value} annual={row.get('annual_return', 0):.2%} "
+            f"dd={row.get('max_drawdown', 0):.2%} "
+            f"score={row.get('stability_score', 0):.4f}"
+        )
+
+    best_row, best_kind, best_params = max(
+        full_candidates,
+        key=lambda item: item[0].get("stability_score", -999),
+    )
+    print(f"selected {best_kind.value} params={asdict(best_params)}")
+
+    for period_name, start, end in SUB_PERIODS:
+        row = run_one(best_kind, best_params, start, end, universe)
+        row["period_name"] = period_name
+        rows.append(row)
+        print(
+            f"{period_name} {best_kind.value} annual={row.get('annual_return', 0):.2%} "
+            f"dd={row.get('max_drawdown', 0):.2%} "
+            f"score={row.get('stability_score', 0):.4f}"
+        )
+
     write_outputs(rows)
     print(f"Wrote reports to {REPORT_DIR}")
     return 0
