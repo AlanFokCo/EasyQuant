@@ -360,3 +360,207 @@ def score_snapshot(snapshot: SignalSnapshot, kind: StrategyKind) -> float:
         + support_score * 0.3
         + low_vol_bonus
     )
+
+
+def industry_for_code(code: str) -> str:
+    """Return configured industry label for a bare or suffixed code."""
+
+    bare = _bare(code)
+    for leader in DEFAULT_LEADER_UNIVERSE:
+        if _bare(leader.code) == bare:
+            return leader.industry
+    return "未知"
+
+
+def target_weights(
+    selections: list[tuple[str, SignalSnapshot | None, float]],
+    exposure: float,
+    params: StrategyParams,
+) -> dict[str, float]:
+    """Build capped target weights from ranked selections."""
+
+    weights: dict[str, float] = {}
+    industry_weights: dict[str, float] = {}
+    if not selections or exposure <= 0:
+        return weights
+
+    count = max(1, min(params.top_n, len(selections)))
+    base_weight = min(params.max_stock_weight, exposure / count)
+    for code, _snapshot, _score in selections[: params.top_n]:
+        industry = industry_for_code(code)
+        current_industry = industry_weights.get(industry, 0.0)
+        allowed_by_industry = max(0.0, params.max_industry_weight - current_industry)
+        weight = min(base_weight, allowed_by_industry, params.max_stock_weight)
+        if weight <= 0:
+            continue
+        weights[code] = weight
+        industry_weights[industry] = current_industry + weight
+    return weights
+
+
+def _set_costs():
+    from eqlib import OrderCost, set_order_cost
+
+    set_order_cost(
+        OrderCost(
+            open_tax=0,
+            close_tax=0.0005,
+            open_commission=0.00025,
+            close_commission=0.00025,
+            close_today_commission=0,
+            min_commission=5,
+        )
+    )
+
+
+def select_candidates(
+    context,
+    kind: StrategyKind,
+    params: StrategyParams,
+    universe: list[str],
+    benchmark_frame: pd.DataFrame,
+) -> list[tuple[str, SignalSnapshot, float]]:
+    """Rank candidates using only history available to the current callback."""
+
+    from eqlib import attribute_history
+
+    selections: list[tuple[str, SignalSnapshot, float]] = []
+    lookback = (
+        max(
+            params.level_window,
+            params.short_level_window,
+            params.rs_window,
+            params.volume_window,
+            params.atr_period,
+        )
+        + 5
+    )
+    for code in universe:
+        if is_excluded_board(code):
+            continue
+        frame = attribute_history(
+            code,
+            lookback,
+            "1d",
+            ["open", "high", "low", "close", "volume"],
+        )
+        if frame is None or frame.empty:
+            continue
+        snapshot = build_signal_snapshot(frame, benchmark_frame, params)
+        if snapshot is None or snapshot.breakdown:
+            continue
+        score = score_snapshot(snapshot, kind)
+        if score > 0:
+            selections.append((code, snapshot, score))
+    selections.sort(key=lambda item: item[2], reverse=True)
+    return selections
+
+
+def rebalance_portfolio(
+    context,
+    selections: list[tuple[str, SignalSnapshot, float]],
+    exposure: float,
+    params: StrategyParams,
+) -> None:
+    """Move portfolio toward ranked target weights."""
+
+    from eqlib import order_target, order_target_value, record
+
+    weights = target_weights(selections, exposure, params)
+    target_codes = set(weights)
+    for code in list(context.portfolio.positions.keys()):
+        if code not in target_codes:
+            order_target(code, 0)
+
+    total_value = context.portfolio.total_value
+    for code, weight in weights.items():
+        target_value = total_value * weight
+        if target_value >= 1000:
+            order_target_value(code, target_value)
+
+    record(
+        total_value=context.portfolio.total_value,
+        exposure=exposure,
+        holdings=len(weights),
+    )
+
+
+def _risk_review(context, params: StrategyParams) -> None:
+    """Weekly structural risk review; exits valid breakdowns."""
+
+    from eqlib import attribute_history, order_target
+
+    lookback = max(params.level_window, params.atr_period) + 5
+    for code in list(context.portfolio.positions.keys()):
+        frame = attribute_history(
+            code,
+            lookback,
+            "1d",
+            ["open", "high", "low", "close", "volume"],
+        )
+        if frame is None or frame.empty:
+            continue
+        _resistance, support = rolling_levels(frame, params.level_window)
+        atr_value = float(compute_atr(frame, params.atr_period).iloc[-1])
+        close = float(frame["close"].iloc[-1])
+        if close < support - params.atr_multiplier * atr_value:
+            order_target(code, 0)
+
+
+def make_initialize(
+    kind: StrategyKind,
+    params: StrategyParams | None = None,
+    universe: list[str] | None = None,
+    benchmark: str = "000300.XSHG",
+):
+    """Create an ``initialize(context)`` callback for ``eqlib.run_backtest``."""
+
+    params = params or StrategyParams()
+    universe = list(universe or get_default_leader_universe())
+
+    def initialize(context):
+        from eqlib import attribute_history, g, run_monthly, run_weekly, set_benchmark
+
+        set_benchmark(benchmark)
+        _set_costs()
+        context.universe = universe + [benchmark]
+        g.sr_kind = kind
+        g.sr_params = params
+        g.sr_universe = universe
+        g.sr_benchmark = benchmark
+
+        def monthly_scan(ctx):
+            lookback = (
+                max(
+                    g.sr_params.level_window,
+                    g.sr_params.rs_window,
+                    g.sr_params.atr_period,
+                )
+                + 5
+            )
+            bench = attribute_history(
+                g.sr_benchmark,
+                lookback,
+                "1d",
+                ["open", "high", "low", "close", "volume"],
+            )
+            if bench is None or bench.empty:
+                return
+            state = classify_market(bench, g.sr_params)
+            exposure = market_exposure(state, g.sr_params)
+            selections = select_candidates(
+                ctx,
+                g.sr_kind,
+                g.sr_params,
+                g.sr_universe,
+                bench,
+            )
+            rebalance_portfolio(ctx, selections, exposure, g.sr_params)
+
+        def weekly_review(ctx):
+            _risk_review(ctx, g.sr_params)
+
+        run_monthly(monthly_scan, day_of_month=1, time="09:30")
+        run_weekly(weekly_review, day_of_week=4, time="09:30")
+
+    return initialize
