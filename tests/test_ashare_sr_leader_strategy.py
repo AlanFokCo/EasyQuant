@@ -5,6 +5,7 @@ import pandas as pd
 
 from eqlib.strategies.ashare_sr_leader import (
     DEFAULT_LEADER_UNIVERSE,
+    industry_for_code,
     MarketState,
     StrategyKind,
     StrategyParams,
@@ -16,6 +17,7 @@ from eqlib.strategies.ashare_sr_leader import (
     market_exposure,
     rolling_levels,
     score_snapshot,
+    target_weights,
 )
 
 
@@ -142,3 +144,25 @@ def test_breakdown_snapshot_has_negative_scores():
     assert snapshot is not None
     assert snapshot.breakdown
     assert score_snapshot(snapshot, StrategyKind.PULLBACK_MARKET_GATE) < 0
+
+
+def test_industry_for_code_uses_default_universe_metadata():
+    assert industry_for_code("600519") == "白酒"
+    assert industry_for_code("600519.XSHG") == "白酒"
+    assert industry_for_code("123456") == "未知"
+
+
+def test_target_weights_respect_stock_and_industry_caps():
+    params = StrategyParams(top_n=5, max_stock_weight=0.12, max_industry_weight=0.30)
+    selections = [
+        ("600519", None, 10.0),
+        ("000858", None, 9.0),
+        ("000568", None, 8.0),
+        ("300750", None, 7.0),
+        ("600036", None, 6.0),
+    ]
+    weights = target_weights(selections, exposure=0.9, params=params)
+    assert sum(weights.values()) <= 0.9
+    assert all(weight <= 0.12 for weight in weights.values())
+    liquor_weight = weights["600519"] + weights["000858"] + weights["000568"]
+    assert liquor_weight <= 0.30
