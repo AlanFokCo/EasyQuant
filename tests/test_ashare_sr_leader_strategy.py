@@ -6,6 +6,7 @@ import pandas as pd
 from eqlib.strategies.ashare_sr_leader import (
     DEFAULT_LEADER_UNIVERSE,
     industry_for_code,
+    liquidity_capped_target_value,
     MarketState,
     StrategyKind,
     StrategyParams,
@@ -21,7 +22,11 @@ from eqlib.strategies.ashare_sr_leader import (
     should_rebalance_position,
     target_weights,
 )
-from scripts.run_ashare_sr_leader_research import candidate_param_grid, stability_score
+from scripts.run_ashare_sr_leader_research import (
+    candidate_param_grid,
+    period_interpretation,
+    stability_score,
+)
 
 
 def _frame(close_values):
@@ -150,12 +155,29 @@ def test_default_price_filter_accepts_qfq_scaled_leader_prices():
         rs_window=20,
     )
     stock = _ohlcv_from_close(
-        list(np.linspace(0.4, 0.6, 50)) + [0.62],
+        list(np.linspace(0.6, 0.8, 50)) + [0.82],
         volume_start=200_000,
         volume_end=250_000,
     )
     benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
     assert build_signal_snapshot(stock, benchmark, params) is not None
+
+
+def test_default_price_filter_rejects_extreme_qfq_execution_artifacts():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+    )
+    stock = _ohlcv_from_close(
+        list(np.linspace(0.02, 0.03, 50)) + [0.031],
+        volume_start=2_000_000,
+        volume_end=2_500_000,
+    )
+    benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
+    assert build_signal_snapshot(stock, benchmark, params) is None
 
 
 def test_defensive_score_prefers_near_support_without_breakdown():
@@ -185,6 +207,32 @@ def test_breakdown_snapshot_has_negative_scores():
     assert snapshot is not None
     assert snapshot.breakdown
     assert score_snapshot(snapshot, StrategyKind.PULLBACK_MARKET_GATE) < 0
+
+
+def test_liquidity_capped_target_value_limits_new_order_size():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+        liquidity_volume_pct=0.08,
+    )
+    stock = _ohlcv_from_close(
+        list(np.linspace(0.3, 0.4, 50)) + [0.42],
+        volume_start=2_000_000,
+        volume_end=2_500_000,
+    )
+    benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
+    snapshot = build_signal_snapshot(stock, benchmark, params)
+    assert snapshot is not None
+    capped = liquidity_capped_target_value(
+        requested_target_value=120_000,
+        snapshot=snapshot,
+        params=params,
+    )
+    assert capped < 120_000
+    assert capped == snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
 
 
 def test_industry_for_code_uses_default_universe_metadata():
@@ -302,3 +350,33 @@ def test_should_rebalance_position_ignores_small_weight_drift():
         total_value=1_000_000,
         params=params,
     )
+
+
+def test_period_interpretation_reports_regime_and_recommendation():
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "pullback_market_gate",
+            "annual_return": 0.12,
+            "max_drawdown": -0.18,
+            "sharpe_ratio": 1.1,
+            "excess_return": 0.04,
+            "trade_count": 70,
+            "stability_score": 0.55,
+        },
+        {
+            "period_name": "2022",
+            "kind": "defensive_support",
+            "annual_return": -0.04,
+            "max_drawdown": -0.16,
+            "sharpe_ratio": -0.2,
+            "excess_return": 0.03,
+            "trade_count": 18,
+            "stability_score": 0.10,
+        },
+    ]
+    text = period_interpretation(rows)
+    assert "最终推荐" in text
+    assert "pullback_market_gate" in text
+    assert "2022" in text
+    assert "交易次数没有表现出高频" in text

@@ -45,9 +45,10 @@ class StrategyParams:
     strong_market_exposure: float = 0.90
     neutral_market_exposure: float = 0.65
     weak_market_exposure: float = 0.35
-    min_price: float = 0.0
+    min_price: float = 0.10
     min_avg_volume: float = 100_000.0
     rebalance_threshold: float = 0.08
+    liquidity_volume_pct: float = 0.08
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class SignalSnapshot:
     resistance: float
     support: float
     atr: float
+    avg_volume: float
     volume_ratio: float
     relative_strength: float
     volatility: float
@@ -326,6 +328,7 @@ def build_signal_snapshot(
         resistance=resistance,
         support=support,
         atr=atr_value,
+        avg_volume=avg_volume,
         volume_ratio=volume_ratio,
         relative_strength=rel_strength,
         volatility=volatility,
@@ -444,6 +447,19 @@ def should_rebalance_position(
     return drift >= params.rebalance_threshold
 
 
+def liquidity_capped_target_value(
+    requested_target_value: float,
+    snapshot: SignalSnapshot | None,
+    params: StrategyParams,
+) -> float:
+    """Cap new target value so orders stay below the engine's volume limit."""
+
+    if snapshot is None:
+        return requested_target_value
+    liquidity_cap = snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
+    return min(requested_target_value, liquidity_cap)
+
+
 def _set_costs():
     from eqlib import OrderCost, set_order_cost
 
@@ -525,10 +541,17 @@ def rebalance_portfolio(
             order_target(code, 0)
 
     total_value = context.portfolio.total_value
+    snapshots = {code: snapshot for code, snapshot, _score in final_selections}
     for code, weight in weights.items():
         target_value = total_value * weight
         position = context.portfolio.positions.get(code)
         current_value = position.total_value if position is not None else 0.0
+        if position is None:
+            target_value = liquidity_capped_target_value(
+                requested_target_value=target_value,
+                snapshot=snapshots.get(code),
+                params=params,
+            )
         if not should_rebalance_position(
             current_value=current_value,
             target_value=target_value,
