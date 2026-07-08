@@ -20,6 +20,14 @@ class StrategyKind(str, Enum):
     PULLBACK_MARKET_GATE = "pullback_market_gate"
 
 
+class MarketState(str, Enum):
+    """Broad-market structure state."""
+
+    STRONG = "strong"
+    NEUTRAL = "neutral"
+    WEAK = "weak"
+
+
 @dataclass(frozen=True)
 class StrategyParams:
     """Parameter set for support/resistance leader strategies."""
@@ -48,6 +56,24 @@ class LeaderStock:
     code: str
     name: str
     industry: str
+
+
+@dataclass(frozen=True)
+class SignalSnapshot:
+    """Point-in-time signal state for one stock."""
+
+    close: float
+    resistance: float
+    support: float
+    atr: float
+    volume_ratio: float
+    relative_strength: float
+    volatility: float
+    support_distance: float
+    resistance_distance: float
+    breakout: bool
+    pullback: bool
+    breakdown: bool
 
 
 DEFAULT_LEADER_UNIVERSE: tuple[LeaderStock, ...] = (
@@ -176,3 +202,161 @@ def rolling_levels(frame: pd.DataFrame, window: int) -> tuple[float, float]:
         return float("nan"), float("nan")
     completed = frame.iloc[-window - 1:-1]
     return float(completed["high"].max()), float(completed["low"].min())
+
+
+def _last_float(series: pd.Series) -> float:
+    values = series.dropna()
+    return float(values.iloc[-1]) if not values.empty else float("nan")
+
+
+def classify_market(frame: pd.DataFrame, params: StrategyParams) -> MarketState:
+    """Classify broad-market state from completed daily bars."""
+
+    if len(frame) < params.level_window + 1:
+        return MarketState.NEUTRAL
+
+    close = float(frame["close"].iloc[-1])
+    ma = frame["close"].rolling(
+        params.level_window,
+        min_periods=params.level_window,
+    ).mean()
+    ma_value = _last_float(ma)
+    resistance, support = rolling_levels(frame, params.level_window)
+    atr_value = float(compute_atr(frame, params.atr_period).iloc[-1])
+
+    if close < support - params.atr_multiplier * atr_value:
+        return MarketState.WEAK
+    if close > resistance + params.atr_multiplier * atr_value:
+        return MarketState.STRONG
+    if pd.notna(ma_value) and close > ma_value and close > support:
+        return MarketState.STRONG
+    return MarketState.NEUTRAL
+
+
+def market_exposure(state: MarketState, params: StrategyParams) -> float:
+    """Map market state to target equity exposure."""
+
+    if state is MarketState.STRONG:
+        return params.strong_market_exposure
+    if state is MarketState.WEAK:
+        return params.weak_market_exposure
+    return params.neutral_market_exposure
+
+
+def _relative_strength(
+    stock_close: pd.Series,
+    benchmark_close: pd.Series,
+    window: int,
+) -> float:
+    if len(stock_close) < window + 1 or len(benchmark_close) < window + 1:
+        return 0.0
+    stock_ret = float(stock_close.iloc[-1] / stock_close.iloc[-window - 1] - 1)
+    bench_ret = float(benchmark_close.iloc[-1] / benchmark_close.iloc[-window - 1] - 1)
+    return stock_ret - bench_ret
+
+
+def build_signal_snapshot(
+    stock_frame: pd.DataFrame,
+    benchmark_frame: pd.DataFrame,
+    params: StrategyParams,
+) -> SignalSnapshot | None:
+    """Build a point-in-time support/resistance signal snapshot."""
+
+    required = (
+        max(
+            params.level_window,
+            params.rs_window,
+            params.volume_window,
+            params.atr_period,
+        )
+        + 1
+    )
+    if len(stock_frame) < required or len(benchmark_frame) < params.rs_window + 1:
+        return None
+
+    close = float(stock_frame["close"].iloc[-1])
+    if close < params.min_price:
+        return None
+
+    avg_volume = float(stock_frame["volume"].tail(params.volume_window).mean())
+    if avg_volume < params.min_avg_volume:
+        return None
+
+    resistance_long, support_long = rolling_levels(stock_frame, params.level_window)
+    resistance_short, support_short = rolling_levels(stock_frame, params.short_level_window)
+    resistance_candidates = [
+        value for value in (resistance_long, resistance_short) if pd.notna(value)
+    ]
+    support_candidates = [
+        value for value in (support_long, support_short) if pd.notna(value)
+    ]
+    if not resistance_candidates or not support_candidates:
+        return None
+
+    resistance = min(resistance_candidates)
+    support = max(support_candidates)
+    atr_value = float(compute_atr(stock_frame, params.atr_period).iloc[-1])
+    volume_ratio = float(stock_frame["volume"].iloc[-1] / avg_volume) if avg_volume > 0 else 0.0
+    rel_strength = _relative_strength(
+        stock_frame["close"],
+        benchmark_frame["close"],
+        params.rs_window,
+    )
+    returns = stock_frame["close"].pct_change().tail(20).dropna()
+    volatility = float(returns.std()) if not returns.empty else 0.0
+
+    breakout = (
+        close > resistance + params.atr_multiplier * atr_value
+        and volume_ratio >= params.volume_ratio_min
+        and rel_strength > 0
+    )
+    breakdown = close < support - params.atr_multiplier * atr_value
+    support_distance = (close - support) / close if close > 0 else float("inf")
+    resistance_distance = (resistance - close) / close if close > 0 else float("inf")
+    pullback = (
+        not breakdown
+        and close >= support
+        and support_distance <= max(0.12, params.atr_multiplier * atr_value / close * 3)
+        and rel_strength >= -0.03
+    )
+
+    return SignalSnapshot(
+        close=close,
+        resistance=resistance,
+        support=support,
+        atr=atr_value,
+        volume_ratio=volume_ratio,
+        relative_strength=rel_strength,
+        volatility=volatility,
+        support_distance=support_distance,
+        resistance_distance=resistance_distance,
+        breakout=breakout,
+        pullback=pullback,
+        breakdown=breakdown,
+    )
+
+
+def score_snapshot(snapshot: SignalSnapshot, kind: StrategyKind) -> float:
+    """Score a snapshot for a candidate strategy variant."""
+
+    if snapshot.breakdown:
+        return -100.0
+
+    low_vol_bonus = max(0.0, 0.05 - snapshot.volatility) * 10
+    rs_score = snapshot.relative_strength * 100
+    volume_score = min(snapshot.volume_ratio, 2.0)
+    support_score = max(0.0, 0.20 - snapshot.support_distance) * 20
+    breakout_score = 8.0 if snapshot.breakout else 0.0
+    pullback_score = 10.0 if snapshot.pullback else 0.0
+
+    if kind is StrategyKind.DEFENSIVE_SUPPORT:
+        return support_score + low_vol_bonus + max(0.0, rs_score) * 0.2
+    if kind is StrategyKind.RESISTANCE_BREAKOUT:
+        return breakout_score + rs_score + volume_score - snapshot.volatility * 20
+    return (
+        pullback_score
+        + breakout_score * 0.7
+        + rs_score * 0.7
+        + support_score * 0.3
+        + low_vol_bonus
+    )
