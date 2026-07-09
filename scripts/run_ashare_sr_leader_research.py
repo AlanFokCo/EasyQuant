@@ -102,6 +102,24 @@ def candidate_param_grid(quick: bool = False):
                     ),
                 )
             )
+        grid.append(
+            (
+                kind,
+                StrategyParams(
+                    level_window=120,
+                    short_level_window=60,
+                    atr_multiplier=0.5,
+                    volume_ratio_min=1.0,
+                    top_n=12,
+                    max_stock_weight=0.07,
+                    max_industry_weight=0.21,
+                    strong_market_exposure=0.70,
+                    neutral_market_exposure=0.45,
+                    weak_market_exposure=0.20,
+                    rebalance_threshold=0.10,
+                ),
+            )
+        )
     return grid
 
 
@@ -145,7 +163,7 @@ def stability_score(metrics: dict) -> float:
     trade_count = int(metrics.get("trade_count", 0))
     excess_return = float(metrics.get("excess_return", 0.0))
     churn_penalty = max(0, trade_count - 120) / 120 * 0.15
-    drawdown_penalty = max(0.0, max_drawdown - 0.25) * 1.5
+    drawdown_penalty = max(0.0, max_drawdown - 0.20) * 3.0
     return (
         annual_return * 1.5
         + sharpe * 0.25
@@ -174,6 +192,7 @@ def summarize_result(result: dict) -> dict:
         "win_rate_trade": float(metrics.get("win_rate_trade", 0.0)),
         "profit_loss_ratio": float(metrics.get("profit_loss_ratio", 0.0)),
         "trade_count": int(metrics.get("trade_count", len(result.get("trade_log", [])))),
+        "raw_trade_count": len(result.get("trade_log", [])),
     }
     summary["stability_score"] = stability_score(summary)
     return summary
@@ -192,6 +211,77 @@ def _best_by_period(rows: list[dict]) -> dict[str, dict]:
         ):
             best[period] = row
     return best
+
+
+def audit_rows(rows: list[dict]) -> list[dict[str, str]]:
+    """Return report-quality issues that should be investigated before use."""
+
+    issues: list[dict[str, str]] = []
+    if not rows:
+        return [
+            {
+                "severity": "error",
+                "code": "empty_result",
+                "message": "没有生成任何回测结果，报告不可用。",
+            }
+        ]
+
+    full_rows = [row for row in rows if row.get("period_name") == "full"]
+    if full_rows and all(
+        abs(float(row.get("benchmark_return", 0.0))) < 1e-12 for row in full_rows
+    ):
+        issues.append(
+            {
+                "severity": "error",
+                "code": "benchmark_missing",
+                "message": "全周期候选策略的基准收益全部为 0，需要检查大盘基准序列是否接入。",
+            }
+        )
+
+    ranked_full = sorted(
+        full_rows,
+        key=lambda row: row.get("stability_score", -999),
+        reverse=True,
+    )
+    if ranked_full and abs(float(ranked_full[0].get("max_drawdown", 0.0))) > 0.30:
+        issues.append(
+            {
+                "severity": "warning",
+                "code": "deep_drawdown",
+                "message": "当前最优全周期策略最大回撤超过 30%，与稳定收益目标冲突，需要降低仓位或重新调参。",
+            }
+        )
+
+    for row in rows:
+        if row.get("period_name") != "full" and float(row.get("excess_return", 0.0)) < -0.10:
+            issues.append(
+                {
+                    "severity": "warning",
+                    "code": "subperiod_underperformance",
+                    "message": f"{row.get('period_name')} 阶段明显跑输基准，需要检查该市场环境下的入场/仓位过滤。",
+                }
+            )
+            break
+
+    if any(int(row.get("trade_count", 0)) > 120 for row in rows):
+        issues.append(
+            {
+                "severity": "warning",
+                "code": "trade_churn",
+                "message": "存在交易次数超过 120 的回测结果，需要检查是否偏离中低频目标。",
+            }
+        )
+
+    if any(int(row.get("raw_trade_count", row.get("trade_count", 0))) > 150 for row in rows):
+        issues.append(
+            {
+                "severity": "warning",
+                "code": "execution_fragmentation",
+                "message": "存在原始成交笔数过高的结果，可能由复权低价、成交量限制或拆单造成，需要降低单次交易容量。",
+            }
+        )
+
+    return issues
 
 
 def _period_reason(row: dict) -> str:
@@ -271,6 +361,34 @@ def period_interpretation(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def audit_markdown(rows: list[dict]) -> str:
+    """Render audit findings for the Markdown report."""
+
+    issues = audit_rows(rows)
+    lines = ["## 回测审计", ""]
+    lines.append(f"- 审计结论: {recommendation_text(issues)}")
+    if not issues:
+        lines.append("- 未发现基准缺失、深回撤、明显分阶段跑输或交易频率偏高问题。")
+        return "\n".join(lines) + "\n"
+    for issue in issues:
+        lines.append(
+            f"- `{issue['severity']}` `{issue['code']}`: {issue['message']}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def recommendation_text(issues: list[dict[str, str]]) -> str:
+    """Return a plain-language recommendation gated by audit findings."""
+
+    blocking_codes = {"benchmark_missing", "deep_drawdown", "subperiod_underperformance"}
+    if any(
+        issue.get("severity") == "error" or issue.get("code") in blocking_codes
+        for issue in issues
+    ):
+        return "审计未完全通过，不建议直接实盘；应继续降低回撤、修正失效阶段或扩大稳健参数验证。"
+    return "审计未发现关键阻断问题，可作为候选策略继续观察和小规模验证。"
+
+
 def _html_escape(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -292,6 +410,13 @@ def _metric_card(label: str, value: str, tone: str = "") -> str:
     )
 
 
+def _profile_name(row: dict) -> str:
+    params = row.get("params", {}) or {}
+    if float(params.get("strong_market_exposure", 0.90)) <= 0.70:
+        return "guarded"
+    return "balanced"
+
+
 def render_html_report(rows: list[dict]) -> str:
     """Render a self-contained HTML report for strategy research results."""
 
@@ -302,9 +427,11 @@ def render_html_report(rows: list[dict]) -> str:
     )
     full_rows = [row for row in sorted_rows if row.get("period_name") == "full"]
     best = full_rows[0] if full_rows else (sorted_rows[0] if sorted_rows else {})
+    display_rows = full_rows if full_rows else sorted_rows
     benchmark_missing = bool(sorted_rows) and all(
         abs(float(row.get("benchmark_return", 0.0))) < 1e-12 for row in sorted_rows
     )
+    audit_issues = audit_rows(sorted_rows)
 
     cards = "\n".join(
         [
@@ -320,11 +447,12 @@ def render_html_report(rows: list[dict]) -> str:
     )
 
     table_rows = []
-    for idx, row in enumerate(sorted_rows[:10], start=1):
+    for idx, row in enumerate(display_rows[:10], start=1):
         table_rows.append(
             "<tr>"
             f"<td>{idx}</td>"
             f"<td>{_html_escape(row.get('kind', 'N/A'))}</td>"
+            f"<td>{_html_escape(_profile_name(row))}</td>"
             f"<td>{_html_escape(row.get('period_name', 'N/A'))}</td>"
             f"<td>{_html_escape(row.get('start', ''))} 至 {_html_escape(row.get('end', ''))}</td>"
             f"<td>{_fmt_pct(float(row.get('annual_return', 0.0)))}</td>"
@@ -334,6 +462,7 @@ def render_html_report(rows: list[dict]) -> str:
             f"<td>{_fmt_pct(float(row.get('max_drawdown', 0.0)))}</td>"
             f"<td>{_fmt_num(row.get('sharpe_ratio', 0), 2)}</td>"
             f"<td>{_html_escape(row.get('trade_count', 0))}</td>"
+            f"<td>{_html_escape(row.get('raw_trade_count', row.get('trade_count', 0)))}</td>"
             "</tr>"
         )
 
@@ -363,6 +492,18 @@ def render_html_report(rows: list[dict]) -> str:
         if benchmark_missing
         else ""
     )
+    audit_items = "".join(
+        f"<li><code>{_html_escape(issue['severity'])}</code> "
+        f"<code>{_html_escape(issue['code'])}</code>: "
+        f"{_html_escape(issue['message'])}</li>"
+        for issue in audit_issues
+    )
+    audit_html = (
+        f"<ul>{audit_items}</ul>"
+        if audit_issues
+        else "<p>未发现基准缺失、深回撤、明显分阶段跑输或交易频率偏高问题。</p>"
+    )
+    recommendation = recommendation_text(audit_issues)
 
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -497,13 +638,13 @@ def render_html_report(rows: list[dict]) -> str:
       {benchmark_note}
     </header>
 
-    <h2>Top Results</h2>
+    <h2>全周期候选排名</h2>
     <table>
       <thead>
         <tr>
-          <th>Rank</th><th>Strategy</th><th>Period</th><th>Range</th>
+          <th>Rank</th><th>Strategy</th><th>Profile</th><th>Period</th><th>Range</th>
           <th>Annual</th><th>Total</th><th>Benchmark</th><th>Excess</th>
-          <th>Max DD</th><th>Sharpe</th><th>Trades</th>
+          <th>Max DD</th><th>Sharpe</th><th>Trades</th><th>Raw Trades</th>
         </tr>
       </thead>
       <tbody>
@@ -528,6 +669,12 @@ def render_html_report(rows: list[dict]) -> str:
     <section class="section">
       <p>最终推荐策略：<strong>{_html_escape(best.get('kind', 'N/A'))}</strong></p>
       <p>推荐依据：稳定性评分 {_fmt_num(best.get('stability_score', 0), 4)}，年化收益 {_fmt_pct(float(best.get('annual_return', 0.0)))}，最大回撤 {_fmt_pct(float(best.get('max_drawdown', 0.0)))}，交易次数 {_html_escape(best.get('trade_count', 0))}。策略选择依据为稳定性评分、回撤、Sharpe、收益和交易次数的综合表现，而不是单次最高收益。</p>
+      <p><strong>审计结论：</strong>{_html_escape(recommendation)}</p>
+    </section>
+
+    <h2>回测审计</h2>
+    <section class="section">
+      {audit_html}
     </section>
 
     <h2>风险提示</h2>
@@ -611,6 +758,7 @@ def write_outputs(rows: list[dict]) -> None:
         "max_drawdown",
         "calmar_ratio",
         "trade_count",
+        "raw_trade_count",
         "stability_score",
         "params",
     ]
@@ -634,21 +782,23 @@ def write_outputs(rows: list[dict]) -> None:
         f"- Sharpe: `{best.get('sharpe_ratio', 0):.2f}`",
         f"- 交易次数: `{best.get('trade_count', 0)}`",
         "",
-        "## Top Results",
+        "## 全周期候选排名",
         "",
-        "| Rank | Strategy | Period | Annual | Benchmark | Excess | Max DD | Sharpe | Trades |",
-        "|---:|---|---|---:|---:|---:|---:|---:|---:|",
+        "| Rank | Strategy | Profile | Period | Annual | Benchmark | Excess | Max DD | Sharpe | Trades | Raw Trades |",
+        "|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
-    for idx, row in enumerate(sorted_rows[:10], start=1):
+    display_rows = full_rows if full_rows else sorted_rows
+    for idx, row in enumerate(display_rows[:10], start=1):
         lines.append(
-            f"| {idx} | {row.get('kind')} | {row.get('start')} to {row.get('end')} | "
+            f"| {idx} | {row.get('kind')} | {_profile_name(row)} | {row.get('start')} to {row.get('end')} | "
             f"{row.get('annual_return', 0):.2%} | {row.get('benchmark_return', 0):.2%} | "
             f"{row.get('excess_return', 0):.2%} | {row.get('max_drawdown', 0):.2%} | "
             f"{row.get('sharpe_ratio', 0):.2f} | "
-            f"{row.get('trade_count', 0)} |"
+            f"{row.get('trade_count', 0)} | {row.get('raw_trade_count', row.get('trade_count', 0))} |"
         )
     lines.append("")
     lines.append(period_interpretation(sorted_rows))
+    lines.append(audit_markdown(sorted_rows))
     (REPORT_DIR / "final_report.md").write_text(
         "\n".join(lines),
         encoding="utf-8",

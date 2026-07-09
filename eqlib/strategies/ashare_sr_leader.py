@@ -48,7 +48,7 @@ class StrategyParams:
     min_price: float = 0.10
     min_avg_volume: float = 100_000.0
     rebalance_threshold: float = 0.08
-    liquidity_volume_pct: float = 0.08
+    liquidity_volume_pct: float = 0.03
 
 
 @dataclass(frozen=True)
@@ -460,6 +460,22 @@ def liquidity_capped_target_value(
     return min(requested_target_value, liquidity_cap)
 
 
+def liquidity_capped_rebalance_target_value(
+    requested_target_value: float,
+    current_value: float,
+    snapshot: SignalSnapshot | None,
+    params: StrategyParams,
+) -> float:
+    """Cap position increases while allowing risk-reducing sells."""
+
+    if requested_target_value <= current_value:
+        return requested_target_value
+    if snapshot is None:
+        return requested_target_value
+    liquidity_cap = snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
+    return min(requested_target_value, current_value + liquidity_cap)
+
+
 def _set_costs():
     from eqlib import OrderCost, set_order_cost
 
@@ -546,12 +562,12 @@ def rebalance_portfolio(
         target_value = total_value * weight
         position = context.portfolio.positions.get(code)
         current_value = position.total_value if position is not None else 0.0
-        if position is None:
-            target_value = liquidity_capped_target_value(
-                requested_target_value=target_value,
-                snapshot=snapshots.get(code),
-                params=params,
-            )
+        target_value = liquidity_capped_rebalance_target_value(
+            requested_target_value=target_value,
+            current_value=current_value,
+            snapshot=snapshots.get(code),
+            params=params,
+        )
         if not should_rebalance_position(
             current_value=current_value,
             target_value=target_value,
