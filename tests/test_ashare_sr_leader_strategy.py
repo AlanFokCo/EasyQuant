@@ -25,6 +25,7 @@ from eqlib.strategies.ashare_sr_leader import (
 from scripts.run_ashare_sr_leader_research import (
     candidate_param_grid,
     period_interpretation,
+    render_html_report,
     stability_score,
 )
 
@@ -380,3 +381,49 @@ def test_period_interpretation_reports_regime_and_recommendation():
     assert "pullback_market_gate" in text
     assert "2022" in text
     assert "交易次数没有表现出高频" in text
+
+
+def test_render_html_report_contains_metrics_tables_and_risk_notes():
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "defensive_support",
+            "start": "2020-01-01",
+            "end": "2026-07-08",
+            "annual_return": 0.019,
+            "total_return": 0.1295,
+            "benchmark_return": 0.0,
+            "max_drawdown": -0.1799,
+            "sharpe_ratio": -0.05,
+            "excess_return": 0.1295,
+            "trade_count": 9,
+            "stability_score": 0.1451,
+        },
+        {
+            "period_name": "2022",
+            "kind": "support<script>",
+            "start": "2022-01-01",
+            "end": "2022-12-31",
+            "annual_return": -0.13,
+            "total_return": -0.128,
+            "benchmark_return": 0.0,
+            "max_drawdown": -0.207,
+            "sharpe_ratio": -1.24,
+            "excess_return": -0.128,
+            "trade_count": 5,
+            "stability_score": -0.63,
+        },
+    ]
+
+    html = render_html_report(rows)
+
+    assert html.startswith("<!doctype html>")
+    assert "<title>A股行业龙头支撑压力策略研究报告</title>" in html
+    assert "defensive_support" in html
+    assert "1.90%" in html
+    assert "-17.99%" in html
+    assert "Top Results" in html
+    assert "分阶段解释" in html
+    assert "风险提示" in html
+    assert "support&lt;script&gt;" in html
+    assert "support<script>" not in html
