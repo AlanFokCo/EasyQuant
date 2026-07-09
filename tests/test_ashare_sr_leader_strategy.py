@@ -490,6 +490,10 @@ def test_period_interpretation_reports_regime_and_recommendation():
     assert "最终推荐" in text
     assert "pullback_market_gate" in text
     assert "2022" in text
+    assert "长期回测压力诊断" in text
+    assert "不作为收益参考" in text
+    assert "该长期策略" in text
+    assert "最优候选" not in text
     assert "交易次数没有表现出高频" in text
 
 
@@ -537,7 +541,8 @@ def test_render_html_report_contains_metrics_tables_and_risk_notes():
     assert "Excess" in html
     assert "5.00%" in html
     assert "7.95%" in html
-    assert "分阶段解释" in html
+    assert "长期回测压力诊断" in html
+    assert "短期或分阶段结果只用于解释策略失效环境" in html
     assert "风险提示" in html
     assert "support&lt;script&gt;" in html
     assert "support<script>" not in html

@@ -315,7 +315,9 @@ def period_interpretation(rows: list[dict]) -> str:
         else {}
     )
     lines = [
-        "## 分阶段解释",
+        "## 长期回测压力诊断",
+        "",
+        "以下分阶段结果只用于解释 2020-2026 长期策略在哪些市场环境中失效或承压，不作为收益参考，也不参与最终策略排名。",
         "",
     ]
     for period in ("2020-2021", "2022", "2023-2024", "2025-2026"):
@@ -326,7 +328,7 @@ def period_interpretation(rows: list[dict]) -> str:
             [
                 f"### {period}",
                 "",
-                f"- 最优候选: `{row.get('kind')}`",
+                f"- 该长期策略: `{row.get('kind')}`",
                 f"- 年化收益: `{_fmt_pct(float(row.get('annual_return', 0.0)))}`",
                 f"- 最大回撤: `{_fmt_pct(float(row.get('max_drawdown', 0.0)))}`",
                 f"- 超额收益: `{_fmt_pct(float(row.get('excess_return', 0.0)))}`",
@@ -652,11 +654,12 @@ def render_html_report(rows: list[dict]) -> str:
       </tbody>
     </table>
 
-    <h2>分阶段解释</h2>
+    <h2>长期回测压力诊断</h2>
+    <p class="subtitle">短期或分阶段结果只用于解释策略失效环境，不作为收益参考，也不参与最终排名。</p>
     <table>
       <thead>
         <tr>
-          <th>阶段</th><th>最优候选</th><th>年化收益</th><th>总收益</th>
+          <th>阶段</th><th>该长期策略</th><th>年化收益</th><th>总收益</th>
           <th>最大回撤</th><th>交易次数</th><th>解释</th>
         </tr>
       </thead>
