@@ -30,6 +30,7 @@ from scripts.run_ashare_sr_leader_research import (
     period_interpretation,
     render_html_report,
     stability_score,
+    write_eqlib_html_report,
 )
 
 
@@ -572,3 +573,23 @@ def test_render_html_report_surfaces_audit_issues():
     assert "deep_drawdown" in html
     assert "最大回撤超过 30%" in html
     assert "不建议直接实盘" in html
+
+
+def test_write_eqlib_html_report_delegates_to_eqlib_generator(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_generate_html_report(result, out_path):
+        calls.append((result, out_path))
+        out_path.write_text("<html>eqlib</html>", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "scripts.run_ashare_sr_leader_research.generate_html_report",
+        fake_generate_html_report,
+    )
+    result = {"recorded_values": [], "trade_log": []}
+    out_path = tmp_path / "eqlib_best_backtest.html"
+
+    write_eqlib_html_report(result, out_path)
+
+    assert calls == [(result, out_path)]
+    assert out_path.read_text(encoding="utf-8") == "<html>eqlib</html>"

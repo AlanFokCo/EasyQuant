@@ -14,7 +14,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from eqlib import analyze_returns, run_backtest
+from eqlib import analyze_returns, generate_html_report, run_backtest
 from eqlib.strategies.ashare_sr_leader import (
     StrategyKind,
     StrategyParams,
@@ -26,6 +26,7 @@ START_DATE = "2020-01-01"
 END_DATE = "2026-07-08"
 BENCHMARK = "000300.XSHG"
 REPORT_DIR = Path("reports/ashare_sr_leader")
+EQLIB_HTML_REPORT = REPORT_DIR / "eqlib_best_backtest.html"
 SUB_PERIODS = (
     ("2020-2021", "2020-01-01", "2021-12-31"),
     ("2022", "2022-01-01", "2022-12-31"),
@@ -196,6 +197,13 @@ def summarize_result(result: dict) -> dict:
     }
     summary["stability_score"] = stability_score(summary)
     return summary
+
+
+def write_eqlib_html_report(result: dict, out_path: Path = EQLIB_HTML_REPORT) -> None:
+    """Write eqlib's native interactive HTML report for a backtest result."""
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    generate_html_report(result, out_path)
 
 
 def _fmt_pct(value: float) -> str:
@@ -704,6 +712,31 @@ def run_one(
 ) -> dict:
     """Run one backtest and return metrics plus metadata."""
 
+    result = run_one_result(kind, params, start, end, universe)
+    if result is None:
+        return {"error": "backtest returned None"}
+
+    summary = summarize_result(result)
+    summary.update(
+        {
+            "kind": kind.value,
+            "start": start,
+            "end": end,
+            "params": asdict(params),
+        }
+    )
+    return summary
+
+
+def run_one_result(
+    kind: StrategyKind,
+    params: StrategyParams,
+    start: str,
+    end: str,
+    universe: list[str],
+) -> dict | None:
+    """Run one backtest and return the raw eqlib result."""
+
     initialize = make_initialize(
         kind=kind,
         params=params,
@@ -719,19 +752,7 @@ def run_one(
         securities=universe + [BENCHMARK],
         use_local=False,
     )
-    if result is None:
-        return {"error": "backtest returned None"}
-
-    summary = summarize_result(result)
-    summary.update(
-        {
-            "kind": kind.value,
-            "start": start,
-            "end": end,
-            "params": asdict(params),
-        }
-    )
-    return summary
+    return result
 
 
 def write_outputs(rows: list[dict]) -> None:
@@ -842,11 +863,25 @@ def main() -> int:
 
     rows = []
     full_candidates = []
+    full_results = []
     for kind, params in candidate_param_grid(quick=False):
-        row = run_one(kind, params, START_DATE, END_DATE, universe)
+        result = run_one_result(kind, params, START_DATE, END_DATE, universe)
+        if result is None:
+            row = {"error": "backtest returned None"}
+        else:
+            row = summarize_result(result)
+            row.update(
+                {
+                    "kind": kind.value,
+                    "start": START_DATE,
+                    "end": END_DATE,
+                    "params": asdict(params),
+                }
+            )
         row["period_name"] = "full"
         rows.append(row)
         full_candidates.append((row, kind, params))
+        full_results.append((row, result))
         print(
             f"full {kind.value} annual={row.get('annual_return', 0):.2%} "
             f"dd={row.get('max_drawdown', 0):.2%} "
@@ -858,6 +893,11 @@ def main() -> int:
         key=lambda item: item[0].get("stability_score", -999),
     )
     print(f"selected {best_kind.value} params={asdict(best_params)}")
+    best_result = next(
+        result
+        for row, result in full_results
+        if row is best_row and result is not None
+    )
 
     for period_name, start, end in SUB_PERIODS:
         row = run_one(best_kind, best_params, start, end, universe)
@@ -870,6 +910,7 @@ def main() -> int:
         )
 
     write_outputs(rows)
+    write_eqlib_html_report(best_result)
     print(f"Wrote reports to {REPORT_DIR}")
     return 0
 
