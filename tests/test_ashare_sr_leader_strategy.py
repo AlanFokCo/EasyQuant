@@ -7,6 +7,7 @@ from eqlib.strategies.ashare_sr_leader import (
     DEFAULT_LEADER_UNIVERSE,
     industry_for_code,
     liquidity_capped_target_value,
+    liquidity_capped_rebalance_target_value,
     MarketState,
     StrategyKind,
     StrategyParams,
@@ -24,6 +25,7 @@ from eqlib.strategies.ashare_sr_leader import (
 )
 from scripts.run_ashare_sr_leader_research import (
     _benchmark_total_return,
+    audit_rows,
     candidate_param_grid,
     period_interpretation,
     render_html_report,
@@ -237,6 +239,35 @@ def test_liquidity_capped_target_value_limits_new_order_size():
     assert capped == snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
 
 
+def test_liquidity_capped_rebalance_target_value_limits_additional_buys():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+        liquidity_volume_pct=0.08,
+    )
+    stock = _ohlcv_from_close(
+        list(np.linspace(0.3, 0.4, 50)) + [0.42],
+        volume_start=2_000_000,
+        volume_end=2_500_000,
+    )
+    benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
+    snapshot = build_signal_snapshot(stock, benchmark, params)
+    assert snapshot is not None
+
+    capped = liquidity_capped_rebalance_target_value(
+        requested_target_value=120_000,
+        current_value=20_000,
+        snapshot=snapshot,
+        params=params,
+    )
+
+    assert capped < 120_000
+    assert capped == 20_000 + snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
+
+
 def test_industry_for_code_uses_default_universe_metadata():
     assert industry_for_code("600519") == "白酒"
     assert industry_for_code("600519.XSHG") == "白酒"
@@ -312,6 +343,19 @@ def test_candidate_param_grid_contains_three_strategy_kinds():
     }
 
 
+def test_candidate_param_grid_includes_guarded_risk_controls():
+    grid = candidate_param_grid(quick=False)
+    guarded = [
+        params
+        for _kind, params in grid
+        if params.strong_market_exposure <= 0.70
+        and params.neutral_market_exposure <= 0.45
+        and params.max_stock_weight <= 0.07
+    ]
+
+    assert guarded
+
+
 def test_stability_score_penalizes_drawdown_and_trade_count():
     good = {
         "annual_return": 0.12,
@@ -324,6 +368,54 @@ def test_stability_score_penalizes_drawdown_and_trade_count():
     deep_drawdown = dict(good, max_drawdown=-0.45)
     assert stability_score(good) > stability_score(overtraded)
     assert stability_score(good) > stability_score(deep_drawdown)
+
+
+def test_stability_score_prefers_controlled_drawdown_over_high_excess():
+    controlled = {
+        "annual_return": 0.05,
+        "sharpe_ratio": 0.2,
+        "max_drawdown": -0.15,
+        "trade_count": 20,
+        "excess_return": 0.05,
+    }
+    risky = {
+        "annual_return": 0.07,
+        "sharpe_ratio": 0.3,
+        "max_drawdown": -0.40,
+        "trade_count": 20,
+        "excess_return": 0.25,
+    }
+
+    assert stability_score(controlled) > stability_score(risky)
+
+
+def test_audit_rows_flags_missing_benchmark_deep_drawdown_and_bad_subperiod():
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "pullback_market_gate",
+            "benchmark_return": 0.0,
+            "max_drawdown": -0.39,
+            "trade_count": 25,
+            "excess_return": 0.30,
+        },
+        {
+            "period_name": "2025-2026",
+            "kind": "pullback_market_gate",
+            "benchmark_return": 0.24,
+            "max_drawdown": -0.10,
+            "trade_count": 7,
+            "raw_trade_count": 180,
+            "excess_return": -0.27,
+        },
+    ]
+
+    issues = audit_rows(rows)
+
+    assert any(issue["code"] == "benchmark_missing" for issue in issues)
+    assert any(issue["code"] == "deep_drawdown" for issue in issues)
+    assert any(issue["code"] == "subperiod_underperformance" for issue in issues)
+    assert any(issue["code"] == "execution_fragmentation" for issue in issues)
 
 
 def test_benchmark_total_return_uses_engine_benchmark_values():
@@ -440,7 +532,7 @@ def test_render_html_report_contains_metrics_tables_and_risk_notes():
     assert "defensive_support" in html
     assert "1.90%" in html
     assert "-17.99%" in html
-    assert "Top Results" in html
+    assert "全周期候选排名" in html
     assert "Benchmark" in html
     assert "Excess" in html
     assert "5.00%" in html
@@ -449,3 +541,29 @@ def test_render_html_report_contains_metrics_tables_and_risk_notes():
     assert "风险提示" in html
     assert "support&lt;script&gt;" in html
     assert "support<script>" not in html
+
+
+def test_render_html_report_surfaces_audit_issues():
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "risky_strategy",
+            "start": "2020-01-01",
+            "end": "2026-07-08",
+            "annual_return": 0.08,
+            "total_return": 0.55,
+            "benchmark_return": 0.10,
+            "max_drawdown": -0.36,
+            "sharpe_ratio": 0.3,
+            "excess_return": 0.45,
+            "trade_count": 20,
+            "stability_score": 0.10,
+        }
+    ]
+
+    html = render_html_report(rows)
+
+    assert "回测审计" in html
+    assert "deep_drawdown" in html
+    assert "最大回撤超过 30%" in html
+    assert "不建议直接实盘" in html
