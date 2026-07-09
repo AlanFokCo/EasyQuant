@@ -107,13 +107,33 @@ def candidate_param_grid(quick: bool = False):
 
 def _benchmark_total_return(result: dict) -> float:
     recorded = result.get("recorded_values", [])
+    benchmark_values = result.get("benchmark_values", [])
+    if recorded and benchmark_values:
+        start = _date_key(recorded[0].get("date"))
+        end = _date_key(recorded[-1].get("date"))
+        values = [
+            float(row["value"])
+            for row in benchmark_values
+            if row.get("value") is not None
+            and start <= _date_key(row.get("date")) <= end
+            and float(row["value"]) > 0
+        ]
+        if len(values) >= 2:
+            return round(values[-1] / values[0] - 1, 12)
+
     if not recorded:
         return 0.0
     first = recorded[0].get("bench_value")
     last = recorded[-1].get("bench_value")
     if first in (None, 0) or last is None:
         return 0.0
-    return float(last / first - 1)
+    return round(float(last / first - 1), 12)
+
+
+def _date_key(value: object) -> str:
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d")
+    return str(value)[:10]
 
 
 def stability_score(metrics: dict) -> float:
@@ -291,6 +311,8 @@ def render_html_report(rows: list[dict]) -> str:
             _metric_card("最优策略", best.get("kind", "N/A")),
             _metric_card("稳定性评分", _fmt_num(best.get("stability_score", 0), 4)),
             _metric_card("年化收益", _fmt_pct(float(best.get("annual_return", 0.0))), "good"),
+            _metric_card("基准收益", _fmt_pct(float(best.get("benchmark_return", 0.0))), "blue"),
+            _metric_card("超额收益", _fmt_pct(float(best.get("excess_return", 0.0))), "good"),
             _metric_card("最大回撤", _fmt_pct(float(best.get("max_drawdown", 0.0))), "risk"),
             _metric_card("Sharpe", _fmt_num(best.get("sharpe_ratio", 0), 2)),
             _metric_card("交易次数", str(best.get("trade_count", 0))),
@@ -307,6 +329,8 @@ def render_html_report(rows: list[dict]) -> str:
             f"<td>{_html_escape(row.get('start', ''))} 至 {_html_escape(row.get('end', ''))}</td>"
             f"<td>{_fmt_pct(float(row.get('annual_return', 0.0)))}</td>"
             f"<td>{_fmt_pct(float(row.get('total_return', 0.0)))}</td>"
+            f"<td>{_fmt_pct(float(row.get('benchmark_return', 0.0)))}</td>"
+            f"<td>{_fmt_pct(float(row.get('excess_return', 0.0)))}</td>"
             f"<td>{_fmt_pct(float(row.get('max_drawdown', 0.0)))}</td>"
             f"<td>{_fmt_num(row.get('sharpe_ratio', 0), 2)}</td>"
             f"<td>{_html_escape(row.get('trade_count', 0))}</td>"
@@ -354,6 +378,7 @@ def render_html_report(rows: list[dict]) -> str:
       --line: #d9e0e4;
       --band: #f4f7f8;
       --accent: #0b6b5c;
+      --blue: #255c99;
       --risk: #a43d2c;
       --paper: #ffffff;
     }}
@@ -414,6 +439,7 @@ def render_html_report(rows: list[dict]) -> str:
       line-height: 1.25;
     }}
     .metric.good strong {{ color: var(--accent); }}
+    .metric.blue strong {{ color: var(--blue); }}
     .metric.risk strong {{ color: var(--risk); }}
     .notice {{
       margin: 16px 0 0;
@@ -476,7 +502,8 @@ def render_html_report(rows: list[dict]) -> str:
       <thead>
         <tr>
           <th>Rank</th><th>Strategy</th><th>Period</th><th>Range</th>
-          <th>Annual</th><th>Total</th><th>Max DD</th><th>Sharpe</th><th>Trades</th>
+          <th>Annual</th><th>Total</th><th>Benchmark</th><th>Excess</th>
+          <th>Max DD</th><th>Sharpe</th><th>Trades</th>
         </tr>
       </thead>
       <tbody>
@@ -601,20 +628,23 @@ def write_outputs(rows: list[dict]) -> None:
         f"- 最优策略: `{best.get('kind', 'N/A')}`",
         f"- 稳定性评分: `{best.get('stability_score', 0):.4f}`",
         f"- 年化收益: `{best.get('annual_return', 0):.2%}`",
+        f"- 基准收益: `{best.get('benchmark_return', 0):.2%}`",
+        f"- 超额收益: `{best.get('excess_return', 0):.2%}`",
         f"- 最大回撤: `{best.get('max_drawdown', 0):.2%}`",
         f"- Sharpe: `{best.get('sharpe_ratio', 0):.2f}`",
         f"- 交易次数: `{best.get('trade_count', 0)}`",
         "",
         "## Top Results",
         "",
-        "| Rank | Strategy | Period | Annual | Max DD | Sharpe | Excess | Trades |",
-        "|---:|---|---|---:|---:|---:|---:|---:|",
+        "| Rank | Strategy | Period | Annual | Benchmark | Excess | Max DD | Sharpe | Trades |",
+        "|---:|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for idx, row in enumerate(sorted_rows[:10], start=1):
         lines.append(
             f"| {idx} | {row.get('kind')} | {row.get('start')} to {row.get('end')} | "
-            f"{row.get('annual_return', 0):.2%} | {row.get('max_drawdown', 0):.2%} | "
-            f"{row.get('sharpe_ratio', 0):.2f} | {row.get('excess_return', 0):.2%} | "
+            f"{row.get('annual_return', 0):.2%} | {row.get('benchmark_return', 0):.2%} | "
+            f"{row.get('excess_return', 0):.2%} | {row.get('max_drawdown', 0):.2%} | "
+            f"{row.get('sharpe_ratio', 0):.2f} | "
             f"{row.get('trade_count', 0)} |"
         )
     lines.append("")

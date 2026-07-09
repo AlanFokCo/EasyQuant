@@ -23,6 +23,7 @@ from eqlib.strategies.ashare_sr_leader import (
     target_weights,
 )
 from scripts.run_ashare_sr_leader_research import (
+    _benchmark_total_return,
     candidate_param_grid,
     period_interpretation,
     render_html_report,
@@ -325,6 +326,23 @@ def test_stability_score_penalizes_drawdown_and_trade_count():
     assert stability_score(good) > stability_score(deep_drawdown)
 
 
+def test_benchmark_total_return_uses_engine_benchmark_values():
+    result = {
+        "recorded_values": [
+            {"date": "2020-01-02", "total_value": 1_000_000},
+            {"date": "2020-01-06", "total_value": 1_010_000},
+        ],
+        "benchmark_values": [
+            {"date": "2019-12-31", "value": 90.0},
+            {"date": "2020-01-02", "value": 100.0},
+            {"date": "2020-01-03", "value": 105.0},
+            {"date": "2020-01-06", "value": 110.0},
+        ],
+    }
+
+    assert _benchmark_total_return(result) == 0.10
+
+
 def test_should_rebalance_position_ignores_small_weight_drift():
     params = StrategyParams()
     assert should_rebalance_position(
@@ -392,10 +410,10 @@ def test_render_html_report_contains_metrics_tables_and_risk_notes():
             "end": "2026-07-08",
             "annual_return": 0.019,
             "total_return": 0.1295,
-            "benchmark_return": 0.0,
+            "benchmark_return": 0.05,
             "max_drawdown": -0.1799,
             "sharpe_ratio": -0.05,
-            "excess_return": 0.1295,
+            "excess_return": 0.0795,
             "trade_count": 9,
             "stability_score": 0.1451,
         },
@@ -423,6 +441,10 @@ def test_render_html_report_contains_metrics_tables_and_risk_notes():
     assert "1.90%" in html
     assert "-17.99%" in html
     assert "Top Results" in html
+    assert "Benchmark" in html
+    assert "Excess" in html
+    assert "5.00%" in html
+    assert "7.95%" in html
     assert "分阶段解释" in html
     assert "风险提示" in html
     assert "support&lt;script&gt;" in html
