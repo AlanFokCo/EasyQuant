@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -250,6 +251,273 @@ def period_interpretation(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _html_escape(value: object) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _fmt_num(value: object, digits: int = 2) -> str:
+    try:
+        return f"{float(value):.{digits}f}"
+    except (TypeError, ValueError):
+        return "0.00"
+
+
+def _metric_card(label: str, value: str, tone: str = "") -> str:
+    tone_class = f" {tone}" if tone else ""
+    return (
+        f'<section class="metric{tone_class}">'
+        f"<span>{_html_escape(label)}</span>"
+        f"<strong>{_html_escape(value)}</strong>"
+        "</section>"
+    )
+
+
+def render_html_report(rows: list[dict]) -> str:
+    """Render a self-contained HTML report for strategy research results."""
+
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: row.get("stability_score", -999),
+        reverse=True,
+    )
+    full_rows = [row for row in sorted_rows if row.get("period_name") == "full"]
+    best = full_rows[0] if full_rows else (sorted_rows[0] if sorted_rows else {})
+    benchmark_missing = bool(sorted_rows) and all(
+        abs(float(row.get("benchmark_return", 0.0))) < 1e-12 for row in sorted_rows
+    )
+
+    cards = "\n".join(
+        [
+            _metric_card("最优策略", best.get("kind", "N/A")),
+            _metric_card("稳定性评分", _fmt_num(best.get("stability_score", 0), 4)),
+            _metric_card("年化收益", _fmt_pct(float(best.get("annual_return", 0.0))), "good"),
+            _metric_card("最大回撤", _fmt_pct(float(best.get("max_drawdown", 0.0))), "risk"),
+            _metric_card("Sharpe", _fmt_num(best.get("sharpe_ratio", 0), 2)),
+            _metric_card("交易次数", str(best.get("trade_count", 0))),
+        ]
+    )
+
+    table_rows = []
+    for idx, row in enumerate(sorted_rows[:10], start=1):
+        table_rows.append(
+            "<tr>"
+            f"<td>{idx}</td>"
+            f"<td>{_html_escape(row.get('kind', 'N/A'))}</td>"
+            f"<td>{_html_escape(row.get('period_name', 'N/A'))}</td>"
+            f"<td>{_html_escape(row.get('start', ''))} 至 {_html_escape(row.get('end', ''))}</td>"
+            f"<td>{_fmt_pct(float(row.get('annual_return', 0.0)))}</td>"
+            f"<td>{_fmt_pct(float(row.get('total_return', 0.0)))}</td>"
+            f"<td>{_fmt_pct(float(row.get('max_drawdown', 0.0)))}</td>"
+            f"<td>{_fmt_num(row.get('sharpe_ratio', 0), 2)}</td>"
+            f"<td>{_html_escape(row.get('trade_count', 0))}</td>"
+            "</tr>"
+        )
+
+    best_by_period = _best_by_period(sorted_rows)
+    period_rows = []
+    for period in ("2020-2021", "2022", "2023-2024", "2025-2026"):
+        row = best_by_period.get(period)
+        if not row:
+            continue
+        period_rows.append(
+            "<tr>"
+            f"<td>{_html_escape(period)}</td>"
+            f"<td>{_html_escape(row.get('kind', 'N/A'))}</td>"
+            f"<td>{_fmt_pct(float(row.get('annual_return', 0.0)))}</td>"
+            f"<td>{_fmt_pct(float(row.get('total_return', 0.0)))}</td>"
+            f"<td>{_fmt_pct(float(row.get('max_drawdown', 0.0)))}</td>"
+            f"<td>{_html_escape(row.get('trade_count', 0))}</td>"
+            f"<td>{_html_escape(_period_reason(row))}</td>"
+            "</tr>"
+        )
+
+    benchmark_note = (
+        """
+        <p class="notice">注意：本次结果中基准收益为 0，说明大盘基准序列没有有效接入。
+        因此本报告当前优先看策略自身收益、回撤和交易频率，超额收益暂不作为跑赢大盘证据。</p>
+        """
+        if benchmark_missing
+        else ""
+    )
+
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A股行业龙头支撑压力策略研究报告</title>
+  <style>
+    :root {{
+      color-scheme: light;
+      --ink: #172026;
+      --muted: #66717a;
+      --line: #d9e0e4;
+      --band: #f4f7f8;
+      --accent: #0b6b5c;
+      --risk: #a43d2c;
+      --paper: #ffffff;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      color: var(--ink);
+      background: #eef3f5;
+      font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    }}
+    main {{
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }}
+    header {{
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }}
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }}
+    h2 {{
+      margin: 30px 0 12px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }}
+    p {{ margin: 8px 0; }}
+    .subtitle {{ color: var(--muted); }}
+    .metrics {{
+      display: grid;
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 18px 0 6px;
+    }}
+    .metric {{
+      min-height: 86px;
+      padding: 13px 14px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }}
+    .metric span {{
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }}
+    .metric strong {{
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 20px;
+      line-height: 1.25;
+    }}
+    .metric.good strong {{ color: var(--accent); }}
+    .metric.risk strong {{ color: var(--risk); }}
+    .notice {{
+      margin: 16px 0 0;
+      padding: 12px 14px;
+      background: #fff8e6;
+      border: 1px solid #ebd48a;
+      border-radius: 8px;
+      color: #6b5618;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }}
+    th, td {{
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }}
+    th {{
+      background: var(--band);
+      color: #34434d;
+      font-weight: 650;
+      white-space: nowrap;
+    }}
+    tr:last-child td {{ border-bottom: 0; }}
+    .section {{
+      padding: 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }}
+    ul {{ margin: 8px 0 0; padding-left: 20px; }}
+    @media (max-width: 900px) {{
+      main {{ padding: 20px 12px 32px; }}
+      .metrics {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      table {{ display: block; overflow-x: auto; }}
+      h1 {{ font-size: 24px; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>A股行业龙头支撑压力策略研究报告</h1>
+      <p class="subtitle">回测区间：{_html_escape(best.get('start', START_DATE))} 至 {_html_escape(best.get('end', END_DATE))}；策略池排除科创板与北交所，偏中低频交易。</p>
+      <div class="metrics">
+        {cards}
+      </div>
+      {benchmark_note}
+    </header>
+
+    <h2>Top Results</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th><th>Strategy</th><th>Period</th><th>Range</th>
+          <th>Annual</th><th>Total</th><th>Max DD</th><th>Sharpe</th><th>Trades</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(table_rows)}
+      </tbody>
+    </table>
+
+    <h2>分阶段解释</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>阶段</th><th>最优候选</th><th>年化收益</th><th>总收益</th>
+          <th>最大回撤</th><th>交易次数</th><th>解释</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(period_rows)}
+      </tbody>
+    </table>
+
+    <h2>最终推荐</h2>
+    <section class="section">
+      <p>最终推荐策略：<strong>{_html_escape(best.get('kind', 'N/A'))}</strong></p>
+      <p>推荐依据：稳定性评分 {_fmt_num(best.get('stability_score', 0), 4)}，年化收益 {_fmt_pct(float(best.get('annual_return', 0.0)))}，最大回撤 {_fmt_pct(float(best.get('max_drawdown', 0.0)))}，交易次数 {_html_escape(best.get('trade_count', 0))}。策略选择依据为稳定性评分、回撤、Sharpe、收益和交易次数的综合表现，而不是单次最高收益。</p>
+    </section>
+
+    <h2>风险提示</h2>
+    <section class="section">
+      <ul>
+        <li>历史回测不代表未来收益。</li>
+        <li>行业龙头池仍可能存在幸存者偏差。</li>
+        <li>akshare 数据源可用性、复权处理和基准序列会影响结果。</li>
+        <li>支撑压力不是确定性价格预测，只是结构化风险收益判断。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
+"""
+
+
 def run_one(
     kind: StrategyKind,
     params: StrategyParams,
@@ -290,7 +558,7 @@ def run_one(
 
 
 def write_outputs(rows: list[dict]) -> None:
-    """Write JSON, CSV, and Markdown summary reports."""
+    """Write JSON, CSV, Markdown, and HTML summary reports."""
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     sorted_rows = sorted(
@@ -353,6 +621,10 @@ def write_outputs(rows: list[dict]) -> None:
     lines.append(period_interpretation(sorted_rows))
     (REPORT_DIR / "final_report.md").write_text(
         "\n".join(lines),
+        encoding="utf-8",
+    )
+    (REPORT_DIR / "final_report.html").write_text(
+        render_html_report(sorted_rows),
         encoding="utf-8",
     )
 
