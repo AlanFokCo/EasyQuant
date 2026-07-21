@@ -1090,6 +1090,26 @@ def _tag_order(context, order, code: str, channel: CandidateChannel) -> None:
     context.sr_code_channels.setdefault(code, channel.value)
 
 
+def _sync_robust_order_lifecycle(context) -> None:
+    current_dt = getattr(context, "current_dt", None)
+    current_date = current_dt.date() if current_dt is not None else None
+    previous_date = getattr(context, "_sr_order_intent_date", current_date)
+    pending_entries = getattr(context, "_sr_pending_entry_codes", set())
+    pending_exits = getattr(context, "_sr_pending_exit_codes", set())
+    if previous_date != current_date:
+        pending_entries.clear()
+    context._sr_order_intent_date = current_date
+    context._sr_pending_entry_codes = pending_entries
+    context._sr_pending_exit_codes = pending_exits
+
+    held_codes = set(context.portfolio.positions)
+    for code in list(context.sr_code_channels):
+        if code in held_codes or code in pending_entries:
+            continue
+        context.sr_code_channels.pop(code, None)
+        pending_exits.discard(code)
+
+
 def rebalance_robust_portfolio(
     context,
     candidates: list[RobustCandidate],
@@ -1100,25 +1120,58 @@ def rebalance_robust_portfolio(
 
     from eqlib import order_target, order_target_value, record
 
-    weights = robust_target_weights(candidates, exposure, params)
-    candidate_by_code = {candidate.code: candidate for candidate in candidates}
+    _sync_robust_order_lifecycle(context)
     held_codes = list(context.portfolio.positions.keys())
+    effective_candidates = [
+        RobustCandidate(
+            code=candidate.code,
+            channel=CandidateChannel(
+                context.sr_code_channels.get(candidate.code, candidate.channel.value)
+            ),
+            score=candidate.score,
+            volatility=candidate.volatility,
+            close=candidate.close,
+            avg_volume=candidate.avg_volume,
+        )
+        if candidate.code in context.portfolio.positions
+        else candidate
+        for candidate in candidates
+        if candidate.code not in context._sr_pending_exit_codes
+    ]
+    weights = robust_target_weights(effective_candidates, exposure, params)
+    candidate_by_code = {
+        candidate.code: candidate for candidate in effective_candidates
+    }
     for code in held_codes:
-        if code in weights:
+        if code in weights or code in context._sr_pending_exit_codes:
             continue
         channel = CandidateChannel(
             context.sr_code_channels.get(code, CandidateChannel.PRIMARY.value)
         )
         order = order_target(code, 0)
         _tag_order(context, order, code, channel)
+        if order is not None:
+            context._sr_pending_exit_codes.add(code)
+            context._sr_pending_entry_codes.discard(code)
 
     total_value = context.portfolio.total_value
     for code, weight in weights.items():
         candidate = candidate_by_code[code]
         position = context.portfolio.positions.get(code)
         current_value = position.total_value if position is not None else 0.0
+        requested_target_value = total_value * weight
+        risk_state = getattr(
+            getattr(context, "sr_risk_tracker", None),
+            "state",
+            PortfolioRiskState.NORMAL,
+        )
+        if (
+            candidate.channel is CandidateChannel.FALLBACK
+            and risk_state >= PortfolioRiskState.DEFENSIVE
+        ):
+            requested_target_value = min(requested_target_value, current_value)
         target_value = liquidity_capped_rebalance_target_value(
-            requested_target_value=total_value * weight,
+            requested_target_value=requested_target_value,
             current_value=current_value,
             snapshot=candidate,
             params=params,
@@ -1137,6 +1190,8 @@ def rebalance_robust_portfolio(
         )
         order = order_target_value(code, target_value)
         _tag_order(context, order, code, channel)
+        if order is not None and position is None:
+            context._sr_pending_entry_codes.add(code)
 
     record(
         total_value=context.portfolio.total_value,
@@ -1150,28 +1205,24 @@ def reduce_portfolio_to_budget(context, exposure_budget: float) -> None:
 
     from eqlib import order_target_value
 
-    pending_exits = getattr(context, "_sr_pending_exit_codes", set())
-    try:
-        total_value = float(context.portfolio.total_value)
-        invested = sum(
-            float(position.total_value)
-            for position in context.portfolio.positions.values()
+    _sync_robust_order_lifecycle(context)
+    total_value = float(context.portfolio.total_value)
+    invested = sum(
+        float(position.total_value)
+        for position in context.portfolio.positions.values()
+    )
+    if total_value <= 0 or invested <= total_value * exposure_budget:
+        return
+    ratio = total_value * exposure_budget / invested
+    for code, position in context.portfolio.positions.items():
+        if code in context._sr_pending_exit_codes:
+            continue
+        target = float(position.total_value) * ratio
+        order = order_target_value(code, target)
+        channel = CandidateChannel(
+            context.sr_code_channels.get(code, CandidateChannel.PRIMARY.value)
         )
-        if total_value <= 0 or invested <= total_value * exposure_budget:
-            return
-        ratio = total_value * exposure_budget / invested
-        for code, position in context.portfolio.positions.items():
-            if code in pending_exits:
-                continue
-            target = float(position.total_value) * ratio
-            order = order_target_value(code, target)
-            channel = CandidateChannel(
-                context.sr_code_channels.get(code, CandidateChannel.PRIMARY.value)
-            )
-            _tag_order(context, order, code, channel)
-    finally:
-        if hasattr(context, "_sr_pending_exit_codes"):
-            del context._sr_pending_exit_codes
+        _tag_order(context, order, code, channel)
 
 
 def _risk_review(context, params: StrategyParams) -> None:
@@ -1204,8 +1255,10 @@ def _risk_review(context, params: StrategyParams) -> None:
                 order_target(code, 0)
         return
 
-    context._sr_pending_exit_codes = set()
+    _sync_robust_order_lifecycle(context)
     for code in list(context.portfolio.positions.keys()):
+        if code in context._sr_pending_exit_codes:
+            continue
         frame = attribute_history(
             code,
             lookback,
@@ -1273,6 +1326,9 @@ def make_initialize(
             context.sr_risk_tracker = PortfolioRiskTracker.initial(
                 context.portfolio.total_value
             )
+            context._sr_order_intent_date = context.current_dt.date()
+            context._sr_pending_entry_codes = set()
+            context._sr_pending_exit_codes = set()
 
         def monthly_scan(ctx):
             if g.sr_params.robust_enabled:
@@ -1320,6 +1376,7 @@ def make_initialize(
                     reduce_portfolio_to_budget(ctx, exposure)
                     return
                 if not complete:
+                    reduce_portfolio_to_budget(ctx, exposure)
                     return
                 candidates = select_robust_candidates(
                     ctx,
