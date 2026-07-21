@@ -393,6 +393,15 @@ def market_volatility_factor(
     )
 
 
+def risk_data_complete(
+    benchmark_frame: pd.DataFrame,
+    volatility_factor: float | None,
+) -> bool:
+    """Return whether a callback may increase portfolio risk."""
+
+    return not benchmark_frame.empty and volatility_factor is not None
+
+
 def drawdown_risk_multiplier(state: PortfolioRiskState) -> float:
     """Map a portfolio risk state to its exposure multiplier."""
 
@@ -597,6 +606,17 @@ def score_fallback_snapshot(snapshot: FallbackSnapshot) -> float:
     relative_strength_score = max(0.0, snapshot.relative_strength) * 100
     low_volatility_score = max(0.0, 0.04 - snapshot.volatility) * 50
     return trend_score + relative_strength_score + low_volatility_score
+
+
+def filter_fallback_by_volatility(
+    candidates: list[RobustCandidate],
+) -> list[RobustCandidate]:
+    """Keep fallback candidates no more volatile than the cross-sectional median."""
+
+    if not candidates:
+        return []
+    median = float(pd.Series([item.volatility for item in candidates]).median())
+    return [item for item in candidates if item.volatility <= median]
 
 
 def score_snapshot(snapshot: SignalSnapshot, kind: StrategyKind) -> float:
@@ -902,6 +922,116 @@ def select_candidates(
     return selections
 
 
+def _primary_candidates(
+    selections: list[tuple[str, SignalSnapshot, float]],
+) -> list[RobustCandidate]:
+    return [
+        RobustCandidate(
+            code=code,
+            channel=CandidateChannel.PRIMARY,
+            score=score,
+            volatility=snapshot.volatility,
+            close=snapshot.close,
+            avg_volume=snapshot.avg_volume,
+        )
+        for code, snapshot, score in selections
+    ]
+
+
+def select_fallback_candidates(
+    context,
+    params: StrategyParams,
+    universe: list[str],
+    benchmark_frame: pd.DataFrame,
+    excluded_codes: set[str],
+) -> list[RobustCandidate]:
+    """Rank eligible fallback candidates from completed daily bars."""
+
+    from eqlib import attribute_history
+
+    lookback = max(
+        params.level_window,
+        params.short_level_window,
+        params.rs_window,
+        params.volume_window,
+        params.atr_period,
+        params.fallback_trend_window,
+        params.fallback_medium_window + params.fallback_trend_lookback,
+    ) + 5
+    candidates: list[RobustCandidate] = []
+    for code in universe:
+        if code in excluded_codes or is_excluded_board(code):
+            continue
+        frame = attribute_history(
+            code,
+            lookback,
+            "1d",
+            ["open", "high", "low", "close", "volume"],
+        )
+        if frame is None or frame.empty:
+            continue
+        snapshot = build_fallback_snapshot(frame, benchmark_frame, params)
+        if snapshot is None:
+            continue
+        candidates.append(
+            RobustCandidate(
+                code=code,
+                channel=CandidateChannel.FALLBACK,
+                score=score_fallback_snapshot(snapshot),
+                volatility=snapshot.volatility,
+                close=snapshot.close,
+                avg_volume=snapshot.avg_volume,
+            )
+        )
+    return sorted(
+        filter_fallback_by_volatility(candidates),
+        key=lambda item: item.score,
+        reverse=True,
+    )
+
+
+def select_robust_candidates(
+    context,
+    kind: StrategyKind,
+    params: StrategyParams,
+    universe: list[str],
+    benchmark_frame: pd.DataFrame,
+    market_state: MarketState,
+    risk_state: PortfolioRiskState,
+) -> list[RobustCandidate]:
+    """Compose normalized primary and fallback candidates."""
+
+    primary = _primary_candidates(
+        select_candidates(context, kind, params, universe, benchmark_frame)
+    )
+    if (
+        len(primary) >= params.min_primary_candidates
+        or market_state is MarketState.WEAK
+        or risk_state >= PortfolioRiskState.DEFENSIVE
+    ):
+        return combine_robust_candidates(
+            primary,
+            [],
+            market_state,
+            risk_state,
+            params,
+        )
+    fallback = select_fallback_candidates(
+        context,
+        params,
+        universe,
+        benchmark_frame,
+        excluded_codes={candidate.code for candidate in primary},
+    )
+    return combine_robust_candidates(
+        primary,
+        fallback,
+        market_state,
+        risk_state,
+        params,
+    )
+
+
 def rebalance_portfolio(
     context,
     selections: list[tuple[str, SignalSnapshot, float]],
@@ -953,12 +1083,128 @@ def rebalance_portfolio(
     )
 
 
+def _tag_order(context, order, code: str, channel: CandidateChannel) -> None:
+    if order is None:
+        return
+    context.sr_order_channels[str(order.order_id)] = channel.value
+    context.sr_code_channels.setdefault(code, channel.value)
+
+
+def rebalance_robust_portfolio(
+    context,
+    candidates: list[RobustCandidate],
+    exposure: float,
+    params: StrategyParams,
+) -> None:
+    """Move the robust portfolio toward channel-aware target weights."""
+
+    from eqlib import order_target, order_target_value, record
+
+    weights = robust_target_weights(candidates, exposure, params)
+    candidate_by_code = {candidate.code: candidate for candidate in candidates}
+    held_codes = list(context.portfolio.positions.keys())
+    for code in held_codes:
+        if code in weights:
+            continue
+        channel = CandidateChannel(
+            context.sr_code_channels.get(code, CandidateChannel.PRIMARY.value)
+        )
+        order = order_target(code, 0)
+        _tag_order(context, order, code, channel)
+
+    total_value = context.portfolio.total_value
+    for code, weight in weights.items():
+        candidate = candidate_by_code[code]
+        position = context.portfolio.positions.get(code)
+        current_value = position.total_value if position is not None else 0.0
+        target_value = liquidity_capped_rebalance_target_value(
+            requested_target_value=total_value * weight,
+            current_value=current_value,
+            snapshot=candidate,
+            params=params,
+        )
+        if not should_rebalance_position(
+            current_value=current_value,
+            target_value=target_value,
+            total_value=total_value,
+            params=params,
+        ):
+            continue
+        if target_value < 1000:
+            continue
+        channel = CandidateChannel(
+            context.sr_code_channels.get(code, candidate.channel.value)
+        )
+        order = order_target_value(code, target_value)
+        _tag_order(context, order, code, channel)
+
+    record(
+        total_value=context.portfolio.total_value,
+        exposure=exposure,
+        holdings=len(weights),
+    )
+
+
+def reduce_portfolio_to_budget(context, exposure_budget: float) -> None:
+    """Reduce positions proportionally; never increase exposure."""
+
+    from eqlib import order_target_value
+
+    pending_exits = getattr(context, "_sr_pending_exit_codes", set())
+    try:
+        total_value = float(context.portfolio.total_value)
+        invested = sum(
+            float(position.total_value)
+            for position in context.portfolio.positions.values()
+        )
+        if total_value <= 0 or invested <= total_value * exposure_budget:
+            return
+        ratio = total_value * exposure_budget / invested
+        for code, position in context.portfolio.positions.items():
+            if code in pending_exits:
+                continue
+            target = float(position.total_value) * ratio
+            order = order_target_value(code, target)
+            channel = CandidateChannel(
+                context.sr_code_channels.get(code, CandidateChannel.PRIMARY.value)
+            )
+            _tag_order(context, order, code, channel)
+    finally:
+        if hasattr(context, "_sr_pending_exit_codes"):
+            del context._sr_pending_exit_codes
+
+
 def _risk_review(context, params: StrategyParams) -> None:
     """Weekly structural risk review; exits valid breakdowns."""
 
     from eqlib import attribute_history, order_target
 
     lookback = max(params.level_window, params.short_level_window, params.atr_period) + 5
+    if not params.robust_enabled:
+        for code in list(context.portfolio.positions.keys()):
+            frame = attribute_history(
+                code,
+                lookback,
+                "1d",
+                ["open", "high", "low", "close", "volume"],
+            )
+            if frame is None or frame.empty:
+                continue
+            _resistance, support = rolling_levels(frame, params.level_window)
+            atr_value = float(compute_atr(frame, params.atr_period).iloc[-1])
+            close = float(frame["close"].iloc[-1])
+            if close < support - params.atr_multiplier * atr_value:
+                order_target(code, 0)
+                continue
+            if should_exit_trailing_drawdown(
+                frame,
+                stop_pct=params.max_position_drawdown,
+                window=params.short_level_window,
+            ):
+                order_target(code, 0)
+        return
+
+    context._sr_pending_exit_codes = set()
     for code in list(context.portfolio.positions.keys()):
         frame = attribute_history(
             code,
@@ -971,15 +1217,32 @@ def _risk_review(context, params: StrategyParams) -> None:
         _resistance, support = rolling_levels(frame, params.level_window)
         atr_value = float(compute_atr(frame, params.atr_period).iloc[-1])
         close = float(frame["close"].iloc[-1])
+        channel = CandidateChannel(
+            getattr(context, "sr_code_channels", {}).get(
+                code,
+                CandidateChannel.PRIMARY.value,
+            )
+        )
         if close < support - params.atr_multiplier * atr_value:
-            order_target(code, 0)
+            order = order_target(code, 0)
+            _tag_order(context, order, code, channel)
+            if order is not None:
+                context._sr_pending_exit_codes.add(code)
             continue
+        stop_pct = (
+            params.fallback_trailing_drawdown
+            if channel is CandidateChannel.FALLBACK
+            else params.max_position_drawdown
+        )
         if should_exit_trailing_drawdown(
             frame,
-            stop_pct=params.max_position_drawdown,
+            stop_pct=stop_pct,
             window=params.short_level_window,
         ):
-            order_target(code, 0)
+            order = order_target(code, 0)
+            _tag_order(context, order, code, channel)
+            if order is not None:
+                context._sr_pending_exit_codes.add(code)
 
 
 def make_initialize(
@@ -1003,8 +1266,78 @@ def make_initialize(
         g.sr_params = params
         g.sr_universe = universe
         g.sr_benchmark = benchmark
+        if g.sr_params.robust_enabled:
+            context.sr_order_channels = {}
+            context.sr_code_channels = {}
+            context.sr_risk_events = []
+            context.sr_risk_tracker = PortfolioRiskTracker.initial(
+                context.portfolio.total_value
+            )
 
         def monthly_scan(ctx):
+            if g.sr_params.robust_enabled:
+                lookback = (
+                    max(
+                        g.sr_params.level_window,
+                        g.sr_params.rs_window,
+                        g.sr_params.atr_period,
+                        g.sr_params.market_volatility_window,
+                    )
+                    + 5
+                )
+                bench = attribute_history(
+                    g.sr_benchmark,
+                    lookback,
+                    "1d",
+                    ["open", "high", "low", "close", "volume"],
+                )
+                if bench is None:
+                    bench = pd.DataFrame()
+                state = (
+                    classify_market(bench, g.sr_params)
+                    if not bench.empty
+                    else MarketState.WEAK
+                )
+                volatility_factor = market_volatility_factor(bench, g.sr_params)
+                complete = risk_data_complete(bench, volatility_factor)
+                ctx.sr_risk_tracker = update_portfolio_risk(
+                    ctx.sr_risk_tracker,
+                    ctx.portfolio.total_value,
+                    state,
+                    g.sr_params,
+                    allow_recovery=False,
+                    data_complete=complete,
+                )
+                exposure = final_risk_budget(
+                    state,
+                    volatility_factor
+                    if volatility_factor is not None
+                    else g.sr_params.market_volatility_floor,
+                    ctx.sr_risk_tracker.state,
+                    g.sr_params,
+                )
+                if ctx.sr_risk_tracker.state is PortfolioRiskState.PROTECT:
+                    reduce_portfolio_to_budget(ctx, exposure)
+                    return
+                if not complete:
+                    return
+                candidates = select_robust_candidates(
+                    ctx,
+                    g.sr_kind,
+                    g.sr_params,
+                    g.sr_universe,
+                    bench,
+                    state,
+                    ctx.sr_risk_tracker.state,
+                )
+                rebalance_robust_portfolio(
+                    ctx,
+                    candidates,
+                    exposure,
+                    g.sr_params,
+                )
+                return
+
             lookback = (
                 max(
                     g.sr_params.level_window,
@@ -1033,6 +1366,65 @@ def make_initialize(
             rebalance_portfolio(ctx, selections, exposure, g.sr_params)
 
         def weekly_review(ctx):
+            if g.sr_params.robust_enabled:
+                lookback = (
+                    max(
+                        g.sr_params.level_window,
+                        g.sr_params.rs_window,
+                        g.sr_params.atr_period,
+                        g.sr_params.market_volatility_window,
+                    )
+                    + 5
+                )
+                bench = attribute_history(
+                    g.sr_benchmark,
+                    lookback,
+                    "1d",
+                    ["open", "high", "low", "close", "volume"],
+                )
+                if bench is None:
+                    bench = pd.DataFrame()
+                state = (
+                    classify_market(bench, g.sr_params)
+                    if not bench.empty
+                    else MarketState.WEAK
+                )
+                volatility_factor = market_volatility_factor(bench, g.sr_params)
+                complete = risk_data_complete(bench, volatility_factor)
+                previous = ctx.sr_risk_tracker
+                updated = update_portfolio_risk(
+                    previous,
+                    ctx.portfolio.total_value,
+                    state,
+                    g.sr_params,
+                    allow_recovery=True,
+                    data_complete=complete,
+                )
+                ctx.sr_risk_tracker = updated
+                if updated.state is not previous.state:
+                    ctx.sr_risk_events.append(
+                        {
+                            "date": ctx.current_dt.date().isoformat(),
+                            "from": previous.state.name.lower(),
+                            "to": updated.state.name.lower(),
+                            "drawdown": round(
+                                1 - ctx.portfolio.total_value / updated.high_water,
+                                6,
+                            ),
+                        }
+                    )
+                _risk_review(ctx, g.sr_params)
+                exposure = final_risk_budget(
+                    state,
+                    volatility_factor
+                    if volatility_factor is not None
+                    else g.sr_params.market_volatility_floor,
+                    updated.state,
+                    g.sr_params,
+                )
+                reduce_portfolio_to_budget(ctx, exposure)
+                return
+
             _risk_review(ctx, g.sr_params)
 
         run_monthly(monthly_scan, day_of_month=1, time="09:30")
