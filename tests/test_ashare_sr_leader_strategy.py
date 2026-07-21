@@ -8,7 +8,11 @@ import pandas as pd
 from eqlib.strategies.ashare_sr_leader import (
     CandidateChannel,
     DEFAULT_LEADER_UNIVERSE,
+    PortfolioRiskState,
+    PortfolioRiskTracker,
     build_fallback_snapshot,
+    drawdown_risk_multiplier,
+    final_risk_budget,
     industry_for_code,
     liquidity_capped_target_value,
     liquidity_capped_rebalance_target_value,
@@ -22,12 +26,14 @@ from eqlib.strategies.ashare_sr_leader import (
     get_default_leader_universe,
     is_excluded_board,
     market_exposure,
+    market_volatility_factor,
     rolling_levels,
     score_snapshot,
     score_fallback_snapshot,
     should_exit_trailing_drawdown,
     should_rebalance_position,
     target_weights,
+    update_portfolio_risk,
 )
 from scripts.run_ashare_sr_leader_research import (
     _benchmark_total_return,
@@ -122,6 +128,76 @@ def test_robust_defaults_leave_baseline_disabled():
     assert params.fallback_exposure_cap == 0.25
     assert params.fallback_trailing_drawdown == 0.10
     assert params.target_annual_volatility == 0.18
+
+
+def test_market_volatility_factor_is_bounded_and_never_leverages():
+    params = StrategyParams(
+        market_volatility_window=20,
+        target_annual_volatility=0.18,
+        market_volatility_floor=0.55,
+    )
+    quiet = _ohlcv_from_close(list(np.linspace(100, 103, 40)))
+    noisy_returns = np.tile([0.04, -0.035], 20)
+    noisy_close = 100 * np.cumprod(1 + noisy_returns)
+    noisy = _ohlcv_from_close(noisy_close)
+
+    assert market_volatility_factor(quiet, params) == 1.0
+    assert 0.55 <= market_volatility_factor(noisy, params) < 1.0
+    assert market_volatility_factor(noisy.iloc[:10], params) is None
+    budget = final_risk_budget(
+        MarketState.STRONG,
+        volatility_factor=0.80,
+        risk_state=PortfolioRiskState.DEFENSIVE,
+        params=StrategyParams(strong_market_exposure=0.90),
+    )
+    assert budget == 0.36
+
+
+def test_portfolio_risk_downgrades_immediately_at_each_threshold():
+    params = StrategyParams()
+    tracker = PortfolioRiskTracker.initial(1_000_000)
+
+    cautious = update_portfolio_risk(
+        tracker, 915_000, MarketState.NEUTRAL, params, allow_recovery=False
+    )
+    defensive = update_portfolio_risk(
+        cautious, 875_000, MarketState.NEUTRAL, params, allow_recovery=False
+    )
+    protect = update_portfolio_risk(
+        defensive, 835_000, MarketState.NEUTRAL, params, allow_recovery=False
+    )
+
+    assert cautious.state is PortfolioRiskState.CAUTIOUS
+    assert defensive.state is PortfolioRiskState.DEFENSIVE
+    assert protect.state is PortfolioRiskState.PROTECT
+    assert drawdown_risk_multiplier(protect.state) == 0.25
+
+
+def test_portfolio_risk_recovers_only_one_level_after_half_loss_recovery():
+    params = StrategyParams()
+    tracker = PortfolioRiskTracker(
+        state=PortfolioRiskState.PROTECT,
+        high_water=1_000_000,
+        trough=830_000,
+    )
+
+    blocked = update_portfolio_risk(
+        tracker,
+        920_000,
+        MarketState.WEAK,
+        params,
+        allow_recovery=True,
+    )
+    recovered = update_portfolio_risk(
+        tracker,
+        920_000,
+        MarketState.NEUTRAL,
+        params,
+        allow_recovery=True,
+    )
+
+    assert blocked.state is PortfolioRiskState.PROTECT
+    assert recovered.state is PortfolioRiskState.DEFENSIVE
 
 
 def test_fallback_snapshot_requires_intact_positive_trend():
