@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 
 from eqlib.strategies.ashare_sr_leader import (
+    CandidateChannel,
     DEFAULT_LEADER_UNIVERSE,
+    build_fallback_snapshot,
     industry_for_code,
     liquidity_capped_target_value,
     liquidity_capped_rebalance_target_value,
@@ -22,6 +24,7 @@ from eqlib.strategies.ashare_sr_leader import (
     market_exposure,
     rolling_levels,
     score_snapshot,
+    score_fallback_snapshot,
     should_exit_trailing_drawdown,
     should_rebalance_position,
     target_weights,
@@ -109,6 +112,62 @@ def _ohlcv_from_close(close_values, volume_start=1_000_000, volume_end=2_000_000
             "volume": np.linspace(volume_start, volume_end, len(close)),
         }
     )
+
+
+def test_robust_defaults_leave_baseline_disabled():
+    params = StrategyParams()
+
+    assert not params.robust_enabled
+    assert params.min_primary_candidates == 5
+    assert params.fallback_exposure_cap == 0.25
+    assert params.fallback_trailing_drawdown == 0.10
+    assert params.target_annual_volatility == 0.18
+
+
+def test_fallback_snapshot_requires_intact_positive_trend():
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+        fallback_trend_window=30,
+        fallback_medium_window=15,
+        fallback_trend_lookback=5,
+        min_avg_volume=1,
+    )
+    stock = _ohlcv_from_close(list(np.linspace(10, 14, 70)))
+    benchmark = _ohlcv_from_close(list(np.linspace(10, 11, 70)))
+
+    snapshot = build_fallback_snapshot(stock, benchmark, params)
+
+    assert snapshot is not None
+    assert snapshot.relative_strength > 0
+    assert snapshot.medium_trend_change >= 0
+    assert snapshot.channel is CandidateChannel.FALLBACK
+    assert score_fallback_snapshot(snapshot) > 0
+
+
+def test_fallback_snapshot_rejects_falling_or_benchmark_lagging_stock():
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+        fallback_trend_window=30,
+        fallback_medium_window=15,
+        fallback_trend_lookback=5,
+        min_avg_volume=1,
+    )
+    falling = _ohlcv_from_close(list(np.linspace(14, 10, 70)))
+    lagging = _ohlcv_from_close(list(np.linspace(10, 10.5, 70)))
+    benchmark = _ohlcv_from_close(list(np.linspace(10, 12, 70)))
+
+    assert build_fallback_snapshot(falling, benchmark, params) is None
+    assert build_fallback_snapshot(lagging, benchmark, params) is None
 
 
 def _make_snapshot(**overrides):
