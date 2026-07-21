@@ -29,6 +29,13 @@ class MarketState(str, Enum):
     WEAK = "weak"
 
 
+class CandidateChannel(str, Enum):
+    """Origin of a robust portfolio candidate."""
+
+    PRIMARY = "primary"
+    FALLBACK = "fallback"
+
+
 @dataclass(frozen=True)
 class StrategyParams:
     """Parameter set for support/resistance leader strategies."""
@@ -53,6 +60,20 @@ class StrategyParams:
     max_position_drawdown: float = 0.0
     rebalance_threshold: float = 0.08
     liquidity_volume_pct: float = 0.03
+    robust_enabled: bool = False
+    min_primary_candidates: int = 5
+    fallback_exposure_cap: float = 0.25
+    fallback_trailing_drawdown: float = 0.10
+    fallback_trend_window: int = 120
+    fallback_medium_window: int = 60
+    fallback_trend_lookback: int = 20
+    fallback_min_relative_strength: float = 0.0
+    market_volatility_window: int = 20
+    target_annual_volatility: float = 0.18
+    market_volatility_floor: float = 0.55
+    cautious_drawdown: float = 0.08
+    defensive_drawdown: float = 0.12
+    protect_drawdown: float = 0.16
 
 
 @dataclass(frozen=True)
@@ -81,6 +102,19 @@ class SignalSnapshot:
     breakout: bool
     pullback: bool
     breakdown: bool
+
+
+@dataclass(frozen=True)
+class FallbackSnapshot:
+    """Trend and liquidity state for a fallback candidate."""
+
+    close: float
+    avg_volume: float
+    relative_strength: float
+    volatility: float
+    medium_trend_change: float
+    breakdown: bool
+    channel: CandidateChannel = CandidateChannel.FALLBACK
 
 
 DEFAULT_LEADER_UNIVERSE: tuple[LeaderStock, ...] = (
@@ -350,6 +384,80 @@ def build_signal_snapshot(
         pullback=pullback,
         breakdown=breakdown,
     )
+
+
+def build_fallback_snapshot(
+    stock_frame: pd.DataFrame,
+    benchmark_frame: pd.DataFrame,
+    params: StrategyParams,
+) -> FallbackSnapshot | None:
+    """Build a trend-qualified fallback snapshot from completed bars."""
+
+    required = max(
+        params.level_window,
+        params.short_level_window,
+        params.rs_window,
+        params.volume_window,
+        params.atr_period,
+        params.fallback_trend_window,
+        params.fallback_medium_window + params.fallback_trend_lookback,
+    ) + 1
+    if len(stock_frame) < required or len(benchmark_frame) < params.rs_window + 1:
+        return None
+
+    close_series = stock_frame["close"].astype(float)
+    close = float(close_series.iloc[-1])
+    if close < params.min_price:
+        return None
+
+    avg_volume = float(stock_frame["volume"].tail(params.volume_window).mean())
+    if avg_volume < params.min_avg_volume:
+        return None
+
+    long_ma = close_series.rolling(params.fallback_trend_window).mean()
+    medium_ma = close_series.rolling(params.fallback_medium_window).mean()
+    long_value = float(long_ma.iloc[-1])
+    medium_now = float(medium_ma.iloc[-1])
+    medium_then = float(medium_ma.iloc[-params.fallback_trend_lookback - 1])
+    if pd.isna(long_value) or pd.isna(medium_now) or pd.isna(medium_then):
+        return None
+    if close <= long_value or medium_now < medium_then:
+        return None
+
+    relative_strength = _relative_strength(
+        close_series,
+        benchmark_frame["close"].astype(float),
+        params.rs_window,
+    )
+    if relative_strength < params.fallback_min_relative_strength:
+        return None
+
+    _resistance, support = rolling_levels(stock_frame, params.level_window)
+    atr_value = float(compute_atr(stock_frame, params.atr_period).iloc[-1])
+    breakdown = close < support - params.atr_multiplier * atr_value
+    if breakdown:
+        return None
+
+    returns = close_series.pct_change().tail(20).dropna()
+    volatility = float(returns.std()) if not returns.empty else 0.0
+    medium_trend_change = medium_now / medium_then - 1 if medium_then > 0 else 0.0
+    return FallbackSnapshot(
+        close=close,
+        avg_volume=avg_volume,
+        relative_strength=relative_strength,
+        volatility=volatility,
+        medium_trend_change=medium_trend_change,
+        breakdown=False,
+    )
+
+
+def score_fallback_snapshot(snapshot: FallbackSnapshot) -> float:
+    """Rank fallback candidates by trend, relative strength, and low volatility."""
+
+    trend_score = max(0.0, snapshot.medium_trend_change) * 100
+    relative_strength_score = max(0.0, snapshot.relative_strength) * 100
+    low_volatility_score = max(0.0, 0.04 - snapshot.volatility) * 50
+    return trend_score + relative_strength_score + low_volatility_score
 
 
 def score_snapshot(snapshot: SignalSnapshot, kind: StrategyKind) -> float:
