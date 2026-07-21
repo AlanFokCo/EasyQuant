@@ -7,9 +7,11 @@ so support/resistance logic can be tested without network data.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 
 import pandas as pd
+
+from eqlib.constants import TRADING_DAYS_PER_YEAR
 
 
 class StrategyKind(str, Enum):
@@ -27,6 +29,15 @@ class MarketState(str, Enum):
     STRONG = "strong"
     NEUTRAL = "neutral"
     WEAK = "weak"
+
+
+class PortfolioRiskState(IntEnum):
+    """Ordered portfolio drawdown states from least to most defensive."""
+
+    NORMAL = 0
+    CAUTIOUS = 1
+    DEFENSIVE = 2
+    PROTECT = 3
 
 
 class CandidateChannel(str, Enum):
@@ -74,6 +85,19 @@ class StrategyParams:
     cautious_drawdown: float = 0.08
     defensive_drawdown: float = 0.12
     protect_drawdown: float = 0.16
+
+
+@dataclass(frozen=True)
+class PortfolioRiskTracker:
+    """High-water and trough state for one drawdown episode."""
+
+    state: PortfolioRiskState
+    high_water: float
+    trough: float
+
+    @classmethod
+    def initial(cls, total_value: float) -> "PortfolioRiskTracker":
+        return cls(PortfolioRiskState.NORMAL, total_value, total_value)
 
 
 @dataclass(frozen=True)
@@ -282,6 +306,107 @@ def market_exposure(state: MarketState, params: StrategyParams) -> float:
     if state is MarketState.WEAK:
         return params.weak_market_exposure
     return params.neutral_market_exposure
+
+
+def _risk_state_for_drawdown(
+    drawdown: float,
+    params: StrategyParams,
+) -> PortfolioRiskState:
+    if drawdown >= params.protect_drawdown:
+        return PortfolioRiskState.PROTECT
+    if drawdown >= params.defensive_drawdown:
+        return PortfolioRiskState.DEFENSIVE
+    if drawdown >= params.cautious_drawdown:
+        return PortfolioRiskState.CAUTIOUS
+    return PortfolioRiskState.NORMAL
+
+
+def update_portfolio_risk(
+    tracker: PortfolioRiskTracker,
+    total_value: float,
+    market_state: MarketState,
+    params: StrategyParams,
+    allow_recovery: bool,
+    data_complete: bool = True,
+) -> PortfolioRiskTracker:
+    """Downgrade immediately and recover at most one state per review."""
+
+    if total_value <= 0:
+        return tracker
+    high_water = max(tracker.high_water, total_value)
+    trough = min(tracker.trough, total_value)
+    drawdown = max(0.0, 1 - total_value / high_water) if high_water > 0 else 0.0
+    threshold_state = _risk_state_for_drawdown(drawdown, params)
+    if threshold_state > tracker.state:
+        return PortfolioRiskTracker(threshold_state, high_water, min(trough, total_value))
+
+    loss = high_water - trough
+    recovery_ratio = (total_value - trough) / loss if loss > 0 else 1.0
+    can_recover = (
+        allow_recovery
+        and data_complete
+        and market_state is not MarketState.WEAK
+        and recovery_ratio >= 0.5
+        and threshold_state < tracker.state
+    )
+    state = PortfolioRiskState(tracker.state - 1) if can_recover else tracker.state
+    if state is PortfolioRiskState.NORMAL and total_value >= high_water:
+        trough = total_value
+    return PortfolioRiskTracker(state, high_water, trough)
+
+
+def market_volatility_factor(
+    benchmark_frame: pd.DataFrame,
+    params: StrategyParams,
+) -> float | None:
+    """Scale risk down when completed benchmark returns exceed target volatility."""
+
+    close = benchmark_frame.get("close")
+    if close is None or len(close) < params.market_volatility_window + 1:
+        return None
+    returns = close.astype(float).pct_change().dropna().tail(params.market_volatility_window)
+    if len(returns) < params.market_volatility_window:
+        return None
+    realized = float(returns.std()) * (TRADING_DAYS_PER_YEAR**0.5)
+    if realized <= 0:
+        return 1.0
+    return max(
+        params.market_volatility_floor,
+        min(1.0, params.target_annual_volatility / realized),
+    )
+
+
+def drawdown_risk_multiplier(state: PortfolioRiskState) -> float:
+    """Map a portfolio risk state to its exposure multiplier."""
+
+    return {
+        PortfolioRiskState.NORMAL: 1.0,
+        PortfolioRiskState.CAUTIOUS: 0.75,
+        PortfolioRiskState.DEFENSIVE: 0.50,
+        PortfolioRiskState.PROTECT: 0.25,
+    }[state]
+
+
+def final_risk_budget(
+    market_state: MarketState,
+    volatility_factor: float,
+    risk_state: PortfolioRiskState,
+    params: StrategyParams,
+) -> float:
+    """Return the final unlevered equity exposure budget."""
+
+    return round(
+        max(
+            0.0,
+            min(
+                1.0,
+                market_exposure(market_state, params)
+                * volatility_factor
+                * drawdown_risk_multiplier(risk_state),
+            ),
+        ),
+        12,
+    )
 
 
 def _relative_strength(
