@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, IntEnum
+import math
 
 import pandas as pd
 
@@ -139,6 +140,18 @@ class FallbackSnapshot:
     medium_trend_change: float
     breakdown: bool
     channel: CandidateChannel = CandidateChannel.FALLBACK
+
+
+@dataclass(frozen=True)
+class RobustCandidate:
+    """Normalized candidate used by robust portfolio construction."""
+
+    code: str
+    channel: CandidateChannel
+    score: float
+    volatility: float
+    close: float
+    avg_volume: float
 
 
 DEFAULT_LEADER_UNIVERSE: tuple[LeaderStock, ...] = (
@@ -630,6 +643,86 @@ def industry_for_code(code: str) -> str:
         if _bare(leader.code) == bare:
             return leader.industry
     return "未知"
+
+
+def combine_robust_candidates(
+    primary: list[RobustCandidate],
+    fallback: list[RobustCandidate],
+    market_state: MarketState,
+    risk_state: PortfolioRiskState,
+    params: StrategyParams,
+) -> list[RobustCandidate]:
+    """Keep primary candidates first and add fallback only when allowed."""
+
+    primary_ranked = sorted(primary, key=lambda item: item.score, reverse=True)
+    if len(primary_ranked) >= params.min_primary_candidates:
+        return primary_ranked[: params.top_n]
+    if market_state is MarketState.WEAK or risk_state >= PortfolioRiskState.DEFENSIVE:
+        return primary_ranked[: params.top_n]
+
+    chosen = list(primary_ranked[: params.top_n])
+    chosen_codes = {item.code for item in chosen}
+    for item in sorted(fallback, key=lambda candidate: candidate.score, reverse=True):
+        if item.code in chosen_codes or len(chosen) >= params.top_n:
+            continue
+        chosen.append(item)
+        chosen_codes.add(item.code)
+    return chosen
+
+
+def _allocate_robust_channel(
+    candidates: list[RobustCandidate],
+    budget: float,
+    params: StrategyParams,
+    weights: dict[str, float],
+    industry_weights: dict[str, float],
+) -> None:
+    if not candidates or budget <= 0:
+        return
+    inverse = [
+        1 / candidate.volatility
+        if math.isfinite(candidate.volatility) and candidate.volatility > 1e-6
+        else 1e6
+        for candidate in candidates
+    ]
+    inverse_total = sum(inverse)
+    for candidate, inverse_value in zip(candidates, inverse):
+        requested = budget * inverse_value / inverse_total
+        industry = industry_for_code(candidate.code)
+        industry_room = max(
+            0.0,
+            params.max_industry_weight - industry_weights.get(industry, 0.0),
+        )
+        weight = min(requested, params.max_stock_weight, industry_room)
+        if weight <= 0:
+            continue
+        weights[candidate.code] = weight
+        industry_weights[industry] = industry_weights.get(industry, 0.0) + weight
+
+
+def robust_target_weights(
+    candidates: list[RobustCandidate],
+    exposure: float,
+    params: StrategyParams,
+) -> dict[str, float]:
+    """Allocate primary first, then a capped fallback sleeve without redistribution."""
+
+    selected = candidates[: params.top_n]
+    primary = [item for item in selected if item.channel is CandidateChannel.PRIMARY]
+    fallback = [item for item in selected if item.channel is CandidateChannel.FALLBACK]
+    weights: dict[str, float] = {}
+    industry_weights: dict[str, float] = {}
+    _allocate_robust_channel(primary, exposure, params, weights, industry_weights)
+    remaining = max(0.0, exposure - sum(weights.values()))
+    fallback_budget = min(params.fallback_exposure_cap, remaining)
+    _allocate_robust_channel(
+        fallback,
+        fallback_budget,
+        params,
+        weights,
+        industry_weights,
+    )
+    return weights
 
 
 def target_weights(
