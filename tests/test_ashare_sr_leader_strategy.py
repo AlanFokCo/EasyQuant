@@ -11,6 +11,7 @@ from eqlib.strategies.ashare_sr_leader import (
     DEFAULT_LEADER_UNIVERSE,
     PortfolioRiskState,
     PortfolioRiskTracker,
+    RobustCandidate,
     build_fallback_snapshot,
     drawdown_risk_multiplier,
     final_risk_budget,
@@ -24,11 +25,13 @@ from eqlib.strategies.ashare_sr_leader import (
     choose_portfolio_candidates,
     classify_market,
     compute_atr,
+    combine_robust_candidates,
     get_default_leader_universe,
     is_excluded_board,
     market_exposure,
     market_volatility_factor,
     rolling_levels,
+    robust_target_weights,
     score_snapshot,
     score_fallback_snapshot,
     should_exit_trailing_drawdown,
@@ -303,6 +306,98 @@ def test_fallback_snapshot_rejects_falling_or_benchmark_lagging_stock():
 
     assert build_fallback_snapshot(falling, benchmark, params) is None
     assert build_fallback_snapshot(lagging, benchmark, params) is None
+
+
+def _robust_candidate(
+    code: str,
+    channel: CandidateChannel,
+    score: float,
+    volatility: float,
+) -> RobustCandidate:
+    return RobustCandidate(
+        code=code,
+        channel=channel,
+        score=score,
+        volatility=volatility,
+        close=10.0,
+        avg_volume=1_000_000.0,
+    )
+
+
+def test_robust_candidates_use_fallback_only_when_primary_is_short():
+    params = StrategyParams(robust_enabled=True, min_primary_candidates=2, top_n=3)
+    primary = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.03),
+    ]
+    fallback = [_robust_candidate("600036", CandidateChannel.FALLBACK, 8.0, 0.01)]
+
+    enough = combine_robust_candidates(
+        primary, fallback, MarketState.NEUTRAL, PortfolioRiskState.NORMAL, params
+    )
+    short = combine_robust_candidates(
+        primary[:1], fallback, MarketState.NEUTRAL, PortfolioRiskState.NORMAL, params
+    )
+
+    assert all(item.channel is CandidateChannel.PRIMARY for item in enough)
+    assert [item.channel for item in short] == [
+        CandidateChannel.PRIMARY,
+        CandidateChannel.FALLBACK,
+    ]
+
+
+def test_fallback_is_disabled_in_weak_or_defensive_state():
+    params = StrategyParams(robust_enabled=True, min_primary_candidates=2, top_n=3)
+    primary = [_robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02)]
+    fallback = [_robust_candidate("600036", CandidateChannel.FALLBACK, 8.0, 0.01)]
+
+    weak = combine_robust_candidates(
+        primary, fallback, MarketState.WEAK, PortfolioRiskState.NORMAL, params
+    )
+    defensive = combine_robust_candidates(
+        primary, fallback, MarketState.NEUTRAL, PortfolioRiskState.DEFENSIVE, params
+    )
+
+    assert weak == primary
+    assert defensive == primary
+
+
+def test_robust_weights_prioritize_primary_and_cap_fallback_and_industry():
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=4,
+        max_stock_weight=0.30,
+        max_industry_weight=0.35,
+        fallback_exposure_cap=0.20,
+    )
+    candidates = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.04),
+        _robust_candidate("000858", CandidateChannel.FALLBACK, 8.0, 0.01),
+        _robust_candidate("600036", CandidateChannel.FALLBACK, 7.0, 0.02),
+    ]
+
+    weights = robust_target_weights(candidates, exposure=0.70, params=params)
+
+    fallback_weight = weights["000858"] + weights["600036"]
+    assert fallback_weight <= 0.20
+    assert weights["600519"] > weights["300750"]
+    assert weights["600519"] + weights["000858"] <= 0.35
+    assert sum(weights.values()) <= 0.70
+
+
+@pytest.mark.parametrize("volatility", [0.0, -0.02, float("nan")])
+def test_robust_weights_floor_zero_or_invalid_volatility(volatility):
+    params = StrategyParams(robust_enabled=True, top_n=2, max_stock_weight=0.60)
+    candidates = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, volatility),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.02),
+    ]
+
+    weights = robust_target_weights(candidates, exposure=0.60, params=params)
+
+    assert all(np.isfinite(weight) for weight in weights.values())
+    assert sum(weights.values()) <= 0.60
 
 
 def _make_snapshot(**overrides):
