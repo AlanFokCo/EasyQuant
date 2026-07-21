@@ -371,31 +371,6 @@ def test_reduce_portfolio_to_budget_only_queues_smaller_targets(monkeypatch):
     assert queued == [("600519", 150_000), ("600036", 100_000)]
 
 
-def test_reduce_portfolio_skips_a_position_already_queued_for_exit(monkeypatch):
-    queued = []
-    monkeypatch.setattr(
-        "eqlib.order_target_value",
-        lambda code, value: queued.append((code, value)) or None,
-    )
-    context = SimpleNamespace(
-        portfolio=SimpleNamespace(
-            total_value=1_000_000,
-            positions={
-                "600519": SimpleNamespace(total_value=300_000),
-                "600036": SimpleNamespace(total_value=200_000),
-            },
-        ),
-        sr_order_channels={},
-        sr_code_channels={},
-        _sr_pending_exit_codes={"600036"},
-    )
-
-    reduce_portfolio_to_budget(context, exposure_budget=0.25)
-
-    assert queued == [("600519", 150_000)]
-    assert not hasattr(context, "_sr_pending_exit_codes")
-
-
 def test_missing_benchmark_or_volatility_data_blocks_risk_increase():
     assert not risk_data_complete(pd.DataFrame(), None)
     assert not risk_data_complete(_ohlcv_from_close([10, 11]), None)
@@ -532,68 +507,224 @@ def test_robust_selection_skips_fallback_when_primary_supply_is_sufficient(
     assert [candidate.code for candidate in selected] == ["600519", "300750"]
 
 
-def test_robust_rebalance_tags_orders_and_preserves_existing_channel(monkeypatch):
+def test_robust_rebalance_allocates_existing_fallback_through_fallback_sleeve(
+    monkeypatch,
+):
     queued = []
-    recorded = []
-
-    def fake_order_target(code, amount):
-        queued.append(("target", code, amount))
-        return SimpleNamespace(order_id=f"exit-{code}")
-
-    def fake_order_target_value(code, value):
-        queued.append(("value", code, value))
-        return SimpleNamespace(order_id=f"value-{code}")
-
-    monkeypatch.setattr("eqlib.order_target", fake_order_target)
-    monkeypatch.setattr("eqlib.order_target_value", fake_order_target_value)
-    monkeypatch.setattr("eqlib.record", lambda **values: recorded.append(values))
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
     monkeypatch.setattr(
-        "eqlib.strategies.ashare_sr_leader.robust_target_weights",
-        lambda candidates, exposure, params: {"600519": 0.20, "300750": 0.30},
+        "eqlib.order_target_value",
+        lambda code, value: queued.append((code, value))
+        or SimpleNamespace(order_id=f"value-{code}"),
     )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
     context = SimpleNamespace(
         portfolio=SimpleNamespace(
             total_value=1_000_000,
-            positions={
-                "600519": SimpleNamespace(total_value=100_000),
-                "600036": SimpleNamespace(total_value=80_000),
-            },
+            positions={"600519": SimpleNamespace(total_value=50_000)},
         ),
         sr_order_channels={},
-        sr_code_channels={
-            "600519": CandidateChannel.FALLBACK.value,
-            "600036": CandidateChannel.PRIMARY.value,
-        },
+        sr_code_channels={"600519": CandidateChannel.FALLBACK.value},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
     )
     candidates = [
         RobustCandidate(
-            "600519", CandidateChannel.PRIMARY, 10.0, 0.02, 10.0, 1_000.0
-        ),
-        RobustCandidate(
-            "300750", CandidateChannel.PRIMARY, 9.0, 0.03, 20.0, 1_000.0
-        ),
+            "600519",
+            CandidateChannel.PRIMARY,
+            10.0,
+            0.02,
+            100.0,
+            10_000_000.0,
+        )
     ]
     params = StrategyParams(
-        top_n=2,
-        rebalance_threshold=0.0,
-        liquidity_volume_pct=0.10,
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        fallback_exposure_cap=0.10,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=1.0,
+    )
+
+    rebalance_robust_portfolio(context, candidates, exposure=0.80, params=params)
+
+    assert queued == [("600519", pytest.approx(100_000))]
+    assert context.sr_order_channels == {
+        "value-600519": CandidateChannel.FALLBACK.value
+    }
+
+
+def test_robust_rebalance_never_increases_existing_fallback_in_defensive(
+    monkeypatch,
+):
+    queued = []
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append((code, value))
+        or SimpleNamespace(order_id=f"value-{code}"),
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={"600519": SimpleNamespace(total_value=50_000)},
+        ),
+        sr_order_channels={},
+        sr_code_channels={"600519": CandidateChannel.FALLBACK.value},
+        sr_risk_tracker=PortfolioRiskTracker(
+            PortfolioRiskState.DEFENSIVE,
+            high_water=1_000_000,
+            trough=880_000,
+        ),
+    )
+    candidates = [
+        RobustCandidate(
+            "600519",
+            CandidateChannel.PRIMARY,
+            10.0,
+            0.02,
+            100.0,
+            10_000_000.0,
+        )
+    ]
+    params = StrategyParams(
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        fallback_exposure_cap=0.10,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=1.0,
     )
 
     rebalance_robust_portfolio(context, candidates, exposure=0.50, params=params)
 
-    assert queued == [
-        ("target", "600036", 0),
-        ("value", "600519", 101_000),
-        ("value", "300750", 2_000),
-    ]
-    assert context.sr_order_channels == {
-        "exit-600036": CandidateChannel.PRIMARY.value,
-        "value-600519": CandidateChannel.FALLBACK.value,
-        "value-300750": CandidateChannel.PRIMARY.value,
-    }
+    assert queued == []
     assert context.sr_code_channels["600519"] == CandidateChannel.FALLBACK.value
-    assert context.sr_code_channels["300750"] == CandidateChannel.PRIMARY.value
-    assert recorded == [{"total_value": 1_000_000, "exposure": 0.50, "holdings": 2}]
+
+
+def test_confirmed_exit_reentry_retires_stale_channel_and_primary_stop_applies(
+    monkeypatch,
+):
+    queued = []
+
+    def fake_order_target(code, amount):
+        queued.append(("target", code, amount))
+        return SimpleNamespace(order_id=f"exit-{len(queued)}")
+
+    def fake_order_target_value(code, value):
+        queued.append(("value", code, value))
+        return SimpleNamespace(order_id=f"entry-{len(queued)}")
+
+    monkeypatch.setattr("eqlib.order_target", fake_order_target)
+    monkeypatch.setattr("eqlib.order_target_value", fake_order_target_value)
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={"600519": SimpleNamespace(total_value=100_000)},
+        ),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={"600519": CandidateChannel.FALLBACK.value},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=1,
+        level_window=3,
+        short_level_window=3,
+        atr_period=2,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=1.0,
+        max_position_drawdown=0.0,
+        fallback_trailing_drawdown=0.10,
+    )
+
+    rebalance_robust_portfolio(context, [], exposure=0.50, params=params)
+    assert context.sr_code_channels["600519"] == CandidateChannel.FALLBACK.value
+
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    context.portfolio.positions = {}
+    primary = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    rebalance_robust_portfolio(context, [primary], exposure=0.10, params=params)
+
+    assert queued[-1] == ("value", "600519", pytest.approx(100_000))
+    assert context.sr_code_channels["600519"] == CandidateChannel.PRIMARY.value
+    assert context.sr_order_channels[str("entry-2")] == CandidateChannel.PRIMARY.value
+
+    queued_before_review = list(queued)
+    _risk_review(context, params)
+    assert queued == queued_before_review
+    assert context.sr_code_channels["600519"] == CandidateChannel.PRIMARY.value
+
+    context.current_dt = pd.Timestamp("2026-07-03 09:30").to_pydatetime()
+    context.portfolio.positions = {"600519": SimpleNamespace(total_value=100_000)}
+    trailing_frame = _ohlcv_from_close([10.0, 11.0, 12.0, 12.0, 10.7])
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: trailing_frame)
+    queued.clear()
+
+    _risk_review(context, params)
+
+    assert queued == []
+    assert context.sr_code_channels["600519"] == CandidateChannel.PRIMARY.value
+
+
+def test_unfilled_exit_remains_protected_across_callback_dates(monkeypatch):
+    queued = []
+    monkeypatch.setattr(
+        "eqlib.order_target",
+        lambda code, amount: queued.append(("target", code, amount))
+        or SimpleNamespace(order_id=f"exit-{code}"),
+    )
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append(("value", code, value))
+        or SimpleNamespace(order_id=f"value-{code}"),
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={"600519": SimpleNamespace(total_value=500_000)},
+        ),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={"600519": CandidateChannel.FALLBACK.value},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    params = StrategyParams(robust_enabled=True)
+
+    rebalance_robust_portfolio(context, [], exposure=0.50, params=params)
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+    renewed_primary = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    rebalance_robust_portfolio(
+        context,
+        [renewed_primary],
+        exposure=0.90,
+        params=params,
+    )
+
+    assert queued == [("target", "600519", 0)]
+    assert context._sr_pending_exit_codes == {"600519"}
+    assert context.sr_code_channels["600519"] == CandidateChannel.FALLBACK.value
 
 
 def test_robust_candidates_use_fallback_only_when_primary_is_short():
@@ -1121,21 +1252,85 @@ def test_monthly_protect_reduces_with_missing_volatility_and_never_selects(
         "eqlib.strategies.ashare_sr_leader.select_robust_candidates",
         lambda *args: pytest.fail("PROTECT must not select entry candidates"),
     )
-    reductions = []
-    monkeypatch.setattr(
-        "eqlib.strategies.ashare_sr_leader.reduce_portfolio_to_budget",
-        lambda context, exposure: reductions.append(exposure),
-    )
+    queued = []
+
+    def fake_order_target_value(code, value):
+        queued.append((code, value))
+        return SimpleNamespace(order_id=f"protect-{code}")
+
+    monkeypatch.setattr("eqlib.order_target_value", fake_order_target_value)
     context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
     context.portfolio.total_value = 800_000
+    context.portfolio.positions = {
+        "600519": SimpleNamespace(total_value=500_000),
+    }
+    context.sr_code_channels = {"600519": CandidateChannel.FALLBACK.value}
 
     callbacks["monthly"][0](context)
 
     assert context.sr_risk_tracker.state is PortfolioRiskState.PROTECT
-    assert reductions == [pytest.approx(0.60 * 0.55 * 0.25)]
+    assert queued == [("600519", pytest.approx(800_000 * 0.60 * 0.55 * 0.25))]
+    assert context.sr_order_channels == {
+        "protect-600519": CandidateChannel.FALLBACK.value
+    }
 
 
-def test_weekly_review_records_recovery_then_exits_before_reduction(monkeypatch):
+@pytest.mark.parametrize(
+    ("risk_state", "risk_multiplier"),
+    [
+        (PortfolioRiskState.CAUTIOUS, 0.75),
+        (PortfolioRiskState.DEFENSIVE, 0.50),
+    ],
+)
+def test_monthly_incomplete_data_still_reduces_existing_exposure(
+    monkeypatch,
+    risk_state,
+    risk_multiplier,
+):
+    params = StrategyParams(
+        robust_enabled=True,
+        neutral_market_exposure=0.60,
+        market_volatility_floor=0.55,
+    )
+    benchmark = _ohlcv_from_close([10.0, 10.1])
+    queued = []
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: benchmark)
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.classify_market",
+        lambda frame, runtime_params: MarketState.NEUTRAL,
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.select_robust_candidates",
+        lambda *args: pytest.fail("incomplete data must not select entry candidates"),
+    )
+
+    def fake_order_target_value(code, value):
+        queued.append((code, value))
+        return SimpleNamespace(order_id=f"reduce-{code}")
+
+    monkeypatch.setattr("eqlib.order_target_value", fake_order_target_value)
+    context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
+    context.portfolio.positions = {
+        "600519": SimpleNamespace(total_value=500_000),
+    }
+    context.sr_code_channels = {"600519": CandidateChannel.PRIMARY.value}
+    context.sr_risk_tracker = PortfolioRiskTracker(
+        risk_state,
+        high_water=1_000_000,
+        trough=900_000,
+    )
+
+    callbacks["monthly"][0](context)
+
+    expected_budget = 0.60 * 0.55 * risk_multiplier
+    assert context.sr_risk_tracker.state is risk_state
+    assert queued == [("600519", pytest.approx(1_000_000 * expected_budget))]
+    assert context.sr_order_channels == {
+        "reduce-600519": CandidateChannel.PRIMARY.value
+    }
+
+
+def test_weekly_review_records_recovery_with_real_risk_operations(monkeypatch):
     params = StrategyParams(
         robust_enabled=True,
         level_window=4,
@@ -1148,15 +1343,6 @@ def test_weekly_review_records_recovery_then_exits_before_reduction(monkeypatch)
     monkeypatch.setattr(
         "eqlib.strategies.ashare_sr_leader.classify_market",
         lambda frame, runtime_params: MarketState.NEUTRAL,
-    )
-    call_order = []
-    monkeypatch.setattr(
-        "eqlib.strategies.ashare_sr_leader._risk_review",
-        lambda *args: call_order.append("exits"),
-    )
-    monkeypatch.setattr(
-        "eqlib.strategies.ashare_sr_leader.reduce_portfolio_to_budget",
-        lambda *args: call_order.append("reduce"),
     )
     context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
     context.portfolio.total_value = 950_000
@@ -1177,7 +1363,61 @@ def test_weekly_review_records_recovery_then_exits_before_reduction(monkeypatch)
             "drawdown": 0.05,
         }
     ]
-    assert call_order == ["exits", "reduce"]
+
+
+def test_same_day_weekly_reduction_cannot_supersede_monthly_exit(monkeypatch):
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=3,
+        short_level_window=3,
+        rs_window=3,
+        atr_period=2,
+        market_volatility_window=3,
+        max_position_drawdown=0.0,
+    )
+    completed_frame = _ohlcv_from_close(
+        [10.0, 11.0, 12.0, 12.0, 11.0, 8.0]
+    )
+    queued = []
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: completed_frame)
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.classify_market",
+        lambda frame, runtime_params: MarketState.NEUTRAL,
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.market_volatility_factor",
+        lambda frame, runtime_params: 0.55,
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.select_robust_candidates",
+        lambda *args: [],
+    )
+
+    def fake_order_target(code, amount):
+        queued.append(("target", code, amount))
+        return SimpleNamespace(order_id=f"exit-{code}")
+
+    def fake_order_target_value(code, value):
+        queued.append(("value", code, value))
+        return SimpleNamespace(order_id=f"value-{code}")
+
+    monkeypatch.setattr("eqlib.order_target", fake_order_target)
+    monkeypatch.setattr("eqlib.order_target_value", fake_order_target_value)
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
+    context.portfolio.positions = {
+        "600519": SimpleNamespace(total_value=900_000),
+    }
+    context.sr_code_channels = {"600519": CandidateChannel.PRIMARY.value}
+
+    callbacks["monthly"][0](context)
+    callbacks["weekly"][0](context)
+
+    assert queued == [("target", "600519", 0)]
+    assert context._sr_pending_exit_codes == {"600519"}
+    assert context.sr_order_channels == {
+        "exit-600519": CandidateChannel.PRIMARY.value
+    }
 
 
 def test_default_off_initialize_preserves_legacy_callbacks(monkeypatch):
