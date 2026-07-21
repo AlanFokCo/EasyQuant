@@ -133,10 +133,11 @@ def _make_ohlcv(symbol, n_days=30, start_date="2024-01-02"):
     return df
 
 
-def _make_result_for_chart(symbols, ohlcv_data=None, trade_log=None):
+def _make_result_for_chart(symbols, ohlcv_data=None, trade_log=None,
+                           start=None, end=None):
     """Build a minimal backtest result dict for _compute_chart_data."""
-    start = datetime.date(2024, 1, 2)
-    end = datetime.date(2024, 2, 15)
+    start = start or datetime.date(2024, 1, 2)
+    end = end or datetime.date(2024, 2, 15)
     dates = pd.bdate_range(start, end, freq="B")
 
     entries = [
@@ -250,6 +251,36 @@ class TestMultiStockKline:
         assert chart["candlestick_data"] == primary["candlestick_data"]
         assert chart["markers"] == primary["markers"]
 
+    def test_primary_symbol_prefers_broadest_chart_history(self, monkeypatch):
+        """Default K-line symbol should not open on a truncated series."""
+        import eqlib.report as report_mod
+        from eqlib.report import _compute_chart_data
+
+        monkeypatch.setattr(report_mod, "fetch_stock_data",
+                            lambda *args, **kwargs: pd.DataFrame())
+        full_history = _make_ohlcv("002594", n_days=260,
+                                   start_date="2020-01-02")
+        short_history = _make_ohlcv("000858", n_days=40,
+                                    start_date="2024-01-02")
+        trade_log = [
+            {"date": datetime.date(2024, 1, 5), "security": "000858",
+             "type": "BUY", "amount": 100, "price": 10.0, "commission": 5.0},
+            {"date": datetime.date(2024, 1, 8), "security": "002594",
+             "type": "BUY", "amount": 200, "price": 15.0, "commission": 5.0},
+        ]
+        result = _make_result_for_chart(
+            ["000858", "002594"],
+            ohlcv_data={"000858": short_history, "002594": full_history},
+            trade_log=trade_log,
+            start=datetime.date(2020, 1, 1),
+            end=datetime.date(2024, 3, 1),
+        )
+
+        chart = _compute_chart_data(result)
+
+        assert chart["symbol"] == "002594"
+        assert chart["candlestick_data"][0]["time"] == "2020-01-02"
+
     def test_compute_symbol_kline_returns_tech_stats(self):
         """_compute_symbol_kline includes tech_stats dict."""
         from eqlib.report import _compute_symbol_kline
@@ -260,6 +291,50 @@ class TestMultiStockKline:
                                      {"601390": ohlcv}, [])
         assert "tech_stats" in data
         assert isinstance(data["tech_stats"], dict)
+
+    def test_compute_symbol_kline_drops_nan_ohlc_rows(self, monkeypatch):
+        """NaN OHLC rows from union-index panels must not reach HTML JSON."""
+        import eqlib.report as report_mod
+        from eqlib.report import _compute_symbol_kline
+
+        monkeypatch.setattr(report_mod, "fetch_stock_data",
+                            lambda *args, **kwargs: pd.DataFrame())
+        dates = pd.to_datetime(["2020-01-02", "2020-01-03", "2024-01-02"])
+        ohlcv = pd.DataFrame({
+            "open": [float("nan"), float("nan"), 10.0],
+            "high": [float("nan"), float("nan"), 10.5],
+            "low": [float("nan"), float("nan"), 9.8],
+            "close": [float("nan"), float("nan"), 10.2],
+            "volume": [float("nan"), float("nan"), 1000.0],
+        }, index=dates)
+
+        data = _compute_symbol_kline(
+            "000858", datetime.date(2020, 1, 1), datetime.date(2024, 1, 31),
+            {"000858": ohlcv}, [],
+        )
+
+        assert data["candlestick_data"] == [
+            {"time": "2024-01-02", "open": 10.0, "high": 10.5,
+             "low": 9.8, "close": 10.2}
+        ]
+
+    def test_compute_symbol_kline_uses_fetch_when_it_improves_coverage(self, monkeypatch):
+        """A short preloaded slice should be replaced by fuller fetched data."""
+        import eqlib.report as report_mod
+        from eqlib.report import _compute_symbol_kline
+
+        preloaded = _make_ohlcv("002594", n_days=5, start_date="2024-01-02")
+        fetched = _make_ohlcv("002594", n_days=260, start_date="2020-01-02")
+        monkeypatch.setattr(report_mod, "fetch_stock_data",
+                            lambda *args, **kwargs: fetched)
+
+        data = _compute_symbol_kline(
+            "002594", datetime.date(2020, 1, 1), datetime.date(2024, 1, 31),
+            {"002594": preloaded}, [],
+        )
+
+        assert data["candlestick_data"][0]["time"] == "2020-01-02"
+        assert len(data["candlestick_data"]) > len(preloaded)
 
     def test_empty_ohlcv_does_not_crash(self):
         """Missing OHLCV data for a symbol doesn't crash."""

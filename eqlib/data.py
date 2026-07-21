@@ -382,6 +382,14 @@ def _fetch_from_sina(symbol: str, start_date: str, end_date: str, adjust: str) -
     return df
 
 
+def _compact_date_to_iso(date_value: str) -> str:
+    """Convert YYYYMMDD to YYYY-MM-DD for providers that require ISO dates."""
+    value = str(date_value)
+    if len(value) == 8 and value.isdigit():
+        return f"{value[:4]}-{value[4:6]}-{value[6:8]}"
+    return value
+
+
 def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
     """Source 4: BaoStock (optional dependency, pip install baostock).
 
@@ -396,13 +404,15 @@ def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: st
     prefix = "sh." if symbol.startswith(("6", "9")) else "sz."
     full_symbol = f"{prefix}{symbol}"
     adjust_flag = {"qfq": "2", "hfq": "1", "": "3"}.get(adjust, "3")
+    start_fmt = _compact_date_to_iso(start_date)
+    end_fmt = _compact_date_to_iso(end_date)
 
     try:
         bs.login()
         rs = bs.query_history_k_data_plus(
             full_symbol,
             "date,open,high,low,close,volume,amount,turn,pctChg",
-            start_date=start_date, end_date=end_date,
+            start_date=start_fmt, end_date=end_fmt,
             frequency="daily", adjustflag=adjust_flag,
         )
         if rs.error_code != "0":
@@ -475,6 +485,22 @@ def _validate_ohlcv(df, source_name):
         log.debug("validate_ohlcv: %s has high < low", source_name)
         return False
     return True
+
+
+def _covers_requested_start(df: pd.DataFrame, start_date: str, tolerance_days: int = 14) -> bool:
+    """Return True when fetched data starts near the requested start date.
+
+    Some providers silently truncate long ranges.  In that case the fallback
+    chain should continue instead of treating a recent slice as full history.
+    """
+    if df.empty:
+        return False
+    try:
+        first_date = pd.Timestamp(df.index.min()).normalize()
+        requested_start = pd.Timestamp(start_date).normalize()
+    except Exception:
+        return True
+    return first_date <= requested_start + pd.Timedelta(days=tolerance_days)
 
 
 def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
@@ -562,7 +588,10 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
 
         return pd.DataFrame()
 
-    # ETF/Stock: try each source in priority order
+    # ETF/Stock: try each source in priority order.  Keep a valid-but-short
+    # candidate so newly listed securities can still return data if no later
+    # provider has fuller coverage.
+    fallback_df = pd.DataFrame()
     for source_name, fetcher in _DATA_FETCHERS:
         try:
             if source_name == "baostock":
@@ -599,6 +628,11 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
                 if not _validate_ohlcv(df, source_name):
                     continue
 
+                if not _covers_requested_start(df, start_str):
+                    if fallback_df.empty or len(df) > len(fallback_df):
+                        fallback_df = df
+                    continue
+
                 with _cache_lock:
                     _cache[cache_key] = df
                     _cache.move_to_end(cache_key)
@@ -608,6 +642,14 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
         except Exception as e:
             log.debug("fetch_stock_data: %s source %s failed: %s", symbol, source_name, e)
             continue
+
+    if not fallback_df.empty:
+        with _cache_lock:
+            _cache[cache_key] = fallback_df
+            _cache.move_to_end(cache_key)
+            while len(_cache) > _MAX_CACHE_ENTRIES:
+                _cache.popitem(last=False)
+        return fallback_df
 
     # MED-32: bare 000xxx codes may actually be Shanghai indices.
     # If stock lookup fails, auto-retry as index with .XSHG suffix.
@@ -741,6 +783,8 @@ def attribute_history(security, count: int, unit: str = "1d",
                     {f: sec_data[f] for f in available}
                 )
             return result.tail(count)
+        if preloaded.panel is None:
+            return pd.DataFrame()
 
     # Fallback: slice from preloaded panel (legacy path)
     if preloaded is not None and preloaded.panel is not None:
@@ -761,6 +805,7 @@ def attribute_history(security, count: int, unit: str = "1d",
                 sec_df = sec_df[sec_df.index < cutoff]
             result = sec_df[available].tail(count)
             return result
+        return pd.DataFrame()
 
     # Fallback: fetch from disk/network
     end_date = _context.current_dt

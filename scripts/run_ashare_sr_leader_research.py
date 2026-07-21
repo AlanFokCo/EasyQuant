@@ -14,7 +14,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from eqlib import analyze_returns, generate_html_report, run_backtest
+from eqlib import analyze_returns, generate_html_report, grade_strategy, run_backtest
 from eqlib.strategies.ashare_sr_leader import (
     StrategyKind,
     StrategyParams,
@@ -23,15 +23,16 @@ from eqlib.strategies.ashare_sr_leader import (
 )
 
 START_DATE = "2020-01-01"
-END_DATE = "2026-07-08"
+END_DATE = "2025-12-31"
 BENCHMARK = "000300.XSHG"
+STARTING_CASH = 1_000_000
 REPORT_DIR = Path("reports/ashare_sr_leader")
-EQLIB_HTML_REPORT = REPORT_DIR / "eqlib_best_backtest.html"
+EQLIB_HTML_REPORT = REPORT_DIR / "eqlib_best_backtest_2020_2025.html"
 SUB_PERIODS = (
     ("2020-2021", "2020-01-01", "2021-12-31"),
     ("2022", "2022-01-01", "2022-12-31"),
     ("2023-2024", "2023-01-01", "2024-12-31"),
-    ("2025-2026", "2025-01-01", "2026-07-08"),
+    ("2025", "2025-01-01", "2025-12-31"),
 )
 
 RESEARCH_UNIVERSE = [
@@ -86,6 +87,7 @@ def candidate_param_grid(quick: bool = False):
             (StrategyKind.DEFENSIVE_SUPPORT, StrategyParams(level_window=60, top_n=8)),
             (StrategyKind.RESISTANCE_BREAKOUT, StrategyParams(level_window=60, top_n=8)),
             (StrategyKind.PULLBACK_MARKET_GATE, StrategyParams(level_window=60, top_n=8)),
+            (StrategyKind.ADAPTIVE_COMPOSITE, StrategyParams(level_window=60, top_n=8)),
         ]
 
     grid = []
@@ -121,6 +123,115 @@ def candidate_param_grid(quick: bool = False):
                 ),
             )
         )
+        if kind in {StrategyKind.DEFENSIVE_SUPPORT, StrategyKind.PULLBACK_MARKET_GATE}:
+            grid.append(
+                (
+                    kind,
+                    StrategyParams(
+                        level_window=120,
+                        short_level_window=60,
+                        atr_multiplier=0.6,
+                        volume_ratio_min=1.0,
+                        top_n=10,
+                        max_stock_weight=0.08,
+                        max_industry_weight=0.24,
+                        strong_market_exposure=0.82,
+                        neutral_market_exposure=0.50,
+                        weak_market_exposure=0.15,
+                        min_relative_strength=0.0,
+                        max_support_distance=0.08,
+                        rebalance_threshold=0.10,
+                        liquidity_volume_pct=0.03,
+                    ),
+                )
+            )
+        if kind is StrategyKind.PULLBACK_MARKET_GATE:
+            grid.append(
+                (
+                    kind,
+                    StrategyParams(
+                        level_window=120,
+                        short_level_window=60,
+                        atr_multiplier=0.6,
+                        volume_ratio_min=1.0,
+                        top_n=10,
+                        max_stock_weight=0.08,
+                        max_industry_weight=0.24,
+                        strong_market_exposure=0.84,
+                        neutral_market_exposure=0.54,
+                        weak_market_exposure=0.18,
+                        min_relative_strength=-0.005,
+                        max_support_distance=0.10,
+                        rebalance_threshold=0.07,
+                        liquidity_volume_pct=0.035,
+                    ),
+                )
+            )
+            grid.append(
+                (
+                    kind,
+                    StrategyParams(
+                        level_window=120,
+                        short_level_window=60,
+                        atr_multiplier=0.65,
+                        volume_ratio_min=1.05,
+                        top_n=10,
+                        max_stock_weight=0.07,
+                        max_industry_weight=0.21,
+                        strong_market_exposure=0.76,
+                        neutral_market_exposure=0.44,
+                        weak_market_exposure=0.10,
+                        min_relative_strength=0.01,
+                        max_support_distance=0.06,
+                        max_position_drawdown=0.12,
+                        rebalance_threshold=0.08,
+                        liquidity_volume_pct=0.03,
+                    ),
+                )
+            )
+        if kind is StrategyKind.ADAPTIVE_COMPOSITE:
+            grid.extend(
+                [
+                    (
+                        kind,
+                        StrategyParams(
+                            level_window=120,
+                            short_level_window=60,
+                            atr_multiplier=0.55,
+                            volume_ratio_min=1.0,
+                            top_n=12,
+                            max_stock_weight=0.09,
+                            max_industry_weight=0.24,
+                            strong_market_exposure=0.90,
+                            neutral_market_exposure=0.62,
+                            weak_market_exposure=0.22,
+                            min_relative_strength=-0.01,
+                            max_support_distance=0.10,
+                            rebalance_threshold=0.06,
+                            liquidity_volume_pct=0.035,
+                        ),
+                    ),
+                    (
+                        kind,
+                        StrategyParams(
+                            level_window=100,
+                            short_level_window=50,
+                            atr_multiplier=0.45,
+                            volume_ratio_min=0.9,
+                            top_n=10,
+                            max_stock_weight=0.10,
+                            max_industry_weight=0.25,
+                            strong_market_exposure=0.95,
+                            neutral_market_exposure=0.68,
+                            weak_market_exposure=0.25,
+                            min_relative_strength=-0.015,
+                            max_support_distance=0.11,
+                            rebalance_threshold=0.05,
+                            liquidity_volume_pct=0.04,
+                        ),
+                    ),
+                ]
+            )
     return grid
 
 
@@ -163,6 +274,7 @@ def stability_score(metrics: dict) -> float:
     max_drawdown = abs(float(metrics.get("max_drawdown", 0.0)))
     trade_count = int(metrics.get("trade_count", 0))
     excess_return = float(metrics.get("excess_return", 0.0))
+    undertrade_penalty = max(0, 20 - trade_count) / 20 * 0.75
     churn_penalty = max(0, trade_count - 120) / 120 * 0.15
     drawdown_penalty = max(0.0, max_drawdown - 0.20) * 3.0
     return (
@@ -170,14 +282,39 @@ def stability_score(metrics: dict) -> float:
         + sharpe * 0.25
         + excess_return
         - drawdown_penalty
+        - undertrade_penalty
         - churn_penalty
     )
+
+
+def _float_metric(row: dict, key: str, default: float = -999.0) -> float:
+    try:
+        return float(row.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _candidate_rank_key(row: dict) -> tuple[bool, float, float]:
+    """Rank full-period rows by report grade first, then stability."""
+
+    return (
+        row.get("period_name") == "full",
+        _float_metric(row, "grade_score"),
+        _float_metric(row, "stability_score"),
+    )
+
+
+def _best_full_candidate(full_candidates: list[tuple[dict, StrategyKind, StrategyParams]]):
+    """Return the preferred full-period candidate tuple."""
+
+    return max(full_candidates, key=lambda item: _candidate_rank_key(item[0]))
 
 
 def summarize_result(result: dict) -> dict:
     """Return metrics used for comparison."""
 
     metrics = analyze_returns(result, risk_free_rate=0.03) or {}
+    grade_info = grade_strategy(metrics) if metrics else grade_strategy(None)
     total_return = float(metrics.get("total_return", 0.0))
     benchmark_return = _benchmark_total_return(result)
     summary = {
@@ -194,6 +331,9 @@ def summarize_result(result: dict) -> dict:
         "profit_loss_ratio": float(metrics.get("profit_loss_ratio", 0.0)),
         "trade_count": int(metrics.get("trade_count", len(result.get("trade_log", [])))),
         "raw_trade_count": len(result.get("trade_log", [])),
+        "grade": grade_info.get("overall"),
+        "grade_score": float(grade_info.get("score", 0.0)),
+        "grade_weakest": grade_info.get("weakest"),
     }
     summary["stability_score"] = stability_score(summary)
     return summary
@@ -214,9 +354,7 @@ def _best_by_period(rows: list[dict]) -> dict[str, dict]:
     best: dict[str, dict] = {}
     for row in rows:
         period = row.get("period_name", "unknown")
-        if period not in best or row.get("stability_score", -999) > best[period].get(
-            "stability_score", -999
-        ):
+        if period not in best or _candidate_rank_key(row) > _candidate_rank_key(best[period]):
             best[period] = row
     return best
 
@@ -248,7 +386,7 @@ def audit_rows(rows: list[dict]) -> list[dict[str, str]]:
 
     ranked_full = sorted(
         full_rows,
-        key=lambda row: row.get("stability_score", -999),
+        key=_candidate_rank_key,
         reverse=True,
     )
     if ranked_full and abs(float(ranked_full[0].get("max_drawdown", 0.0))) > 0.30:
@@ -318,17 +456,23 @@ def period_interpretation(rows: list[dict]) -> str:
 
     best = _best_by_period(rows)
     full = best.get("full") or (
-        sorted(rows, key=lambda row: row.get("stability_score", -999), reverse=True)[0]
+        sorted(rows, key=_candidate_rank_key, reverse=True)[0]
         if rows
         else {}
+    )
+    period_names = [period_name for period_name, _start, _end in SUB_PERIODS]
+    period_names.extend(
+        row.get("period_name", "")
+        for row in rows
+        if row.get("period_name") not in {"full", *period_names}
     )
     lines = [
         "## 长期回测压力诊断",
         "",
-        "以下分阶段结果只用于解释 2020-2026 长期策略在哪些市场环境中失效或承压，不作为收益参考，也不参与最终策略排名。",
+        f"以下分阶段结果只用于解释 {START_DATE} 至 {END_DATE} 策略在哪些市场环境中失效或承压，不作为收益参考，也不参与最终策略排名。",
         "",
     ]
-    for period in ("2020-2021", "2022", "2023-2024", "2025-2026"):
+    for period in period_names:
         row = best.get(period)
         if not row:
             continue
@@ -422,6 +566,23 @@ def _metric_card(label: str, value: str, tone: str = "") -> str:
 
 def _profile_name(row: dict) -> str:
     params = row.get("params", {}) or {}
+    if (
+        float(params.get("max_position_drawdown", 0.0)) > 0.0
+        and float(params.get("max_position_drawdown", 1.0)) <= 0.12
+        and float(params.get("weak_market_exposure", 0.35)) <= 0.10
+    ):
+        return "drawdown-controlled"
+    if (
+        float(params.get("min_relative_strength", -0.03)) >= 0.0
+        and float(params.get("max_support_distance", 0.12)) <= 0.08
+    ):
+        return "risk-managed"
+    if (
+        float(params.get("strong_market_exposure", 0.90)) <= 0.85
+        and float(params.get("neutral_market_exposure", 0.65)) <= 0.55
+        and float(params.get("rebalance_threshold", 0.08)) <= 0.07
+    ):
+        return "active-balanced"
     if float(params.get("strong_market_exposure", 0.90)) <= 0.70:
         return "guarded"
     return "balanced"
@@ -432,7 +593,7 @@ def render_html_report(rows: list[dict]) -> str:
 
     sorted_rows = sorted(
         rows,
-        key=lambda row: row.get("stability_score", -999),
+        key=_candidate_rank_key,
         reverse=True,
     )
     full_rows = [row for row in sorted_rows if row.get("period_name") == "full"]
@@ -446,6 +607,7 @@ def render_html_report(rows: list[dict]) -> str:
     cards = "\n".join(
         [
             _metric_card("最优策略", best.get("kind", "N/A")),
+            _metric_card("评级", f"{best.get('grade', 'N/A')} / {_fmt_num(best.get('grade_score', 0), 1)}"),
             _metric_card("稳定性评分", _fmt_num(best.get("stability_score", 0), 4)),
             _metric_card("年化收益", _fmt_pct(float(best.get("annual_return", 0.0))), "good"),
             _metric_card("基准收益", _fmt_pct(float(best.get("benchmark_return", 0.0))), "blue"),
@@ -465,6 +627,7 @@ def render_html_report(rows: list[dict]) -> str:
             f"<td>{_html_escape(_profile_name(row))}</td>"
             f"<td>{_html_escape(row.get('period_name', 'N/A'))}</td>"
             f"<td>{_html_escape(row.get('start', ''))} 至 {_html_escape(row.get('end', ''))}</td>"
+            f"<td>{_html_escape(row.get('grade', 'N/A'))} / {_fmt_num(row.get('grade_score', 0), 1)}</td>"
             f"<td>{_fmt_pct(float(row.get('annual_return', 0.0)))}</td>"
             f"<td>{_fmt_pct(float(row.get('total_return', 0.0)))}</td>"
             f"<td>{_fmt_pct(float(row.get('benchmark_return', 0.0)))}</td>"
@@ -478,7 +641,7 @@ def render_html_report(rows: list[dict]) -> str:
 
     best_by_period = _best_by_period(sorted_rows)
     period_rows = []
-    for period in ("2020-2021", "2022", "2023-2024", "2025-2026"):
+    for period in [period_name for period_name, _start, _end in SUB_PERIODS]:
         row = best_by_period.get(period)
         if not row:
             continue
@@ -653,7 +816,7 @@ def render_html_report(rows: list[dict]) -> str:
       <thead>
         <tr>
           <th>Rank</th><th>Strategy</th><th>Profile</th><th>Period</th><th>Range</th>
-          <th>Annual</th><th>Total</th><th>Benchmark</th><th>Excess</th>
+          <th>Grade</th><th>Annual</th><th>Total</th><th>Benchmark</th><th>Excess</th>
           <th>Max DD</th><th>Sharpe</th><th>Trades</th><th>Raw Trades</th>
         </tr>
       </thead>
@@ -679,7 +842,7 @@ def render_html_report(rows: list[dict]) -> str:
     <h2>最终推荐</h2>
     <section class="section">
       <p>最终推荐策略：<strong>{_html_escape(best.get('kind', 'N/A'))}</strong></p>
-      <p>推荐依据：稳定性评分 {_fmt_num(best.get('stability_score', 0), 4)}，年化收益 {_fmt_pct(float(best.get('annual_return', 0.0)))}，最大回撤 {_fmt_pct(float(best.get('max_drawdown', 0.0)))}，交易次数 {_html_escape(best.get('trade_count', 0))}。策略选择依据为稳定性评分、回撤、Sharpe、收益和交易次数的综合表现，而不是单次最高收益。</p>
+      <p>推荐依据：评级 {_html_escape(best.get('grade', 'N/A'))} / {_fmt_num(best.get('grade_score', 0), 1)}，稳定性评分 {_fmt_num(best.get('stability_score', 0), 4)}，年化收益 {_fmt_pct(float(best.get('annual_return', 0.0)))}，最大回撤 {_fmt_pct(float(best.get('max_drawdown', 0.0)))}，交易次数 {_html_escape(best.get('trade_count', 0))}。策略选择依据为评级分数优先、稳定性评分兜底，并综合回撤、Sharpe、收益和交易次数，而不是单次最高收益。</p>
       <p><strong>审计结论：</strong>{_html_escape(recommendation)}</p>
     </section>
 
@@ -747,7 +910,7 @@ def run_one_result(
         initialize_func=initialize,
         start_date=start,
         end_date=end,
-        starting_cash=1_000_000,
+        starting_cash=STARTING_CASH,
         benchmark=BENCHMARK,
         securities=universe + [BENCHMARK],
         use_local=False,
@@ -761,7 +924,7 @@ def write_outputs(rows: list[dict]) -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     sorted_rows = sorted(
         rows,
-        key=lambda row: row.get("stability_score", -999),
+        key=_candidate_rank_key,
         reverse=True,
     )
     (REPORT_DIR / "summary.json").write_text(
@@ -783,6 +946,9 @@ def write_outputs(rows: list[dict]) -> None:
         "calmar_ratio",
         "trade_count",
         "raw_trade_count",
+        "grade",
+        "grade_score",
+        "grade_weakest",
         "stability_score",
         "params",
     ]
@@ -798,6 +964,7 @@ def write_outputs(rows: list[dict]) -> None:
         "# A股行业龙头支撑压力策略研究报告",
         "",
         f"- 最优策略: `{best.get('kind', 'N/A')}`",
+        f"- 评级: `{best.get('grade', 'N/A')} / {best.get('grade_score', 0):.1f}`",
         f"- 稳定性评分: `{best.get('stability_score', 0):.4f}`",
         f"- 年化收益: `{best.get('annual_return', 0):.2%}`",
         f"- 基准收益: `{best.get('benchmark_return', 0):.2%}`",
@@ -808,13 +975,14 @@ def write_outputs(rows: list[dict]) -> None:
         "",
         "## 全周期候选排名",
         "",
-        "| Rank | Strategy | Profile | Period | Annual | Benchmark | Excess | Max DD | Sharpe | Trades | Raw Trades |",
-        "|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Rank | Strategy | Profile | Period | Grade | Annual | Benchmark | Excess | Max DD | Sharpe | Trades | Raw Trades |",
+        "|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     display_rows = full_rows if full_rows else sorted_rows
     for idx, row in enumerate(display_rows[:10], start=1):
         lines.append(
             f"| {idx} | {row.get('kind')} | {_profile_name(row)} | {row.get('start')} to {row.get('end')} | "
+            f"{row.get('grade', 'N/A')} / {float(row.get('grade_score', 0)):.1f} | "
             f"{row.get('annual_return', 0):.2%} | {row.get('benchmark_return', 0):.2%} | "
             f"{row.get('excess_return', 0):.2%} | {row.get('max_drawdown', 0):.2%} | "
             f"{row.get('sharpe_ratio', 0):.2f} | "
@@ -888,10 +1056,7 @@ def main() -> int:
             f"score={row.get('stability_score', 0):.4f}"
         )
 
-    best_row, best_kind, best_params = max(
-        full_candidates,
-        key=lambda item: item[0].get("stability_score", -999),
-    )
+    best_row, best_kind, best_params = _best_full_candidate(full_candidates)
     print(f"selected {best_kind.value} params={asdict(best_params)}")
     best_result = next(
         result

@@ -64,6 +64,63 @@ def _compute_pivot_points(df, window=20):
     return r1, s1, r2, s2
 
 
+_CHART_OHLC_COLUMNS = ("open", "high", "low", "close")
+
+
+def _clean_chart_ohlcv(df: pd.DataFrame, start, end) -> pd.DataFrame:
+    """Return sorted OHLCV rows that are safe to serialize into chart JSON."""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if not set(_CHART_OHLC_COLUMNS).issubset(df.columns):
+        return pd.DataFrame()
+
+    df_sorted = df.sort_index().copy()
+    start_ts, end_ts = pd.Timestamp(start), pd.Timestamp(end)
+    try:
+        ranged = df_sorted.loc[start_ts:end_ts]
+        if not ranged.empty:
+            df_sorted = ranged
+    except Exception:
+        pass
+
+    numeric_cols = list(_CHART_OHLC_COLUMNS)
+    if "volume" in df_sorted.columns:
+        numeric_cols.append("volume")
+    for col in numeric_cols:
+        df_sorted[col] = pd.to_numeric(df_sorted[col], errors="coerce")
+
+    df_sorted = df_sorted.dropna(subset=list(_CHART_OHLC_COLUMNS))
+    if df_sorted.empty:
+        return pd.DataFrame()
+
+    finite_mask = np.isfinite(df_sorted[list(_CHART_OHLC_COLUMNS)]).all(axis=1)
+    positive_mask = (df_sorted[list(_CHART_OHLC_COLUMNS)] > 0).all(axis=1)
+    df_sorted = df_sorted[finite_mask & positive_mask]
+    if df_sorted.empty:
+        return pd.DataFrame()
+
+    if "volume" not in df_sorted.columns:
+        df_sorted["volume"] = 0.0
+    else:
+        df_sorted["volume"] = df_sorted["volume"].fillna(0.0)
+    return df_sorted
+
+
+def _better_chart_coverage(candidate: pd.DataFrame, current: pd.DataFrame) -> bool:
+    """Whether candidate provides better chart coverage than current."""
+    if candidate.empty:
+        return False
+    if current.empty:
+        return True
+    candidate_start = pd.Timestamp(candidate.index.min())
+    current_start = pd.Timestamp(current.index.min())
+    if candidate_start < current_start:
+        return True
+    if candidate_start == current_start and len(candidate) > len(current):
+        return True
+    return len(candidate) > len(current) * 1.25
+
+
 def _build_return_series(recorded, initial):
     """Build cumulative return (%) series from recorded values."""
     returns = []
@@ -516,19 +573,22 @@ def _compute_symbol_kline(symbol, start, end, ohlcv_data, trade_log):
     candlestick_data, ma5_data, ma20_data, ma60_data = [], [], [], []
     volume_data, support_data, resistance_data = [], [], []
 
-    df = ohlcv_data.get(symbol, pd.DataFrame())
-    if df.empty:
+    source_df = ohlcv_data.get(symbol, pd.DataFrame())
+    df_sorted = _clean_chart_ohlcv(source_df, start, end)
+    needs_fetch = df_sorted.empty
+    if not df_sorted.empty:
+        start_ts = pd.Timestamp(start)
+        needs_fetch = pd.Timestamp(df_sorted.index.min()) > start_ts + pd.Timedelta(days=30)
+
+    if needs_fetch:
         try:
-            from eqlib.data import fetch_stock_data
-            df = fetch_stock_data(symbol, start, end)
+            fetched = _clean_chart_ohlcv(fetch_stock_data(symbol, start, end), start, end)
+            if _better_chart_coverage(fetched, df_sorted):
+                df_sorted = fetched
         except Exception:
             pass
 
-    if not df.empty:
-        start_ts, end_ts = pd.Timestamp(start), pd.Timestamp(end)
-        df_sorted = df.sort_index().loc[start_ts:end_ts]
-        if df_sorted.empty:
-            df_sorted = df.sort_index()
+    if not df_sorted.empty:
         closes, highs, lows = df_sorted["close"], df_sorted["high"], df_sorted["low"]
         ma5, ma20, ma60 = closes.rolling(5).mean(), closes.rolling(20).mean(), closes.rolling(60).mean()
         support, resistance = _compute_support_resistance(closes, highs, lows, window=20)
@@ -544,14 +604,12 @@ def _compute_symbol_kline(symbol, start, end, ohlcv_data, trade_log):
             if not pd.isna(m60): ma60_data.append({"time": d, "value": round(float(m60), 3)})
             if not pd.isna(sup): support_data.append({"time": d, "value": round(float(sup), 3)})
             if not pd.isna(res): resistance_data.append({"time": d, "value": round(float(res), 3)})
-    else:
-        df_sorted = pd.DataFrame()
 
     # RSI(14), MACD(12,26,9), Bollinger Bands(20,2)
     rsi_data, macd_data, macd_signal_data, macd_hist_data = [], [], [], []
     bb_upper_data, bb_middle_data, bb_lower_data = [], [], []
 
-    if not df.empty and not df_sorted.empty and len(df_sorted) >= 26:
+    if not df_sorted.empty and len(df_sorted) >= 26:
         closes = df_sorted["close"]
         delta = closes.diff()
         gain, loss = delta.clip(lower=0), (-delta.clip(upper=0))
@@ -599,8 +657,8 @@ def _compute_symbol_kline(symbol, start, end, ohlcv_data, trade_log):
 
     # Technical summary stats
     tech_stats = {}
-    if not df.empty:
-        df_s = df.sort_index()
+    if not df_sorted.empty:
+        df_s = df_sorted.sort_index()
         c = float(df_s["close"].iloc[-1])
         ma5_last = float(df_s["close"].rolling(5).mean().iloc[-1])
         ma20_last = float(df_s["close"].rolling(20).mean().iloc[-1])
@@ -677,7 +735,6 @@ def _compute_chart_data(result):
     if not securities:
         securities.add("601390")
     symbols_list = sorted(securities)
-    symbol = symbols_list[0]
 
     ohlcv_data = result.get("ohlcv_data", {})
 
@@ -686,7 +743,20 @@ def _compute_chart_data(result):
     for sym in symbols_list:
         symbols_data[sym] = _compute_symbol_kline(sym, start, end, ohlcv_data, trade_log)
 
-    # Primary symbol data (first traded stock) for backward compatibility
+    def _primary_symbol_rank(sym):
+        candles = symbols_data[sym].get("candlestick_data", [])
+        if not candles:
+            return (0, pd.Timestamp.max, sym)
+        return (len(candles), pd.Timestamp(candles[0]["time"]), sym)
+
+    # Primary symbol data: prefer the traded stock with the broadest visible
+    # chart history so long backtest reports do not open on a truncated series.
+    symbol = sorted(
+        symbols_list,
+        key=lambda sym: (-_primary_symbol_rank(sym)[0],
+                         _primary_symbol_rank(sym)[1],
+                         _primary_symbol_rank(sym)[2]),
+    )[0]
     primary = symbols_data[symbol]
 
     # Cumulative return, daily P&L, daily return
@@ -749,7 +819,7 @@ def generate_html_report(result, out_path):
     """Generate interactive HTML report with TradingView lightweight-charts.
 
     Features: K-line with volume, support/resistance, pivot levels,
-    strategy vs 沪深300 vs 上证指数 (cumulative return %),
+    strategy vs configured benchmark (cumulative return %),
     drawdown, daily P&L, daily return, trade calendar.
     """
     ctx = result["context"]
@@ -791,6 +861,7 @@ def generate_html_report(result, out_path):
 
     # Benchmark data for metrics calculation
     bench_data = _fetch_benchmark_returns(benchmark, start, end, recorded)
+    dd_benchmark = _build_drawdown_from_cumulative_pct(bench_data)
 
     # ============================================================
     # Performance metrics
@@ -892,6 +963,7 @@ def generate_html_report(result, out_path):
     bench_label = {"000300": "沪深300", "000001": "上证指数"}.get(bench_code, bench_code)
     # E2: Escape benchmark name for safe HTML and JavaScript embedding
     bench_label = html.escape(bench_label)
+    bench_code_label = html.escape(bench_code)
     pnl_badge_class = "pos" if pnl >= 0 else "neg"
 
     # Grade data for new template (reuse cached analytics from _calc_metrics)
@@ -952,8 +1024,10 @@ def generate_html_report(result, out_path):
         cum_return_json=json.dumps(cum_return_data),
         ret_hs300_json=json.dumps(ret_hs300),
         ret_sse_json=json.dumps(ret_sse),
+        ret_benchmark_json=json.dumps(bench_data),
         dd_hs300_json=json.dumps(dd_hs300),
         dd_sse_json=json.dumps(dd_sse),
+        dd_benchmark_json=json.dumps(dd_benchmark),
         drawdown_json=json.dumps(drawdown_data),
         pnl_bar_json=json.dumps(pnl_bar_data),
         daily_returns_json=json.dumps(daily_returns_data),
@@ -968,6 +1042,7 @@ def generate_html_report(result, out_path):
         ann_ret_pct=metrics["ann_ret_pct"],
         win_rate=metrics["win_rate"],
         benchmark_name=bench_label,
+        benchmark_code=bench_code_label,
         benchmark_ret=metrics["benchmark_ret"],
         benchmark_ret_pct=metrics["benchmark_ret_pct"],
         alpha=metrics["alpha"],
@@ -1680,14 +1755,13 @@ details .detail-body {{
     <!-- Cumulative returns -->
     <div id="tb-cumret" class="tab-content active">
       <div class="chart-body">
-        <div class="desc">策略累计收益（%）与<strong>沪深300</strong>、<strong>上证综指</strong>对比；「{benchmark_name} 收益」为 <code>set_benchmark</code> 配置的指数口径。</div>
+        <div class="desc">策略累计收益（%）与<strong>{benchmark_name}</strong>对比；「{benchmark_name} 收益」为 <code>set_benchmark</code> 配置的指数口径。</div>
       </div>
       <div id="returns"></div>
       <div class="legend" style="padding: 8px 16px;">
         <span><span class="ln" style="background:#ef5350"></span>策略</span>
-        <span><span class="ln" style="background:#5b8def"></span>沪深300</span>
-        <span><span class="ln" style="background:#ffa726"></span>上证指数</span>
-        <span><span class="ln" style="background:#ab47bc"></span>超额(相对沪深300)</span>
+        <span><span class="ln" style="background:#ffa726"></span>{benchmark_name}</span>
+        <span><span class="ln" style="background:#ab47bc"></span>超额(相对{benchmark_name})</span>
       </div>
       <div style="padding: 4px 16px 8px;">
         <div class="chart-tabs" id="retTabs" style="display:inline-flex">
@@ -1727,7 +1801,7 @@ details .detail-body {{
       <h2>回撤曲线</h2>
     </div>
     <div class="chart-body">
-      <div class="desc">策略相对历史峰值的回撤（%），与沪深300、上证综指回撤对比。</div>
+      <div class="desc">策略相对历史峰值的回撤（%），与{benchmark_name}回撤对比。</div>
     </div>
     <div id="drawdown"></div>
   </div>
@@ -1913,7 +1987,7 @@ details .detail-body {{
         </div>
         <div class="src-card">
           <div class="src-type">基准指数</div>
-          <div class="src-name">沪深300（000300）&middot; 上证综指（000001）</div>
+          <div class="src-name">{benchmark_name}（{benchmark_code}）</div>
           <div class="src-desc">通过 AKShare <code>stock_zh_index_daily_em</code> 获取，以回测起始日收盘价归一化后与策略区间对齐。</div>
         </div>
         <div class="src-card">
@@ -1935,7 +2009,7 @@ details .detail-body {{
         <li><strong>Sortino 比率</strong>同 Sharpe 但分母仅用下行波动率。</li>
         <li><strong>最大回撤</strong>max[(峰值 &minus; 谷值) / 峰值]。</li>
         <li><strong>Calmar 比率</strong>年化收益率 / |最大回撤|。</li>
-        <li><strong>Alpha / Beta</strong>基于 CAPM，以沪深300为市场基准。</li>
+        <li><strong>Alpha / Beta</strong>基于 CAPM，以{benchmark_name}为市场基准。</li>
         <li><strong>胜率</strong>按 FIFO 配对买卖，盈利对数 / 全部配对数。</li>
       </ul>
     </div>
@@ -2060,7 +2134,7 @@ details .detail-body {{
       formula: '(期末收盘价 / 期初收盘价 − 1) × 100%',
       desc: '基准指数在相同回测区间的累计涨跌幅。',
       interp: '将策略收益率与基准对比。',
-      ref: '沪深300指数',
+      ref: '{benchmark_name}',
       grader(v) {{ return null; }},
     }},
     excess_return: {{
@@ -2550,48 +2624,42 @@ details .detail-body {{
       crosshairMarkerVisible: true, title: '策略',
     }});
     stratLine.setData({cum_return_json});
-    const hs300Line = rChart.addLineSeries({{
-      color: '#5b8def', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
-      crosshairMarkerVisible: true, title: '沪深300',
-    }});
-    hs300Line.setData({ret_hs300_json});
-    const sseLine = rChart.addLineSeries({{
+    const benchmarkLine = rChart.addLineSeries({{
       color: '#ffa726', lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, lastValueVisible: true,
-      crosshairMarkerVisible: true, title: '上证指数',
+      crosshairMarkerVisible: true, title: '{benchmark_name}',
     }});
-    sseLine.setData({ret_sse_json});
+    benchmarkLine.setData({ret_benchmark_json});
 
-    /* Excess return vs HS300 */
+    /* Excess return vs configured benchmark */
     const excessLine = rChart.addLineSeries({{
       color: '#ab47bc', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
       crosshairMarkerVisible: false, title: '超额',
     }});
     var excessReturnData = [];
-    if ({cum_return_json}.length > 0 && {ret_hs300_json}.length > 0) {{
+    if ({cum_return_json}.length > 0 && {ret_benchmark_json}.length > 0) {{
       var cumArr = {cum_return_json};
-      var hsArr = {ret_hs300_json};
-      var hsMap = {{}};
-      hsArr.forEach(function(d) {{ hsMap[d.time] = d.value; }});
+      var bmArr = {ret_benchmark_json};
+      var bmMap = {{}};
+      bmArr.forEach(function(d) {{ bmMap[d.time] = d.value; }});
       cumArr.forEach(function(d) {{
-        if (hsMap.hasOwnProperty(d.time)) {{
-          excessReturnData.push({{ time: d.time, value: +(d.value - hsMap[d.time]).toFixed(3) }});
+        if (bmMap.hasOwnProperty(d.time)) {{
+          excessReturnData.push({{ time: d.time, value: +(d.value - bmMap[d.time]).toFixed(3) }});
         }}
       }});
     }}
     excessLine.setData(excessReturnData);
     rChart.timeScale().fitContent();
 
-    var retVis = {{ strat: true, hs300: true, sse: true, excess: false }};
+    var retVis = {{ strat: true, benchmark: true, excess: false }};
     window.toggleReturnSeries = function(mode, el) {{
       document.querySelectorAll('#retTabs .chart-tab').forEach(function(t) {{ t.classList.remove('active'); }});
       if (el) el.classList.add('active');
-      if (mode === 'all') {{ retVis = {{ strat: true, hs300: true, sse: true, excess: false }}; }}
-      else if (mode === 'excess') {{ retVis = {{ strat: true, hs300: false, sse: false, excess: true }}; }}
-      else if (mode === 'strategy') {{ retVis = {{ strat: true, hs300: false, sse: false, excess: false }}; }}
-      else if (mode === 'benchmark') {{ retVis = {{ strat: false, hs300: true, sse: true, excess: false }}; }}
+      if (mode === 'all') {{ retVis = {{ strat: true, benchmark: true, excess: false }}; }}
+      else if (mode === 'excess') {{ retVis = {{ strat: true, benchmark: false, excess: true }}; }}
+      else if (mode === 'strategy') {{ retVis = {{ strat: true, benchmark: false, excess: false }}; }}
+      else if (mode === 'benchmark') {{ retVis = {{ strat: false, benchmark: true, excess: false }}; }}
       stratLine.applyOptions({{ visible: retVis.strat }});
-      hs300Line.applyOptions({{ visible: retVis.hs300 }});
-      sseLine.applyOptions({{ visible: retVis.sse }});
+      benchmarkLine.applyOptions({{ visible: retVis.benchmark }});
       excessLine.applyOptions({{ visible: retVis.excess }});
     }};
 
@@ -2646,10 +2714,8 @@ details .detail-body {{
     ddSeries.setData({drawdown_json});
     var ddZeroData = {drawdown_json}.length > 0 ? [{{ time: {drawdown_json}[0].time, value: 0 }}, {{ time: {drawdown_json}[{drawdown_json}.length - 1].time, value: 0 }}] : [];
     ddChart.addLineSeries({{ color: '#4a5568', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }}).setData(ddZeroData);
-    const ddHs300 = ddChart.addLineSeries({{ color: '#5b8def', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
-    ddHs300.setData({dd_hs300_json});
-    const ddSse = ddChart.addLineSeries({{ color: '#ffa726', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
-    ddSse.setData({dd_sse_json});
+    const ddBenchmark = ddChart.addLineSeries({{ color: '#ffa726', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }});
+    ddBenchmark.setData({dd_benchmark_json});
     ddChart.timeScale().fitContent();
 
     /* Daily P&L */

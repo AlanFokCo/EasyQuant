@@ -82,6 +82,50 @@ def test_preloaded_data_records_panel_fallback(monkeypatch):
     assert preloaded._use_panel_fallback is True
 
 
+def test_preloaded_data_skips_network_when_cache_starts_after_requested_period(monkeypatch):
+    import eqlib.data as data_mod
+    import eqlib.data_cache as dc
+
+    network_calls = []
+
+    monkeypatch.setattr(
+        dc,
+        "_load_from_disk",
+        lambda sec, start, end, adjust: _sample_frame() if sec == "000300.XSHG" else None,
+    )
+    monkeypatch.setattr(
+        dc,
+        "_cache_starts_after_request_end",
+        lambda sec, end, adjust: sec == "600941",
+        raising=False,
+    )
+
+    def fake_fetch(*args, **kwargs):
+        network_calls.append(args)
+        return _sample_frame()
+
+    monkeypatch.setattr(data_mod, "fetch_stock_data", fake_fetch)
+
+    preloaded = PreloadedData()
+    preloaded.load(
+        ["000300.XSHG", "600941"],
+        "2020-01-01",
+        "2021-12-31",
+        progress=False,
+        use_local=False,
+    )
+
+    assert network_calls == []
+    assert preloaded.load_stats["sources"]["disk_cache"] == 1
+    assert preloaded.load_stats["sources"]["network"] == 0
+    assert preloaded.load_stats["failed"] == [
+        {
+            "security": "600941",
+            "reason": "cached data starts after requested end",
+        }
+    ]
+
+
 def test_report_json_includes_data_diagnostics(tmp_path, monkeypatch):
     import eqlib.attribution as attribution
     import eqlib.data as data_mod
