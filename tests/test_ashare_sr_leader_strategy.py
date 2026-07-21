@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from eqlib.objects import Order
 from eqlib.strategies.ashare_sr_leader import (
     CandidateChannel,
     DEFAULT_LEADER_UNIVERSE,
@@ -661,6 +662,7 @@ def test_confirmed_exit_reentry_retires_stale_channel_and_primary_stop_applies(
     assert queued[-1] == ("value", "600519", pytest.approx(100_000))
     assert context.sr_code_channels["600519"] == CandidateChannel.PRIMARY.value
     assert context.sr_order_channels[str("entry-2")] == CandidateChannel.PRIMARY.value
+    assert context._sr_pending_exit_orders == {}
 
     queued_before_review = list(queued)
     _risk_review(context, params)
@@ -679,13 +681,28 @@ def test_confirmed_exit_reentry_retires_stale_channel_and_primary_stop_applies(
     assert context.sr_code_channels["600519"] == CandidateChannel.PRIMARY.value
 
 
-def test_unfilled_exit_remains_protected_across_callback_dates(monkeypatch):
+@pytest.mark.parametrize(
+    "open_status",
+    [Order.STATUS_PENDING, Order.STATUS_SUBMITTED, Order.STATUS_PARTIAL_FILL],
+)
+def test_unfilled_exit_remains_protected_across_callback_dates(
+    monkeypatch,
+    open_status,
+):
     queued = []
-    monkeypatch.setattr(
-        "eqlib.order_target",
-        lambda code, amount: queued.append(("target", code, amount))
-        or SimpleNamespace(order_id=f"exit-{code}"),
-    )
+    exit_orders = []
+
+    def fake_order_target(code, amount):
+        queued.append(("target", code, amount))
+        order = Order(code, amount, side=None, order_id=f"exit-{code}")
+        if open_status != Order.STATUS_PENDING:
+            order.transition_to(Order.STATUS_SUBMITTED)
+        if open_status == Order.STATUS_PARTIAL_FILL:
+            order.transition_to(Order.STATUS_PARTIAL_FILL)
+        exit_orders.append(order)
+        return order
+
+    monkeypatch.setattr("eqlib.order_target", fake_order_target)
     monkeypatch.setattr(
         "eqlib.order_target_value",
         lambda code, value: queued.append(("value", code, value))
@@ -724,7 +741,74 @@ def test_unfilled_exit_remains_protected_across_callback_dates(monkeypatch):
 
     assert queued == [("target", "600519", 0)]
     assert context._sr_pending_exit_codes == {"600519"}
+    assert context._sr_pending_exit_orders == {"600519": exit_orders[0]}
+    assert exit_orders[0].status == open_status
     assert context.sr_code_channels["600519"] == CandidateChannel.FALLBACK.value
+
+
+@pytest.mark.parametrize("failed_status", [Order.STATUS_CANCELLED, Order.STATUS_REJECTED])
+def test_failed_exit_is_retried_once_without_allowing_nonzero_target(
+    monkeypatch,
+    failed_status,
+):
+    queued = []
+    exit_orders = []
+
+    def fake_order_target(code, amount):
+        queued.append(("target", code, amount))
+        order = Order(code, amount, side=None, order_id=f"exit-{len(exit_orders) + 1}")
+        exit_orders.append(order)
+        return order
+
+    monkeypatch.setattr("eqlib.order_target", fake_order_target)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append(("value", code, value))
+        or SimpleNamespace(order_id=f"value-{code}"),
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={"600519": SimpleNamespace(total_value=500_000)},
+        ),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={"600519": CandidateChannel.PRIMARY.value},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    params = StrategyParams(robust_enabled=True)
+
+    rebalance_robust_portfolio(context, [], exposure=0.50, params=params)
+    if failed_status == Order.STATUS_REJECTED:
+        exit_orders[0].transition_to(Order.STATUS_SUBMITTED)
+    exit_orders[0].transition_to(failed_status)
+
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+    exit_orders[1].transition_to(Order.STATUS_SUBMITTED)
+    renewed_primary = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    rebalance_robust_portfolio(
+        context,
+        [renewed_primary],
+        exposure=0.90,
+        params=params,
+    )
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+
+    assert queued == [
+        ("target", "600519", 0),
+        ("target", "600519", 0),
+    ]
+    assert context._sr_pending_exit_codes == {"600519"}
+    assert context._sr_pending_exit_orders == {"600519": exit_orders[1]}
 
 
 def test_robust_candidates_use_fallback_only_when_primary_is_short():
@@ -1218,6 +1302,7 @@ def test_robust_initialize_and_monthly_scan_use_complete_risk_data(monkeypatch):
     assert context.sr_code_channels == {}
     assert context.sr_risk_events == []
     assert context.sr_risk_tracker == PortfolioRiskTracker.initial(1_000_000)
+    assert context._sr_pending_exit_orders == {}
 
     callbacks["monthly"][0](context)
 
