@@ -346,6 +346,54 @@ def test_robust_candidates_use_fallback_only_when_primary_is_short():
     ]
 
 
+def test_robust_candidates_sort_each_channel_by_score_with_stable_ties():
+    params = StrategyParams(robust_enabled=True, min_primary_candidates=4, top_n=7)
+    primary = [
+        _robust_candidate("600036", CandidateChannel.PRIMARY, 5.0, 0.02),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 10.0, 0.02),
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02),
+    ]
+    fallback = [
+        _robust_candidate("601318", CandidateChannel.FALLBACK, 1.0, 0.02),
+        _robust_candidate("000858", CandidateChannel.FALLBACK, 8.0, 0.02),
+        _robust_candidate("600030", CandidateChannel.FALLBACK, 9.0, 0.02),
+        _robust_candidate("600887", CandidateChannel.FALLBACK, 8.0, 0.02),
+    ]
+
+    result = combine_robust_candidates(
+        primary, fallback, MarketState.NEUTRAL, PortfolioRiskState.NORMAL, params
+    )
+
+    assert [item.code for item in result] == [
+        "300750",
+        "600519",
+        "600036",
+        "600030",
+        "000858",
+        "600887",
+        "601318",
+    ]
+
+
+def test_robust_candidates_suppress_fallback_code_already_emitted_as_primary():
+    params = StrategyParams(robust_enabled=True, min_primary_candidates=2, top_n=3)
+    primary = [_robust_candidate("600519", CandidateChannel.PRIMARY, 5.0, 0.02)]
+    fallback = [
+        _robust_candidate("600519", CandidateChannel.FALLBACK, 10.0, 0.01),
+        _robust_candidate("600036", CandidateChannel.FALLBACK, 9.0, 0.02),
+    ]
+
+    result = combine_robust_candidates(
+        primary, fallback, MarketState.NEUTRAL, PortfolioRiskState.NORMAL, params
+    )
+
+    assert [item.code for item in result] == ["600519", "600036"]
+    assert [item.channel for item in result] == [
+        CandidateChannel.PRIMARY,
+        CandidateChannel.FALLBACK,
+    ]
+
+
 def test_fallback_is_disabled_in_weak_or_defensive_state():
     params = StrategyParams(robust_enabled=True, min_primary_candidates=2, top_n=3)
     primary = [_robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02)]
@@ -386,9 +434,78 @@ def test_robust_weights_prioritize_primary_and_cap_fallback_and_industry():
     assert sum(weights.values()) <= 0.70
 
 
-@pytest.mark.parametrize("volatility", [0.0, -0.02, float("nan")])
+def test_robust_weights_apply_exact_per_stock_cap():
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=2,
+        max_stock_weight=0.12,
+        max_industry_weight=0.90,
+    )
+    candidates = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.01),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.02),
+    ]
+
+    weights = robust_target_weights(candidates, exposure=0.90, params=params)
+
+    assert weights == {"600519": pytest.approx(0.12), "300750": pytest.approx(0.12)}
+
+
+def test_robust_weights_limit_fallback_to_residual_primary_exposure():
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=3,
+        max_stock_weight=0.30,
+        max_industry_weight=0.90,
+        fallback_exposure_cap=0.20,
+    )
+    candidates = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.02),
+        _robust_candidate("600036", CandidateChannel.FALLBACK, 8.0, 0.01),
+    ]
+
+    weights = robust_target_weights(candidates, exposure=0.70, params=params)
+
+    assert weights["600519"] == pytest.approx(0.30)
+    assert weights["300750"] == pytest.approx(0.30)
+    assert weights["600036"] == pytest.approx(0.10)
+    assert sum(weights.values()) == pytest.approx(0.70)
+
+
+def test_robust_weights_leave_cap_induced_unused_exposure_as_cash():
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=3,
+        max_stock_weight=0.90,
+        max_industry_weight=0.40,
+    )
+    candidates = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.02),
+        _robust_candidate("000858", CandidateChannel.PRIMARY, 9.0, 0.02),
+        _robust_candidate("600036", CandidateChannel.PRIMARY, 8.0, 0.02),
+    ]
+
+    weights = robust_target_weights(candidates, exposure=0.90, params=params)
+
+    assert weights["600519"] == pytest.approx(0.30)
+    assert weights["000858"] == pytest.approx(0.10)
+    assert weights["600036"] == pytest.approx(0.30)
+    assert sum(weights.values()) == pytest.approx(0.70)
+
+
+@pytest.mark.parametrize(
+    "volatility",
+    [float("nan"), float("inf"), float("-inf"), 0.0, -0.02],
+    ids=["nan", "positive-infinity", "negative-infinity", "zero", "negative"],
+)
 def test_robust_weights_floor_zero_or_invalid_volatility(volatility):
-    params = StrategyParams(robust_enabled=True, top_n=2, max_stock_weight=0.60)
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=2,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+    )
     candidates = [
         _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, volatility),
         _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.02),
@@ -396,8 +513,11 @@ def test_robust_weights_floor_zero_or_invalid_volatility(volatility):
 
     weights = robust_target_weights(candidates, exposure=0.60, params=params)
 
-    assert all(np.isfinite(weight) for weight in weights.values())
-    assert sum(weights.values()) <= 0.60
+    expected_floor_weight = 0.60 * 1_000_000 / 1_000_050
+    expected_valid_weight = 0.60 * 50 / 1_000_050
+    assert set(weights) == {"600519", "300750"}
+    assert weights["600519"] == pytest.approx(expected_floor_weight)
+    assert weights["300750"] == pytest.approx(expected_valid_weight)
 
 
 def _make_snapshot(**overrides):
