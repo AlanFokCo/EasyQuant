@@ -168,6 +168,7 @@ nav:
       - explanation/architecture.md
       - explanation/backtest-model.md
       - explanation/ashare-market.md
+      - explanation/ashare-sr-leader-strategy.md
       - explanation/glossary.md
 
   - 示例: examples/index.md

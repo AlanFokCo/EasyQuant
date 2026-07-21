@@ -1,5 +1,7 @@
 """Tests for the A-share industry leader support/resistance strategy."""
 
+import json
+
 import numpy as np
 import pandas as pd
 
@@ -20,17 +22,25 @@ from eqlib.strategies.ashare_sr_leader import (
     market_exposure,
     rolling_levels,
     score_snapshot,
+    should_exit_trailing_drawdown,
     should_rebalance_position,
     target_weights,
 )
 from scripts.run_ashare_sr_leader_research import (
     _benchmark_total_return,
     audit_rows,
+    BENCHMARK,
     candidate_param_grid,
+    END_DATE,
     period_interpretation,
     render_html_report,
+    START_DATE,
     stability_score,
+    SUB_PERIODS,
+    _profile_name,
     write_eqlib_html_report,
+    write_outputs,
+    STARTING_CASH,
 )
 
 
@@ -101,6 +111,27 @@ def _ohlcv_from_close(close_values, volume_start=1_000_000, volume_end=2_000_000
     )
 
 
+def _make_snapshot(**overrides):
+    values = {
+        "close": 10.0,
+        "resistance": 10.5,
+        "support": 9.7,
+        "atr": 0.2,
+        "avg_volume": 1_000_000.0,
+        "volume_ratio": 1.2,
+        "relative_strength": 0.02,
+        "volatility": 0.02,
+        "support_distance": 0.03,
+        "resistance_distance": 0.05,
+        "breakout": False,
+        "pullback": True,
+        "breakdown": False,
+    }
+    values.update(overrides)
+    from eqlib.strategies.ashare_sr_leader import SignalSnapshot
+    return SignalSnapshot(**values)
+
+
 def test_market_gate_uses_completed_index_structure():
     params = StrategyParams(level_window=20, atr_period=5)
     strong = _ohlcv_from_close(list(np.linspace(10, 15, 80)) + [15.5])
@@ -128,6 +159,26 @@ def test_breakout_snapshot_requires_atr_buffer_and_relative_strength():
     assert snapshot.breakout
     assert snapshot.relative_strength > 0
     assert score_snapshot(snapshot, StrategyKind.RESISTANCE_BREAKOUT) > 0
+
+
+def test_composite_score_rewards_support_and_breakout_components():
+    support_snapshot = _make_snapshot(
+        support_distance=0.03,
+        relative_strength=0.02,
+        volatility=0.02,
+        breakout=False,
+        pullback=True,
+    )
+    breakout_snapshot = _make_snapshot(
+        support_distance=0.12,
+        relative_strength=0.08,
+        volatility=0.025,
+        breakout=True,
+        pullback=False,
+    )
+
+    assert score_snapshot(support_snapshot, StrategyKind.ADAPTIVE_COMPOSITE) > 0
+    assert score_snapshot(breakout_snapshot, StrategyKind.ADAPTIVE_COMPOSITE) > 0
 
 
 def test_default_liquidity_threshold_keeps_high_price_leaders():
@@ -204,6 +255,41 @@ def test_defensive_score_prefers_near_support_without_breakdown():
     assert score_snapshot(snapshot, StrategyKind.DEFENSIVE_SUPPORT) > 0
 
 
+def test_signal_snapshot_respects_min_relative_strength_filter():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        atr_multiplier=0.5,
+        volume_window=5,
+        rs_window=20,
+        min_avg_volume=1,
+        min_relative_strength=0.0,
+    )
+    stock = _ohlcv_from_close(list(np.linspace(10, 10.5, 50)) + [10.55])
+    benchmark = _ohlcv_from_close(list(np.linspace(10, 12.0, 51)))
+
+    assert build_signal_snapshot(stock, benchmark, params) is None
+
+
+def test_signal_snapshot_respects_max_support_distance_filter():
+    params = StrategyParams(
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        atr_multiplier=0.5,
+        volume_window=5,
+        volume_ratio_min=5.0,
+        rs_window=20,
+        min_avg_volume=1,
+        max_support_distance=0.04,
+    )
+    stock = _ohlcv_from_close([10, 10.2, 10.4, 10.6, 10.8] * 10 + [11.4])
+    benchmark = _ohlcv_from_close(list(np.linspace(10, 10.3, 51)))
+
+    assert build_signal_snapshot(stock, benchmark, params) is None
+
+
 def test_breakdown_snapshot_has_negative_scores():
     params = StrategyParams(level_window=20, atr_period=5, volume_window=5, rs_window=20, min_avg_volume=1)
     stock = _ohlcv_from_close(list(np.linspace(12, 10, 50)) + [7.0])
@@ -212,6 +298,14 @@ def test_breakdown_snapshot_has_negative_scores():
     assert snapshot is not None
     assert snapshot.breakdown
     assert score_snapshot(snapshot, StrategyKind.PULLBACK_MARKET_GATE) < 0
+
+
+def test_trailing_drawdown_exit_uses_recent_peak_when_enabled():
+    frame = _ohlcv_from_close([10, 11, 12, 13, 14, 12.1])
+
+    assert should_exit_trailing_drawdown(frame, stop_pct=0.12, window=5)
+    assert not should_exit_trailing_drawdown(frame, stop_pct=0.20, window=5)
+    assert not should_exit_trailing_drawdown(frame, stop_pct=0.0, window=5)
 
 
 def test_liquidity_capped_target_value_limits_new_order_size():
@@ -341,7 +435,46 @@ def test_candidate_param_grid_contains_three_strategy_kinds():
         StrategyKind.DEFENSIVE_SUPPORT,
         StrategyKind.RESISTANCE_BREAKOUT,
         StrategyKind.PULLBACK_MARKET_GATE,
+        StrategyKind.ADAPTIVE_COMPOSITE,
     }
+
+
+def test_research_defaults_match_reproducible_2020_2025_report_window():
+    assert START_DATE == "2020-01-01"
+    assert END_DATE == "2025-12-31"
+    assert STARTING_CASH == 1_000_000
+    assert BENCHMARK == "000300.XSHG"
+    assert SUB_PERIODS == (
+        ("2020-2021", "2020-01-01", "2021-12-31"),
+        ("2022", "2022-01-01", "2022-12-31"),
+        ("2023-2024", "2023-01-01", "2024-12-31"),
+        ("2025", "2025-01-01", "2025-12-31"),
+    )
+
+
+def test_candidate_param_grid_includes_a_grade_adaptive_composite_candidate():
+    grid = candidate_param_grid(quick=False)
+    candidates = [
+        params
+        for kind, params in grid
+        if kind is StrategyKind.ADAPTIVE_COMPOSITE
+        and params.level_window == 100
+        and params.short_level_window == 50
+        and params.atr_multiplier == 0.45
+        and params.volume_ratio_min == 0.9
+        and params.top_n == 10
+        and params.max_stock_weight == 0.10
+        and params.max_industry_weight == 0.25
+        and params.strong_market_exposure == 0.95
+        and params.neutral_market_exposure == 0.68
+        and params.weak_market_exposure == 0.25
+        and params.min_relative_strength == -0.015
+        and params.max_support_distance == 0.11
+        and params.rebalance_threshold == 0.05
+        and params.liquidity_volume_pct == 0.04
+    ]
+
+    assert candidates
 
 
 def test_candidate_param_grid_includes_guarded_risk_controls():
@@ -357,6 +490,110 @@ def test_candidate_param_grid_includes_guarded_risk_controls():
     assert guarded
 
 
+def test_candidate_param_grid_includes_trend_confirmed_risk_controls():
+    grid = candidate_param_grid(quick=False)
+    trend_confirmed = [
+        params
+        for kind, params in grid
+        if kind in {StrategyKind.DEFENSIVE_SUPPORT, StrategyKind.PULLBACK_MARKET_GATE}
+        and params.min_relative_strength >= 0.0
+        and params.max_support_distance <= 0.08
+        and params.weak_market_exposure <= 0.15
+        and params.neutral_market_exposure <= 0.50
+        and params.max_stock_weight <= 0.08
+    ]
+
+    assert trend_confirmed
+
+
+def test_candidate_param_grid_includes_adaptive_composite_candidates():
+    grid = candidate_param_grid(quick=False)
+    adaptive = [
+        params
+        for kind, params in grid
+        if kind is StrategyKind.ADAPTIVE_COMPOSITE
+        and params.top_n >= 10
+        and params.rebalance_threshold <= 0.06
+        and params.strong_market_exposure >= 0.85
+        and params.weak_market_exposure <= 0.25
+    ]
+
+    assert adaptive
+
+
+def test_candidate_param_grid_includes_active_balanced_pullback_candidate():
+    grid = candidate_param_grid(quick=False)
+    active_balanced = [
+        params
+        for kind, params in grid
+        if kind is StrategyKind.PULLBACK_MARKET_GATE
+        and params.top_n == 10
+        and params.max_stock_weight == 0.08
+        and params.strong_market_exposure == 0.84
+        and params.neutral_market_exposure == 0.54
+        and params.weak_market_exposure == 0.18
+        and params.min_relative_strength == -0.005
+        and params.max_support_distance == 0.10
+        and params.rebalance_threshold == 0.07
+    ]
+
+    assert active_balanced
+
+
+def test_candidate_param_grid_includes_drawdown_controlled_pullback_candidate():
+    grid = candidate_param_grid(quick=False)
+    drawdown_controlled = [
+        params
+        for kind, params in grid
+        if kind is StrategyKind.PULLBACK_MARKET_GATE
+        and params.max_position_drawdown <= 0.12
+        and params.weak_market_exposure <= 0.10
+        and params.neutral_market_exposure <= 0.45
+        and params.max_stock_weight <= 0.07
+    ]
+
+    assert drawdown_controlled
+
+
+def test_profile_name_labels_trend_confirmed_risk_managed_params():
+    assert _profile_name(
+        {
+            "params": {
+                "min_relative_strength": 0.0,
+                "max_support_distance": 0.08,
+                "weak_market_exposure": 0.15,
+            }
+        }
+    ) == "risk-managed"
+
+
+def test_profile_name_labels_drawdown_controlled_params():
+    assert _profile_name(
+        {
+            "params": {
+                "min_relative_strength": 0.01,
+                "max_support_distance": 0.06,
+                "max_position_drawdown": 0.12,
+                "weak_market_exposure": 0.10,
+            }
+        }
+    ) == "drawdown-controlled"
+
+
+def test_profile_name_labels_active_balanced_params():
+    assert _profile_name(
+        {
+            "params": {
+                "min_relative_strength": -0.005,
+                "max_support_distance": 0.10,
+                "strong_market_exposure": 0.84,
+                "neutral_market_exposure": 0.54,
+                "rebalance_threshold": 0.07,
+            }
+        }
+    ) == "active-balanced"
+
+
 def test_stability_score_penalizes_drawdown_and_trade_count():
     good = {
         "annual_return": 0.12,
@@ -369,6 +606,19 @@ def test_stability_score_penalizes_drawdown_and_trade_count():
     deep_drawdown = dict(good, max_drawdown=-0.45)
     assert stability_score(good) > stability_score(overtraded)
     assert stability_score(good) > stability_score(deep_drawdown)
+
+
+def test_stability_score_softly_penalizes_undertrading():
+    reasonable = {
+        "annual_return": 0.12,
+        "sharpe_ratio": 0.7,
+        "max_drawdown": -0.21,
+        "trade_count": 20,
+        "excess_return": 1.0,
+    }
+    too_inactive = dict(reasonable, annual_return=0.125, trade_count=14)
+
+    assert stability_score(reasonable) > stability_score(too_inactive)
 
 
 def test_stability_score_prefers_controlled_drawdown_over_high_excess():
@@ -417,6 +667,110 @@ def test_audit_rows_flags_missing_benchmark_deep_drawdown_and_bad_subperiod():
     assert any(issue["code"] == "deep_drawdown" for issue in issues)
     assert any(issue["code"] == "subperiod_underperformance" for issue in issues)
     assert any(issue["code"] == "execution_fragmentation" for issue in issues)
+
+
+def test_write_outputs_keeps_long_full_rows_first(tmp_path, monkeypatch):
+    """Short diagnostic periods must not outrank the long 2020-2026 backtest."""
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    rows = [
+        {
+            "period_name": "2020-2021",
+            "kind": "defensive_support",
+            "start": "2020-01-01",
+            "end": "2021-12-31",
+            "annual_return": 0.66,
+            "total_return": 1.75,
+            "benchmark_return": 0.19,
+            "excess_return": 1.56,
+            "max_drawdown": -0.30,
+            "sharpe_ratio": 1.6,
+            "trade_count": 9,
+            "raw_trade_count": 21,
+            "stability_score": 2.65,
+            "params": {},
+        },
+        {
+            "period_name": "full",
+            "kind": "defensive_support",
+            "start": "2020-01-01",
+            "end": "2026-07-08",
+            "annual_return": 0.18,
+            "total_return": 2.04,
+            "benchmark_return": 0.15,
+            "excess_return": 1.89,
+            "max_drawdown": -0.31,
+            "sharpe_ratio": 0.7,
+            "trade_count": 18,
+            "raw_trade_count": 44,
+            "stability_score": 2.05,
+            "params": {},
+        },
+    ]
+
+    write_outputs(rows)
+
+    saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert saved[0]["period_name"] == "full"
+
+
+def test_write_outputs_ranks_full_rows_by_grade_before_stability(tmp_path, monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "pullback_market_gate",
+            "start": "2020-01-01",
+            "end": "2025-12-31",
+            "annual_return": 0.144,
+            "total_return": 1.23,
+            "benchmark_return": 0.115,
+            "excess_return": 1.115,
+            "max_drawdown": -0.244,
+            "sharpe_ratio": 0.72,
+            "trade_count": 12,
+            "raw_trade_count": 32,
+            "stability_score": 1.08,
+            "grade": "B",
+            "grade_score": 69.0,
+            "params": {},
+        },
+        {
+            "period_name": "full",
+            "kind": "adaptive_composite",
+            "start": "2020-01-01",
+            "end": "2025-12-31",
+            "annual_return": 0.163,
+            "total_return": 1.46,
+            "benchmark_return": 0.115,
+            "excess_return": 1.345,
+            "max_drawdown": -0.243,
+            "sharpe_ratio": 0.78,
+            "trade_count": 32,
+            "raw_trade_count": 54,
+            "stability_score": 1.01,
+            "grade": "A",
+            "grade_score": 71.0,
+            "params": {},
+        },
+    ]
+
+    write_outputs(rows)
+
+    saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert saved[0]["kind"] == "adaptive_composite"
+
+
+def test_best_full_candidate_prefers_grade_before_stability():
+    import scripts.run_ashare_sr_leader_research as research
+
+    lower_grade = ({"grade_score": 69.0, "stability_score": 1.08}, StrategyKind.PULLBACK_MARKET_GATE, StrategyParams())
+    higher_grade = ({"grade_score": 71.0, "stability_score": 1.01}, StrategyKind.ADAPTIVE_COMPOSITE, StrategyParams())
+
+    assert research._best_full_candidate([lower_grade, higher_grade]) is higher_grade
 
 
 def test_benchmark_total_return_uses_engine_benchmark_values():

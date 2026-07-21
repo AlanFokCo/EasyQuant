@@ -18,6 +18,7 @@ class StrategyKind(str, Enum):
     DEFENSIVE_SUPPORT = "defensive_support"
     RESISTANCE_BREAKOUT = "resistance_breakout"
     PULLBACK_MARKET_GATE = "pullback_market_gate"
+    ADAPTIVE_COMPOSITE = "adaptive_composite"
 
 
 class MarketState(str, Enum):
@@ -47,6 +48,9 @@ class StrategyParams:
     weak_market_exposure: float = 0.35
     min_price: float = 0.10
     min_avg_volume: float = 100_000.0
+    min_relative_strength: float = -0.03
+    max_support_distance: float = 0.12
+    max_position_drawdown: float = 0.0
     rebalance_threshold: float = 0.08
     liquidity_volume_pct: float = 0.03
 
@@ -316,12 +320,20 @@ def build_signal_snapshot(
     breakdown = close < support - params.atr_multiplier * atr_value
     support_distance = (close - support) / close if close > 0 else float("inf")
     resistance_distance = (resistance - close) / close if close > 0 else float("inf")
+    if not breakdown and rel_strength < params.min_relative_strength:
+        return None
+
     pullback = (
         not breakdown
         and close >= support
-        and support_distance <= max(0.12, params.atr_multiplier * atr_value / close * 3)
+        and support_distance <= max(
+            params.max_support_distance,
+            params.atr_multiplier * atr_value / close * 3,
+        )
         and rel_strength >= -0.03
     )
+    if not breakout and not pullback and support_distance > params.max_support_distance:
+        return None
 
     return SignalSnapshot(
         close=close,
@@ -357,6 +369,16 @@ def score_snapshot(snapshot: SignalSnapshot, kind: StrategyKind) -> float:
         return support_score + low_vol_bonus + max(0.0, rs_score) * 0.2
     if kind is StrategyKind.RESISTANCE_BREAKOUT:
         return breakout_score + rs_score + volume_score - snapshot.volatility * 20
+    if kind is StrategyKind.ADAPTIVE_COMPOSITE:
+        return (
+            pullback_score * 0.8
+            + breakout_score * 0.9
+            + support_score * 0.7
+            + max(0.0, rs_score) * 0.8
+            + low_vol_bonus
+            + volume_score * 0.5
+            - snapshot.volatility * 12
+        )
     return (
         pullback_score
         + breakout_score * 0.7
@@ -445,6 +467,25 @@ def should_rebalance_position(
         return True
     drift = abs(target_value - current_value) / total_value
     return drift >= params.rebalance_threshold
+
+
+def should_exit_trailing_drawdown(
+    frame: pd.DataFrame,
+    stop_pct: float,
+    window: int,
+) -> bool:
+    """Return True when close falls too far from the recent completed peak."""
+
+    if stop_pct <= 0 or window <= 1 or frame.empty or "close" not in frame:
+        return False
+    closes = frame["close"].astype(float).dropna().tail(window + 1)
+    if len(closes) < 2:
+        return False
+    current = float(closes.iloc[-1])
+    peak = float(closes.iloc[:-1].max())
+    if peak <= 0:
+        return False
+    return current < peak * (1 - stop_pct)
 
 
 def liquidity_capped_target_value(
@@ -590,7 +631,7 @@ def _risk_review(context, params: StrategyParams) -> None:
 
     from eqlib import attribute_history, order_target
 
-    lookback = max(params.level_window, params.atr_period) + 5
+    lookback = max(params.level_window, params.short_level_window, params.atr_period) + 5
     for code in list(context.portfolio.positions.keys()):
         frame = attribute_history(
             code,
@@ -604,6 +645,13 @@ def _risk_review(context, params: StrategyParams) -> None:
         atr_value = float(compute_atr(frame, params.atr_period).iloc[-1])
         close = float(frame["close"].iloc[-1])
         if close < support - params.atr_multiplier * atr_value:
+            order_target(code, 0)
+            continue
+        if should_exit_trailing_drawdown(
+            frame,
+            stop_pct=params.max_position_drawdown,
+            window=params.short_level_window,
+        ):
             order_target(code, 0)
 
 

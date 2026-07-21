@@ -7,4 +7,5 @@
 | [系统架构](architecture.md) | 引擎、数据层、报告层、Web Studio 之间的关系 |
 | [回测执行模型](backtest-model.md) | 事件驱动、T+1、前视偏差防护、订单执行语义 |
 | [A 股市场](ashare-market.md) | 代码规则、交易制度、主要指数、手续费 |
+| [A 股行业龙头支撑压力策略](ashare-sr-leader-strategy.md) | 行业龙头池、支撑压力、市场闸门、仓位与风控的策略原理 |
 | [词汇表](glossary.md) | 专业术语中英对照 |

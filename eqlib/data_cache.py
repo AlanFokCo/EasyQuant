@@ -113,33 +113,98 @@ def _cache_path(security: str, adjust: str) -> Path:
     return _get_cache_dir() / f"{hash_}.parquet"
 
 
+def _pickle_cache_path(security: str, adjust: str) -> Path:
+    """Fallback cache path used when parquet engines are unavailable."""
+    key = f"{security}_{adjust}"
+    hash_ = hashlib.md5(key.encode()).hexdigest()[:12]
+    return _get_cache_dir() / f"{hash_}.pkl"
+
+
+def _read_cache_file(path: Path) -> pd.DataFrame:
+    if path.suffix == ".parquet":
+        return pd.read_parquet(path)
+    return pd.read_pickle(path)
+
+
 def _load_from_disk(security: str, start: str, end: str, adjust: str) -> Optional[pd.DataFrame]:
-    """Try to load cached data from parquet and slice to [start, end].
+    """Try to load cached data from disk and slice to [start, end].
 
     Cache expires after 7 days to avoid serving stale adjusted prices
     (e.g., after corporate actions like stock splits or dividends).
     """
-    try:
-        import time
-        path = _cache_path(security, adjust)
-        if path.exists():
+    for path in (_cache_path(security, adjust), _pickle_cache_path(security, adjust)):
+        try:
+            import time
+            if not path.exists():
+                continue
             # Check cache age — invalidate if older than 7 days
             age_seconds = time.time() - path.stat().st_mtime
             if age_seconds > 7 * 86400:
                 path.unlink(missing_ok=True)
-                return None
-            df = pd.read_parquet(path)
+                continue
+            df = _read_cache_file(path)
             if df.empty:
-                return None
+                continue
             sliced = _slice_by_date(df, start, end)
             return sliced if not sliced.empty else None
-    except Exception:
-        pass
+        except Exception:
+            continue
     return None
 
 
+@lru_cache(maxsize=None)
+def _parquet_engine() -> Optional[str]:
+    try:
+        import pyarrow  # noqa: F401
+        return "pyarrow"
+    except ImportError:
+        pass
+    try:
+        import fastparquet  # noqa: F401
+        return "fastparquet"
+    except ImportError:
+        return None
+
+
+def _write_cache_file(df: pd.DataFrame, path: Path):
+    engine = _parquet_engine()
+    if engine is not None:
+        df.to_parquet(path, engine=engine)
+    else:
+        df.to_pickle(path)
+
+
+def _existing_cache_frame(*paths: Path) -> Optional[pd.DataFrame]:
+    for path in paths:
+        if path.exists():
+            try:
+                df = _read_cache_file(path)
+                if not df.empty:
+                    return df
+            except Exception:
+                continue
+    return None
+
+
+def _cache_starts_after_request_end(security: str, end: str, adjust: str) -> bool:
+    """Return True when cached history begins after the requested window."""
+
+    df = _existing_cache_frame(
+        _cache_path(security, adjust),
+        _pickle_cache_path(security, adjust),
+    )
+    if df is None or df.empty:
+        return False
+    try:
+        first_date = pd.Timestamp(df.index.min()).normalize()
+        requested_end = pd.Timestamp(end).normalize()
+    except Exception:
+        return False
+    return first_date > requested_end
+
+
 def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
-    """Save data to parquet cache, merging with any existing cached frame.
+    """Save data to disk cache, merging with any existing cached frame.
 
     When the cache file already exists the new data is merged with the stored
     frame (union of dates, new values overwrite old ones) so the file always
@@ -150,25 +215,22 @@ def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
     """
     from eqlib.logger import log as _log
     try:
-        path = _cache_path(security, adjust)
+        parquet_path = _cache_path(security, adjust)
+        pickle_path = _pickle_cache_path(security, adjust)
+        path = parquet_path if _parquet_engine() is not None else pickle_path
         with _get_file_lock(path):
-            if path.exists():
-                existing = pd.read_parquet(path)
-                if not existing.empty:
-                    df = pd.concat([existing, df])
-                    df = df[~df.index.duplicated(keep='last')].sort_index()
-            df.to_parquet(path, engine="pyarrow" if _has_pyarrow() else "fastparquet")
+            existing = _existing_cache_frame(path, parquet_path, pickle_path)
+            if existing is not None:
+                df = pd.concat([existing, df])
+                df = df[~df.index.duplicated(keep='last')].sort_index()
+            _write_cache_file(df, path)
     except Exception as e:
         _log.warning(f"Failed to save cache for {security}: {e}")
 
 
 @lru_cache(maxsize=None)
 def _has_pyarrow() -> bool:
-    try:
-        import pyarrow  # noqa: F401
-        return True
-    except ImportError:
-        return False
+    return _parquet_engine() == "pyarrow"
 
 
 def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
@@ -353,6 +415,8 @@ class PreloadedData:
                 df = _load_from_disk(sec, start_str, end_str, adjust)
                 if df is not None:
                     return (sec, df, "disk_cache", None)
+                if _cache_starts_after_request_end(sec, end_str, adjust):
+                    return (sec, None, None, "cached data starts after requested end")
                 # Disk cache miss, try network fetch
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
