@@ -4,6 +4,7 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from eqlib.strategies.ashare_sr_leader import (
     CandidateChannel,
@@ -150,7 +151,46 @@ def test_market_volatility_factor_is_bounded_and_never_leverages():
         risk_state=PortfolioRiskState.DEFENSIVE,
         params=StrategyParams(strong_market_exposure=0.90),
     )
-    assert budget == 0.36
+    assert budget == pytest.approx(0.36)
+
+
+def test_final_risk_budget_preserves_clamped_product_precision():
+    params = StrategyParams(strong_market_exposure=0.90)
+    volatility_factor = 0.8123456789012345
+    expected = params.strong_market_exposure * volatility_factor
+
+    budget = final_risk_budget(
+        MarketState.STRONG,
+        volatility_factor=volatility_factor,
+        risk_state=PortfolioRiskState.NORMAL,
+        params=params,
+    )
+
+    assert budget == expected
+
+
+@pytest.mark.parametrize(
+    ("total_value", "expected_state"),
+    [
+        (920_000, PortfolioRiskState.CAUTIOUS),
+        (880_000, PortfolioRiskState.DEFENSIVE),
+        (840_000, PortfolioRiskState.PROTECT),
+    ],
+)
+def test_portfolio_risk_downgrades_at_exact_threshold(
+    total_value, expected_state
+):
+    tracker = PortfolioRiskTracker.initial(1_000_000)
+
+    updated = update_portfolio_risk(
+        tracker,
+        total_value,
+        MarketState.NEUTRAL,
+        StrategyParams(),
+        allow_recovery=False,
+    )
+
+    assert updated.state is expected_state
 
 
 def test_portfolio_risk_downgrades_immediately_at_each_threshold():
@@ -198,6 +238,25 @@ def test_portfolio_risk_recovers_only_one_level_after_half_loss_recovery():
 
     assert blocked.state is PortfolioRiskState.PROTECT
     assert recovered.state is PortfolioRiskState.DEFENSIVE
+
+
+def test_portfolio_risk_does_not_recover_with_incomplete_data():
+    tracker = PortfolioRiskTracker(
+        state=PortfolioRiskState.PROTECT,
+        high_water=1_000_000,
+        trough=830_000,
+    )
+
+    updated = update_portfolio_risk(
+        tracker,
+        920_000,
+        MarketState.NEUTRAL,
+        StrategyParams(),
+        allow_recovery=True,
+        data_complete=False,
+    )
+
+    assert updated.state is PortfolioRiskState.PROTECT
 
 
 def test_fallback_snapshot_requires_intact_positive_trend():
