@@ -335,7 +335,11 @@ def update_portfolio_risk(
         return tracker
     high_water = max(tracker.high_water, total_value)
     trough = min(tracker.trough, total_value)
-    drawdown = max(0.0, 1 - total_value / high_water) if high_water > 0 else 0.0
+    drawdown = (
+        max(0.0, (high_water - total_value) / high_water)
+        if high_water > 0
+        else 0.0
+    )
     threshold_state = _risk_state_for_drawdown(drawdown, params)
     if threshold_state > tracker.state:
         return PortfolioRiskTracker(threshold_state, high_water, min(trough, total_value))
@@ -395,17 +399,14 @@ def final_risk_budget(
 ) -> float:
     """Return the final unlevered equity exposure budget."""
 
-    return round(
-        max(
-            0.0,
-            min(
-                1.0,
-                market_exposure(market_state, params)
-                * volatility_factor
-                * drawdown_risk_multiplier(risk_state),
-            ),
+    return max(
+        0.0,
+        min(
+            1.0,
+            market_exposure(market_state, params)
+            * volatility_factor
+            * drawdown_risk_multiplier(risk_state),
         ),
-        12,
     )
 
 
