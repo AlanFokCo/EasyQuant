@@ -746,6 +746,105 @@ def test_unfilled_exit_remains_protected_across_callback_dates(
     assert context.sr_code_channels["600519"] == CandidateChannel.FALLBACK.value
 
 
+def test_none_returning_exit_adapter_stays_conservatively_pending(monkeypatch):
+    queued = []
+    monkeypatch.setattr(
+        "eqlib.order_target",
+        lambda code, amount: queued.append(("target", code, amount)),
+    )
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append(("value", code, value))
+        or SimpleNamespace(order_id=f"value-{code}"),
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={"600519": SimpleNamespace(total_value=500_000)},
+        ),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={"600519": CandidateChannel.PRIMARY.value},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    params = StrategyParams(robust_enabled=True)
+
+    rebalance_robust_portfolio(context, [], exposure=0.50, params=params)
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+    renewed_primary = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    rebalance_robust_portfolio(
+        context,
+        [renewed_primary],
+        exposure=0.90,
+        params=params,
+    )
+
+    assert queued == [("target", "600519", 0)]
+    assert context._sr_pending_exit_codes == {"600519"}
+    assert set(context._sr_pending_exit_orders) == {"600519"}
+
+
+def test_unfamiliar_exit_status_stays_conservatively_pending(monkeypatch):
+    queued = []
+    adapter_order = SimpleNamespace(
+        order_id="adapter-exit-1",
+        status="accepted_by_broker",
+    )
+    monkeypatch.setattr(
+        "eqlib.order_target",
+        lambda code, amount: queued.append(("target", code, amount))
+        or adapter_order,
+    )
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append(("value", code, value))
+        or SimpleNamespace(order_id=f"value-{code}"),
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={"600519": SimpleNamespace(total_value=500_000)},
+        ),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={"600519": CandidateChannel.PRIMARY.value},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    params = StrategyParams(robust_enabled=True)
+
+    rebalance_robust_portfolio(context, [], exposure=0.50, params=params)
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+    renewed_primary = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    rebalance_robust_portfolio(
+        context,
+        [renewed_primary],
+        exposure=0.90,
+        params=params,
+    )
+
+    assert queued == [("target", "600519", 0)]
+    assert context._sr_pending_exit_codes == {"600519"}
+    assert context._sr_pending_exit_orders == {"600519": adapter_order}
+
+
 @pytest.mark.parametrize("failed_status", [Order.STATUS_CANCELLED, Order.STATUS_REJECTED])
 def test_failed_exit_is_retried_once_without_allowing_nonzero_target(
     monkeypatch,

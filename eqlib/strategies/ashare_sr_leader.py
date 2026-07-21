@@ -48,6 +48,9 @@ class CandidateChannel(str, Enum):
     FALLBACK = "fallback"
 
 
+_OPAQUE_PENDING_EXIT = object()
+
+
 @dataclass(frozen=True)
 class StrategyParams:
     """Parameter set for support/resistance leader strategies."""
@@ -1091,10 +1094,10 @@ def _tag_order(context, order, code: str, channel: CandidateChannel) -> None:
 
 
 def _register_pending_exit(context, code: str, order) -> None:
-    if order is None:
-        return
     context._sr_pending_exit_codes.add(code)
-    context._sr_pending_exit_orders[code] = order
+    context._sr_pending_exit_orders[code] = (
+        order if order is not None else _OPAQUE_PENDING_EXIT
+    )
     context._sr_pending_entry_codes.discard(code)
 
 
@@ -1113,12 +1116,10 @@ def _sync_robust_order_lifecycle(context) -> set[str]:
     context._sr_pending_exit_orders = pending_exit_orders
 
     held_codes = set(context.portfolio.positions)
-    open_statuses = {"pending", "submitted", "partial_fill"}
+    refreshable_statuses = {"cancelled", "rejected"}
     for code, order in list(pending_exit_orders.items()):
         status = getattr(order, "status", None)
-        if code not in held_codes or (
-            status is not None and status not in open_statuses
-        ):
+        if code not in held_codes or status in refreshable_statuses:
             pending_exit_orders.pop(code, None)
             if code not in held_codes:
                 pending_exits.discard(code)
