@@ -2132,8 +2132,53 @@ def test_channel_diagnostics_bridges_missing_close_with_fill_lot_anchors():
     diagnostics = channel_diagnostics(result)
 
     assert diagnostics["primary_trade_count"] == 3
+    assert diagnostics["primary_average_exposure"] == 0.116037
     assert diagnostics["primary_average_holdings"] == 1.0
     assert diagnostics["primary_return_contribution"] == 0.016
+
+
+def test_channel_exposure_excludes_dates_before_a_security_has_a_close_anchor():
+    dates = pd.to_datetime(["2025-01-02", "2025-01-03"])
+    result = {
+        "context": SimpleNamespace(
+            sr_order_channels={"primary": "primary", "fallback": "fallback"}
+        ),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": "primary",
+            },
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600036",
+                "amount": 100,
+                "order_id": "fallback",
+            },
+        ],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 10_000},
+            {"date": "2025-01-03", "total_value": 10_000},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame({"close": [10.0, 11.0]}, index=dates),
+            "600036": pd.DataFrame(
+                {"close": [float("nan"), 10.0]}, index=dates
+            ),
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics["primary_average_exposure"] == 0.105
+    assert diagnostics["fallback_average_exposure"] == 0.1
+    assert diagnostics["primary_average_holdings"] == 1.0
+    assert diagnostics["fallback_average_holdings"] == 1.0
+    assert diagnostics["primary_return_contribution"] == 0.01
+    assert diagnostics["fallback_return_contribution"] == 0.0
 
 
 def test_channel_diagnostics_excludes_invalid_totals_from_snapshot_averages():
