@@ -1,5 +1,6 @@
 """Tests for the A-share industry leader support/resistance strategy."""
 
+import copy
 import csv
 import json
 from types import SimpleNamespace
@@ -56,12 +57,14 @@ from scripts.run_ashare_sr_leader_research import (
     BASELINE_ADAPTIVE_PARAMS,
     BENCHMARK,
     candidate_param_grid,
+    channel_diagnostics,
     END_DATE,
     full_gate_failures,
     neighbor_param_sets,
     neighbor_pass_rate,
     period_interpretation,
     render_html_report,
+    risk_state_diagnostics,
     robust_rank_key,
     robust_seed_param_grid,
     slice_backtest_result,
@@ -1938,6 +1941,193 @@ def test_neighbor_pass_rate_rejects_all_nonfinite_metrics():
     assert neighbor_pass_rate(neighbors) == pytest.approx(1 / 7, abs=1e-6)
 
 
+def test_channel_diagnostics_attributes_next_day_returns_by_order_channel():
+    dates = pd.to_datetime(["2025-01-02", "2025-01-03"])
+    result = {
+        "context": SimpleNamespace(
+            sr_order_channels={"1": "primary", 2: "fallback"}
+        ),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": 1,
+            },
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600036",
+                "amount": 100,
+                "order_id": "2",
+            },
+        ],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 10_000},
+            {"date": "2025-01-03", "total_value": 10_100},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame({"close": [10.0, 11.0]}, index=dates),
+            "600036": pd.DataFrame({"close": [10.0, 9.0]}, index=dates),
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics == {
+        "primary_trade_count": 1,
+        "fallback_trade_count": 1,
+        "primary_average_exposure": 0.104455,
+        "fallback_average_exposure": 0.094554,
+        "primary_average_holdings": 1.0,
+        "fallback_average_holdings": 1.0,
+        "primary_return_contribution": 0.01,
+        "fallback_return_contribution": -0.01,
+    }
+
+
+def test_channel_diagnostics_applies_fills_after_return_and_skips_bad_prices():
+    dates = pd.to_datetime(["2025-01-02", "2025-01-03", "2025-01-06"])
+    result = {
+        "context": SimpleNamespace(
+            sr_order_channels={1: "primary", "2": "primary", 3: "fallback"}
+        ),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": "1",
+            },
+            {
+                "date": "2025-01-03",
+                "type": "SELL",
+                "security": "600519",
+                "amount": 40,
+                "order_id": 2,
+            },
+            {
+                "date": "2025-01-03",
+                "type": "BUY",
+                "security": "missing",
+                "amount": 100,
+                "order_id": 3,
+            },
+            {
+                "date": "2025-01-06",
+                "type": "SELL",
+                "security": "600519",
+                "amount": 60,
+                "order_id": 2,
+            },
+            {
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": 1,
+            },
+        ],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 10_000},
+            {"date": "2025-01-03", "total_value": 10_100},
+            {"date": "2025-01-06", "total_value": 10_200},
+            {"total_value": 99_999},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame(
+                {"close": [10.0, 11.0, float("inf")]}, index=dates
+            )
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics["primary_trade_count"] == 1
+    assert diagnostics["fallback_trade_count"] == 1
+    assert diagnostics["primary_average_holdings"] == pytest.approx(2 / 3)
+    assert diagnostics["fallback_average_holdings"] == pytest.approx(2 / 3)
+    assert diagnostics["primary_return_contribution"] == 0.01
+    assert diagnostics["fallback_return_contribution"] == 0.0
+    assert all(np.isfinite(value) for value in diagnostics.values())
+    assert channel_diagnostics(result) == diagnostics
+
+
+def test_channel_diagnostics_returns_defaults_without_context_and_does_not_mutate():
+    result = {"trade_log": [], "recorded_values": [], "ohlcv_data": {}}
+    original = copy.deepcopy(result)
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics == {
+        "primary_trade_count": 0,
+        "fallback_trade_count": 0,
+        "primary_average_exposure": 0.0,
+        "fallback_average_exposure": 0.0,
+        "primary_average_holdings": 0.0,
+        "fallback_average_holdings": 0.0,
+        "primary_return_contribution": 0.0,
+        "fallback_return_contribution": 0.0,
+    }
+    assert result == original
+
+
+def test_risk_state_diagnostics_counts_state_duration_and_transitions():
+    result = {
+        "context": SimpleNamespace(
+            sr_risk_events=[
+                {"date": "2025-01-03", "from": "normal", "to": "cautious"},
+                {"date": "2025-01-06", "from": "cautious", "to": "normal"},
+            ]
+        ),
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 100},
+            {"date": "2025-01-03", "total_value": 95},
+            {"date": "2025-01-06", "total_value": 98},
+        ],
+    }
+
+    diagnostics = risk_state_diagnostics(result)
+
+    assert diagnostics["risk_state_days"] == {"normal": 2, "cautious": 1}
+    assert diagnostics["risk_state_trigger_count"] == 1
+    assert diagnostics["risk_state_recovery_count"] == 1
+
+
+def test_risk_state_diagnostics_sorts_dates_and_preserves_same_day_event_order():
+    result = {
+        "context": SimpleNamespace(
+            sr_risk_events=[
+                {"date": "2025-01-06", "from": "defensive", "to": "cautious"},
+                {"date": "2025-01-03", "from": "normal", "to": "cautious"},
+                {"date": "2025-01-03", "from": "cautious", "to": "defensive"},
+            ]
+        ),
+        "recorded_values": [
+            {"date": "2025-01-06", "total_value": 98},
+            {"date": "2025-01-02", "total_value": 100},
+            {"date": "2025-01-03", "total_value": 90},
+        ],
+    }
+
+    diagnostics = risk_state_diagnostics(result)
+
+    assert diagnostics == {
+        "risk_state_days": {"normal": 1, "defensive": 1, "cautious": 1},
+        "risk_state_trigger_count": 1,
+        "risk_state_recovery_count": 1,
+    }
+
+
+def test_risk_state_diagnostics_returns_normal_defaults_without_context():
+    assert risk_state_diagnostics({"recorded_values": []}) == {
+        "risk_state_days": {},
+        "risk_state_trigger_count": 0,
+        "risk_state_recovery_count": 0,
+    }
+
+
 def test_slice_backtest_result_rebases_without_mutating_source():
     result = {
         "context": SimpleNamespace(
@@ -2094,6 +2284,31 @@ def test_summarize_result_includes_monthly_win_rate(monkeypatch):
     )
 
     assert summarize_result({"trade_log": []})["monthly_win_rate"] == pytest.approx(2 / 3)
+
+
+def test_run_one_attaches_diagnostics_and_serializable_gate_defaults(monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    result = {"context": SimpleNamespace(), "trade_log": [], "recorded_values": []}
+    monkeypatch.setattr(research, "run_one_result", lambda *_args: result)
+    monkeypatch.setattr(research, "summarize_result", lambda _result: {"grade": "A"})
+
+    row = research.run_one(
+        StrategyKind.ADAPTIVE_COMPOSITE,
+        BASELINE_ADAPTIVE_PARAMS,
+        "2025-01-01",
+        "2025-12-31",
+        ["600519"],
+    )
+
+    assert row["primary_trade_count"] == 0
+    assert row["risk_state_days"] == {}
+    assert row["gate_failures"] == []
+    assert row["robust_gate_pass"] is False
+    assert row["neighbor_pass_rate"] == 0.0
+    assert row["worst_validation_excess"] == 0.0
+    assert row["validation"] == {}
+    json.dumps(row)
 
 
 def test_research_defaults_match_reproducible_2020_2025_report_window():
@@ -2471,6 +2686,154 @@ def test_write_outputs_puts_selected_full_row_first(tmp_path, monkeypatch):
     assert "<td>defensive_support</td>" in first_html_row
     assert "最终推荐策略: `defensive_support`" in markdown
     assert "最终推荐策略：<strong>defensive_support</strong>" in html_report
+
+
+def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data(
+    tmp_path, monkeypatch
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    baseline = {
+        "period_name": "full",
+        "kind": "adaptive_composite",
+        "selected": True,
+        "selection_reason": "baseline_retained_no_robust_candidate",
+        "start": "2020-01-01",
+        "end": "2025-12-31",
+        "annual_return": 0.113,
+        "total_return": 0.89,
+        "benchmark_return": 0.40,
+        "excess_return": 0.49,
+        "max_drawdown": -0.18,
+        "sharpe_ratio": 0.78,
+        "trade_count": 30,
+        "raw_trade_count": 30,
+        "grade": "A",
+        "grade_score": 71.3,
+        "stability_score": 1.0,
+        "gate_failures": [],
+        "robust_gate_pass": False,
+        "neighbor_pass_rate": 0.0,
+        "worst_validation_excess": 0.0,
+        "validation": {},
+        "risk_state_days": {"normal": 100},
+        "risk_state_trigger_count": 0,
+        "risk_state_recovery_count": 0,
+        "primary_trade_count": 30,
+        "fallback_trade_count": 0,
+        "primary_average_exposure": 0.66,
+        "fallback_average_exposure": 0.0,
+        "primary_average_holdings": 7.0,
+        "fallback_average_holdings": 0.0,
+        "primary_return_contribution": 0.42,
+        "fallback_return_contribution": 0.0,
+        "params": BASELINE_ADAPTIVE_PARAMS.__dict__,
+    }
+    robust = {
+        **baseline,
+        "selected": False,
+        "selection_reason": "",
+        "annual_return": 0.13,
+        "max_drawdown": -0.19,
+        "sharpe_ratio": 0.82,
+        "grade_score": 72.0,
+        "gate_failures": ["2025_excess_<script>"],
+        "neighbor_pass_rate": 0.58,
+        "worst_validation_excess": -0.06,
+        "validation": {
+            "2023": {
+                "annual_return": 0.10,
+                "excess_return": -0.02,
+                "max_drawdown": -0.12,
+                "grade": "B",
+            },
+            "2024": {
+                "annual_return": 0.12,
+                "excess_return": 0.01,
+                "max_drawdown": -0.10,
+                "grade": "A",
+            },
+            "2025": {
+                "annual_return": 0.08,
+                "excess_return": -0.06,
+                "max_drawdown": -0.14,
+                "grade": "B",
+            },
+        },
+        "risk_state_days": {"normal": 90, "cautious": 10},
+        "risk_state_trigger_count": 2,
+        "risk_state_recovery_count": 1,
+        "primary_trade_count": 20,
+        "fallback_trade_count": 8,
+        "primary_average_exposure": 0.48,
+        "fallback_average_exposure": 0.14,
+        "primary_average_holdings": 5.5,
+        "fallback_average_holdings": 1.5,
+        "primary_return_contribution": 0.31,
+        "fallback_return_contribution": 0.07,
+        "params": {**BASELINE_ADAPTIVE_PARAMS.__dict__, "robust_enabled": True},
+    }
+
+    write_outputs([robust, baseline])
+
+    saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert saved[0]["selected"] is True
+    robust_saved = next(row for row in saved if row["params"]["robust_enabled"])
+    assert robust_saved["validation"] == robust["validation"]
+    assert robust_saved["risk_state_days"] == robust["risk_state_days"]
+    assert robust_saved["gate_failures"] == robust["gate_failures"]
+
+    with (tmp_path / "summary.csv").open(newline="", encoding="utf-8") as handle:
+        csv_rows = list(csv.DictReader(handle))
+        csv_fields = set(csv_rows[0])
+    assert csv_rows[0]["selected"] == "True"
+    assert csv_rows[1]["neighbor_pass_rate"] == "0.58"
+    assert "primary_return_contribution" in csv_fields
+    assert "risk_state_trigger_count" in csv_fields
+    assert not {"validation", "risk_state_days", "gate_failures"} & csv_fields
+
+    markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    headings = [
+        "稳健门槛",
+        "滚动验证",
+        "风险状态",
+        "主/候补通道",
+        "基线与稳健候选对比",
+    ]
+    assert all(heading in markdown and heading in html_report for heading in headings)
+    assert [markdown.index(heading) for heading in headings] == sorted(
+        markdown.index(heading) for heading in headings
+    )
+    assert "2025_excess_<script>" in markdown
+    assert "2025_excess_&lt;script&gt;" in html_report
+    assert "2025_excess_<script>" not in html_report
+    assert "58.00%" in markdown
+    assert "normal: 90" in markdown
+    retention = "本轮没有找到通过全部稳健门槛的新候选，继续保留当前 A / 71.3 基线。"
+    assert retention in markdown
+    assert retention in html_report
+    gate_html = html_report.split("<h2>稳健门槛</h2>", 1)[1].split(
+        "<h2>滚动验证</h2>", 1
+    )[0]
+    assert "<table>" in gate_html
+    assert "<th>Candidate</th>" in gate_html
+    assert "<td>2025_excess_&lt;script&gt;</td>" in gate_html
+
+    passing_robust = {
+        **robust,
+        "selected": True,
+        "robust_gate_pass": True,
+        "gate_failures": [],
+    }
+    write_outputs([{**baseline, "selected": False}, passing_robust])
+    selected_markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    risk_section = selected_markdown.split("## 风险状态", 1)[1].split(
+        "## 主/候补通道", 1
+    )[0]
+    assert risk_section.index("robust-1") < risk_section.index("baseline")
+    assert retention not in selected_markdown
 
 
 def test_period_interpretation_uses_selected_full_row_for_recommendation():
