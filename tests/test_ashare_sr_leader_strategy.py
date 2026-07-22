@@ -1,5 +1,6 @@
 """Tests for the A-share industry leader support/resistance strategy."""
 
+import csv
 import json
 from types import SimpleNamespace
 
@@ -1866,6 +1867,26 @@ def test_full_gate_requires_return_drawdown_and_a_grade():
     assert "grade_below_a" in full_gate_failures(dict(passing, grade_score=69.9))
 
 
+@pytest.mark.parametrize(
+    ("metric", "value", "failure"),
+    [
+        ("annual_return", float("nan"), "annual_return_nonfinite"),
+        ("annual_return", float("inf"), "annual_return_nonfinite"),
+        ("annual_return", float("-inf"), "annual_return_nonfinite"),
+        ("max_drawdown", float("nan"), "max_drawdown_nonfinite"),
+        ("max_drawdown", float("inf"), "max_drawdown_nonfinite"),
+        ("max_drawdown", float("-inf"), "max_drawdown_nonfinite"),
+        ("grade_score", float("nan"), "grade_score_nonfinite"),
+        ("grade_score", float("inf"), "grade_score_nonfinite"),
+        ("grade_score", float("-inf"), "grade_score_nonfinite"),
+    ],
+)
+def test_full_gate_rejects_nonfinite_metrics(metric, value, failure):
+    passing = {"annual_return": 0.12, "max_drawdown": -0.199, "grade_score": 70.0}
+
+    assert full_gate_failures(dict(passing, **{metric: value})) == [failure]
+
+
 def test_validation_gate_applies_tighter_2025_limit():
     rows = {
         "2023": {"excess_return": -0.10},
@@ -1876,6 +1897,17 @@ def test_validation_gate_applies_tighter_2025_limit():
     assert validation_gate_failures(rows) == [
         "2024_excess_below_minus_10pct",
         "2025_excess_below_minus_5pct",
+    ]
+
+
+def test_validation_gate_2025_exact_boundary_passes():
+    assert validation_gate_failures({"2025": {"excess_return": -0.05}}) == []
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_validation_gate_rejects_nonfinite_excess(value):
+    assert validation_gate_failures({"2025": {"excess_return": value}}) == [
+        "2025_excess_nonfinite"
     ]
 
 
@@ -1890,6 +1922,20 @@ def test_neighbor_pass_rate_uses_10pct_return_and_22pct_drawdown():
 
     assert neighbor_pass_rate(neighbors) == 0.6
     assert neighbor_pass_rate([]) == 0.0
+
+
+def test_neighbor_pass_rate_rejects_all_nonfinite_metrics():
+    neighbors = [
+        {"annual_return": 0.10, "max_drawdown": -0.22},
+        {"annual_return": float("nan"), "max_drawdown": -0.10},
+        {"annual_return": float("inf"), "max_drawdown": -0.10},
+        {"annual_return": float("-inf"), "max_drawdown": -0.10},
+        {"annual_return": 0.20, "max_drawdown": float("nan")},
+        {"annual_return": 0.20, "max_drawdown": float("inf")},
+        {"annual_return": 0.20, "max_drawdown": float("-inf")},
+    ]
+
+    assert neighbor_pass_rate(neighbors) == pytest.approx(1 / 7, abs=1e-6)
 
 
 def test_slice_backtest_result_rebases_without_mutating_source():
@@ -1925,13 +1971,54 @@ def test_slice_backtest_result_rebases_without_mutating_source():
     assert sliced["context"].portfolio.total_value == 1_200_000
     assert sliced["trade_log"] == [{"date": "2023-06-01", "type": "SELL"}]
     assert sliced["benchmark_values"][0]["value"] == 100.0
+    assert _benchmark_total_return(sliced) == 0.10
+    sliced["benchmark_values"][0]["value"] = 999.0
+    sliced["recorded_values"][0]["total_value"] = 999.0
     assert len(result["trade_log"]) == 2
+    assert result["benchmark_values"] == [
+        {"date": "2022-12-30", "value": 95.0},
+        {"date": "2023-01-03", "value": 100.0},
+        {"date": "2023-12-29", "value": 110.0},
+    ]
+    assert result["recorded_values"][1]["total_value"] == 1_050_000
     assert result["context"].portfolio.starting_cash == 1_000_000
 
 
 def test_slice_backtest_result_requires_two_window_values():
     result = {
         "recorded_values": [{"date": "2023-01-03", "total_value": 1_050_000}]
+    }
+
+    assert slice_backtest_result(result, "2023-01-01", "2023-12-31") is None
+
+
+@pytest.mark.parametrize(
+    "benchmark_values",
+    [
+        [],
+        [{"date": "2023-01-03", "value": 100.0}],
+        [
+            {"date": "2023-01-03", "value": float("nan")},
+            {"date": "2023-12-29", "value": 110.0},
+        ],
+        [
+            {"date": "2023-01-03", "value": 100.0},
+            {"date": "2023-12-29", "value": float("inf")},
+        ],
+        [
+            {"date": "2023-01-01", "value": 100.0},
+            {"date": "2023-12-31", "value": 110.0},
+        ],
+    ],
+    ids=["empty", "one-point", "nan", "inf", "outside-recorded-range"],
+)
+def test_slice_backtest_result_rejects_invalid_benchmark(benchmark_values):
+    result = {
+        "recorded_values": [
+            {"date": "2023-01-03", "total_value": 1_050_000},
+            {"date": "2023-12-29", "total_value": 1_200_000},
+        ],
+        "benchmark_values": benchmark_values,
     }
 
     assert slice_backtest_result(result, "2023-01-01", "2023-12-31") is None
@@ -1966,6 +2053,28 @@ def test_robust_rank_key_prefers_pass_rate_then_validation_and_lower_drawdown():
     ]
 
     assert max(rows, key=robust_rank_key) is rows[1]
+
+
+def test_robust_rank_key_is_finite_safe_and_demotes_invalid_rows():
+    valid = {
+        "neighbor_pass_rate": 0.6,
+        "worst_validation_excess": -0.05,
+        "sharpe_ratio": 0.8,
+        "max_drawdown": -0.19,
+        "monthly_win_rate": 0.5,
+        "annual_return": 0.12,
+    }
+    invalid = {
+        "neighbor_pass_rate": float("nan"),
+        "worst_validation_excess": float("inf"),
+        "sharpe_ratio": float("-inf"),
+        "max_drawdown": float("nan"),
+        "monthly_win_rate": float("inf"),
+        "annual_return": float("nan"),
+    }
+
+    assert all(np.isfinite(value) for value in robust_rank_key(invalid))
+    assert max([invalid, valid], key=robust_rank_key) is valid
 
 
 def test_summarize_result_includes_monthly_win_rate(monkeypatch):
@@ -2345,8 +2454,21 @@ def test_write_outputs_puts_selected_full_row_first(tmp_path, monkeypatch):
     saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert saved[0]["selected"] is True
     assert saved[0]["kind"] == "defensive_support"
+    with (tmp_path / "summary.csv").open(newline="", encoding="utf-8") as handle:
+        first_csv_row = next(csv.DictReader(handle))
     markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
     html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    first_markdown_row = next(
+        line for line in markdown.splitlines() if line.startswith("| 1 |")
+    )
+    first_html_row = (
+        html_report.split("<tbody>", 1)[1]
+        .split("<tr>", 1)[1]
+        .split("</tr>", 1)[0]
+    )
+    assert first_csv_row["kind"] == "defensive_support"
+    assert "| 1 | defensive_support |" in first_markdown_row
+    assert "<td>defensive_support</td>" in first_html_row
     assert "最终推荐策略: `defensive_support`" in markdown
     assert "最终推荐策略：<strong>defensive_support</strong>" in html_report
 
@@ -2372,6 +2494,107 @@ def test_period_interpretation_uses_selected_full_row_for_recommendation():
     assert "最终推荐策略: `defensive_support`" in period_interpretation(rows)
 
 
+@pytest.mark.parametrize(
+    ("benchmark_case", "robust_selected"),
+    [
+        ("empty", False),
+        ("one-point", False),
+        ("nonfinite", False),
+        ("valid", True),
+    ],
+)
+def test_main_validation_benchmark_quality_controls_selection(
+    monkeypatch,
+    benchmark_case,
+    robust_selected,
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    center, neighbor = robust_seed_param_grid()[:2]
+    captured = {}
+    formation_ranges = [
+        (formation_start, formation_end)
+        for _period, formation_start, formation_end, _start, _end in VALIDATION_WINDOWS
+    ]
+    monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
+    monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
+    monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
+    monkeypatch.setattr(
+        research,
+        "candidate_param_grid",
+        lambda quick=False: [
+            (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS),
+            (StrategyKind.ADAPTIVE_COMPOSITE, center),
+        ],
+    )
+    monkeypatch.setattr(research, "neighbor_param_sets", lambda _params: [neighbor])
+
+    def fake_run_result(kind, params, start, end, universe):
+        result = {"kind": kind, "params": params, "start": start, "end": end}
+        if (start, end) not in formation_ranges:
+            return result
+        year = end[:4]
+        benchmark_values = {
+            "empty": [],
+            "one-point": [{"date": f"{year}-01-03", "value": 100.0}],
+            "nonfinite": [
+                {"date": f"{year}-01-03", "value": float("nan")},
+                {"date": f"{year}-12-29", "value": 110.0},
+            ],
+            "valid": [
+                {"date": f"{year}-01-03", "value": 100.0},
+                {"date": f"{year}-12-29", "value": 110.0},
+            ],
+        }[benchmark_case]
+        result.update(
+            {
+                "recorded_values": [
+                    {"date": f"{year}-01-03", "total_value": 1_000_000},
+                    {"date": f"{year}-12-29", "total_value": 1_100_000},
+                ],
+                "benchmark_values": benchmark_values,
+                "trade_log": [],
+            }
+        )
+        return result
+
+    def fake_summary(result):
+        if "context" in result:
+            return {"excess_return": 0.0}
+        if result["params"] == neighbor:
+            return {"annual_return": 0.11, "max_drawdown": -0.20}
+        return {
+            "annual_return": 0.15,
+            "max_drawdown": -0.15,
+            "grade_score": 80.0,
+            "sharpe_ratio": 1.0,
+            "monthly_win_rate": 0.6,
+            "stability_score": 1.0,
+        }
+
+    monkeypatch.setattr(research, "run_one_result", fake_run_result)
+    monkeypatch.setattr(research, "summarize_result", fake_summary)
+    monkeypatch.setattr(
+        research, "write_outputs", lambda rows: captured.update(rows=rows)
+    )
+    monkeypatch.setattr(research, "write_eqlib_html_report", lambda _result: None)
+
+    assert research.main() == 0
+
+    full_rows = [row for row in captured["rows"] if row["period_name"] == "full"]
+    center_row = next(row for row in full_rows if row["params"] == center.__dict__)
+    assert center_row["selected"] is robust_selected
+    assert center_row["robust_gate_pass"] is robust_selected
+    if robust_selected:
+        assert center_row["gate_failures"] == []
+    else:
+        assert center_row["gate_failures"] == [
+            "2023_validation_unavailable",
+            "2024_validation_unavailable",
+            "2025_validation_unavailable",
+        ]
+
+
 def test_main_runs_rolling_validation_and_retains_baseline_on_gate_failure(
     monkeypatch,
 ):
@@ -2379,6 +2602,7 @@ def test_main_runs_rolling_validation_and_retains_baseline_on_gate_failure(
 
     center, neighbor = robust_seed_param_grid()[:2]
     calls = []
+    slice_calls = []
     captured = {}
     monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
     monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
@@ -2399,6 +2623,7 @@ def test_main_runs_rolling_validation_and_retains_baseline_on_gate_failure(
         return {"kind": kind, "params": params, "start": start, "end": end}
 
     def fake_slice(result, start, end):
+        slice_calls.append((start, end))
         return {"params": result["params"], "validation_period": start[:4]}
 
     def fake_summary(result):
@@ -2458,7 +2683,210 @@ def test_main_runs_rolling_validation_and_retains_baseline_on_gate_failure(
         ("2021-01-01", "2024-12-31"),
         ("2022-01-01", "2025-12-31"),
     ]
+    assert slice_calls == [
+        (validation_start, validation_end)
+        for _period, _formation_start, _formation_end, validation_start, validation_end in VALIDATION_WINDOWS
+    ]
     assert captured["best_result"]["params"] == BASELINE_ADAPTIVE_PARAMS
+
+
+def test_main_accepts_exact_sixty_percent_neighbor_pass_rate(monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    center = robust_seed_param_grid()[0]
+    neighbors = neighbor_param_sets(center)[:5]
+    passing_neighbors = set(neighbors[:3])
+    captured = {}
+    monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
+    monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
+    monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
+    monkeypatch.setattr(
+        research,
+        "candidate_param_grid",
+        lambda quick=False: [
+            (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS),
+            (StrategyKind.ADAPTIVE_COMPOSITE, center),
+        ],
+    )
+    monkeypatch.setattr(research, "neighbor_param_sets", lambda _params: neighbors)
+    monkeypatch.setattr(
+        research,
+        "run_one_result",
+        lambda kind, params, start, end, universe: {
+            "kind": kind,
+            "params": params,
+            "start": start,
+            "end": end,
+        },
+    )
+    monkeypatch.setattr(
+        research,
+        "slice_backtest_result",
+        lambda result, start, end: {"validation_period": start[:4]},
+    )
+
+    def fake_summary(result):
+        if "validation_period" in result:
+            return {"excess_return": 0.0}
+        if result["params"] in neighbors:
+            return {
+                "annual_return": 0.11 if result["params"] in passing_neighbors else 0.09,
+                "max_drawdown": -0.20,
+            }
+        return {
+            "annual_return": 0.15,
+            "max_drawdown": -0.15,
+            "grade_score": 80.0,
+            "sharpe_ratio": 1.0,
+            "monthly_win_rate": 0.6,
+            "stability_score": 1.0,
+        }
+
+    monkeypatch.setattr(research, "summarize_result", fake_summary)
+    monkeypatch.setattr(
+        research, "write_outputs", lambda rows: captured.update(rows=rows)
+    )
+    monkeypatch.setattr(research, "write_eqlib_html_report", lambda _result: None)
+
+    assert research.main() == 0
+
+    center_row = next(
+        row
+        for row in captured["rows"]
+        if row.get("period_name") == "full" and row.get("params") == center.__dict__
+    )
+    assert center_row["neighbor_pass_rate"] == 0.60
+    assert center_row["gate_failures"] == []
+    assert center_row["robust_gate_pass"] is True
+    assert center_row["selected"] is True
+
+
+def test_main_evaluates_only_top_three_robust_pre_gate_passers(monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    seeds = robust_seed_param_grid()[:4]
+    neighbor = robust_seed_param_grid()[7]
+    sharpes = dict(zip(seeds, [1.0, 4.0, 3.0, 2.0]))
+    expected_finalists = [seeds[1], seeds[2], seeds[3]]
+    neighbor_calls = []
+    run_calls = []
+    monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
+    monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
+    monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
+    monkeypatch.setattr(
+        research,
+        "candidate_param_grid",
+        lambda quick=False: [
+            (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS),
+            *((StrategyKind.ADAPTIVE_COMPOSITE, params) for params in seeds),
+        ],
+    )
+
+    def fake_neighbors(params):
+        neighbor_calls.append(params)
+        return [neighbor]
+
+    def fake_run_result(kind, params, start, end, universe):
+        run_calls.append((params, start, end))
+        return {"params": params, "start": start, "end": end}
+
+    def fake_summary(result):
+        if "validation_period" in result:
+            return {"excess_return": 0.0}
+        if result["params"] == neighbor:
+            return {"annual_return": 0.11, "max_drawdown": -0.20}
+        return {
+            "annual_return": 0.15,
+            "max_drawdown": -0.15,
+            "grade_score": 80.0,
+            "sharpe_ratio": sharpes.get(result["params"], 0.5),
+            "monthly_win_rate": 0.6,
+            "stability_score": 1.0,
+        }
+
+    monkeypatch.setattr(research, "neighbor_param_sets", fake_neighbors)
+    monkeypatch.setattr(research, "run_one_result", fake_run_result)
+    monkeypatch.setattr(
+        research,
+        "slice_backtest_result",
+        lambda result, start, end: {"validation_period": start[:4]},
+    )
+    monkeypatch.setattr(research, "summarize_result", fake_summary)
+    monkeypatch.setattr(research, "write_outputs", lambda _rows: None)
+    monkeypatch.setattr(research, "write_eqlib_html_report", lambda _result: None)
+
+    assert research.main() == 0
+
+    formation_ranges = [
+        (formation_start, formation_end)
+        for _period, formation_start, formation_end, _start, _end in VALIDATION_WINDOWS
+    ]
+    assert neighbor_calls == expected_finalists
+    for finalist in expected_finalists:
+        assert [
+            (start, end)
+            for params, start, end in run_calls
+            if params == finalist and (start, end) in formation_ranges
+        ] == formation_ranges
+    assert not any(
+        params == seeds[0] and (start, end) in formation_ranges
+        for params, start, end in run_calls
+    )
+
+
+def test_main_nonfinite_full_metric_never_reaches_robust_finalists(monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    center = robust_seed_param_grid()[0]
+    captured = {}
+    monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
+    monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
+    monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
+    monkeypatch.setattr(
+        research,
+        "candidate_param_grid",
+        lambda quick=False: [
+            (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS),
+            (StrategyKind.ADAPTIVE_COMPOSITE, center),
+        ],
+    )
+    monkeypatch.setattr(
+        research,
+        "neighbor_param_sets",
+        lambda _params: pytest.fail("invalid candidate reached finalist evaluation"),
+    )
+    monkeypatch.setattr(
+        research,
+        "run_one_result",
+        lambda kind, params, start, end, universe: {"params": params},
+    )
+
+    def fake_summary(result):
+        return {
+            "annual_return": float("nan") if result["params"] == center else 0.15,
+            "max_drawdown": -0.15,
+            "grade_score": 80.0,
+            "sharpe_ratio": 1.0,
+            "monthly_win_rate": 0.6,
+            "stability_score": 1.0,
+        }
+
+    monkeypatch.setattr(research, "summarize_result", fake_summary)
+    monkeypatch.setattr(
+        research, "write_outputs", lambda rows: captured.update(rows=rows)
+    )
+    monkeypatch.setattr(research, "write_eqlib_html_report", lambda _result: None)
+
+    assert research.main() == 0
+
+    center_row = next(
+        row
+        for row in captured["rows"]
+        if row.get("period_name") == "full" and row.get("params") == center.__dict__
+    )
+    assert center_row["gate_failures"] == ["annual_return_nonfinite"]
+    assert center_row["robust_gate_pass"] is False
+    assert center_row["selected"] is False
 
 
 def test_main_selects_highest_ranked_robust_candidate(monkeypatch):

@@ -11,6 +11,7 @@ import argparse
 import csv
 import html
 import json
+import math
 from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -316,11 +317,20 @@ def full_gate_failures(row: dict) -> list[str]:
     """Return full-period hard-gate failures for a summary row."""
 
     failures: list[str] = []
-    if float(row.get("annual_return", 0.0)) < 0.12:
+    annual_return = _finite_metric(row, "annual_return")
+    max_drawdown = _finite_metric(row, "max_drawdown")
+    grade_score = _finite_metric(row, "grade_score")
+    if annual_return is None:
+        failures.append("annual_return_nonfinite")
+    elif annual_return < 0.12:
         failures.append("annual_return_below_12pct")
-    if abs(float(row.get("max_drawdown", 0.0))) >= 0.20:
+    if max_drawdown is None:
+        failures.append("max_drawdown_nonfinite")
+    elif abs(max_drawdown) >= 0.20:
         failures.append("max_drawdown_not_below_20pct")
-    if float(row.get("grade_score", 0.0)) < 70.0:
+    if grade_score is None:
+        failures.append("grade_score_nonfinite")
+    elif grade_score < 70.0:
         failures.append("grade_below_a")
     return failures
 
@@ -330,7 +340,13 @@ def validation_gate_failures(rows: dict[str, dict]) -> list[str]:
 
     failures: list[str] = []
     for period, row in rows.items():
-        excess = float(row.get("excess_return", 0.0))
+        if row.get("error"):
+            failures.append(f"{period}_validation_unavailable")
+            continue
+        excess = _finite_metric(row, "excess_return")
+        if excess is None:
+            failures.append(f"{period}_excess_nonfinite")
+            continue
         if period == "2025" and excess < -0.05:
             failures.append("2025_excess_below_minus_5pct")
         elif period != "2025" and excess < -0.10:
@@ -344,8 +360,10 @@ def neighbor_pass_rate(rows: list[dict]) -> float:
     if not rows:
         return 0.0
     passed = sum(
-        float(row.get("annual_return", 0.0)) >= 0.10
-        and abs(float(row.get("max_drawdown", 0.0))) <= 0.22
+        (annual_return := _finite_metric(row, "annual_return")) is not None
+        and (max_drawdown := _finite_metric(row, "max_drawdown")) is not None
+        and annual_return >= 0.10
+        and abs(max_drawdown) <= 0.22
         for row in rows
     )
     return round(passed / len(rows), 6)
@@ -355,12 +373,12 @@ def robust_rank_key(row: dict) -> tuple[float, float, float, float, float, float
     """Rank robust rows from broad stability to headline return."""
 
     return (
-        float(row.get("neighbor_pass_rate", 0.0)),
-        float(row.get("worst_validation_excess", -999.0)),
-        float(row.get("sharpe_ratio", -999.0)),
-        -abs(float(row.get("max_drawdown", -999.0))),
-        float(row.get("monthly_win_rate", 0.0)),
-        float(row.get("annual_return", -999.0)),
+        _float_metric(row, "neighbor_pass_rate", 0.0),
+        _float_metric(row, "worst_validation_excess"),
+        _float_metric(row, "sharpe_ratio"),
+        -abs(_float_metric(row, "max_drawdown")),
+        _float_metric(row, "monthly_win_rate", 0.0),
+        _float_metric(row, "annual_return"),
     )
 
 
@@ -395,16 +413,26 @@ def _date_key(value: object) -> str:
     return str(value)[:10]
 
 
+def _finite_metric(row: dict, key: str) -> float | None:
+    try:
+        value = float(row[key])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
 def slice_backtest_result(result: dict, start: str, end: str) -> dict | None:
     """Return an isolated validation-year view of a formation backtest."""
 
     recorded = [
-        row
+        dict(row)
         for row in result.get("recorded_values", [])
         if start <= _date_key(row.get("date")) <= end
     ]
     if len(recorded) < 2:
         return None
+    recorded_start = _date_key(recorded[0].get("date"))
+    recorded_end = _date_key(recorded[-1].get("date"))
     context = SimpleNamespace(
         portfolio=SimpleNamespace(
             starting_cash=float(recorded[0]["total_value"]),
@@ -412,15 +440,20 @@ def slice_backtest_result(result: dict, start: str, end: str) -> dict | None:
         )
     )
     trades = [
-        trade
+        dict(trade)
         for trade in result.get("trade_log", [])
         if start <= _date_key(trade.get("date")) <= end
     ]
     benchmark_values = [
-        row
+        dict(row)
         for row in result.get("benchmark_values", [])
-        if start <= _date_key(row.get("date")) <= end
+        if recorded_start <= _date_key(row.get("date")) <= recorded_end
     ]
+    if len(benchmark_values) < 2 or any(
+        (value := _finite_metric(row, "value")) is None or value <= 0.0
+        for row in benchmark_values
+    ):
+        return None
     return {
         "context": context,
         "trade_log": trades,
@@ -453,10 +486,8 @@ def stability_score(metrics: dict) -> float:
 
 
 def _float_metric(row: dict, key: str, default: float = -999.0) -> float:
-    try:
-        return float(row.get(key, default))
-    except (TypeError, ValueError):
-        return default
+    value = _finite_metric(row, key)
+    return default if value is None else value
 
 
 def _candidate_rank_key(row: dict) -> tuple[bool, float, float]:
@@ -1312,7 +1343,7 @@ def main() -> int:
 
         row["validation"] = validation_rows
         row["worst_validation_excess"] = min(
-            float(item.get("excess_return", -999.0))
+            _float_metric(item, "excess_return")
             for item in validation_rows.values()
         )
         gate_failures = full_gate_failures(row)
