@@ -2073,6 +2073,217 @@ def test_channel_diagnostics_returns_defaults_without_context_and_does_not_mutat
     assert result == original
 
 
+def test_channel_diagnostics_bridges_missing_close_with_fill_lot_anchors():
+    dates = pd.to_datetime(["2025-01-02", "2025-01-03", "2025-01-06"])
+    result = {
+        "context": SimpleNamespace(sr_order_channels={1: "primary"}),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": 1,
+            },
+            {
+                "date": "2025-01-03",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 30,
+                "order_id": 1,
+                "partial": True,
+            },
+            {
+                "date": "2025-01-03",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 20,
+                "order_id": 1,
+                "partial": True,
+            },
+            {
+                "date": "2025-01-03",
+                "type": "SELL",
+                "security": "600519",
+                "amount": 20,
+                "order_id": 1,
+            },
+            {
+                "date": "2025-01-06",
+                "type": "SELL",
+                "security": "600519",
+                "amount": 30,
+                "order_id": 1,
+                "partial": True,
+            },
+        ],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 10_000},
+            {"date": "2025-01-03", "total_value": 10_000},
+            {"date": "2025-01-06", "total_value": 10_160},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame(
+                {"close": [10.0, float("nan"), 12.0]}, index=dates
+            )
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics["primary_trade_count"] == 3
+    assert diagnostics["primary_average_holdings"] == 1.0
+    assert diagnostics["primary_return_contribution"] == 0.016
+
+
+def test_channel_diagnostics_excludes_invalid_totals_from_snapshot_averages():
+    dates = pd.to_datetime(["2025-01-02", "2025-01-03"])
+    result = {
+        "context": SimpleNamespace(
+            sr_order_channels={"buy": "primary", "sell": "primary"}
+        ),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": "buy",
+            },
+            {
+                "date": "2025-01-03",
+                "type": "SELL",
+                "security": "600519",
+                "amount": 100,
+                "order_id": "sell",
+            },
+        ],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 10_000},
+            {"date": "2025-01-03", "total_value": float("inf")},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame({"close": [10.0, 11.0]}, index=dates)
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics["primary_average_exposure"] == 0.1
+    assert diagnostics["primary_average_holdings"] == 1.0
+    assert diagnostics["primary_return_contribution"] == 0.01
+
+
+def test_diagnostics_skip_invalid_dates_and_keep_all_outputs_finite():
+    invalid_dates = [pd.NaT, float("nan"), "not-a-date"]
+    price_index = pd.Index([*invalid_dates, "2025-01-02", "2025-01-03"])
+    result = {
+        "context": SimpleNamespace(
+            sr_order_channels={
+                "bad-nat": "primary",
+                "bad-nan": "primary",
+                "bad-text": "fallback",
+                "huge": "primary",
+                "bad-quantity": "fallback",
+            },
+            sr_risk_events=[
+                {"date": pd.NaT, "from": "normal", "to": "protect"},
+                {"date": float("nan"), "from": "normal", "to": "protect"},
+                {"date": "not-a-date", "from": "normal", "to": "protect"},
+                {"date": "2025-01-03", "from": "normal", "to": "cautious"},
+            ],
+        ),
+        "trade_log": [
+            {
+                "date": date,
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": order_id,
+            }
+            for date, order_id in zip(
+                invalid_dates, ["bad-nat", "bad-nan", "bad-text"]
+            )
+        ]
+        + [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 1e308,
+                "order_id": "huge",
+            },
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600036",
+                "amount": float("inf"),
+                "order_id": "bad-quantity",
+            },
+        ],
+        "recorded_values": [
+            *({"date": date, "total_value": 100} for date in invalid_dates),
+            {"date": "2025-01-02", "total_value": 1.0},
+            {"date": "2025-01-03", "total_value": 1.0},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame(
+                {
+                    "close": [
+                        10.0,
+                        10.0,
+                        10.0,
+                        1e-308,
+                        1e308,
+                    ]
+                },
+                index=price_index,
+            )
+        },
+    }
+
+    channel = channel_diagnostics(result)
+    risk = risk_state_diagnostics(result)
+
+    assert channel["primary_trade_count"] == 1
+    assert channel["fallback_trade_count"] == 0
+    assert channel["primary_return_contribution"] == 0.0
+    assert all(np.isfinite(value) for value in channel.values())
+    assert risk == {
+        "risk_state_days": {"normal": 1, "cautious": 1},
+        "risk_state_trigger_count": 1,
+        "risk_state_recovery_count": 0,
+    }
+
+
+def test_channel_diagnostics_prevents_exposure_accumulator_overflow():
+    dates = pd.to_datetime(["2025-01-02", "2025-01-03"])
+    result = {
+        "context": SimpleNamespace(sr_order_channels={1: "primary"}),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 1.0,
+                "order_id": 1,
+            }
+        ],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 1.0},
+            {"date": "2025-01-03", "total_value": 1.0},
+        ],
+        "ohlcv_data": {
+            "600519": pd.DataFrame({"close": [1e308, 1e308]}, index=dates)
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert all(np.isfinite(value) for value in diagnostics.values())
+    assert diagnostics["primary_average_exposure"] == 1e308
+
+
 def test_risk_state_diagnostics_counts_state_duration_and_transitions():
     result = {
         "context": SimpleNamespace(
@@ -2826,6 +3037,14 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
         "selected": True,
         "robust_gate_pass": True,
         "gate_failures": [],
+        "neighbor_pass_rate": 0.60,
+        "validation": {
+            **robust["validation"],
+            "2025": {
+                **robust["validation"]["2025"],
+                "excess_return": -0.05,
+            },
+        },
     }
     write_outputs([{**baseline, "selected": False}, passing_robust])
     selected_markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
@@ -2834,6 +3053,174 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
     )[0]
     assert risk_section.index("robust-1") < risk_section.index("baseline")
     assert retention not in selected_markdown
+
+
+def _review_report_rows():
+    common = {
+        "period_name": "full",
+        "start": "2020-01-01",
+        "end": "2025-12-31",
+        "total_return": 0.8,
+        "benchmark_return": 0.4,
+        "excess_return": 0.4,
+        "max_drawdown": -0.18,
+        "sharpe_ratio": 0.8,
+        "trade_count": 20,
+        "raw_trade_count": 20,
+        "grade": "A",
+        "stability_score": 1.0,
+        "gate_failures": [],
+        "robust_gate_pass": False,
+        "neighbor_pass_rate": 0.7,
+        "worst_validation_excess": -0.02,
+        "validation": {},
+        "risk_state_days": {"normal": 10},
+    }
+    baseline = {
+        **common,
+        "kind": "adaptive_composite",
+        "selected": True,
+        "annual_return": 0.11,
+        "grade_score": 71.3,
+        "neighbor_pass_rate": 0.0,
+        "params": BASELINE_ADAPTIVE_PARAMS.__dict__,
+    }
+    non_finalist = {
+        **common,
+        "kind": "seed_not_validated",
+        "selected": False,
+        "annual_return": 0.14,
+        "grade_score": 90.0,
+        "params": {**BASELINE_ADAPTIVE_PARAMS.__dict__, "robust_enabled": True},
+    }
+    finalist = {
+        **common,
+        "kind": "validated_finalist",
+        "selected": False,
+        "annual_return": 0.13,
+        "grade_score": 72.0,
+        "validation": {
+            "2023": {
+                "annual_return": 0.10,
+                "excess_return": -0.02,
+                "max_drawdown": -0.12,
+                "grade": "B",
+            },
+            "2024": {"error": "validation slice returned None"},
+            "2025": {
+                "annual_return": 0.08,
+                "excess_return": -0.04,
+                "max_drawdown": -0.14,
+                "grade": "B",
+            },
+        },
+        "params": {
+            **BASELINE_ADAPTIVE_PARAMS.__dict__,
+            "robust_enabled": True,
+            "min_primary_candidates": 4,
+        },
+    }
+    return baseline, non_finalist, finalist
+
+
+def test_reports_include_only_validated_finalists_and_mark_unavailable_metrics(
+    tmp_path, monkeypatch
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    baseline, non_finalist, finalist = _review_report_rows()
+
+    write_outputs([non_finalist, finalist, baseline])
+
+    markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    rolling_markdown = markdown.split("## 滚动验证", 1)[1].split(
+        "## 风险状态", 1
+    )[0]
+    rolling_html = html_report.split("<h2>滚动验证</h2>", 1)[1].split(
+        "<h2>风险状态</h2>", 1
+    )[0]
+
+    assert "seed_not_validated" not in rolling_markdown
+    assert "seed_not_validated" not in rolling_html
+    assert "validated_finalist" in rolling_markdown
+    unavailable_row = next(
+        line
+        for line in rolling_markdown.splitlines()
+        if "validated_finalist" in line and "| 2024 |" in line
+    )
+    assert unavailable_row.count("不可用") == 4
+    assert "<td>不可用</td>" in rolling_html
+
+    write_outputs([non_finalist, baseline])
+    empty_markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    empty_rolling = empty_markdown.split("## 滚动验证", 1)[1].split(
+        "## 风险状态", 1
+    )[0]
+    assert "0.00%" not in empty_rolling
+    assert "不可用" in empty_rolling
+
+
+def test_baseline_comparison_is_selected_first_and_uses_complete_gate_failures(
+    tmp_path, monkeypatch
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    baseline, non_finalist, finalist = _review_report_rows()
+
+    write_outputs([non_finalist, finalist, baseline])
+
+    markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    comparison = markdown.split("## 基线与稳健候选对比", 1)[1].split(
+        "## 长期回测压力诊断", 1
+    )[0]
+    data_rows = [
+        line
+        for line in comparison.splitlines()
+        if line.startswith("| ") and not line.startswith("| Candidate")
+    ]
+    baseline_cells = [cell.strip() for cell in data_rows[0].strip("|").split("|")]
+    assert baseline_cells[0] == "baseline"
+    assert "annual_return_below_12pct" in baseline_cells[5]
+    assert "2023_validation_unavailable" in baseline_cells[6]
+    assert "neighbor_pass_rate_below_60pct" in baseline_cells[9]
+    assert "annual_return_below_12pct" in baseline_cells[10]
+    assert "2023_validation_unavailable" in baseline_cells[10]
+    assert "neighbor_pass_rate_below_60pct" in baseline_cells[10]
+    comparison_html = html_report.split(
+        "<h2>基线与稳健候选对比</h2>", 1
+    )[1].split("<h2>长期回测压力诊断</h2>", 1)[0]
+    assert comparison_html.index("<td>baseline</td>") < comparison_html.index(
+        "validated_finalist"
+    )
+
+    selected_finalist = {**finalist, "selected": True}
+    write_outputs(
+        [non_finalist, selected_finalist, {**baseline, "selected": False}]
+    )
+    selected_markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    selected_html = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    selected_comparison = selected_markdown.split(
+        "## 基线与稳健候选对比", 1
+    )[1].split("## 长期回测压力诊断", 1)[0]
+    selected_rows = [
+        line
+        for line in selected_comparison.splitlines()
+        if line.startswith("| ") and not line.startswith("| Candidate")
+    ]
+    robust_cells = [cell.strip() for cell in selected_rows[0].strip("|").split("|")]
+    assert robust_cells[0].startswith("robust-1 (validated_finalist")
+    assert "2024_validation_unavailable" in robust_cells[7]
+    assert "2024_validation_unavailable" in robust_cells[10]
+    selected_comparison_html = selected_html.split(
+        "<h2>基线与稳健候选对比</h2>", 1
+    )[1].split("<h2>长期回测压力诊断</h2>", 1)[0]
+    assert selected_comparison_html.index("validated_finalist") < (
+        selected_comparison_html.index("<td>baseline</td>")
+    )
 
 
 def test_period_interpretation_uses_selected_full_row_for_recommendation():
