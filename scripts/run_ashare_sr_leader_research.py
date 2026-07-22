@@ -16,6 +16,8 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import pandas as pd
+
 from eqlib import analyze_returns, generate_html_report, grade_strategy, run_backtest
 from eqlib.strategies.ashare_sr_leader import (
     PortfolioRiskState,
@@ -414,6 +416,18 @@ def _date_key(value: object) -> str:
     return str(value)[:10]
 
 
+def _valid_date_key(value: object) -> str | None:
+    if value is None or isinstance(value, (bool, int, float)):
+        return None
+    try:
+        timestamp = pd.to_datetime(value, errors="coerce")
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not isinstance(timestamp, pd.Timestamp) or pd.isna(timestamp):
+        return None
+    return timestamp.strftime("%Y-%m-%d")
+
+
 def _channel_defaults() -> dict[str, float | int]:
     return {
         "primary_trade_count": 0,
@@ -430,9 +444,27 @@ def _channel_defaults() -> dict[str, float | int]:
 def _finite_float(value: object) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _finite_product(*values: float) -> float | None:
+    product = 1.0
+    for value in values:
+        product *= value
+        if not math.isfinite(product):
+            return None
+    return product
+
+
+def _finite_sum(values) -> float | None:
+    total = 0.0
+    for value in values:
+        total += value
+        if not math.isfinite(total):
+            return None
+    return total
 
 
 def _close_history(frame: object) -> dict[str, float]:
@@ -443,9 +475,10 @@ def _close_history(frame: object) -> dict[str, float]:
         return {}
     history: dict[str, float] = {}
     for date, value in items:
+        date_key = _valid_date_key(date)
         price = _finite_float(value)
-        if price is not None and price > 0.0:
-            history[_date_key(date)] = price
+        if date_key is not None and price is not None and price > 0.0:
+            history[date_key] = price
     return history
 
 
@@ -459,8 +492,10 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
         raw_channels = {}
     order_channels = {str(key): value for key, value in raw_channels.items()}
     valid_channels = ("primary", "fallback")
-    holdings = {channel: {} for channel in valid_channels}
-    trades_by_date: dict[str, list[dict]] = {}
+    lots: dict[str, dict[str, list[dict[str, float | None]]]] = {
+        channel: {} for channel in valid_channels
+    }
+    trades_by_date: dict[str, list[tuple[dict, str, str, float]]] = {}
 
     for trade in result.get("trade_log", []) or []:
         if not isinstance(trade, dict):
@@ -468,17 +503,18 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
         channel = order_channels.get(str(trade.get("order_id")))
         security = trade.get("security")
         amount = _finite_float(trade.get("amount"))
-        trade_date = trade.get("date")
+        trade_date = _valid_date_key(trade.get("date"))
         if (
             channel not in valid_channels
             or not security
-            or not trade_date
+            or trade_date is None
             or amount is None
             or amount <= 0
         ):
             continue
-        date = _date_key(trade_date)
-        trades_by_date.setdefault(date, []).append(trade)
+        trades_by_date.setdefault(trade_date, []).append(
+            (trade, channel, str(security), amount)
+        )
         if trade.get("type") == "BUY":
             defaults[f"{channel}_trade_count"] += 1
 
@@ -486,72 +522,137 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
         str(security): _close_history(frame)
         for security, frame in (result.get("ohlcv_data", {}) or {}).items()
     }
-    records = sorted(
-        (
-            row
-            for row in (result.get("recorded_values", []) or [])
-            if isinstance(row, dict) and row.get("date") is not None
-        ),
-        key=lambda row: _date_key(row.get("date")),
-    )
-    exposure_totals = {channel: 0.0 for channel in valid_channels}
+    records = []
+    for row in result.get("recorded_values", []) or []:
+        if not isinstance(row, dict):
+            continue
+        date = _valid_date_key(row.get("date"))
+        if date is not None:
+            records.append((date, row))
+    records.sort(key=lambda item: item[0])
+    average_exposures = {channel: 0.0 for channel in valid_channels}
     holding_totals = {channel: 0.0 for channel in valid_channels}
+    exposure_dates = {channel: 0 for channel in valid_channels}
+    holding_dates = {channel: 0 for channel in valid_channels}
     contributions = {channel: 0.0 for channel in valid_channels}
-    previous_date: str | None = None
-    previous_total: float | None = None
 
-    for record in records:
-        date = _date_key(record.get("date"))
-        if previous_date is not None and previous_total is not None and previous_total > 0.0:
-            for channel in valid_channels:
-                for security, amount in holdings[channel].items():
-                    history = close_histories.get(security, {})
-                    previous_close = history.get(previous_date)
-                    current_close = history.get(date)
-                    if previous_close is None or current_close is None:
-                        continue
-                    contributions[channel] += (
-                        amount * (current_close - previous_close) / previous_total
-                    )
-
-        for trade in trades_by_date.get(date, []):
-            channel = order_channels[str(trade.get("order_id"))]
-            security = str(trade["security"])
-            amount = float(trade["amount"])
-            current = holdings[channel].get(security, 0.0)
-            if trade.get("type") == "BUY":
-                holdings[channel][security] = current + amount
-            elif trade.get("type") == "SELL":
-                remaining = max(0.0, current - amount)
-                if remaining > 0.0:
-                    holdings[channel][security] = remaining
-                else:
-                    holdings[channel].pop(security, None)
-
+    for date, record in records:
         total_value = _finite_float(record.get("total_value"))
+        if total_value is not None and total_value <= 0.0:
+            total_value = None
+
+        for channel in valid_channels:
+            for security, security_lots in lots[channel].items():
+                current_close = close_histories.get(security, {}).get(date)
+                if current_close is None:
+                    continue
+                for lot in security_lots:
+                    anchor_close = lot["anchor_close"]
+                    anchor_total = lot["anchor_total"]
+                    amount = lot["amount"]
+                    if (
+                        anchor_close is not None
+                        and anchor_total is not None
+                        and amount is not None
+                    ):
+                        position_value = _finite_product(amount, anchor_close)
+                        price_ratio = _finite_float(current_close / anchor_close)
+                        price_return = (
+                            _finite_float(price_ratio - 1.0)
+                            if price_ratio is not None
+                            else None
+                        )
+                        weight = (
+                            _finite_float(position_value / anchor_total)
+                            if position_value is not None
+                            else None
+                        )
+                        contribution = (
+                            _finite_product(weight, price_return)
+                            if weight is not None and price_return is not None
+                            else None
+                        )
+                        if contribution is not None:
+                            updated = _finite_sum(
+                                [contributions[channel], contribution]
+                            )
+                            if updated is not None:
+                                contributions[channel] = updated
+                    lot["anchor_close"] = current_close
+                    lot["anchor_total"] = total_value
+
+        for trade, channel, security, amount in trades_by_date.get(date, []):
+            security_lots = lots[channel].setdefault(security, [])
+            current_close = close_histories.get(security, {}).get(date)
+            if trade.get("type") == "BUY":
+                security_lots.append(
+                    {
+                        "amount": amount,
+                        "anchor_close": current_close,
+                        "anchor_total": total_value if current_close is not None else None,
+                    }
+                )
+            elif trade.get("type") == "SELL":
+                remaining = amount
+                while security_lots and remaining > 0.0:
+                    lot_amount = float(security_lots[0]["amount"] or 0.0)
+                    sold = min(lot_amount, remaining)
+                    security_lots[0]["amount"] = lot_amount - sold
+                    remaining -= sold
+                    if float(security_lots[0]["amount"] or 0.0) <= 0.0:
+                        security_lots.pop(0)
+            if not security_lots:
+                lots[channel].pop(security, None)
+
+        if total_value is None:
+            continue
         for channel in valid_channels:
             holding_totals[channel] += sum(
-                amount > 0.0 for amount in holdings[channel].values()
+                bool(security_lots) for security_lots in lots[channel].values()
             )
-            if total_value is None or total_value <= 0.0:
-                continue
-            exposure_totals[channel] += sum(
-                amount * close
-                for security, amount in holdings[channel].items()
-                if (close := close_histories.get(security, {}).get(date)) is not None
-            ) / total_value
+            holding_dates[channel] += 1
+            position_values: list[float] = []
+            exposure_valid = True
+            for security, security_lots in lots[channel].items():
+                current_close = close_histories.get(security, {}).get(date)
+                if current_close is None:
+                    continue
+                amount = _finite_sum(
+                    float(lot["amount"] or 0.0) for lot in security_lots
+                )
+                position_value = (
+                    _finite_product(amount, current_close)
+                    if amount is not None
+                    else None
+                )
+                if position_value is None:
+                    exposure_valid = False
+                    break
+                position_values.append(position_value)
+            invested = _finite_sum(position_values) if exposure_valid else None
+            exposure = (
+                _finite_float(invested / total_value)
+                if invested is not None
+                else None
+            )
+            if exposure is not None:
+                next_count = exposure_dates[channel] + 1
+                updated_average = _finite_float(
+                    average_exposures[channel]
+                    + (exposure - average_exposures[channel]) / next_count
+                )
+                if updated_average is not None:
+                    average_exposures[channel] = updated_average
+                    exposure_dates[channel] = next_count
 
-        previous_date = date
-        previous_total = total_value
-
-    record_count = len(records)
     for channel in valid_channels:
-        if record_count:
+        if exposure_dates[channel]:
             defaults[f"{channel}_average_exposure"] = round(
-                exposure_totals[channel] / record_count, 6
+                average_exposures[channel], 6
             )
+        if holding_dates[channel]:
             defaults[f"{channel}_average_holdings"] = round(
-                holding_totals[channel] / record_count, 6
+                holding_totals[channel] / holding_dates[channel], 6
             )
         defaults[f"{channel}_return_contribution"] = round(
             contributions[channel], 6
@@ -578,19 +679,22 @@ def risk_state_diagnostics(result: dict) -> dict:
 
     context = result.get("context")
     raw_events = getattr(context, "sr_risk_events", []) if context else []
-    events = sorted(
-        (
-            event
-            for event in (raw_events or [])
-            if isinstance(event, dict) and event.get("date") is not None
-        ),
-        key=lambda event: _date_key(event["date"]),
-    )
-    dates = sorted(
-        _date_key(row.get("date"))
-        for row in (result.get("recorded_values", []) or [])
-        if isinstance(row, dict) and row.get("date") is not None
-    )
+    events = []
+    for event in raw_events or []:
+        if not isinstance(event, dict):
+            continue
+        date = _valid_date_key(event.get("date"))
+        if date is not None:
+            events.append((date, event))
+    events.sort(key=lambda item: item[0])
+    dates = []
+    for row in result.get("recorded_values", []) or []:
+        if not isinstance(row, dict):
+            continue
+        date = _valid_date_key(row.get("date"))
+        if date is not None:
+            dates.append(date)
+    dates.sort()
     state = PortfolioRiskState.NORMAL
     state_days: dict[str, int] = {}
     trigger_count = 0
@@ -598,8 +702,8 @@ def risk_state_diagnostics(result: dict) -> dict:
     event_index = 0
 
     for date in dates:
-        while event_index < len(events) and _date_key(events[event_index]["date"]) <= date:
-            target = _portfolio_risk_state(events[event_index].get("to"))
+        while event_index < len(events) and events[event_index][0] <= date:
+            target = _portfolio_risk_state(events[event_index][1].get("to"))
             event_index += 1
             if target is None or target is state:
                 continue
@@ -1024,10 +1128,13 @@ def _profile_name(row: dict) -> str:
 
 
 def _robust_report_rows(full_rows: list[dict]) -> list[dict]:
+    validation_periods = {period for period, *_window in VALIDATION_WINDOWS}
     return [
         row
         for row in full_rows
         if bool((row.get("params", {}) or {}).get("robust_enabled"))
+        and isinstance(row.get("validation"), dict)
+        and validation_periods.issubset(row["validation"])
     ]
 
 
@@ -1056,25 +1163,47 @@ def _gate_result(failures: list[str]) -> str:
     return "通过" if not failures else f"未通过: {', '.join(failures)}"
 
 
-def _hard_gate_outcomes(row: dict) -> tuple[str, str, str, str, str]:
+def _hard_gate_diagnostics(
+    row: dict,
+) -> tuple[list[str], tuple[str, str, str, str, str]]:
     validation = row.get("validation", {}) or {}
-    full_result = _gate_result(full_gate_failures(row))
-    annual_results = []
+    full_failures = full_gate_failures(row)
+    annual_failures = []
     for year in ("2023", "2024", "2025"):
-        failures = validation_gate_failures(
-            {year: validation.get(year, {"error": "missing"})}
+        annual_failures.append(
+            validation_gate_failures(
+                {year: validation.get(year, {"error": "missing"})}
+            )
         )
-        annual_results.append(_gate_result(failures))
-    neighbor_result = (
-        "通过"
-        if _float_metric(row, "neighbor_pass_rate", 0.0) >= 0.60
-        else "未通过: neighbor_pass_rate_below_60pct"
+    neighbor_rate = _finite_metric(row, "neighbor_pass_rate")
+    if neighbor_rate is None:
+        neighbor_failures = ["neighbor_pass_rate_nonfinite"]
+    elif neighbor_rate < 0.60:
+        neighbor_failures = ["neighbor_pass_rate_below_60pct"]
+    else:
+        neighbor_failures = []
+    failures = [
+        *full_failures,
+        *(failure for period in annual_failures for failure in period),
+        *neighbor_failures,
+    ]
+    outcomes = (
+        _gate_result(full_failures),
+        *(_gate_result(period) for period in annual_failures),
+        _gate_result(neighbor_failures),
     )
-    return full_result, *annual_results, neighbor_result
+    return failures, outcomes
+
+
+def _report_validation_value(row: dict, key: str) -> str:
+    if row.get("error"):
+        return "不可用"
+    value = _finite_metric(row, key)
+    return "不可用" if value is None else _fmt_pct(value)
 
 
 def _retention_notice(robust_rows: list[dict]) -> str:
-    if any(row.get("robust_gate_pass") is True for row in robust_rows):
+    if any(not _hard_gate_diagnostics(row)[0] for row in robust_rows):
         return ""
     return "本轮没有找到通过全部稳健门槛的新候选，继续保留当前 A / 71.3 基线。"
 
@@ -1128,13 +1257,13 @@ def _markdown_research_sections(full_rows: list[dict]) -> str:
             annual = validation.get(year, {}) or {}
             lines.append(
                 f"| {_report_candidate_label(row, index)} | {year} | "
-                f"{_fmt_pct(_float_metric(annual, 'annual_return', 0.0))} | "
-                f"{_fmt_pct(_float_metric(annual, 'excess_return', 0.0))} | "
-                f"{_fmt_pct(_float_metric(annual, 'max_drawdown', 0.0))} | "
-                f"{annual.get('grade', 'N/A')} |"
+                f"{_report_validation_value(annual, 'annual_return')} | "
+                f"{_report_validation_value(annual, 'excess_return')} | "
+                f"{_report_validation_value(annual, 'max_drawdown')} | "
+                f"{annual.get('grade', '不可用') if not annual.get('error') else '不可用'} |"
             )
     if not robust_rows:
-        lines.append("| N/A | 2023/2024/2025 | 0.00% | 0.00% | 0.00% | N/A |")
+        lines.append("| N/A | 2023/2024/2025 | 不可用 | 不可用 | 不可用 | 不可用 |")
 
     diagnostic_rows = [
         row
@@ -1188,11 +1317,14 @@ def _markdown_research_sections(full_rows: list[dict]) -> str:
             "|---|---:|---:|---:|---|---|---|---|---|---|---|",
         ]
     )
-    comparison_rows = ([baseline] if baseline else []) + robust_rows
+    comparison_rows = [
+        row
+        for row in full_rows
+        if row is baseline or any(row is robust for robust in robust_rows)
+    ]
     for row in comparison_rows:
         label = candidate_label(row)
-        outcomes = _hard_gate_outcomes(row)
-        failures = list(row.get("gate_failures", []) or [])
+        failures, outcomes = _hard_gate_diagnostics(row)
         lines.append(
             f"| {label} | {_fmt_pct(_float_metric(row, 'annual_return', 0.0))} | "
             f"{_fmt_pct(_float_metric(row, 'max_drawdown', 0.0))} | "
