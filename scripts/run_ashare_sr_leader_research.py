@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 from eqlib import analyze_returns, generate_html_report, grade_strategy, run_backtest
 from eqlib.strategies.ashare_sr_leader import (
+    PortfolioRiskState,
     StrategyKind,
     StrategyParams,
     get_default_leader_universe,
@@ -413,6 +414,210 @@ def _date_key(value: object) -> str:
     return str(value)[:10]
 
 
+def _channel_defaults() -> dict[str, float | int]:
+    return {
+        "primary_trade_count": 0,
+        "fallback_trade_count": 0,
+        "primary_average_exposure": 0.0,
+        "fallback_average_exposure": 0.0,
+        "primary_average_holdings": 0.0,
+        "fallback_average_holdings": 0.0,
+        "primary_return_contribution": 0.0,
+        "fallback_return_contribution": 0.0,
+    }
+
+
+def _finite_float(value: object) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _close_history(frame: object) -> dict[str, float]:
+    try:
+        close = frame["close"]
+        items = close.items()
+    except (KeyError, TypeError, AttributeError):
+        return {}
+    history: dict[str, float] = {}
+    for date, value in items:
+        price = _finite_float(value)
+        if price is not None and price > 0.0:
+            history[_date_key(date)] = price
+    return history
+
+
+def channel_diagnostics(result: dict) -> dict[str, float | int]:
+    """Attribute holdings, exposure, and next-close return by entry channel."""
+
+    defaults = _channel_defaults()
+    context = result.get("context")
+    raw_channels = getattr(context, "sr_order_channels", {}) if context else {}
+    if not isinstance(raw_channels, dict):
+        raw_channels = {}
+    order_channels = {str(key): value for key, value in raw_channels.items()}
+    valid_channels = ("primary", "fallback")
+    holdings = {channel: {} for channel in valid_channels}
+    trades_by_date: dict[str, list[dict]] = {}
+
+    for trade in result.get("trade_log", []) or []:
+        if not isinstance(trade, dict):
+            continue
+        channel = order_channels.get(str(trade.get("order_id")))
+        security = trade.get("security")
+        amount = _finite_float(trade.get("amount"))
+        trade_date = trade.get("date")
+        if (
+            channel not in valid_channels
+            or not security
+            or not trade_date
+            or amount is None
+            or amount <= 0
+        ):
+            continue
+        date = _date_key(trade_date)
+        trades_by_date.setdefault(date, []).append(trade)
+        if trade.get("type") == "BUY":
+            defaults[f"{channel}_trade_count"] += 1
+
+    close_histories = {
+        str(security): _close_history(frame)
+        for security, frame in (result.get("ohlcv_data", {}) or {}).items()
+    }
+    records = sorted(
+        (
+            row
+            for row in (result.get("recorded_values", []) or [])
+            if isinstance(row, dict) and row.get("date") is not None
+        ),
+        key=lambda row: _date_key(row.get("date")),
+    )
+    exposure_totals = {channel: 0.0 for channel in valid_channels}
+    holding_totals = {channel: 0.0 for channel in valid_channels}
+    contributions = {channel: 0.0 for channel in valid_channels}
+    previous_date: str | None = None
+    previous_total: float | None = None
+
+    for record in records:
+        date = _date_key(record.get("date"))
+        if previous_date is not None and previous_total is not None and previous_total > 0.0:
+            for channel in valid_channels:
+                for security, amount in holdings[channel].items():
+                    history = close_histories.get(security, {})
+                    previous_close = history.get(previous_date)
+                    current_close = history.get(date)
+                    if previous_close is None or current_close is None:
+                        continue
+                    contributions[channel] += (
+                        amount * (current_close - previous_close) / previous_total
+                    )
+
+        for trade in trades_by_date.get(date, []):
+            channel = order_channels[str(trade.get("order_id"))]
+            security = str(trade["security"])
+            amount = float(trade["amount"])
+            current = holdings[channel].get(security, 0.0)
+            if trade.get("type") == "BUY":
+                holdings[channel][security] = current + amount
+            elif trade.get("type") == "SELL":
+                remaining = max(0.0, current - amount)
+                if remaining > 0.0:
+                    holdings[channel][security] = remaining
+                else:
+                    holdings[channel].pop(security, None)
+
+        total_value = _finite_float(record.get("total_value"))
+        for channel in valid_channels:
+            holding_totals[channel] += sum(
+                amount > 0.0 for amount in holdings[channel].values()
+            )
+            if total_value is None or total_value <= 0.0:
+                continue
+            exposure_totals[channel] += sum(
+                amount * close
+                for security, amount in holdings[channel].items()
+                if (close := close_histories.get(security, {}).get(date)) is not None
+            ) / total_value
+
+        previous_date = date
+        previous_total = total_value
+
+    record_count = len(records)
+    for channel in valid_channels:
+        if record_count:
+            defaults[f"{channel}_average_exposure"] = round(
+                exposure_totals[channel] / record_count, 6
+            )
+            defaults[f"{channel}_average_holdings"] = round(
+                holding_totals[channel] / record_count, 6
+            )
+        defaults[f"{channel}_return_contribution"] = round(
+            contributions[channel], 6
+        )
+    return defaults
+
+
+def _portfolio_risk_state(value: object) -> PortfolioRiskState | None:
+    if isinstance(value, PortfolioRiskState):
+        return value
+    if isinstance(value, str):
+        try:
+            return PortfolioRiskState[value.upper()]
+        except KeyError:
+            return None
+    try:
+        return PortfolioRiskState(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def risk_state_diagnostics(result: dict) -> dict:
+    """Count recorded-day risk states and ordered state transitions."""
+
+    context = result.get("context")
+    raw_events = getattr(context, "sr_risk_events", []) if context else []
+    events = sorted(
+        (
+            event
+            for event in (raw_events or [])
+            if isinstance(event, dict) and event.get("date") is not None
+        ),
+        key=lambda event: _date_key(event["date"]),
+    )
+    dates = sorted(
+        _date_key(row.get("date"))
+        for row in (result.get("recorded_values", []) or [])
+        if isinstance(row, dict) and row.get("date") is not None
+    )
+    state = PortfolioRiskState.NORMAL
+    state_days: dict[str, int] = {}
+    trigger_count = 0
+    recovery_count = 0
+    event_index = 0
+
+    for date in dates:
+        while event_index < len(events) and _date_key(events[event_index]["date"]) <= date:
+            target = _portfolio_risk_state(events[event_index].get("to"))
+            event_index += 1
+            if target is None or target is state:
+                continue
+            if state is PortfolioRiskState.NORMAL and target > state:
+                trigger_count += 1
+            if target < state:
+                recovery_count += 1
+            state = target
+        name = state.name.lower()
+        state_days[name] = state_days.get(name, 0) + 1
+
+    return {
+        "risk_state_days": state_days,
+        "risk_state_trigger_count": trigger_count,
+        "risk_state_recovery_count": recovery_count,
+    }
+
+
 def _finite_metric(row: dict, key: str) -> float | None:
     try:
         value = float(row[key])
@@ -548,6 +753,24 @@ def summarize_result(result: dict) -> dict:
         ),
     }
     summary["stability_score"] = stability_score(summary)
+    return summary
+
+
+def _attach_research_diagnostics(summary: dict, result: dict | None = None) -> dict:
+    if result is not None:
+        summary.update(channel_diagnostics(result))
+        summary.update(risk_state_diagnostics(result))
+    else:
+        for key, value in _channel_defaults().items():
+            summary.setdefault(key, value)
+        summary.setdefault("risk_state_days", {})
+        summary.setdefault("risk_state_trigger_count", 0)
+        summary.setdefault("risk_state_recovery_count", 0)
+    summary.setdefault("gate_failures", [])
+    summary.setdefault("robust_gate_pass", False)
+    summary.setdefault("neighbor_pass_rate", 0.0)
+    summary.setdefault("worst_validation_excess", 0.0)
+    summary.setdefault("validation", {})
     return summary
 
 
@@ -800,6 +1023,232 @@ def _profile_name(row: dict) -> str:
     return "balanced"
 
 
+def _robust_report_rows(full_rows: list[dict]) -> list[dict]:
+    return [
+        row
+        for row in full_rows
+        if bool((row.get("params", {}) or {}).get("robust_enabled"))
+    ]
+
+
+def _baseline_report_row(full_rows: list[dict]) -> dict:
+    baseline_params = asdict(BASELINE_ADAPTIVE_PARAMS)
+    for row in full_rows:
+        if row.get("params") == baseline_params:
+            return row
+    return next(
+        (
+            row
+            for row in full_rows
+            if not bool((row.get("params", {}) or {}).get("robust_enabled"))
+        ),
+        {},
+    )
+
+
+def _report_candidate_label(row: dict, robust_index: int | None = None) -> str:
+    if robust_index is None:
+        return "baseline"
+    return f"robust-{robust_index} ({row.get('kind', 'N/A')}/{_profile_name(row)})"
+
+
+def _gate_result(failures: list[str]) -> str:
+    return "通过" if not failures else f"未通过: {', '.join(failures)}"
+
+
+def _hard_gate_outcomes(row: dict) -> tuple[str, str, str, str, str]:
+    validation = row.get("validation", {}) or {}
+    full_result = _gate_result(full_gate_failures(row))
+    annual_results = []
+    for year in ("2023", "2024", "2025"):
+        failures = validation_gate_failures(
+            {year: validation.get(year, {"error": "missing"})}
+        )
+        annual_results.append(_gate_result(failures))
+    neighbor_result = (
+        "通过"
+        if _float_metric(row, "neighbor_pass_rate", 0.0) >= 0.60
+        else "未通过: neighbor_pass_rate_below_60pct"
+    )
+    return full_result, *annual_results, neighbor_result
+
+
+def _retention_notice(robust_rows: list[dict]) -> str:
+    if any(row.get("robust_gate_pass") is True for row in robust_rows):
+        return ""
+    return "本轮没有找到通过全部稳健门槛的新候选，继续保留当前 A / 71.3 基线。"
+
+
+def _markdown_research_sections(full_rows: list[dict]) -> str:
+    robust_rows = _robust_report_rows(full_rows)
+    baseline = _baseline_report_row(full_rows)
+    robust_numbers = {id(row): index for index, row in enumerate(robust_rows, start=1)}
+
+    def candidate_label(row: dict) -> str:
+        return _report_candidate_label(
+            row,
+            None if row is baseline else robust_numbers[id(row)],
+        )
+
+    lines = ["## 稳健门槛", ""]
+    notice = _retention_notice(robust_rows)
+    if notice:
+        lines.extend([notice, ""])
+    lines.extend(
+        [
+            "| Candidate | Result | Failure codes | Neighbor pass | Worst validation excess |",
+            "|---|---|---|---:|---:|",
+        ]
+    )
+    if robust_rows:
+        for index, row in enumerate(robust_rows, start=1):
+            failures = list(row.get("gate_failures", []) or [])
+            lines.append(
+                f"| {_report_candidate_label(row, index)} | "
+                f"{'通过' if row.get('robust_gate_pass') is True else '未通过'} | "
+                f"{', '.join(str(code) for code in failures) or '无'} | "
+                f"{_fmt_pct(_float_metric(row, 'neighbor_pass_rate', 0.0))} | "
+                f"{_fmt_pct(_float_metric(row, 'worst_validation_excess', 0.0))} |"
+            )
+    else:
+        lines.append("| N/A | 未通过 | 无稳健候选 | 0.00% | 0.00% |")
+
+    lines.extend(
+        [
+            "",
+            "## 滚动验证",
+            "",
+            "| Candidate | Year | Annual | Excess | Max DD | Grade |",
+            "|---|---:|---:|---:|---:|---|",
+        ]
+    )
+    for index, row in enumerate(robust_rows, start=1):
+        validation = row.get("validation", {}) or {}
+        for year in ("2023", "2024", "2025"):
+            annual = validation.get(year, {}) or {}
+            lines.append(
+                f"| {_report_candidate_label(row, index)} | {year} | "
+                f"{_fmt_pct(_float_metric(annual, 'annual_return', 0.0))} | "
+                f"{_fmt_pct(_float_metric(annual, 'excess_return', 0.0))} | "
+                f"{_fmt_pct(_float_metric(annual, 'max_drawdown', 0.0))} | "
+                f"{annual.get('grade', 'N/A')} |"
+            )
+    if not robust_rows:
+        lines.append("| N/A | 2023/2024/2025 | 0.00% | 0.00% | 0.00% | N/A |")
+
+    diagnostic_rows = [
+        row
+        for row in full_rows
+        if row is baseline or any(row is robust for robust in robust_rows)
+    ]
+    lines.extend(
+        [
+            "",
+            "## 风险状态",
+            "",
+            "| Candidate | Days by state | Triggers | Recoveries |",
+            "|---|---|---:|---:|",
+        ]
+    )
+    for row in diagnostic_rows:
+        label = candidate_label(row)
+        state_days = row.get("risk_state_days", {}) or {}
+        days = ", ".join(f"{state}: {count}" for state, count in state_days.items())
+        lines.append(
+            f"| {label} | {days or '无'} | "
+            f"{row.get('risk_state_trigger_count', 0)} | "
+            f"{row.get('risk_state_recovery_count', 0)} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 主/候补通道",
+            "",
+            "| Candidate | Channel | Trades | Average exposure | Average holdings | Return contribution |",
+            "|---|---|---:|---:|---:|---:|",
+        ]
+    )
+    for row in diagnostic_rows:
+        label = candidate_label(row)
+        for channel, name in (("primary", "主通道"), ("fallback", "候补通道")):
+            lines.append(
+                f"| {label} | {name} | {row.get(f'{channel}_trade_count', 0)} | "
+                f"{_fmt_pct(_float_metric(row, f'{channel}_average_exposure', 0.0))} | "
+                f"{_fmt_num(row.get(f'{channel}_average_holdings', 0.0), 2)} | "
+                f"{_fmt_pct(_float_metric(row, f'{channel}_return_contribution', 0.0))} |"
+            )
+
+    lines.extend(
+        [
+            "",
+            "## 基线与稳健候选对比",
+            "",
+            "| Candidate | Annual | Max DD | Sharpe | Grade | Full gate | 2023 gate | 2024 gate | 2025 gate | Neighborhood gate | Overall |",
+            "|---|---:|---:|---:|---|---|---|---|---|---|---|",
+        ]
+    )
+    comparison_rows = ([baseline] if baseline else []) + robust_rows
+    for row in comparison_rows:
+        label = candidate_label(row)
+        outcomes = _hard_gate_outcomes(row)
+        failures = list(row.get("gate_failures", []) or [])
+        lines.append(
+            f"| {label} | {_fmt_pct(_float_metric(row, 'annual_return', 0.0))} | "
+            f"{_fmt_pct(_float_metric(row, 'max_drawdown', 0.0))} | "
+            f"{_fmt_num(row.get('sharpe_ratio', 0.0), 2)} | "
+            f"{row.get('grade', 'N/A')} / {_fmt_num(row.get('grade_score', 0.0), 1)} | "
+            f"{' | '.join(outcomes)} | {_gate_result(failures)} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _html_research_sections(full_rows: list[dict]) -> str:
+    def render_body(lines: list[str]) -> str:
+        content = [line for line in lines if line]
+        notes = [line for line in content if not line.startswith("|")]
+        table_lines = [line for line in content if line.startswith("|")]
+        parts = [f"<p>{_html_escape(note)}</p>" for note in notes]
+        if len(table_lines) >= 2:
+            rows = [
+                [cell.strip() for cell in line.strip("|").split("|")]
+                for line in table_lines
+            ]
+            header = "".join(f"<th>{_html_escape(cell)}</th>" for cell in rows[0])
+            body = "".join(
+                "<tr>"
+                + "".join(f"<td>{_html_escape(cell)}</td>" for cell in row)
+                + "</tr>"
+                for row in rows[2:]
+            )
+            parts.append(
+                f"<table><thead><tr>{header}</tr></thead><tbody>{body}</tbody></table>"
+            )
+        return "".join(parts)
+
+    markdown = _markdown_research_sections(full_rows)
+    sections = []
+    current_heading = ""
+    current_lines: list[str] = []
+    for line in markdown.splitlines():
+        if line.startswith("## "):
+            if current_heading:
+                sections.append(
+                    f"<h2>{_html_escape(current_heading)}</h2>"
+                    f'<section class="section">{render_body(current_lines)}</section>'
+                )
+            current_heading = line[3:]
+            current_lines = []
+        else:
+            current_lines.append(line)
+    if current_heading:
+        sections.append(
+            f"<h2>{_html_escape(current_heading)}</h2>"
+            f'<section class="section">{render_body(current_lines)}</section>'
+        )
+    return "\n".join(sections)
+
+
 def render_html_report(rows: list[dict]) -> str:
     """Render a self-contained HTML report for strategy research results."""
 
@@ -815,6 +1264,7 @@ def render_html_report(rows: list[dict]) -> str:
         abs(float(row.get("benchmark_return", 0.0))) < 1e-12 for row in sorted_rows
     )
     audit_issues = audit_rows(sorted_rows)
+    research_sections = _html_research_sections(full_rows)
 
     cards = "\n".join(
         [
@@ -1037,6 +1487,8 @@ def render_html_report(rows: list[dict]) -> str:
       </tbody>
     </table>
 
+    {research_sections}
+
     <h2>长期回测压力诊断</h2>
     <p class="subtitle">短期或分阶段结果只用于解释策略失效环境，不作为收益参考，也不参与最终排名。</p>
     <table>
@@ -1089,9 +1541,10 @@ def run_one(
 
     result = run_one_result(kind, params, start, end, universe)
     if result is None:
-        return {"error": "backtest returned None"}
+        return _attach_research_diagnostics({"error": "backtest returned None"})
 
     summary = summarize_result(result)
+    _attach_research_diagnostics(summary, result)
     summary.update(
         {
             "kind": kind.value,
@@ -1147,6 +1600,8 @@ def write_outputs(rows: list[dict]) -> None:
     fieldnames = [
         "kind",
         "period_name",
+        "selected",
+        "selection_reason",
         "start",
         "end",
         "total_return",
@@ -1162,6 +1617,19 @@ def write_outputs(rows: list[dict]) -> None:
         "grade_score",
         "grade_weakest",
         "stability_score",
+        "robust_gate_pass",
+        "neighbor_pass_rate",
+        "worst_validation_excess",
+        "risk_state_trigger_count",
+        "risk_state_recovery_count",
+        "primary_trade_count",
+        "fallback_trade_count",
+        "primary_average_exposure",
+        "fallback_average_exposure",
+        "primary_average_holdings",
+        "fallback_average_holdings",
+        "primary_return_contribution",
+        "fallback_return_contribution",
         "params",
     ]
     with (REPORT_DIR / "summary.csv").open("w", newline="", encoding="utf-8") as fh:
@@ -1201,6 +1669,7 @@ def write_outputs(rows: list[dict]) -> None:
             f"{row.get('trade_count', 0)} | {row.get('raw_trade_count', row.get('trade_count', 0))} |"
         )
     lines.append("")
+    lines.append(_markdown_research_sections(full_rows))
     lines.append(period_interpretation(sorted_rows))
     lines.append(audit_markdown(sorted_rows))
     (REPORT_DIR / "final_report.md").write_text(
@@ -1269,6 +1738,7 @@ def main() -> int:
                     "params": asdict(params),
                 }
             )
+        _attach_research_diagnostics(row, result)
         row.update(
             {
                 "period_name": "full",
@@ -1391,6 +1861,7 @@ def main() -> int:
                     "params": asdict(best_params),
                 }
             )
+        _attach_research_diagnostics(row, result)
         row.update({"period_name": period_name, "selected": False})
         rows.append(row)
         print(
