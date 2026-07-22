@@ -11,8 +11,9 @@ import argparse
 import csv
 import html
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from eqlib import analyze_returns, generate_html_report, grade_strategy, run_backtest
 from eqlib.strategies.ashare_sr_leader import (
@@ -33,6 +34,11 @@ SUB_PERIODS = (
     ("2022", "2022-01-01", "2022-12-31"),
     ("2023-2024", "2023-01-01", "2024-12-31"),
     ("2025", "2025-01-01", "2025-12-31"),
+)
+VALIDATION_WINDOWS = (
+    ("2023", "2020-01-01", "2023-12-31", "2023-01-01", "2023-12-31"),
+    ("2024", "2021-01-01", "2024-12-31", "2024-01-01", "2024-12-31"),
+    ("2025", "2022-01-01", "2025-12-31", "2025-01-01", "2025-12-31"),
 )
 
 RESEARCH_UNIVERSE = [
@@ -78,17 +84,64 @@ RESEARCH_UNIVERSE = [
     "601919",
 ]
 
+BASELINE_ADAPTIVE_PARAMS = StrategyParams(
+    level_window=100,
+    short_level_window=50,
+    atr_multiplier=0.45,
+    volume_ratio_min=0.9,
+    top_n=10,
+    max_stock_weight=0.10,
+    max_industry_weight=0.25,
+    strong_market_exposure=0.95,
+    neutral_market_exposure=0.68,
+    weak_market_exposure=0.25,
+    min_relative_strength=-0.015,
+    max_support_distance=0.11,
+    rebalance_threshold=0.05,
+    liquidity_volume_pct=0.04,
+)
+
+
+def robust_seed_param_grid() -> list[StrategyParams]:
+    """Return the deterministic robust parameter seeds."""
+
+    center = replace(BASELINE_ADAPTIVE_PARAMS, robust_enabled=True)
+    return [
+        center,
+        replace(center, min_primary_candidates=4),
+        replace(center, min_primary_candidates=6),
+        replace(center, fallback_exposure_cap=0.20),
+        replace(center, fallback_exposure_cap=0.30),
+        replace(center, fallback_trailing_drawdown=0.08),
+        replace(center, target_annual_volatility=0.16),
+        replace(center, target_annual_volatility=0.20),
+        replace(
+            center,
+            cautious_drawdown=0.07,
+            defensive_drawdown=0.11,
+            protect_drawdown=0.15,
+        ),
+        replace(
+            center,
+            cautious_drawdown=0.09,
+            defensive_drawdown=0.13,
+            protect_drawdown=0.17,
+        ),
+    ]
+
 
 def candidate_param_grid(quick: bool = False):
     """Return strategy/parameter combinations to evaluate."""
 
     if quick:
-        return [
+        grid = [
             (StrategyKind.DEFENSIVE_SUPPORT, StrategyParams(level_window=60, top_n=8)),
             (StrategyKind.RESISTANCE_BREAKOUT, StrategyParams(level_window=60, top_n=8)),
             (StrategyKind.PULLBACK_MARKET_GATE, StrategyParams(level_window=60, top_n=8)),
             (StrategyKind.ADAPTIVE_COMPOSITE, StrategyParams(level_window=60, top_n=8)),
         ]
+        grid.append((StrategyKind.ADAPTIVE_COMPOSITE, robust_seed_param_grid()[0]))
+        return list(dict.fromkeys(grid))
 
     grid = []
     for kind in StrategyKind:
@@ -213,26 +266,102 @@ def candidate_param_grid(quick: bool = False):
                     ),
                     (
                         kind,
-                        StrategyParams(
-                            level_window=100,
-                            short_level_window=50,
-                            atr_multiplier=0.45,
-                            volume_ratio_min=0.9,
-                            top_n=10,
-                            max_stock_weight=0.10,
-                            max_industry_weight=0.25,
-                            strong_market_exposure=0.95,
-                            neutral_market_exposure=0.68,
-                            weak_market_exposure=0.25,
-                            min_relative_strength=-0.015,
-                            max_support_distance=0.11,
-                            rebalance_threshold=0.05,
-                            liquidity_volume_pct=0.04,
-                        ),
+                        BASELINE_ADAPTIVE_PARAMS,
                     ),
                 ]
             )
-    return grid
+    grid.extend(
+        (StrategyKind.ADAPTIVE_COMPOSITE, params)
+        for params in robust_seed_param_grid()
+    )
+    return list(dict.fromkeys(grid))
+
+
+def neighbor_param_sets(params: StrategyParams) -> list[StrategyParams]:
+    """Return deterministic one-step robustness neighbors around params."""
+
+    variants = [
+        replace(params, min_primary_candidates=value) for value in (4, 5, 6)
+    ]
+    variants.extend(
+        replace(params, fallback_exposure_cap=value) for value in (0.20, 0.25, 0.30)
+    )
+    variants.extend(
+        replace(params, fallback_trailing_drawdown=value) for value in (0.08, 0.10)
+    )
+    variants.extend(
+        replace(params, target_annual_volatility=value)
+        for value in (0.16, 0.18, 0.20)
+    )
+    variants.extend(
+        [
+            replace(
+                params,
+                cautious_drawdown=0.07,
+                defensive_drawdown=0.11,
+                protect_drawdown=0.15,
+            ),
+            replace(
+                params,
+                cautious_drawdown=0.09,
+                defensive_drawdown=0.13,
+                protect_drawdown=0.17,
+            ),
+        ]
+    )
+    return list(dict.fromkeys(item for item in variants if item != params))
+
+
+def full_gate_failures(row: dict) -> list[str]:
+    """Return full-period hard-gate failures for a summary row."""
+
+    failures: list[str] = []
+    if float(row.get("annual_return", 0.0)) < 0.12:
+        failures.append("annual_return_below_12pct")
+    if abs(float(row.get("max_drawdown", 0.0))) >= 0.20:
+        failures.append("max_drawdown_not_below_20pct")
+    if float(row.get("grade_score", 0.0)) < 70.0:
+        failures.append("grade_below_a")
+    return failures
+
+
+def validation_gate_failures(rows: dict[str, dict]) -> list[str]:
+    """Return excess-return gate failures for rolling validation years."""
+
+    failures: list[str] = []
+    for period, row in rows.items():
+        excess = float(row.get("excess_return", 0.0))
+        if period == "2025" and excess < -0.05:
+            failures.append("2025_excess_below_minus_5pct")
+        elif period != "2025" and excess < -0.10:
+            failures.append(f"{period}_excess_below_minus_10pct")
+    return failures
+
+
+def neighbor_pass_rate(rows: list[dict]) -> float:
+    """Return the share of neighbors meeting approved return/risk limits."""
+
+    if not rows:
+        return 0.0
+    passed = sum(
+        float(row.get("annual_return", 0.0)) >= 0.10
+        and abs(float(row.get("max_drawdown", 0.0))) <= 0.22
+        for row in rows
+    )
+    return round(passed / len(rows), 6)
+
+
+def robust_rank_key(row: dict) -> tuple[float, float, float, float, float, float]:
+    """Rank robust rows from broad stability to headline return."""
+
+    return (
+        float(row.get("neighbor_pass_rate", 0.0)),
+        float(row.get("worst_validation_excess", -999.0)),
+        float(row.get("sharpe_ratio", -999.0)),
+        -abs(float(row.get("max_drawdown", -999.0))),
+        float(row.get("monthly_win_rate", 0.0)),
+        float(row.get("annual_return", -999.0)),
+    )
 
 
 def _benchmark_total_return(result: dict) -> float:
@@ -264,6 +393,42 @@ def _date_key(value: object) -> str:
     if hasattr(value, "strftime"):
         return value.strftime("%Y-%m-%d")
     return str(value)[:10]
+
+
+def slice_backtest_result(result: dict, start: str, end: str) -> dict | None:
+    """Return an isolated validation-year view of a formation backtest."""
+
+    recorded = [
+        row
+        for row in result.get("recorded_values", [])
+        if start <= _date_key(row.get("date")) <= end
+    ]
+    if len(recorded) < 2:
+        return None
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            starting_cash=float(recorded[0]["total_value"]),
+            total_value=float(recorded[-1]["total_value"]),
+        )
+    )
+    trades = [
+        trade
+        for trade in result.get("trade_log", [])
+        if start <= _date_key(trade.get("date")) <= end
+    ]
+    benchmark_values = [
+        row
+        for row in result.get("benchmark_values", [])
+        if start <= _date_key(row.get("date")) <= end
+    ]
+    return {
+        "context": context,
+        "trade_log": trades,
+        "recorded_values": recorded,
+        "benchmark": result.get("benchmark", BENCHMARK),
+        "benchmark_values": benchmark_values,
+        "ohlcv_data": result.get("ohlcv_data", {}),
+    }
 
 
 def stability_score(metrics: dict) -> float:
@@ -304,6 +469,15 @@ def _candidate_rank_key(row: dict) -> tuple[bool, float, float]:
     )
 
 
+def _report_rank_key(row: dict) -> tuple[bool, bool, float, float]:
+    """Keep the selected full-period row ahead of diagnostic ranking."""
+
+    return (
+        row.get("period_name") == "full" and row.get("selected") is True,
+        *_candidate_rank_key(row),
+    )
+
+
 def _best_full_candidate(full_candidates: list[tuple[dict, StrategyKind, StrategyParams]]):
     """Return the preferred full-period candidate tuple."""
 
@@ -317,6 +491,7 @@ def summarize_result(result: dict) -> dict:
     grade_info = grade_strategy(metrics) if metrics else grade_strategy(None)
     total_return = float(metrics.get("total_return", 0.0))
     benchmark_return = _benchmark_total_return(result)
+    monthly_returns = metrics.get("monthly_returns", {}) or {}
     summary = {
         "total_return": total_return,
         "benchmark_return": benchmark_return,
@@ -334,6 +509,12 @@ def summarize_result(result: dict) -> dict:
         "grade": grade_info.get("overall"),
         "grade_score": float(grade_info.get("score", 0.0)),
         "grade_weakest": grade_info.get("weakest"),
+        "monthly_win_rate": (
+            sum(value > 0 for value in monthly_returns.values())
+            / len(monthly_returns)
+            if monthly_returns
+            else 0.0
+        ),
     }
     summary["stability_score"] = stability_score(summary)
     return summary
@@ -354,7 +535,7 @@ def _best_by_period(rows: list[dict]) -> dict[str, dict]:
     best: dict[str, dict] = {}
     for row in rows:
         period = row.get("period_name", "unknown")
-        if period not in best or _candidate_rank_key(row) > _candidate_rank_key(best[period]):
+        if period not in best or _report_rank_key(row) > _report_rank_key(best[period]):
             best[period] = row
     return best
 
@@ -593,7 +774,7 @@ def render_html_report(rows: list[dict]) -> str:
 
     sorted_rows = sorted(
         rows,
-        key=_candidate_rank_key,
+        key=_report_rank_key,
         reverse=True,
     )
     full_rows = [row for row in sorted_rows if row.get("period_name") == "full"]
@@ -924,7 +1105,7 @@ def write_outputs(rows: list[dict]) -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     sorted_rows = sorted(
         rows,
-        key=_candidate_rank_key,
+        key=_report_rank_key,
         reverse=True,
     )
     (REPORT_DIR / "summary.json").write_text(
@@ -963,7 +1144,7 @@ def write_outputs(rows: list[dict]) -> None:
     lines = [
         "# A股行业龙头支撑压力策略研究报告",
         "",
-        f"- 最优策略: `{best.get('kind', 'N/A')}`",
+        f"- 最终推荐策略: `{best.get('kind', 'N/A')}`",
         f"- 评级: `{best.get('grade', 'N/A')} / {best.get('grade_score', 0):.1f}`",
         f"- 稳定性评分: `{best.get('stability_score', 0):.4f}`",
         f"- 年化收益: `{best.get('annual_return', 0):.2%}`",
@@ -1014,7 +1195,6 @@ def main() -> int:
     universe = [code for code in RESEARCH_UNIVERSE if code in default_universe]
     if args.quick:
         universe = universe[:15]
-        periods = (("quick", "2024-01-01", "2024-12-31"),)
         rows = []
         for kind, params in candidate_param_grid(quick=args.quick):
             row = run_one(kind, params, "2024-01-01", "2024-12-31", universe)
@@ -1029,11 +1209,23 @@ def main() -> int:
         print(f"Wrote reports to {REPORT_DIR}")
         return 0
 
-    rows = []
-    full_candidates = []
-    full_results = []
+    rows: list[dict] = []
+    full_candidates: list[tuple[dict, StrategyKind, StrategyParams]] = []
+    result_cache: dict[tuple[StrategyKind, StrategyParams, str, str], dict | None] = {}
+
+    def cached_result(
+        kind: StrategyKind,
+        params: StrategyParams,
+        start: str,
+        end: str,
+    ) -> dict | None:
+        key = (kind, params, start, end)
+        if key not in result_cache:
+            result_cache[key] = run_one_result(kind, params, start, end, universe)
+        return result_cache[key]
+
     for kind, params in candidate_param_grid(quick=False):
-        result = run_one_result(kind, params, START_DATE, END_DATE, universe)
+        result = cached_result(kind, params, START_DATE, END_DATE)
         if result is None:
             row = {"error": "backtest returned None"}
         else:
@@ -1046,27 +1238,129 @@ def main() -> int:
                     "params": asdict(params),
                 }
             )
-        row["period_name"] = "full"
+        row.update(
+            {
+                "period_name": "full",
+                "gate_failures": full_gate_failures(row),
+                "robust_gate_pass": False,
+                "selected": False,
+            }
+        )
         rows.append(row)
         full_candidates.append((row, kind, params))
-        full_results.append((row, result))
         print(
             f"full {kind.value} annual={row.get('annual_return', 0):.2%} "
             f"dd={row.get('max_drawdown', 0):.2%} "
             f"score={row.get('stability_score', 0):.4f}"
         )
 
-    best_row, best_kind, best_params = _best_full_candidate(full_candidates)
-    print(f"selected {best_kind.value} params={asdict(best_params)}")
-    best_result = next(
-        result
-        for row, result in full_results
-        if row is best_row and result is not None
+    robust_finalists = [
+        item
+        for item in full_candidates
+        if item[2].robust_enabled and not item[0]["gate_failures"]
+    ]
+    robust_finalists.sort(
+        key=lambda item: (
+            _float_metric(item[0], "sharpe_ratio"),
+            -abs(_float_metric(item[0], "max_drawdown")),
+            _float_metric(item[0], "annual_return"),
+        ),
+        reverse=True,
     )
 
+    for row, kind, params in robust_finalists[:3]:
+        neighbor_rows: list[dict] = []
+        for neighbor_params in neighbor_param_sets(params):
+            result = cached_result(kind, neighbor_params, START_DATE, END_DATE)
+            neighbor_rows.append(
+                summarize_result(result)
+                if result is not None
+                else {"annual_return": 0.0, "max_drawdown": -1.0}
+            )
+        row["neighbor_pass_rate"] = neighbor_pass_rate(neighbor_rows)
+
+        validation_rows: dict[str, dict] = {}
+        for period, formation_start, formation_end, start, end in VALIDATION_WINDOWS:
+            formation_result = cached_result(
+                kind,
+                params,
+                formation_start,
+                formation_end,
+            )
+            sliced = (
+                slice_backtest_result(formation_result, start, end)
+                if formation_result is not None
+                else None
+            )
+            if sliced is None:
+                validation_row = {
+                    "error": "validation slice returned None",
+                    "excess_return": -999.0,
+                }
+            else:
+                validation_row = summarize_result(sliced)
+            validation_row.update(
+                {
+                    "period_name": period,
+                    "formation_start": formation_start,
+                    "formation_end": formation_end,
+                    "start": start,
+                    "end": end,
+                }
+            )
+            validation_rows[period] = validation_row
+
+        row["validation"] = validation_rows
+        row["worst_validation_excess"] = min(
+            float(item.get("excess_return", -999.0))
+            for item in validation_rows.values()
+        )
+        gate_failures = full_gate_failures(row)
+        gate_failures.extend(validation_gate_failures(validation_rows))
+        if float(row.get("neighbor_pass_rate", 0.0)) < 0.60:
+            gate_failures.append("neighbor_pass_rate_below_60pct")
+        row["gate_failures"] = gate_failures
+        row["robust_gate_pass"] = not gate_failures
+
+    passing = [
+        item for item in full_candidates if item[0].get("robust_gate_pass") is True
+    ]
+    if passing:
+        best_row, best_kind, best_params = max(
+            passing,
+            key=lambda item: robust_rank_key(item[0]),
+        )
+        best_row["selection_reason"] = "robust_candidate_passed_all_gates"
+    else:
+        best_row, best_kind, best_params = next(
+            item
+            for item in full_candidates
+            if item[1] is StrategyKind.ADAPTIVE_COMPOSITE
+            and item[2] == BASELINE_ADAPTIVE_PARAMS
+        )
+        best_row["selection_reason"] = "baseline_retained_no_robust_candidate"
+
+    for row, _kind, _params in full_candidates:
+        row["selected"] = row is best_row
+
+    print(f"selected {best_kind.value} params={asdict(best_params)}")
+    best_result = cached_result(best_kind, best_params, START_DATE, END_DATE)
+
     for period_name, start, end in SUB_PERIODS:
-        row = run_one(best_kind, best_params, start, end, universe)
-        row["period_name"] = period_name
+        result = cached_result(best_kind, best_params, start, end)
+        if result is None:
+            row = {"error": "backtest returned None"}
+        else:
+            row = summarize_result(result)
+            row.update(
+                {
+                    "kind": best_kind.value,
+                    "start": start,
+                    "end": end,
+                    "params": asdict(best_params),
+                }
+            )
+        row.update({"period_name": period_name, "selected": False})
         rows.append(row)
         print(
             f"{period_name} {best_kind.value} annual={row.get('annual_return', 0):.2%} "
@@ -1075,7 +1369,8 @@ def main() -> int:
         )
 
     write_outputs(rows)
-    write_eqlib_html_report(best_result)
+    if best_result is not None:
+        write_eqlib_html_report(best_result)
     print(f"Wrote reports to {REPORT_DIR}")
     return 0
 
