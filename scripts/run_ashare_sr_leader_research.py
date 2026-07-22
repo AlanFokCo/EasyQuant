@@ -483,7 +483,13 @@ def _close_history(frame: object) -> dict[str, float]:
 
 
 def channel_diagnostics(result: dict) -> dict[str, float | int]:
-    """Attribute holdings, exposure, and next-close return by entry channel."""
+    """Attribute holdings, exposure, and next-close return by entry channel.
+
+    Exposure carries each security's latest prior-or-current valid close. A
+    channel/date with any held security that has no such close is excluded from
+    the exposure average; return-contribution lots remain unanchored until an
+    actual valid close is recorded, so the carry does not fabricate returns.
+    """
 
     defaults = _channel_defaults()
     context = result.get("context")
@@ -522,6 +528,12 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
         str(security): _close_history(frame)
         for security, frame in (result.get("ohlcv_data", {}) or {}).items()
     }
+    close_points = {
+        security: sorted(history.items())
+        for security, history in close_histories.items()
+    }
+    close_indexes = {security: 0 for security in close_points}
+    last_closes: dict[str, float] = {}
     records = []
     for row in result.get("recorded_values", []) or []:
         if not isinstance(row, dict):
@@ -537,6 +549,13 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
     contributions = {channel: 0.0 for channel in valid_channels}
 
     for date, record in records:
+        for security, points in close_points.items():
+            index = close_indexes[security]
+            while index < len(points) and points[index][0] <= date:
+                last_closes[security] = points[index][1]
+                index += 1
+            close_indexes[security] = index
+
         total_value = _finite_float(record.get("total_value"))
         if total_value is not None and total_value <= 0.0:
             total_value = None
@@ -614,14 +633,15 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
             position_values: list[float] = []
             exposure_valid = True
             for security, security_lots in lots[channel].items():
-                current_close = close_histories.get(security, {}).get(date)
-                if current_close is None:
-                    continue
+                valuation_close = last_closes.get(security)
+                if valuation_close is None:
+                    exposure_valid = False
+                    break
                 amount = _finite_sum(
                     float(lot["amount"] or 0.0) for lot in security_lots
                 )
                 position_value = (
-                    _finite_product(amount, current_close)
+                    _finite_product(amount, valuation_close)
                     if amount is not None
                     else None
                 )
