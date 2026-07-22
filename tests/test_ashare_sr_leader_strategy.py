@@ -52,14 +52,24 @@ from eqlib.strategies.ashare_sr_leader import (
 from scripts.run_ashare_sr_leader_research import (
     _benchmark_total_return,
     audit_rows,
+    BASELINE_ADAPTIVE_PARAMS,
     BENCHMARK,
     candidate_param_grid,
     END_DATE,
+    full_gate_failures,
+    neighbor_param_sets,
+    neighbor_pass_rate,
     period_interpretation,
     render_html_report,
+    robust_rank_key,
+    robust_seed_param_grid,
+    slice_backtest_result,
     START_DATE,
     stability_score,
     SUB_PERIODS,
+    summarize_result,
+    validation_gate_failures,
+    VALIDATION_WINDOWS,
     _profile_name,
     write_eqlib_html_report,
     write_outputs,
@@ -1792,6 +1802,191 @@ def test_candidate_param_grid_contains_three_strategy_kinds():
     }
 
 
+def test_robust_seed_grid_is_small_deterministic_and_unique():
+    first = robust_seed_param_grid()
+    second = robust_seed_param_grid()
+
+    assert first == second
+    assert len(first) == 10
+    assert len(set(first)) == len(first)
+    assert first[0] == StrategyParams(
+        **{
+            **BASELINE_ADAPTIVE_PARAMS.__dict__,
+            "robust_enabled": True,
+        }
+    )
+    assert all(params.robust_enabled for params in first)
+
+
+def test_candidate_param_grid_retains_baseline_and_appends_robust_seeds():
+    full_grid = candidate_param_grid(quick=False)
+    quick_grid = candidate_param_grid(quick=True)
+    robust_full = [
+        params
+        for kind, params in full_grid
+        if kind is StrategyKind.ADAPTIVE_COMPOSITE and params.robust_enabled
+    ]
+    robust_quick = [
+        params
+        for kind, params in quick_grid
+        if kind is StrategyKind.ADAPTIVE_COMPOSITE and params.robust_enabled
+    ]
+
+    assert (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS) in full_grid
+    assert robust_full == robust_seed_param_grid()
+    assert robust_quick == robust_seed_param_grid()[:1]
+    assert len(full_grid) == len(set(full_grid))
+    assert len(quick_grid) == len(set(quick_grid))
+
+
+def test_neighbor_param_sets_are_deterministic_unique_and_exclude_center():
+    center = robust_seed_param_grid()[0]
+
+    first = neighbor_param_sets(center)
+
+    assert first == neighbor_param_sets(center)
+    assert len(first) == len(set(first))
+    assert center not in first
+    assert [params.min_primary_candidates for params in first[:2]] == [4, 6]
+
+
+def test_full_gate_requires_return_drawdown_and_a_grade():
+    passing = {"annual_return": 0.12, "max_drawdown": -0.199, "grade_score": 70.0}
+
+    assert full_gate_failures(passing) == []
+    assert "annual_return_below_12pct" in full_gate_failures(
+        dict(passing, annual_return=0.119)
+    )
+    assert "max_drawdown_not_below_20pct" in full_gate_failures(
+        dict(passing, max_drawdown=-0.20)
+    )
+    assert "max_drawdown_not_below_20pct" in full_gate_failures(
+        dict(passing, max_drawdown=0.20)
+    )
+    assert "grade_below_a" in full_gate_failures(dict(passing, grade_score=69.9))
+
+
+def test_validation_gate_applies_tighter_2025_limit():
+    rows = {
+        "2023": {"excess_return": -0.10},
+        "2024": {"excess_return": -0.101},
+        "2025": {"excess_return": -0.051},
+    }
+
+    assert validation_gate_failures(rows) == [
+        "2024_excess_below_minus_10pct",
+        "2025_excess_below_minus_5pct",
+    ]
+
+
+def test_neighbor_pass_rate_uses_10pct_return_and_22pct_drawdown():
+    neighbors = [
+        {"annual_return": 0.11, "max_drawdown": -0.20},
+        {"annual_return": 0.10, "max_drawdown": -0.22},
+        {"annual_return": 0.09, "max_drawdown": -0.18},
+        {"annual_return": 0.12, "max_drawdown": -0.23},
+        {"annual_return": 0.13, "max_drawdown": 0.19},
+    ]
+
+    assert neighbor_pass_rate(neighbors) == 0.6
+    assert neighbor_pass_rate([]) == 0.0
+
+
+def test_slice_backtest_result_rebases_without_mutating_source():
+    result = {
+        "context": SimpleNamespace(
+            portfolio=SimpleNamespace(
+                starting_cash=1_000_000, total_value=1_200_000
+            )
+        ),
+        "trade_log": [
+            {"date": "2022-12-30", "type": "BUY"},
+            {"date": "2023-06-01", "type": "SELL"},
+        ],
+        "recorded_values": [
+            {"date": "2022-12-30", "total_value": 1_000_000},
+            {"date": "2023-01-03", "total_value": 1_050_000},
+            {"date": "2023-12-29", "total_value": 1_200_000},
+        ],
+        "benchmark": "000300.XSHG",
+        "benchmark_values": [
+            {"date": "2022-12-30", "value": 95.0},
+            {"date": "2023-01-03", "value": 100.0},
+            {"date": "2023-12-29", "value": 110.0},
+        ],
+        "ohlcv_data": {},
+    }
+
+    sliced = slice_backtest_result(result, "2023-01-01", "2023-12-31")
+
+    assert sliced is not None
+    assert sliced["context"] is not result["context"]
+    assert sliced["context"].portfolio.starting_cash == 1_050_000
+    assert sliced["context"].portfolio.total_value == 1_200_000
+    assert sliced["trade_log"] == [{"date": "2023-06-01", "type": "SELL"}]
+    assert sliced["benchmark_values"][0]["value"] == 100.0
+    assert len(result["trade_log"]) == 2
+    assert result["context"].portfolio.starting_cash == 1_000_000
+
+
+def test_slice_backtest_result_requires_two_window_values():
+    result = {
+        "recorded_values": [{"date": "2023-01-03", "total_value": 1_050_000}]
+    }
+
+    assert slice_backtest_result(result, "2023-01-01", "2023-12-31") is None
+
+
+def test_robust_rank_key_prefers_pass_rate_then_validation_and_lower_drawdown():
+    rows = [
+        {
+            "neighbor_pass_rate": 0.8,
+            "worst_validation_excess": -0.02,
+            "sharpe_ratio": 1.0,
+            "max_drawdown": -0.18,
+            "monthly_win_rate": 0.6,
+            "annual_return": 0.15,
+        },
+        {
+            "neighbor_pass_rate": 0.8,
+            "worst_validation_excess": -0.02,
+            "sharpe_ratio": 1.0,
+            "max_drawdown": -0.16,
+            "monthly_win_rate": 0.6,
+            "annual_return": 0.15,
+        },
+        {
+            "neighbor_pass_rate": 0.7,
+            "worst_validation_excess": 0.20,
+            "sharpe_ratio": 2.0,
+            "max_drawdown": -0.05,
+            "monthly_win_rate": 0.9,
+            "annual_return": 0.30,
+        },
+    ]
+
+    assert max(rows, key=robust_rank_key) is rows[1]
+
+
+def test_summarize_result_includes_monthly_win_rate(monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(
+        research,
+        "analyze_returns",
+        lambda *_args, **_kwargs: {
+            "monthly_returns": {"2025-01": 0.01, "2025-02": -0.02, "2025-03": 0.03}
+        },
+    )
+    monkeypatch.setattr(
+        research,
+        "grade_strategy",
+        lambda _metrics: {"overall": "C", "score": 50.0, "weakest": "return"},
+    )
+
+    assert summarize_result({"trade_log": []})["monthly_win_rate"] == pytest.approx(2 / 3)
+
+
 def test_research_defaults_match_reproducible_2020_2025_report_window():
     assert START_DATE == "2020-01-01"
     assert END_DATE == "2025-12-31"
@@ -1802,6 +1997,11 @@ def test_research_defaults_match_reproducible_2020_2025_report_window():
         ("2022", "2022-01-01", "2022-12-31"),
         ("2023-2024", "2023-01-01", "2024-12-31"),
         ("2025", "2025-01-01", "2025-12-31"),
+    )
+    assert VALIDATION_WINDOWS == (
+        ("2023", "2020-01-01", "2023-12-31", "2023-01-01", "2023-12-31"),
+        ("2024", "2021-01-01", "2024-12-31", "2024-01-01", "2024-12-31"),
+        ("2025", "2022-01-01", "2025-12-31", "2025-01-01", "2025-12-31"),
     )
 
 
@@ -2115,6 +2315,227 @@ def test_write_outputs_ranks_full_rows_by_grade_before_stability(tmp_path, monke
 
     saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert saved[0]["kind"] == "adaptive_composite"
+
+
+def test_write_outputs_puts_selected_full_row_first(tmp_path, monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "adaptive_composite",
+            "selected": False,
+            "grade_score": 90.0,
+            "stability_score": 2.0,
+            "params": {},
+        },
+        {
+            "period_name": "full",
+            "kind": "defensive_support",
+            "selected": True,
+            "grade_score": 70.0,
+            "stability_score": 1.0,
+            "params": {},
+        },
+    ]
+
+    write_outputs(rows)
+
+    saved = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert saved[0]["selected"] is True
+    assert saved[0]["kind"] == "defensive_support"
+    markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    assert "最终推荐策略: `defensive_support`" in markdown
+    assert "最终推荐策略：<strong>defensive_support</strong>" in html_report
+
+
+def test_period_interpretation_uses_selected_full_row_for_recommendation():
+    rows = [
+        {
+            "period_name": "full",
+            "kind": "defensive_support",
+            "selected": True,
+            "grade_score": 70.0,
+            "stability_score": 1.0,
+        },
+        {
+            "period_name": "full",
+            "kind": "adaptive_composite",
+            "selected": False,
+            "grade_score": 90.0,
+            "stability_score": 2.0,
+        },
+    ]
+
+    assert "最终推荐策略: `defensive_support`" in period_interpretation(rows)
+
+
+def test_main_runs_rolling_validation_and_retains_baseline_on_gate_failure(
+    monkeypatch,
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    center, neighbor = robust_seed_param_grid()[:2]
+    calls = []
+    captured = {}
+    monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
+    monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
+    monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
+    monkeypatch.setattr(
+        research,
+        "candidate_param_grid",
+        lambda quick=False: [
+            (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS),
+            (StrategyKind.ADAPTIVE_COMPOSITE, center),
+        ],
+    )
+    monkeypatch.setattr(research, "neighbor_param_sets", lambda _params: [neighbor])
+
+    def fake_run_result(kind, params, start, end, universe):
+        key = (kind, params, start, end)
+        calls.append(key)
+        return {"kind": kind, "params": params, "start": start, "end": end}
+
+    def fake_slice(result, start, end):
+        return {"params": result["params"], "validation_period": start[:4]}
+
+    def fake_summary(result):
+        if "validation_period" in result:
+            return {"excess_return": 0.0}
+        if result["params"] == neighbor:
+            return {"annual_return": 0.09, "max_drawdown": -0.18}
+        return {
+            "annual_return": 0.15,
+            "max_drawdown": -0.15,
+            "grade_score": 80.0,
+            "sharpe_ratio": 1.0,
+            "monthly_win_rate": 0.6,
+            "stability_score": 1.0,
+        }
+
+    monkeypatch.setattr(research, "run_one_result", fake_run_result)
+    monkeypatch.setattr(research, "slice_backtest_result", fake_slice)
+    monkeypatch.setattr(research, "summarize_result", fake_summary)
+    monkeypatch.setattr(
+        research,
+        "run_one",
+        lambda *_args, **_kwargs: {"annual_return": 0.0, "max_drawdown": 0.0},
+    )
+    monkeypatch.setattr(
+        research,
+        "write_outputs",
+        lambda rows: captured.update(rows=rows),
+    )
+    monkeypatch.setattr(
+        research,
+        "write_eqlib_html_report",
+        lambda result: captured.update(best_result=result),
+    )
+
+    assert research.main() == 0
+
+    full_rows = [row for row in captured["rows"] if row["period_name"] == "full"]
+    baseline_row = next(
+        row for row in full_rows if row["params"] == BASELINE_ADAPTIVE_PARAMS.__dict__
+    )
+    center_row = next(row for row in full_rows if row["params"] == center.__dict__)
+    assert baseline_row["selected"] is True
+    assert baseline_row["selection_reason"] == "baseline_retained_no_robust_candidate"
+    assert center_row["selected"] is False
+    assert center_row["neighbor_pass_rate"] == 0.0
+    assert center_row["gate_failures"] == ["neighbor_pass_rate_below_60pct"]
+    assert list(center_row["validation"]) == ["2023", "2024", "2025"]
+    assert sum(row["selected"] for row in full_rows) == 1
+    assert len(calls) == len(set(calls))
+    assert [
+        (start, end)
+        for _kind, params, start, end in calls
+        if params == center and (start, end) != (START_DATE, END_DATE)
+    ] == [
+        ("2020-01-01", "2023-12-31"),
+        ("2021-01-01", "2024-12-31"),
+        ("2022-01-01", "2025-12-31"),
+    ]
+    assert captured["best_result"]["params"] == BASELINE_ADAPTIVE_PARAMS
+
+
+def test_main_selects_highest_ranked_robust_candidate(monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    first, second = robust_seed_param_grid()[:2]
+    neighbor = robust_seed_param_grid()[3]
+    captured = {}
+    monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
+    monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
+    monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
+    monkeypatch.setattr(
+        research,
+        "candidate_param_grid",
+        lambda quick=False: [
+            (StrategyKind.ADAPTIVE_COMPOSITE, BASELINE_ADAPTIVE_PARAMS),
+            (StrategyKind.ADAPTIVE_COMPOSITE, first),
+            (StrategyKind.ADAPTIVE_COMPOSITE, second),
+        ],
+    )
+    monkeypatch.setattr(research, "neighbor_param_sets", lambda _params: [neighbor])
+    monkeypatch.setattr(
+        research,
+        "run_one_result",
+        lambda kind, params, start, end, universe: {
+            "kind": kind,
+            "params": params,
+            "start": start,
+            "end": end,
+        },
+    )
+    monkeypatch.setattr(
+        research,
+        "slice_backtest_result",
+        lambda result, start, end: {
+            "params": result["params"],
+            "validation_period": start[:4],
+        },
+    )
+
+    def fake_summary(result):
+        if "validation_period" in result:
+            return {
+                "excess_return": 0.02 if result["params"] == second else 0.0
+            }
+        if result["params"] == neighbor:
+            return {"annual_return": 0.11, "max_drawdown": -0.20}
+        return {
+            "annual_return": 0.15,
+            "max_drawdown": -0.15,
+            "grade_score": 80.0,
+            "sharpe_ratio": 1.1 if result["params"] == first else 1.0,
+            "monthly_win_rate": 0.6,
+            "stability_score": 1.0,
+        }
+
+    monkeypatch.setattr(research, "summarize_result", fake_summary)
+    monkeypatch.setattr(
+        research,
+        "run_one",
+        lambda *_args, **_kwargs: {"annual_return": 0.0, "max_drawdown": 0.0},
+    )
+    monkeypatch.setattr(
+        research,
+        "write_outputs",
+        lambda rows: captured.update(rows=rows),
+    )
+    monkeypatch.setattr(research, "write_eqlib_html_report", lambda _result: None)
+
+    assert research.main() == 0
+
+    full_rows = [row for row in captured["rows"] if row["period_name"] == "full"]
+    selected = next(row for row in full_rows if row["selected"])
+    assert selected["params"] == second.__dict__
+    assert selected["selection_reason"] == "robust_candidate_passed_all_gates"
+    assert selected["worst_validation_excess"] == 0.02
+    assert selected["robust_gate_pass"] is True
 
 
 def test_best_full_candidate_prefers_grade_before_stability():
