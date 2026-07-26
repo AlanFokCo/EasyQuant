@@ -17,7 +17,7 @@ The implementation is split across two files:
 | `eqlib/strategies/ashare_sr_leader.py` | Testable strategy logic: signals, scoring, weights, rebalancing, and risk review |
 | `scripts/run_ashare_sr_leader_research.py` | Parameter grid, backtest execution, stability scoring, and report generation |
 
-The report `reports/ashare_sr_leader/eqlib_best_backtest_2020_2025.html` corresponds to the `pullback_market_gate` variant: a pullback-confirmation strategy with a market exposure gate.
+The latest report at `reports/ashare_sr_leader/eqlib_best_backtest_2020_2025.html` did not find a new candidate that passed every robustness gate, so the predeclared fallback retained the `adaptive_composite` baseline parameters. `pullback_market_gate` is no longer the report's final selection.
 
 ## Strategy Architecture
 
@@ -82,42 +82,31 @@ Parameters are managed by `StrategyParams`. The defaults reflect a medium-to-low
 | `rebalance_threshold` | 0.08 | Rebalance trigger threshold |
 | `liquidity_volume_pct` | 0.03 | Maximum incremental buy as a percentage of average traded value |
 
-The winning 2020-2025 `pullback_market_gate` configuration is more conservative:
+### Exact Current Baseline Parameters
 
-| Parameter | Value |
-|-----------|------:|
-| `level_window` | 120 |
-| `short_level_window` | 60 |
-| `atr_multiplier` | 0.6 |
-| `top_n` | 10 |
-| `max_stock_weight` | 0.08 |
-| `max_industry_weight` | 0.24 |
-| `strong_market_exposure` | 0.82 |
-| `neutral_market_exposure` | 0.50 |
-| `weak_market_exposure` | 0.15 |
-| `min_relative_strength` | 0.0 |
-| `max_support_distance` | 0.08 |
-| `rebalance_threshold` | 0.10 |
-| `liquidity_volume_pct` | 0.03 |
+The fallback baseline is the `adaptive_composite` parameter set identified as `A / 71.3` in the historical baseline report. `A / 71.3` is the established label for that parameter set, not its grade in this rerun; the actual fresh result is `D / 29.8`, as shown later.
 
-This indicates the final version is not an aggressive momentum chase. It emphasizes relative strength, proximity to support, weak-market de-risking, and low turnover.
+| Parameter | Baseline | Parameter | Baseline |
+|-----------|---------:|-----------|---------:|
+| `level_window` | 100 | `short_level_window` | 50 |
+| `atr_period` | 20 | `atr_multiplier` | 0.45 |
+| `volume_window` | 20 | `volume_ratio_min` | 0.90 |
+| `rs_window` | 60 | `top_n` | 10 |
+| `max_stock_weight` | 0.10 | `max_industry_weight` | 0.25 |
+| `strong_market_exposure` | 0.95 | `neutral_market_exposure` | 0.68 |
+| `weak_market_exposure` | 0.25 | `min_price` | 0.10 |
+| `min_avg_volume` | 100,000 | `min_relative_strength` | -0.015 |
+| `max_support_distance` | 0.11 | `max_position_drawdown` | 0.0 |
+| `rebalance_threshold` | 0.05 | `liquidity_volume_pct` | 0.04 |
+| `robust_enabled` | `False` | `min_primary_candidates` | 5 |
+| `fallback_exposure_cap` | 0.25 | `fallback_trailing_drawdown` | 0.10 |
+| `fallback_trend_window` | 120 | `fallback_medium_window` | 60 |
+| `fallback_trend_lookback` | 20 | `fallback_min_relative_strength` | 0.0 |
+| `market_volatility_window` | 20 | `target_annual_volatility` | 0.18 |
+| `market_volatility_floor` | 0.55 | `cautious_drawdown` | 0.08 |
+| `defensive_drawdown` | 0.12 | `protect_drawdown` | 0.16 |
 
-To try to lift the report grade from B to A, the research grid also includes a more conservative `drawdown-controlled` candidate. It does not change the default strategy and does not replace the existing 2020-2025 winning parameters; it simply gives the next research run one more risk-focused candidate to compare:
-
-| Parameter | Value |
-|-----------|------:|
-| `atr_multiplier` | 0.65 |
-| `volume_ratio_min` | 1.05 |
-| `max_stock_weight` | 0.07 |
-| `max_industry_weight` | 0.21 |
-| `strong_market_exposure` | 0.76 |
-| `neutral_market_exposure` | 0.44 |
-| `weak_market_exposure` | 0.10 |
-| `min_relative_strength` | 0.01 |
-| `max_support_distance` | 0.06 |
-| `max_position_drawdown` | 0.12 |
-
-The intent is explicit: sacrifice some offensive exposure in exchange for lower drawdown, with the hope of improving the Sharpe ratio and the risk-control portion of the grade.
+The baseline keeps `robust_enabled=False`, so primary/fallback channels, portfolio drawdown states, and volatility scaling do not alter its historical execution path. Robust research candidates enable those mechanisms from the same parameter center and compare 16%, 18%, and 20% volatility targets and their neighborhoods.
 
 ## Support and Resistance
 
@@ -175,7 +164,7 @@ A breakdown requires:
 close < support - atr_multiplier × ATR
 ```
 
-This filters small fluctuations near support/resistance. A larger `atr_multiplier` makes the strategy more conservative; the 2020-2025 winning configuration uses `0.6`, above the default `0.5`.
+This filters small fluctuations near support/resistance. A larger `atr_multiplier` makes the strategy more conservative; the retained baseline uses `0.45`.
 
 ## Relative Strength
 
@@ -192,7 +181,7 @@ relative_strength =
 
 The default window is 60 days.
 
-This avoids buying stocks that merely fell less or rebounded weakly while still underperforming the market. The 2020-2025 winning configuration uses `min_relative_strength = 0.0`, so candidates must at least keep pace with the benchmark.
+This avoids buying stocks that merely fell less or rebounded weakly while still underperforming the market. The current baseline uses `min_relative_strength = -0.015`, allowing slight lag while filtering clearly weak names.
 
 ## Signal Snapshot
 
@@ -223,6 +212,17 @@ Before the snapshot is accepted, the strategy filters out stocks with:
 - No breakout, no pullback, and too far from support.
 
 This removes unsuitable names early so scoring only handles structurally meaningful candidates.
+
+## Primary and Fallback Channels
+
+With `robust_enabled`, candidates come from two channels and primary candidates always have priority:
+
+- **Primary channel**: support/resistance candidates that pass the `SignalSnapshot` filters, are not broken down, and score above zero.
+- **Fallback channel**: enabled only when there are fewer than `min_primary_candidates=5`, the market is not `WEAK`, and portfolio risk is below `DEFENSIVE`; names already in the primary channel cannot be duplicated.
+
+A fallback name must also have complete history, pass price and average-volume filters, close above its 120-day moving average, have a 60-day moving average no lower than 20 trading days earlier, have 60-day relative strength of at least zero, and remain above breakdown. The strategy then keeps only names whose 20-day volatility is no higher than the fallback cross-sectional median and ranks them by medium-term trend, relative strength, and low volatility.
+
+Fallback exposure is capped at 25% of the portfolio and each fallback holding uses a 10% trailing drawdown exit. No fallback risk may be added in `DEFENSIVE` or `PROTECT`; primary candidates continue to use the support/resistance ranking.
 
 ## Breakout, Pullback, and Breakdown
 
@@ -274,7 +274,7 @@ The research script tests four `StrategyKind` variants:
 | `pullback_market_gate` | Pullback confirmation with market exposure gate, preferring pullbacks while still rewarding breakouts |
 | `adaptive_composite` | Composite scorer combining pullback, breakout, support distance, relative strength, low volatility, and volume |
 
-The 2020-2025 best report selected `pullback_market_gate`. In that period, waiting for a defendable pullback while requiring market-relative strength was more stable than simply chasing breakouts.
+No robust candidate passed every gate in this 2020-2025 run, so the rules retained the `adaptive_composite` baseline. This is a fallback decision, not a win by `pullback_market_gate` or a new robust candidate.
 
 ## Scoring
 
@@ -291,17 +291,19 @@ breakout_score = 8 if breakout else 0
 pullback_score = 10 if pullback else 0
 ```
 
-For `pullback_market_gate`, the final score is:
+The retained baseline's `adaptive_composite` score is:
 
 ```text
-pullback_score
-+ 0.7 × breakout_score
-+ 0.7 × rs_score
-+ 0.3 × support_score
+0.8 × pullback_score
++ 0.9 × breakout_score
++ 0.7 × support_score
++ 0.8 × max(0, rs_score)
 + low_vol_bonus
++ 0.5 × volume_score
+- 12 × volatility
 ```
 
-So the variant emphasizes pullbacks first, then breakout confirmation and relative strength, with support proximity and low volatility as additional rewards.
+It combines pullbacks, breakouts, support proximity, positive relative strength, low volatility, and volume, with a direct volatility penalty.
 
 Only stocks with positive scores enter the candidate list, sorted from highest to lowest score.
 
@@ -317,15 +319,37 @@ Each month, the strategy classifies the benchmark index and maps that state to t
 
 This is the market gate. It does not choose the stocks; it controls how much risk the whole portfolio should take.
 
-The 2020-2025 winning configuration maps exposure as:
+The current baseline maps exposure as:
 
 ```text
-STRONG  → 82%
-NEUTRAL → 50%
-WEAK    → 15%
+STRONG  → 95%
+NEUTRAL → 68%
+WEAK    → 25%
 ```
 
 Even if stock-level signals look attractive, the strategy de-risks heavily when broad-market structure is weak.
+
+## Portfolio Drawdown States and Volatility Scaling
+
+Robust candidates add high-water portfolio drawdown states on top of broad-market exposure:
+
+| State | Portfolio Drawdown Trigger | Exposure Multiplier |
+|-------|---------------------------:|--------------------:|
+| `NORMAL` | Below 8% | 1.00 |
+| `CAUTIOUS` | At 8% | 0.75 |
+| `DEFENSIVE` | At 12% | 0.50 |
+| `PROTECT` | At 16% | 0.25 |
+
+Downgrades are immediate. Recovery requires a non-`WEAK` market, complete risk data, and recovery of at least half the loss from the episode high-water mark to its trough; each weekly review can recover at most one state.
+
+Volatility scaling uses the annualized standard deviation of the benchmark's latest 20 completed daily returns:
+
+```text
+volatility_factor = clamp(target_volatility / realized_volatility, 0.55, 1.00)
+final_exposure = market_exposure × volatility_factor × drawdown_multiplier
+```
+
+The research center target is 18%, with neighboring 16% and 20% targets; the floor is fixed at 0.55 and the factor never adds leverage. Incomplete data may reduce risk but cannot authorize an increase.
 
 ## Portfolio Construction
 
@@ -337,11 +361,11 @@ After ranking candidates, the strategy builds target weights:
 4. Cap each industry at `max_industry_weight`.
 5. Keep valid existing holdings first, then fill remaining slots with new candidates.
 
-For the 2020-2025 winning configuration:
+For the current baseline:
 
 - At most 10 holdings.
-- Maximum single-stock weight: 8%.
-- Maximum single-industry weight: 24%.
+- Maximum single-stock weight: 10%.
+- Maximum single-industry weight: 25%.
 
 This prevents excessive concentration in one leader or one sector.
 
@@ -353,7 +377,7 @@ The strategy does not trade on every tiny target-weight change. `should_rebalanc
 drift = abs(target_value - current_value) / total_value
 ```
 
-Trading only happens when `drift >= rebalance_threshold`. The 2020-2025 winning configuration uses `10%`, which keeps turnover low.
+Trading only happens when `drift >= rebalance_threshold`. The current baseline threshold is `5%`.
 
 New buys and increases are also capped by liquidity:
 
@@ -411,17 +435,17 @@ This matches the default example trading-cost convention.
 
 ## How the Research Script Selects the Best Strategy
 
-`scripts/run_ashare_sr_leader_research.py` performs the research loop:
+`scripts/run_ashare_sr_leader_research.py` runs the traditional parameter grid and robust seeds with `robust_enabled`, then applies staged gates rather than directly selecting the highest return or stability score.
 
-1. Build strategy variants and parameter combinations.
-2. Run full-period backtests.
-3. Extract return, volatility, Sharpe, drawdown, and trade-count metrics with `analyze_returns()`.
-4. Compute a stability score.
-5. Select the highest-scoring full-period candidate.
-6. Run sub-period backtests for the selected candidate.
-7. Write `summary.json`, `summary.csv`, `final_report.md`, `final_report.html`, and the native EasyQuant HTML report.
+### Full-Period Hard Gates
 
-The stability score is not just total return:
+A robust candidate must satisfy all three conditions from 2020-01-01 through 2025-12-31:
+
+- Annual return of at least 12%.
+- Absolute maximum drawdown strictly below 20%.
+- Grade score of at least 70, which is grade A.
+
+Only robust candidates that pass all three proceed. The stability score remains a diagnostic and ranking measure for traditional candidates:
 
 ```text
 1.5 × annual_return
@@ -438,28 +462,46 @@ Penalties include:
 - Too few trades, which can indicate an accidental non-trading result.
 - More than 120 trades, which indicates excessive churn.
 
-This explains why the highest-return parameter set may not be selected as the final strategy.
+### Rolling Validation and Neighborhood Stability
+
+Up to three full-period finalists continue through:
+
+- 2023 window: run 2020-2023 and inspect 2023; excess return must be at least -10%.
+- 2024 window: run 2021-2024 and inspect 2024; excess return must be at least -10%.
+- 2025 window: run 2022-2025 and inspect 2025; excess return must be at least -5%.
+
+Because 2025 participates in candidate selection and gating, it is a pressure or stress-validation period, never untouched out-of-sample data.
+
+Neighborhood tests vary minimum primary count across 4/5/6, fallback exposure cap across 20%/25%/30%, fallback trailing drawdown across 8%/10%, volatility target across 16%/18%/20%, and drawdown thresholds across 7%/11%/15% and 9%/13%/17%. Each neighbor must deliver at least 10% annual return with absolute maximum drawdown no greater than 22%; at least 60% of neighbors must pass.
+
+A candidate may replace the baseline only after passing the full-period, rolling-validation, and neighborhood gates. Otherwise the script retains the exact `BASELINE_ADAPTIVE_PARAMS` and writes `selection_reason = baseline_retained_no_robust_candidate`. This is a predeclared honest fallback and never relabels a failed result as a robust win.
 
 ## 2020-2025 Report Variant
 
-The summary for `eqlib_best_backtest_2020_2025.html` records:
+The actual full research run on 2026-07-26 found no robust candidate that passed the first full-period gate: every robust candidate triggered both `annual_return_below_12pct` and `grade_below_a`, so the designed pipeline did not proceed to rolling or neighborhood evaluation. It retained the exact `adaptive_composite` baseline historically identified as `A / 71.3`, while the fresh measurement of that same parameter set is `D / 29.8` under the current data and code state.
+
+The first selected full-period row in `summary.json` and the native report records:
 
 | Metric | Value |
 |--------|------:|
-| Strategy variant | `pullback_market_gate` |
+| Selection reason | `baseline_retained_no_robust_candidate` |
+| Strategy variant | `adaptive_composite` |
 | Backtest period | 2020-01-01 to 2025-12-31 |
-| Total return | 123.17% |
+| Total return | 12.08% |
 | Benchmark return | 11.50% |
-| Excess return | 111.67% |
-| Annual return | 14.42% |
-| Annual volatility | 16.49% |
-| Sharpe | 0.72 |
-| Sortino | 1.04 |
-| Max drawdown | -24.37% |
-| Trade count | 12 |
-| Raw trade count | 32 |
+| Excess return | 0.57% |
+| Annual return | 1.93% |
+| Annual volatility | 8.79% |
+| Sharpe | -0.08 |
+| Sortino | -0.11 |
+| Max drawdown | -17.33% |
+| Grade | D / 29.8 |
+| Trade count | 7 |
+| Raw trade count | 22 |
 
-These metrics describe a low-frequency, lower-turnover, structurally defensive portfolio strategy. Much of its return comes from a small number of longer holding periods rather than frequent trading.
+This selected row itself fails the annual-return and grade-A gates; it is selected only by the honest fallback rule. The standalone 2025 stress-validation period returned 3.61% annualized with -11.42% maximum drawdown and -17.61% excess return, materially lagging the benchmark, so it cannot be described as an untouched out-of-sample win.
+
+Generated results live under `reports/ashare_sr_leader/`: `summary.json`, `summary.csv`, `final_report.md`, `final_report.html`, and `eqlib_best_backtest_2020_2025.html`. Together they record baseline retention, not a robust-candidate victory.
 
 ## Suitable Market Conditions
 
@@ -506,7 +548,7 @@ Many support/resistance systems buy near support, buy breakouts, and sell breakd
    Weak-market de-risking controls drawdown but can miss strong counter-trend stocks.
 
 5. **Parameters come from historical backtests**  
-   `pullback_market_gate` performed well over 2020-2025, but it may not remain optimal. Out-of-sample tests, walk-forward validation, and parameter sensitivity checks are still needed.
+   The retained `adaptive_composite` baseline received only `D / 29.8` in the current backtest, and the 2025 stress-validation period materially lagged the benchmark. New out-of-sample tests, walk-forward validation, and parameter sensitivity checks are still needed.
 
 6. **Data processing matters**  
    A-share daily bars, suspensions, adjustments, volume, and index data can materially affect signals and fills.
@@ -536,4 +578,4 @@ To understand the implementation from code, read in this order:
 - Monthly rebalancing and weekly breakdown review reduce churn and structural risk.
 - Stability scoring selects parameters instead of simply maximizing return.
 
-The 2020-2025 `pullback_market_gate` version is best understood as: pullback confirmation first, breakout as a secondary reward, weak-market de-risking, and low-frequency holding.
+The 2020-2025 report does not conclude that a new variant won; it retains the `adaptive_composite` baseline under the predeclared fallback rule. The fresh `D / 29.8` result means these risk mechanisms must not be interpreted as validated robust return capability.

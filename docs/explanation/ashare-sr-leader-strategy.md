@@ -17,7 +17,7 @@
 | `eqlib/strategies/ashare_sr_leader.py` | 策略信号、打分、仓位、调仓、风控的可测试实现 |
 | `scripts/run_ashare_sr_leader_research.py` | 参数网格、回测运行、稳定性评分、报告生成 |
 
-回测报告 `reports/ashare_sr_leader/eqlib_best_backtest_2020_2025.html` 对应的最优变体是 `pullback_market_gate`，即“突破回踩 + 市场闸门”版本。
+最新回测报告 `reports/ashare_sr_leader/eqlib_best_backtest_2020_2025.html` 没有选出通过全部稳健门槛的新候选，因此按预先约定的回退规则保留 `adaptive_composite` 基线参数。`pullback_market_gate` 不再是当前报告的最终选择。
 
 ## 策略框架
 
@@ -82,42 +82,31 @@ bare.startswith(("688", "8", "4", "9"))
 | `rebalance_threshold` | 0.08 | 再平衡触发阈值 |
 | `liquidity_volume_pct` | 0.03 | 单次增仓占均量成交额的上限 |
 
-2020-2025 报告中的最优 `pullback_market_gate` 参数更保守：
+### 当前基线的精确参数
 
-| 参数 | 取值 |
-|------|------:|
-| `level_window` | 120 |
-| `short_level_window` | 60 |
-| `atr_multiplier` | 0.6 |
-| `top_n` | 10 |
-| `max_stock_weight` | 0.08 |
-| `max_industry_weight` | 0.24 |
-| `strong_market_exposure` | 0.82 |
-| `neutral_market_exposure` | 0.50 |
-| `weak_market_exposure` | 0.15 |
-| `min_relative_strength` | 0.0 |
-| `max_support_distance` | 0.08 |
-| `rebalance_threshold` | 0.10 |
-| `liquidity_volume_pct` | 0.03 |
+当前回退基线是历史报告中评级为 `A / 71.3` 的 `adaptive_composite` 参数组。`A / 71.3` 是这组参数的既有基线标识，不是本次重新运行后的评级；本次实际结果为 `D / 29.8`，见后文结果表。
 
-这组参数说明最终版本不是激进追涨，而是更强调相对强度、靠近支撑、弱市降仓和低换手。
+| 参数 | 基线值 | 参数 | 基线值 |
+|------|------:|------|------:|
+| `level_window` | 100 | `short_level_window` | 50 |
+| `atr_period` | 20 | `atr_multiplier` | 0.45 |
+| `volume_window` | 20 | `volume_ratio_min` | 0.90 |
+| `rs_window` | 60 | `top_n` | 10 |
+| `max_stock_weight` | 0.10 | `max_industry_weight` | 0.25 |
+| `strong_market_exposure` | 0.95 | `neutral_market_exposure` | 0.68 |
+| `weak_market_exposure` | 0.25 | `min_price` | 0.10 |
+| `min_avg_volume` | 100,000 | `min_relative_strength` | -0.015 |
+| `max_support_distance` | 0.11 | `max_position_drawdown` | 0.0 |
+| `rebalance_threshold` | 0.05 | `liquidity_volume_pct` | 0.04 |
+| `robust_enabled` | `False` | `min_primary_candidates` | 5 |
+| `fallback_exposure_cap` | 0.25 | `fallback_trailing_drawdown` | 0.10 |
+| `fallback_trend_window` | 120 | `fallback_medium_window` | 60 |
+| `fallback_trend_lookback` | 20 | `fallback_min_relative_strength` | 0.0 |
+| `market_volatility_window` | 20 | `target_annual_volatility` | 0.18 |
+| `market_volatility_floor` | 0.55 | `cautious_drawdown` | 0.08 |
+| `defensive_drawdown` | 0.12 | `protect_drawdown` | 0.16 |
 
-为了尝试把报告评级从 B 提升到 A，研究网格中还加入了一个更保守的 `drawdown-controlled` 候选。它不会改变默认策略，也不会替换 2020-2025 已有最优参数；它只是让下一轮研究多比较一种更偏控回撤的版本：
-
-| 参数 | 取值 |
-|------|------:|
-| `atr_multiplier` | 0.65 |
-| `volume_ratio_min` | 1.05 |
-| `max_stock_weight` | 0.07 |
-| `max_industry_weight` | 0.21 |
-| `strong_market_exposure` | 0.76 |
-| `neutral_market_exposure` | 0.44 |
-| `weak_market_exposure` | 0.10 |
-| `min_relative_strength` | 0.01 |
-| `max_support_distance` | 0.06 |
-| `max_position_drawdown` | 0.12 |
-
-这个候选的目的很明确：牺牲一部分进攻性，尝试把最大回撤压低到评级函数更偏好的区间，并通过更平滑的净值路径改善 Sharpe。
+基线保持 `robust_enabled=False`，所以主/候补通道、组合回撤状态和波动率缩放不会改变它的历史执行路径。稳健研究候选从同一参数中心启用这些机制，再比较 16%、18%、20% 波动率目标及其邻域。
 
 ## 支撑压力计算
 
@@ -175,7 +164,7 @@ close > resistance + atr_multiplier × ATR
 close < support - atr_multiplier × ATR
 ```
 
-这相当于过滤支撑压力附近的小噪音。`atr_multiplier` 越大，信号越保守；2020-2025 最优参数使用 `0.6`，比默认 `0.5` 更谨慎。
+这相当于过滤支撑压力附近的小噪音。`atr_multiplier` 越大，信号越保守；当前保留的基线使用 `0.45`。
 
 ## 相对强弱
 
@@ -192,7 +181,7 @@ relative_strength =
 
 默认窗口是 60 日。
 
-这个指标的作用是避免买入只是“跌得少一点”或“反弹但仍弱于市场”的股票。2020-2025 最优参数要求 `min_relative_strength = 0.0`，也就是候选股至少不能跑输基准。
+这个指标的作用是避免买入只是“跌得少一点”或“反弹但仍弱于市场”的股票。当前基线使用 `min_relative_strength = -0.015`，允许轻微落后基准，但会过滤明显弱势标的。
 
 ## 个股信号快照
 
@@ -223,6 +212,17 @@ relative_strength =
 - 非突破、非回踩，而且距离支撑过远。
 
 这一步把明显不适合交易的标的尽早剔除，后续打分只处理结构较清晰的候选。
+
+## 主通道与候补通道
+
+启用 `robust_enabled` 后，策略把候选分为两个来源，并始终优先使用主通道：
+
+- **主通道**：通过上述 `SignalSnapshot` 过滤、没有破位且打分大于 0 的支撑压力候选。
+- **候补通道**：只有主通道少于 `min_primary_candidates=5`、大盘不是 `WEAK`、组合风险状态低于 `DEFENSIVE` 时才启用；主通道已有股票不会重复进入候补。
+
+候补股票还必须同时满足：数据窗口完整、价格和均量达标、收盘价高于 120 日均线、60 日均线不低于 20 个交易日前、60 日相对强弱至少为 0、没有跌破支撑。满足这些条件后，只保留 20 日波动率不高于候补横截面中位数的股票，再按中期趋势、相对强弱和低波动打分。
+
+候补仓位上限为组合的 25%，单只候补持仓使用 10% 移动回撤退出。进入 `DEFENSIVE` 或 `PROTECT` 后不再增加候补风险；主通道仍按原有支撑压力规则排序。
 
 ## 突破、回踩与破位
 
@@ -274,7 +274,7 @@ close < support - atr_multiplier × ATR
 | `pullback_market_gate` | 突破回踩 + 市场闸门，偏好回踩确认，同时保留突破加分 |
 | `adaptive_composite` | 综合型策略，把回踩、突破、支撑距离、相对强弱、低波动和量能综合打分 |
 
-2020-2025 的最优报告选择了 `pullback_market_gate`。这说明在该回测区间中，“等价格回到可防守区域、同时不明显跑输市场”的逻辑，比单纯追突破更稳定。
+本次 2020-2025 研究没有稳健候选通过全部门槛，最终按规则保留 `adaptive_composite` 基线；这是一项回退决定，不是 `pullback_market_gate` 或新稳健候选获胜。
 
 ## 打分逻辑
 
@@ -291,17 +291,19 @@ breakout_score = 8 if breakout else 0
 pullback_score = 10 if pullback else 0
 ```
 
-`pullback_market_gate` 的最终分数为：
+当前基线 `adaptive_composite` 的最终分数为：
 
 ```text
-pullback_score
-+ 0.7 × breakout_score
-+ 0.7 × rs_score
-+ 0.3 × support_score
+0.8 × pullback_score
++ 0.9 × breakout_score
++ 0.7 × support_score
++ 0.8 × max(0, rs_score)
 + low_vol_bonus
++ 0.5 × volume_score
+- 12 × volatility
 ```
 
-可以看出它最重视回踩，其次是突破确认和相对强弱，支撑距离提供额外加分，低波动也会被奖励。
+它综合回踩、突破、支撑距离、正相对强弱、低波动和量能，并对波动率直接扣分。
 
 只有分数大于 0 的股票会进入候选列表，然后按分数从高到低排序。
 
@@ -319,15 +321,37 @@ pullback_score
 
 这就是“市场闸门”。它不是决定买哪只股票，而是决定当前组合整体应该承担多少风险。
 
-2020-2025 最优参数的仓位映射是：
+当前基线参数的仓位映射是：
 
 ```text
-STRONG  → 82%
-NEUTRAL → 50%
-WEAK    → 15%
+STRONG  → 95%
+NEUTRAL → 68%
+WEAK    → 25%
 ```
 
 这意味着即使个股信号很好，只要大盘结构较弱，策略也会显著降仓。
+
+## 组合回撤状态与波动率缩放
+
+稳健候选在大盘仓位之上再叠加组合高水位回撤状态：
+
+| 状态 | 组合回撤触发点 | 仓位乘数 |
+|------|---------------:|---------:|
+| `NORMAL` | 低于 8% | 1.00 |
+| `CAUTIOUS` | 达到 8% | 0.75 |
+| `DEFENSIVE` | 达到 12% | 0.50 |
+| `PROTECT` | 达到 16% | 0.25 |
+
+降级立即发生。恢复要求市场不是 `WEAK`、风险数据完整、净值已收复本轮高水位到谷底损失的至少一半；每次周度复查最多恢复一级。
+
+波动率缩放使用基准最近 20 个已完成交易日收益率的年化标准差：
+
+```text
+volatility_factor = clamp(target_volatility / realized_volatility, 0.55, 1.00)
+final_exposure = market_exposure × volatility_factor × drawdown_multiplier
+```
+
+研究中心目标是 18%，并测试 16% 和 20% 的相邻目标；缩放下限固定为 0.55，且不会加杠杆。数据不足时只允许降风险，不允许增加风险。
 
 ## 组合构建
 
@@ -339,11 +363,11 @@ WEAK    → 15%
 4. 同一行业累计权重不能超过 `max_industry_weight`。
 5. 已持有股票若仍在有效候选中，会优先保留，再用新候选补齐。
 
-2020-2025 最优参数中：
+当前基线参数中：
 
 - 最多 10 只。
-- 单股最高 8%。
-- 单行业最高 24%。
+- 单股最高 10%。
+- 单行业最高 25%。
 
 这使组合不会过度集中在单个龙头或单一行业上。
 
@@ -355,7 +379,7 @@ WEAK    → 15%
 drift = abs(target_value - current_value) / total_value
 ```
 
-只有 `drift >= rebalance_threshold` 时才触发交易。2020-2025 最优参数为 `10%`，因此换手会比较低。
+只有 `drift >= rebalance_threshold` 时才触发交易。当前基线阈值为 `5%`。
 
 新增或增持仓位还会受到流动性限制：
 
@@ -413,17 +437,17 @@ OrderCost(
 
 ## 研究脚本如何选择最优策略
 
-`scripts/run_ashare_sr_leader_research.py` 会做参数搜索：
+`scripts/run_ashare_sr_leader_research.py` 先运行传统参数网格和启用 `robust_enabled` 的稳健种子，再按分层门槛选择，而不是直接取最高收益或最高稳定性评分。
 
-1. 构建多个策略变体和参数组合。
-2. 对全周期运行回测。
-3. 用 `analyze_returns()` 提取收益、波动、Sharpe、最大回撤、交易次数等指标。
-4. 计算稳定性评分。
-5. 选择稳定性评分最高的全周期候选。
-6. 对最优候选再跑分阶段回测。
-7. 输出 `summary.json`、`summary.csv`、`final_report.md`、`final_report.html` 和 EasyQuant HTML 回测报告。
+### 全周期硬门槛
 
-稳定性评分不是单纯追求最高收益，而是综合：
+稳健候选必须在 2020-01-01 至 2025-12-31 同时满足：
+
+- 年化收益至少 12%。
+- 最大回撤绝对值严格小于 20%。
+- 评级分数至少 70，即达到 A 级。
+
+只有通过这三项的稳健候选才进入后续验证。稳定性评分仍用于诊断和传统候选排序：
 
 ```text
 1.5 × annual_return
@@ -440,28 +464,46 @@ OrderCost(
 - 交易次数太少会受到轻微惩罚，避免“几乎不交易”的偶然结果。
 - 交易次数超过 120 会受到换手惩罚。
 
-这解释了为什么“最高收益”的参数不一定被选为最终策略。
+### 滚动验证与邻域稳定性
+
+最多三个全周期入围者继续接受：
+
+- 2023 窗口：运行 2020-2023，检查 2023；超额收益不得低于 -10%。
+- 2024 窗口：运行 2021-2024，检查 2024；超额收益不得低于 -10%。
+- 2025 窗口：运行 2022-2025，检查 2025；超额收益不得低于 -5%。
+
+2025 已参与候选选择和门槛判断，因此只能称为压力验证或稳健性验证期，不能称为“未触碰的样本外数据”。
+
+邻域测试会改变主通道最低数量 4/5/6、候补仓位上限 20%/25%/30%、候补移动回撤 8%/10%、波动率目标 16%/18%/20%，以及两组组合回撤阈值 7%/11%/15% 和 9%/13%/17%。每个邻居需达到年化收益 10% 且最大回撤绝对值不超过 22%；至少 60% 的邻居通过，中心候选才通过邻域门槛。
+
+候选只有同时通过全周期、滚动验证和邻域门槛才可替换基线。否则脚本明确保留精确的 `BASELINE_ADAPTIVE_PARAMS`，并写入 `selection_reason = baseline_retained_no_robust_candidate`。这是预先定义的诚实回退，不会把未通过门槛的结果包装成稳健胜出。
 
 ## 2020-2025 报告对应版本
 
-`eqlib_best_backtest_2020_2025.html` 对应的摘要文件显示：
+2026-07-26 的实际完整研究没有任何稳健候选通过第一层全周期硬门槛：稳健候选均同时触发 `annual_return_below_12pct` 和 `grade_below_a`，所以按设计没有进入滚动验证和邻域测试。最终保留历史标识为 `A / 71.3` 的精确 `adaptive_composite` 基线参数，但同一参数在本次数据与代码状态下的实际重测评级是 `D / 29.8`。
+
+`summary.json` 和原生回测报告中的首个全周期选择行显示：
 
 | 指标 | 值 |
 |------|------:|
-| 策略变体 | `pullback_market_gate` |
+| 选择原因 | `baseline_retained_no_robust_candidate` |
+| 策略变体 | `adaptive_composite` |
 | 回测区间 | 2020-01-01 至 2025-12-31 |
-| 总收益 | 123.17% |
+| 总收益 | 12.08% |
 | 基准收益 | 11.50% |
-| 超额收益 | 111.67% |
-| 年化收益 | 14.42% |
-| 年化波动 | 16.49% |
-| Sharpe | 0.72 |
-| Sortino | 1.04 |
-| 最大回撤 | -24.37% |
-| 交易次数 | 12 |
-| 原始成交笔数 | 32 |
+| 超额收益 | 0.57% |
+| 年化收益 | 1.93% |
+| 年化波动 | 8.79% |
+| Sharpe | -0.08 |
+| Sortino | -0.11 |
+| 最大回撤 | -17.33% |
+| 评级 | D / 29.8 |
+| 交易次数 | 7 |
+| 原始成交笔数 | 22 |
 
-从这些指标看，它是一个低频、较低换手、强调结构防守的组合策略。收益来自少数较长持仓周期，而不是频繁交易。
+该选择行自身未通过年化收益和 A 级门槛；它被选择仅因为诚实回退规则。2025 单独压力验证的年化收益为 3.61%、最大回撤为 -11.42%、超额收益为 -17.61%，明显跑输基准，不能描述为未触碰样本外胜出。
+
+生成结果位于 `reports/ashare_sr_leader/`：`summary.json`、`summary.csv`、`final_report.md`、`final_report.html` 和 `eqlib_best_backtest_2020_2025.html`。这些文件共同记录了基线保留结论，而不是稳健候选获胜。
 
 ## 策略适合的市场环境
 
@@ -508,7 +550,7 @@ OrderCost(
    弱市降仓能控制风险，但也可能错过逆势强股。
 
 5. **参数来自历史回测**  
-   `pullback_market_gate` 在 2020-2025 表现较好，不代表未来仍是最优。需要样本外测试、滚动验证和参数敏感性分析。
+   本轮保留的 `adaptive_composite` 基线在当前回测中仅获 `D / 29.8`，且 2025 压力验证明显跑输基准。仍需新的样本外测试、滚动验证和参数敏感性分析。
 
 6. **数据源和复权处理会影响结果**  
    A 股日线、停牌、复权、成交量和指数数据的处理差异，会改变信号和成交结果。
@@ -538,4 +580,4 @@ OrderCost(
 - 用月度换仓和周度破位复查降低换手与结构性风险。
 - 用稳定性评分而非单纯收益挑选参数。
 
-2020-2025 报告中的 `pullback_market_gate` 版本，最终呈现的是“回踩确认优先、突破加分、弱市降仓、低频持有”的策略风格。
+2020-2025 报告的结论不是某个新变体胜出，而是按预设回退规则保留 `adaptive_composite` 基线。新重测的 `D / 29.8` 结果说明，这些风险机制不能被解释为已经验证的稳健收益能力。
