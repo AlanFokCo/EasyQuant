@@ -3067,9 +3067,14 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
     assert "2025_excess_<script>" not in html_report
     assert "58.00%" in markdown
     assert "normal: 90" in markdown
-    retention = "本轮没有找到通过全部稳健门槛的新候选，继续保留当前 A / 71.3 基线。"
+    retention = "没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。"
+    grade_context = "历史参数集标签 A/71.3；本次重跑评级 A/71.3。"
     assert retention in markdown
     assert retention in html_report
+    assert grade_context in markdown
+    assert grade_context in html_report
+    assert "当前 A / 71.3" not in markdown
+    assert "当前 A / 71.3" not in html_report
     gate_html = html_report.split("<h2>稳健门槛</h2>", 1)[1].split(
         "<h2>滚动验证</h2>", 1
     )[0]
@@ -3266,6 +3271,156 @@ def test_baseline_comparison_is_selected_first_and_uses_complete_gate_failures(
     assert selected_comparison_html.index("validated_finalist") < (
         selected_comparison_html.index("<td>baseline</td>")
     )
+
+
+def _publication_review_rows(*, robust_pass: bool = False):
+    baseline = {
+        "period_name": "full",
+        "kind": "adaptive_composite",
+        "selected": not robust_pass,
+        "selection_reason": (
+            "" if robust_pass else "baseline_retained_no_robust_candidate"
+        ),
+        "start": "2020-01-01",
+        "end": "2025-12-31",
+        "annual_return": 0.0193157,
+        "total_return": 0.121,
+        "benchmark_return": 0.10,
+        "excess_return": 0.021,
+        "max_drawdown": -0.1733,
+        "sharpe_ratio": -0.08,
+        "trade_count": 20,
+        "raw_trade_count": 20,
+        "grade": "D",
+        "grade_score": 29.8,
+        "stability_score": -0.47,
+        "gate_failures": ["annual_return_below_12pct", "grade_below_a"],
+        "robust_gate_pass": False,
+        "neighbor_pass_rate": 0.0,
+        "worst_validation_excess": 0.0,
+        "validation": {},
+        "risk_state_days": {"normal": 100},
+        "params": BASELINE_ADAPTIVE_PARAMS.__dict__,
+    }
+    robust_rows = [
+        {
+            **baseline,
+            "selected": False,
+            "selection_reason": "",
+            "annual_return": 0.04 + index / 1000,
+            "grade": "D",
+            "grade_score": 30.0 + index,
+            "params": {
+                **BASELINE_ADAPTIVE_PARAMS.__dict__,
+                "robust_enabled": True,
+                "min_primary_candidates": index + 4,
+            },
+        }
+        for index in range(10)
+    ]
+    if robust_pass:
+        robust_rows[0] = {
+            **robust_rows[0],
+            "selected": True,
+            "selection_reason": "robust_candidate_passed_all_gates",
+            "annual_return": 0.14,
+            "max_drawdown": -0.18,
+            "sharpe_ratio": 0.9,
+            "grade": "A",
+            "grade_score": 74.0,
+            "gate_failures": [],
+            "robust_gate_pass": True,
+            "neighbor_pass_rate": 0.7,
+            "worst_validation_excess": -0.02,
+            "validation": {
+                year: {
+                    "annual_return": 0.10,
+                    "excess_return": -0.02,
+                    "max_drawdown": -0.12,
+                    "grade": "B",
+                }
+                for year in ("2023", "2024", "2025")
+            },
+        }
+    diagnostic_pullback = {
+        **baseline,
+        "kind": "pullback_market_gate",
+        "selected": False,
+        "selection_reason": "",
+        "grade": "A",
+        "grade_score": 95.0,
+        "stability_score": 5.0,
+        "params": {},
+    }
+    subperiod = {
+        **baseline,
+        "period_name": "2022",
+        "kind": "adaptive_composite",
+        "selected": False,
+        "selection_reason": "",
+        "start": "2022-01-01",
+        "end": "2022-12-31",
+    }
+    return [diagnostic_pullback, *robust_rows, baseline, subperiod]
+
+
+def test_publication_reports_explain_baseline_retention_and_failed_seed_counts(
+    tmp_path, monkeypatch
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+
+    write_outputs(_publication_review_rows())
+
+    markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    required = [
+        "选择原因: baseline_retained_no_robust_candidate",
+        "没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。",
+        "历史参数集标签 A/71.3；本次重跑评级 D/29.8。",
+        "已评估稳健种子: 10",
+        "通过全部稳健门槛: 0",
+        "annual_return_below_12pct: 10",
+        "grade_below_a: 10",
+    ]
+    assert all(text in markdown and text in html_report for text in required)
+    assert "当前 A / 71.3" not in markdown
+    assert "当前 A / 71.3" not in html_report
+    assert "突破回踩加市场闸门策略占优" not in markdown
+    assert "突破回踩加市场闸门策略占优" not in html_report
+    assert "最终推荐策略: `pullback_market_gate`" not in markdown
+    assert "最终推荐策略：<strong>pullback_market_gate</strong>" not in html_report
+    assert "| 1 | adaptive_composite |" in markdown
+    first_html_row = (
+        html_report.split("<tbody>", 1)[1]
+        .split("<tr>", 1)[1]
+        .split("</tr>", 1)[0]
+    )
+    assert "<td>adaptive_composite</td>" in first_html_row
+
+
+def test_publication_reports_recommend_a_robust_candidate_that_passed_all_gates(
+    tmp_path, monkeypatch
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+
+    write_outputs(_publication_review_rows(robust_pass=True))
+
+    markdown = (tmp_path / "final_report.md").read_text(encoding="utf-8")
+    html_report = (tmp_path / "final_report.html").read_text(encoding="utf-8")
+    required = [
+        "选择原因: robust_candidate_passed_all_gates",
+        "稳健候选通过全部稳健门槛，因此推荐 adaptive_composite。",
+        "已评估稳健种子: 10",
+        "通过全部稳健门槛: 1",
+    ]
+    assert all(text in markdown and text in html_report for text in required)
+    assert "历史参数集标签 A/71.3" not in markdown
+    assert "历史参数集标签 A/71.3" not in html_report
+    assert "| 1 | adaptive_composite |" in markdown
 
 
 def test_period_interpretation_uses_selected_full_row_for_recommendation():

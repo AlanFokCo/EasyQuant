@@ -989,12 +989,36 @@ def audit_rows(rows: list[dict]) -> list[dict[str, str]]:
     return issues
 
 
-def _period_reason(row: dict) -> str:
+def _fresh_grade_label(row: dict) -> str:
+    grade = str(row.get("grade", "N/A"))
+    score = _finite_metric(row, "grade_score")
+    return f"{grade}/{score:.1f}" if score is not None else f"{grade}/N/A"
+
+
+def _selection_report_lines(row: dict) -> list[str]:
+    reason = row.get("selection_reason")
+    if reason == "baseline_retained_no_robust_candidate":
+        return [
+            f"选择原因: {reason}",
+            "没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。",
+            f"历史参数集标签 A/71.3；本次重跑评级 {_fresh_grade_label(row)}。",
+        ]
+    if reason == "robust_candidate_passed_all_gates":
+        return [
+            f"选择原因: {reason}",
+            f"稳健候选通过全部稳健门槛，因此推荐 {row.get('kind', 'N/A')}。",
+        ]
+    return []
+
+
+def _period_reason(row: dict, selection_reason: str = "") -> str:
     kind = row.get("kind", "")
     excess = float(row.get("excess_return", 0.0))
     drawdown = abs(float(row.get("max_drawdown", 0.0)))
     trades = int(row.get("trade_count", 0))
-    if kind == StrategyKind.DEFENSIVE_SUPPORT.value:
+    if selection_reason == "baseline_retained_no_robust_candidate":
+        base = "该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。"
+    elif kind == StrategyKind.DEFENSIVE_SUPPORT.value:
         base = "防守型支撑策略占优，说明该阶段靠近支撑且结构未破坏的行业龙头更能控制回撤。"
     elif kind == StrategyKind.RESISTANCE_BREAKOUT.value:
         base = "压力突破策略占优，说明该阶段趋势延续和放量突破更容易获得超额收益。"
@@ -1019,6 +1043,7 @@ def period_interpretation(rows: list[dict]) -> str:
         if rows
         else {}
     )
+    selection_reason = str(full.get("selection_reason", ""))
     period_names = [period_name for period_name, _start, _end in SUB_PERIODS]
     period_names.extend(
         row.get("period_name", "")
@@ -1044,7 +1069,7 @@ def period_interpretation(rows: list[dict]) -> str:
                 f"- 最大回撤: `{_fmt_pct(float(row.get('max_drawdown', 0.0)))}`",
                 f"- 超额收益: `{_fmt_pct(float(row.get('excess_return', 0.0)))}`",
                 f"- 交易次数: `{row.get('trade_count', 0)}`",
-                f"- 解释: {_period_reason(row)}",
+                f"- 解释: {_period_reason(row, selection_reason)}",
                 "",
             ]
         )
@@ -1056,12 +1081,24 @@ def period_interpretation(rows: list[dict]) -> str:
             "",
             "推荐原因:",
             "",
-            f"- 稳定性评分为 `{full.get('stability_score', 0):.4f}`。",
-            f"- 年化收益为 `{_fmt_pct(float(full.get('annual_return', 0.0)))}`，"
+        ]
+    )
+    lines.extend(f"- {line}" for line in _selection_report_lines(full))
+    lines.extend(
+        [
+            f"- 本次重跑稳定性评分为 `{full.get('stability_score', 0):.4f}`。",
+            f"- 本次重跑年化收益为 `{_fmt_pct(float(full.get('annual_return', 0.0)))}`，"
             f"超额收益为 `{_fmt_pct(float(full.get('excess_return', 0.0)))}`。",
-            f"- 最大回撤为 `{_fmt_pct(float(full.get('max_drawdown', 0.0)))}`。",
-            f"- 交易次数为 `{full.get('trade_count', 0)}`，交易次数没有表现出高频或中高频特征。",
-            "- 策略选择依据为稳定性评分、回撤、Sharpe、超额收益和交易次数的综合表现，而不是单次最高收益。",
+            f"- 本次重跑最大回撤为 `{_fmt_pct(float(full.get('max_drawdown', 0.0)))}`。",
+            f"- 本次重跑交易次数为 `{full.get('trade_count', 0)}`，交易次数没有表现出高频或中高频特征。",
+        ]
+    )
+    if not selection_reason:
+        lines.append(
+            "- 策略选择依据为稳定性评分、回撤、Sharpe、超额收益和交易次数的综合表现，而不是单次最高收益。"
+        )
+    lines.extend(
+        [
             "",
             "## 风险提示",
             "",
@@ -1158,6 +1195,14 @@ def _robust_report_rows(full_rows: list[dict]) -> list[dict]:
     ]
 
 
+def _robust_seed_rows(full_rows: list[dict]) -> list[dict]:
+    return [
+        row
+        for row in full_rows
+        if bool((row.get("params", {}) or {}).get("robust_enabled"))
+    ]
+
+
 def _baseline_report_row(full_rows: list[dict]) -> dict:
     baseline_params = asdict(BASELINE_ADAPTIVE_PARAMS)
     for row in full_rows:
@@ -1222,13 +1267,29 @@ def _report_validation_value(row: dict, key: str) -> str:
     return "不可用" if value is None else _fmt_pct(value)
 
 
-def _retention_notice(robust_rows: list[dict]) -> str:
-    if any(not _hard_gate_diagnostics(row)[0] for row in robust_rows):
+def _retention_notice(baseline: dict, robust_seeds: list[dict]) -> str:
+    if any(row.get("robust_gate_pass") is True for row in robust_seeds):
         return ""
-    return "本轮没有找到通过全部稳健门槛的新候选，继续保留当前 A / 71.3 基线。"
+    if baseline.get("selection_reason") == "baseline_retained_no_robust_candidate":
+        return _selection_report_lines(baseline)[1]
+    return "本轮没有找到通过全部稳健门槛的新候选。"
+
+
+def _robust_failure_summary(robust_seeds: list[dict]) -> str:
+    failure_counts: dict[str, int] = {}
+    for row in robust_seeds:
+        for failure in row.get("gate_failures", []) or []:
+            code = str(failure)
+            failure_counts[code] = failure_counts.get(code, 0) + 1
+    if not failure_counts:
+        return "无"
+    return "；".join(
+        f"{failure}: {count}" for failure, count in failure_counts.items()
+    )
 
 
 def _markdown_research_sections(full_rows: list[dict]) -> str:
+    robust_seeds = _robust_seed_rows(full_rows)
     robust_rows = _robust_report_rows(full_rows)
     baseline = _baseline_report_row(full_rows)
     robust_numbers = {id(row): index for index, row in enumerate(robust_rows, start=1)}
@@ -1239,8 +1300,18 @@ def _markdown_research_sections(full_rows: list[dict]) -> str:
             None if row is baseline else robust_numbers[id(row)],
         )
 
-    lines = ["## 稳健门槛", ""]
-    notice = _retention_notice(robust_rows)
+    robust_pass_count = sum(
+        row.get("robust_gate_pass") is True for row in robust_seeds
+    )
+    lines = [
+        "## 稳健门槛",
+        "",
+        f"已评估稳健种子: {len(robust_seeds)}",
+        f"通过全部稳健门槛: {robust_pass_count}",
+        f"失败原因汇总: {_robust_failure_summary(robust_seeds)}",
+        "",
+    ]
+    notice = _retention_notice(baseline, robust_seeds)
     if notice:
         lines.extend([notice, ""])
     lines.extend(
@@ -1249,18 +1320,19 @@ def _markdown_research_sections(full_rows: list[dict]) -> str:
             "|---|---|---|---:|---:|",
         ]
     )
-    if robust_rows:
-        for index, row in enumerate(robust_rows, start=1):
+    if robust_seeds:
+        for index, row in enumerate(robust_seeds, start=1):
             failures = list(row.get("gate_failures", []) or [])
+            is_finalist = any(row is finalist for finalist in robust_rows)
             lines.append(
                 f"| {_report_candidate_label(row, index)} | "
                 f"{'通过' if row.get('robust_gate_pass') is True else '未通过'} | "
                 f"{', '.join(str(code) for code in failures) or '无'} | "
-                f"{_fmt_pct(_float_metric(row, 'neighbor_pass_rate', 0.0))} | "
-                f"{_fmt_pct(_float_metric(row, 'worst_validation_excess', 0.0))} |"
+                f"{_fmt_pct(_float_metric(row, 'neighbor_pass_rate', 0.0)) if is_finalist else '不可用'} | "
+                f"{_fmt_pct(_float_metric(row, 'worst_validation_excess', 0.0)) if is_finalist else '不可用'} |"
             )
     else:
-        lines.append("| N/A | 未通过 | 无稳健候选 | 0.00% | 0.00% |")
+        lines.append("| N/A | 未评估 | 无 | 不可用 | 不可用 |")
 
     lines.extend(
         [
@@ -1417,6 +1489,10 @@ def render_html_report(rows: list[dict]) -> str:
     )
     audit_issues = audit_rows(sorted_rows)
     research_sections = _html_research_sections(full_rows)
+    selection_lines = _selection_report_lines(best)
+    selection_html = "".join(
+        f"<p>{_html_escape(line)}</p>" for line in selection_lines
+    )
 
     cards = "\n".join(
         [
@@ -1467,7 +1543,7 @@ def render_html_report(rows: list[dict]) -> str:
             f"<td>{_fmt_pct(float(row.get('total_return', 0.0)))}</td>"
             f"<td>{_fmt_pct(float(row.get('max_drawdown', 0.0)))}</td>"
             f"<td>{_html_escape(row.get('trade_count', 0))}</td>"
-            f"<td>{_html_escape(_period_reason(row))}</td>"
+            f"<td>{_html_escape(_period_reason(row, str(best.get('selection_reason', ''))))}</td>"
             "</tr>"
         )
 
@@ -1658,7 +1734,8 @@ def render_html_report(rows: list[dict]) -> str:
     <h2>最终推荐</h2>
     <section class="section">
       <p>最终推荐策略：<strong>{_html_escape(best.get('kind', 'N/A'))}</strong></p>
-      <p>推荐依据：评级 {_html_escape(best.get('grade', 'N/A'))} / {_fmt_num(best.get('grade_score', 0), 1)}，稳定性评分 {_fmt_num(best.get('stability_score', 0), 4)}，年化收益 {_fmt_pct(float(best.get('annual_return', 0.0)))}，最大回撤 {_fmt_pct(float(best.get('max_drawdown', 0.0)))}，交易次数 {_html_escape(best.get('trade_count', 0))}。策略选择依据为评级分数优先、稳定性评分兜底，并综合回撤、Sharpe、收益和交易次数，而不是单次最高收益。</p>
+      {selection_html}
+      <p>本次重跑指标：评级 {_html_escape(best.get('grade', 'N/A'))}/{_fmt_num(best.get('grade_score', 0), 1)}，稳定性评分 {_fmt_num(best.get('stability_score', 0), 4)}，年化收益 {_fmt_pct(float(best.get('annual_return', 0.0)))}，最大回撤 {_fmt_pct(float(best.get('max_drawdown', 0.0)))}，交易次数 {_html_escape(best.get('trade_count', 0))}。</p>
       <p><strong>审计结论：</strong>{_html_escape(recommendation)}</p>
     </section>
 
@@ -1796,6 +1873,7 @@ def write_outputs(rows: list[dict]) -> None:
         "# A股行业龙头支撑压力策略研究报告",
         "",
         f"- 最终推荐策略: `{best.get('kind', 'N/A')}`",
+        *(f"- {line}" for line in _selection_report_lines(best)),
         f"- 评级: `{best.get('grade', 'N/A')} / {best.get('grade_score', 0):.1f}`",
         f"- 稳定性评分: `{best.get('stability_score', 0):.4f}`",
         f"- 年化收益: `{best.get('annual_return', 0):.2%}`",
