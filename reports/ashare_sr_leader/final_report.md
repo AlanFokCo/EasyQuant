@@ -1,6 +1,9 @@
 # A股行业龙头支撑压力策略研究报告
 
 - 最终推荐策略: `adaptive_composite`
+- 选择原因: baseline_retained_no_robust_candidate
+- 没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。
+- 历史参数集标签 A/71.3；本次重跑评级 D/29.8。
 - 评级: `D / 29.8`
 - 稳定性评分: `-0.4727`
 - 年化收益: `1.93%`
@@ -27,11 +30,24 @@
 
 ## 稳健门槛
 
-本轮没有找到通过全部稳健门槛的新候选，继续保留当前 A / 71.3 基线。
+已评估稳健种子: 10
+通过全部稳健门槛: 0
+失败原因汇总: annual_return_below_12pct: 10；grade_below_a: 10
+
+没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。
 
 | Candidate | Result | Failure codes | Neighbor pass | Worst validation excess |
 |---|---|---|---:|---:|
-| N/A | 未通过 | 无稳健候选 | 0.00% | 0.00% |
+| robust-1 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-2 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-3 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-4 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-5 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-6 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-7 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-8 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-9 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
+| robust-10 (adaptive_composite/balanced) | 未通过 | annual_return_below_12pct, grade_below_a | 不可用 | 不可用 |
 
 ## 滚动验证
 
@@ -69,7 +85,7 @@
 - 最大回撤: `0.00%`
 - 超额收益: `-18.98%`
 - 交易次数: `0`
-- 解释: 突破回踩加市场闸门策略占优，说明该阶段等待确认并随市场结构调节仓位更有效。跑输基准，回撤可控，交易次数没有表现出高频或中高频特征。
+- 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑输基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ### 2022
 
@@ -78,7 +94,7 @@
 - 最大回撤: `0.00%`
 - 超额收益: `21.27%`
 - 交易次数: `0`
-- 解释: 突破回踩加市场闸门策略占优，说明该阶段等待确认并随市场结构调节仓位更有效。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
+- 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ### 2023-2024
 
@@ -87,7 +103,7 @@
 - 最大回撤: `-14.05%`
 - 超额收益: `8.55%`
 - 交易次数: `6`
-- 解释: 突破回踩加市场闸门策略占优，说明该阶段等待确认并随市场结构调节仓位更有效。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
+- 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ### 2025
 
@@ -96,7 +112,7 @@
 - 最大回撤: `-11.42%`
 - 超额收益: `-17.61%`
 - 交易次数: `1`
-- 解释: 突破回踩加市场闸门策略占优，说明该阶段等待确认并随市场结构调节仓位更有效。跑输基准，回撤可控，交易次数没有表现出高频或中高频特征。
+- 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑输基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ## 最终推荐
 
@@ -104,11 +120,13 @@
 
 推荐原因:
 
-- 稳定性评分为 `-0.4727`。
-- 年化收益为 `1.93%`，超额收益为 `0.57%`。
-- 最大回撤为 `-17.33%`。
-- 交易次数为 `7`，交易次数没有表现出高频或中高频特征。
-- 策略选择依据为稳定性评分、回撤、Sharpe、超额收益和交易次数的综合表现，而不是单次最高收益。
+- 选择原因: baseline_retained_no_robust_candidate
+- 没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。
+- 历史参数集标签 A/71.3；本次重跑评级 D/29.8。
+- 本次重跑稳定性评分为 `-0.4727`。
+- 本次重跑年化收益为 `1.93%`，超额收益为 `0.57%`。
+- 本次重跑最大回撤为 `-17.33%`。
+- 本次重跑交易次数为 `7`，交易次数没有表现出高频或中高频特征。
 
 ## 风险提示
 
