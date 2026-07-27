@@ -1474,7 +1474,10 @@ def _capture_strategy_callbacks(monkeypatch, params, total_value=1_000_000):
         lambda func, **kwargs: callbacks.setdefault("weekly", (func, kwargs)),
     )
     monkeypatch.setattr("eqlib.set_benchmark", lambda benchmark: None)
-    monkeypatch.setattr("eqlib.strategies.ashare_sr_leader._set_costs", lambda: None)
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader._set_costs",
+        lambda *_args: None,
+    )
     context = SimpleNamespace(
         portfolio=SimpleNamespace(total_value=total_value, positions={}),
         current_dt=pd.Timestamp("2026-07-21 09:30").to_pydatetime(),

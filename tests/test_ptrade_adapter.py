@@ -1,10 +1,68 @@
 """Tests for ptrade_adapter.py — verifies code conversion, Position/Portfolio,
 g namespace, and API surface without requiring QMT runtime."""
 
-import sys
+import datetime
 import inspect
+import sys
+
+import numpy as np
+import pandas as pd
+
 sys.path.insert(0, '.')
 import eqlib.ptrade_adapter as pa
+from eqlib.strategies.ashare_sr_leader import (
+    CandidateChannel,
+    MarketState,
+    PortfolioRiskState,
+    StrategyKind,
+    StrategyParams,
+    make_initialize,
+    reduce_portfolio_to_budget,
+    select_robust_candidates,
+)
+
+
+class _FakeQMTContext:
+    capital = 1_000_000
+    start = "2026-07-01"
+    end = "2026-07-31"
+
+    def __init__(self, frames=None, timestamp=None):
+        self.frames = frames or {}
+        self.timestamp = timestamp or datetime.datetime(2026, 7, 21, 9, 30)
+
+    def get_bar_timetag(self):
+        return int(self.timestamp.timestamp() * 1000)
+
+    def get_market_data(self, fields, stock_code, **_kwargs):
+        frame = self.frames.get(stock_code[0], pd.DataFrame())
+        return frame.loc[:, [field for field in fields if field in frame.columns]]
+
+
+def _ohlcv(close_values):
+    close = pd.Series(close_values, dtype=float)
+    return pd.DataFrame(
+        {
+            "open": close * 0.99,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.linspace(1_000_000, 2_000_000, len(close)),
+        }
+    )
+
+
+def _reset_adapter(monkeypatch):
+    monkeypatch.setattr(pa, "_context", None)
+    monkeypatch.setattr(pa, "_initialize_func", None)
+    monkeypatch.setattr(pa, "_daily_funcs", [])
+    monkeypatch.setattr(pa, "_weekly_funcs", [])
+    monkeypatch.setattr(pa, "_monthly_funcs", [])
+    monkeypatch.setattr(pa, "_before_start_funcs", [])
+    monkeypatch.setattr(pa, "_after_end_funcs", [])
+    monkeypatch.setattr(pa, "_handle_data_func", None)
+    monkeypatch.setattr(pa, "_account", "")
+    monkeypatch.setattr(pa, "g", pa._SimpleG())
 
 
 class TestGNamespace:
@@ -104,6 +162,18 @@ class TestPosition:
         assert pos.closeable_amount == 50
         assert pos.amount == 100
 
+    def test_total_value_uses_market_value(self):
+        pos = pa.Position(
+            "601390",
+            100,
+            10.0,
+            closeable_amount=100,
+            market_value=1_250.0,
+        )
+
+        assert pos.total_value == 1_250.0
+        assert pos.value == 1_250.0
+
 
 class TestPortfolioSource:
     """Portfolio.update_from_qmt should use correct QMT fields."""
@@ -168,6 +238,96 @@ class TestLifecycle:
         src = inspect.getsource(pa.on_bar)
         assert "t.split(':')" in src
         assert 'total_seconds()' in src
+
+    def test_start_initializes_robust_factory_with_adapter_runtime(self, monkeypatch):
+        _reset_adapter(monkeypatch)
+        expected_dt = datetime.datetime(2026, 7, 21, 9, 30)
+        qmt = _FakeQMTContext(timestamp=expected_dt)
+        pa._initialize_func = make_initialize(
+            StrategyKind.ADAPTIVE_COMPOSITE,
+            params=StrategyParams(robust_enabled=True),
+            universe=["600519"],
+        )
+
+        pa.start(qmt)
+
+        assert pa._context.current_dt == expected_dt
+        assert pa._context.sr_risk_tracker.high_water == 1_000_000
+        assert len(pa._monthly_funcs) == 1
+        assert len(pa._weekly_funcs) == 1
+
+    def test_real_ptrade_context_supports_selection_and_no_return_reduction(
+        self,
+        monkeypatch,
+    ):
+        _reset_adapter(monkeypatch)
+        stock = _ohlcv(np.linspace(10.0, 15.0, 30))
+        benchmark = _ohlcv(np.linspace(10.0, 11.0, 30))
+        qmt = _FakeQMTContext(
+            frames={
+                "600519.SH": stock,
+                "000300.SH": benchmark,
+            }
+        )
+        params = StrategyParams(
+            robust_enabled=True,
+            level_window=6,
+            short_level_window=4,
+            atr_period=3,
+            atr_multiplier=0.0,
+            volume_window=3,
+            volume_ratio_min=0.5,
+            rs_window=5,
+            min_avg_volume=1,
+            min_primary_candidates=1,
+            fallback_trend_window=8,
+            fallback_medium_window=5,
+            fallback_trend_lookback=2,
+        )
+        pa._initialize_func = make_initialize(
+            StrategyKind.ADAPTIVE_COMPOSITE,
+            params=params,
+            universe=["600519"],
+        )
+        pa.start(qmt)
+        context = pa._context
+
+        selected = select_robust_candidates(
+            context,
+            StrategyKind.ADAPTIVE_COMPOSITE,
+            params,
+            ["600519"],
+            benchmark,
+            MarketState.NEUTRAL,
+            PortfolioRiskState.NORMAL,
+        )
+
+        assert selected
+        assert selected[0].code == "600519"
+        assert selected[0].channel is CandidateChannel.PRIMARY
+
+        context.portfolio.positions = {
+            "600519": pa.Position(
+                "600519",
+                amount=50_000,
+                avg_cost=8.0,
+                market_value=500_000.0,
+            )
+        }
+        context.portfolio.total_value = 1_000_000.0
+        context.sr_code_channels = {
+            "600519": CandidateChannel.PRIMARY.value,
+        }
+        queued = []
+        monkeypatch.setattr(
+            pa,
+            "order_target_value",
+            lambda code, value: queued.append((code, value)),
+        )
+
+        reduce_portfolio_to_budget(context, exposure_budget=0.25)
+
+        assert queued == [("600519", 250_000.0)]
 
 
 class TestDocstring:
