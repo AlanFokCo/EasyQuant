@@ -1,6 +1,8 @@
 """Tests for pure data-utility functions (no network required)."""
 
 import datetime
+import os
+import time
 from types import SimpleNamespace
 
 import pandas as pd
@@ -177,10 +179,44 @@ class TestLongRangeSourceCoverage:
         monkeypatch.setattr(cache_mod, "_parquet_engine", lambda: None)
         df = _sample_ohlcv("2020-01-02", 10)
 
-        cache_mod._save_to_disk(df, "002594", "qfq")
-        loaded = cache_mod._load_from_disk("002594", "20200101", "20200131", "qfq")
+        cache_mod._save_to_disk(
+            df,
+            "002594",
+            "qfq",
+            requested_start="20200101",
+            requested_end="20200115",
+        )
+        loaded = cache_mod._load_from_disk("002594", "20200101", "20200115", "qfq")
 
         assert cache_mod._pickle_cache_path("002594", "qfq").exists()
         assert loaded is not None
         assert loaded.index.min() == pd.Timestamp("2020-01-02")
         assert len(loaded) == len(df)
+
+    def test_stale_cache_lookup_never_deletes_user_file(self, monkeypatch, tmp_path):
+        import eqlib.data_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "_CACHE_DIR", str(tmp_path))
+        monkeypatch.setattr(cache_mod, "_parquet_engine", lambda: None)
+        df = _sample_ohlcv("2020-01-02", 10)
+        cache_mod._save_to_disk(
+            df,
+            "002594",
+            "qfq",
+            requested_start="2020-01-01",
+            requested_end="2020-01-31",
+        )
+        path = cache_mod._pickle_cache_path("002594", "qfq")
+        stale_time = time.time() - 8 * 86400
+        os.utime(path, (stale_time, stale_time))
+
+        assert (
+            cache_mod._load_from_disk(
+                "002594",
+                "20200101",
+                "20200131",
+                "qfq",
+            )
+            is None
+        )
+        assert path.exists()
