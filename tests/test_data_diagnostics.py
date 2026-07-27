@@ -121,7 +121,138 @@ def test_preloaded_data_skips_network_when_cache_starts_after_requested_period(m
     assert preloaded.load_stats["failed"] == [
         {
             "security": "600941",
-            "reason": "cached data starts after requested end",
+            "reason": "authoritative listing date is after requested end",
+        }
+    ]
+
+
+def test_late_window_cache_does_not_suppress_older_fetch(monkeypatch, tmp_path):
+    import eqlib.data as data_mod
+    import eqlib.data_cache as dc
+
+    monkeypatch.setattr(dc, "_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(dc, "_parquet_engine", lambda: None)
+    calls = []
+
+    def fake_fetch(sec, start, end, adjust="qfq"):
+        calls.append((sec, str(start), str(end), adjust))
+        frame_start = "2024-01-02" if str(start).startswith("2024") else "2020-01-02"
+        return _sample_frame(frame_start)
+
+    monkeypatch.setattr(data_mod, "fetch_stock_data", fake_fetch)
+
+    late = PreloadedData()
+    late.load(
+        ["600519"],
+        "2024-01-01",
+        "2024-01-10",
+        progress=False,
+        use_local=False,
+    )
+    older = PreloadedData()
+    older.load(
+        ["600519"],
+        "2020-01-01",
+        "2020-01-10",
+        progress=False,
+        use_local=False,
+    )
+
+    assert [call[1:3] for call in calls] == [
+        ("2024-01-01", "2024-01-10"),
+        ("2020-01-01", "2020-01-10"),
+    ]
+    assert older.panel.index.min() == pd.Timestamp("2020-01-02")
+
+
+def test_partial_cache_fetches_uncovered_prefix(monkeypatch, tmp_path):
+    import eqlib.data as data_mod
+    import eqlib.data_cache as dc
+
+    monkeypatch.setattr(dc, "_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(dc, "_parquet_engine", lambda: None)
+    calls = []
+
+    def fake_fetch(sec, start, end, adjust="qfq"):
+        calls.append((str(start), str(end)))
+        return _sample_frame("2024-01-02" if len(calls) == 1 else "2023-01-02")
+
+    monkeypatch.setattr(data_mod, "fetch_stock_data", fake_fetch)
+
+    PreloadedData().load(
+        ["600519"],
+        "2024-01-01",
+        "2024-01-10",
+        progress=False,
+        use_local=False,
+    )
+    expanded = PreloadedData()
+    expanded.load(
+        ["600519"],
+        "2023-01-01",
+        "2024-01-10",
+        progress=False,
+        use_local=False,
+    )
+    PreloadedData().load(
+        ["600519"],
+        "2023-01-01",
+        "2024-01-10",
+        progress=False,
+        use_local=False,
+    )
+
+    assert calls == [
+        ("2024-01-01", "2024-01-10"),
+        ("2023-01-01", "2024-01-10"),
+        ("2023-01-01", "2024-01-10"),
+    ]
+    assert expanded.panel.index.min() == pd.Timestamp("2023-01-02")
+
+
+def test_authoritative_post_window_listing_skips_network(monkeypatch, tmp_path):
+    import eqlib.data as data_mod
+    import eqlib.data_cache as dc
+
+    monkeypatch.setattr(dc, "_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(dc, "_parquet_engine", lambda: None)
+    dc._save_to_disk(
+        _sample_frame("2024-01-02"),
+        "600941",
+        "qfq",
+        requested_start="2024-01-01",
+        requested_end="2024-01-10",
+        listing_date="2022-01-05",
+        listing_date_authoritative=True,
+    )
+    dc._save_to_disk(
+        _sample_frame("2020-01-02"),
+        "000300.XSHG",
+        "qfq",
+        requested_start="2020-01-01",
+        requested_end="2020-01-10",
+    )
+    network_calls = []
+    monkeypatch.setattr(
+        data_mod,
+        "fetch_stock_data",
+        lambda *args, **kwargs: network_calls.append(args) or pd.DataFrame(),
+    )
+
+    preloaded = PreloadedData()
+    preloaded.load(
+        ["000300.XSHG", "600941"],
+        "2020-01-01",
+        "2020-01-10",
+        progress=False,
+        use_local=False,
+    )
+
+    assert network_calls == []
+    assert preloaded.load_stats["failed"] == [
+        {
+            "security": "600941",
+            "reason": "authoritative listing date is after requested end",
         }
     ]
 

@@ -8,9 +8,10 @@ Provides:
 - Configurable memory limit with automatic fallback to compact storage
 """
 
-import os
-import hashlib
 import datetime
+import hashlib
+import json
+import os
 import threading
 import time
 from functools import lru_cache
@@ -120,6 +121,86 @@ def _pickle_cache_path(security: str, adjust: str) -> Path:
     return _get_cache_dir() / f"{hash_}.pkl"
 
 
+def _metadata_cache_path(security: str, adjust: str) -> Path:
+    """Return the sidecar path containing cache provenance and coverage."""
+    key = f"{security}_{adjust}"
+    hash_ = hashlib.md5(key.encode()).hexdigest()[:12]
+    return _get_cache_dir() / f"{hash_}.metadata.json"
+
+
+def _normalise_cache_date(value) -> str:
+    return pd.Timestamp(value).normalize().strftime("%Y%m%d")
+
+
+def _read_cache_metadata(security: str, adjust: str) -> dict:
+    path = _metadata_cache_path(security, adjust)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _merge_date_ranges(ranges: list[dict]) -> list[dict]:
+    parsed = []
+    for item in ranges:
+        try:
+            start = pd.Timestamp(item["start"]).normalize()
+            end = pd.Timestamp(item["end"]).normalize()
+        except (KeyError, TypeError, ValueError):
+            continue
+        if start <= end:
+            parsed.append((start, end))
+    parsed.sort()
+
+    merged = []
+    for start, end in parsed:
+        if merged and start <= merged[-1][1] + pd.Timedelta(days=1):
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return [
+        {"start": start.strftime("%Y%m%d"), "end": end.strftime("%Y%m%d")}
+        for start, end in merged
+    ]
+
+
+def _write_cache_metadata(path: Path, payload: dict) -> None:
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(
+        json.dumps(payload, ensure_ascii=True, allow_nan=False, sort_keys=True),
+        encoding="utf-8",
+    )
+    temp_path.replace(path)
+
+
+def _cache_covers_request(
+    security: str,
+    start: str,
+    end: str,
+    adjust: str,
+) -> bool:
+    metadata = _read_cache_metadata(security, adjust)
+    ranges = _merge_date_ranges(metadata.get("covered_ranges", []))
+    if not ranges:
+        return False
+
+    requested_start = pd.Timestamp(start).normalize()
+    requested_end = pd.Timestamp(end).normalize()
+    if metadata.get("listing_date_authoritative"):
+        try:
+            listing_date = pd.Timestamp(metadata["listing_date"]).normalize()
+        except (KeyError, TypeError, ValueError):
+            return False
+        requested_start = max(requested_start, listing_date)
+
+    return any(
+        pd.Timestamp(item["start"]) <= requested_start
+        and pd.Timestamp(item["end"]) >= requested_end
+        for item in ranges
+    )
+
+
 def _read_cache_file(path: Path) -> pd.DataFrame:
     if path.suffix == ".parquet":
         return pd.read_parquet(path)
@@ -137,10 +218,11 @@ def _load_from_disk(security: str, start: str, end: str, adjust: str) -> Optiona
             import time
             if not path.exists():
                 continue
-            # Check cache age — invalidate if older than 7 days
+            # Stale cache files remain user-owned; bypass rather than delete them.
             age_seconds = time.time() - path.stat().st_mtime
             if age_seconds > 7 * 86400:
-                path.unlink(missing_ok=True)
+                continue
+            if not _cache_covers_request(security, start, end, adjust):
                 continue
             df = _read_cache_file(path)
             if df.empty:
@@ -187,23 +269,28 @@ def _existing_cache_frame(*paths: Path) -> Optional[pd.DataFrame]:
 
 
 def _cache_starts_after_request_end(security: str, end: str, adjust: str) -> bool:
-    """Return True when cached history begins after the requested window."""
-
-    df = _existing_cache_frame(
-        _cache_path(security, adjust),
-        _pickle_cache_path(security, adjust),
-    )
-    if df is None or df.empty:
+    """Return True only for an authoritative post-window listing date."""
+    metadata = _read_cache_metadata(security, adjust)
+    if not metadata.get("listing_date_authoritative"):
         return False
     try:
-        first_date = pd.Timestamp(df.index.min()).normalize()
+        listing_date = pd.Timestamp(metadata["listing_date"]).normalize()
         requested_end = pd.Timestamp(end).normalize()
-    except Exception:
+    except (KeyError, TypeError, ValueError):
         return False
-    return first_date > requested_end
+    return listing_date > requested_end
 
 
-def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
+def _save_to_disk(
+    df: pd.DataFrame,
+    security: str,
+    adjust: str,
+    *,
+    requested_start=None,
+    requested_end=None,
+    listing_date=None,
+    listing_date_authoritative: bool = False,
+):
     """Save data to disk cache, merging with any existing cached frame.
 
     When the cache file already exists the new data is merged with the stored
@@ -215,8 +302,21 @@ def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
     """
     from eqlib.logger import log as _log
     try:
+        frame_attrs = dict(df.attrs)
+        incoming_start = None
+        incoming_end = None
+        if not df.empty:
+            incoming_start = pd.Timestamp(df.index.min()).normalize()
+            incoming_end = pd.Timestamp(df.index.max()).normalize()
+        if listing_date is None:
+            listing_date = frame_attrs.get("listing_date")
+        listing_date_authoritative = bool(
+            listing_date_authoritative
+            or frame_attrs.get("listing_date_authoritative", False)
+        )
         parquet_path = _cache_path(security, adjust)
         pickle_path = _pickle_cache_path(security, adjust)
+        metadata_path = _metadata_cache_path(security, adjust)
         path = parquet_path if _parquet_engine() is not None else pickle_path
         with _get_file_lock(path):
             existing = _existing_cache_frame(path, parquet_path, pickle_path)
@@ -224,6 +324,46 @@ def _save_to_disk(df: pd.DataFrame, security: str, adjust: str):
                 df = pd.concat([existing, df])
                 df = df[~df.index.duplicated(keep='last')].sort_index()
             _write_cache_file(df, path)
+
+            metadata = _read_cache_metadata(security, adjust)
+            metadata["version"] = 1
+            requested_ranges = list(metadata.get("requested_ranges", []))
+            if requested_start is not None and requested_end is not None:
+                requested_ranges.append(
+                    {
+                        "start": _normalise_cache_date(requested_start),
+                        "end": _normalise_cache_date(requested_end),
+                    }
+                )
+            metadata["requested_ranges"] = _merge_date_ranges(requested_ranges)
+
+            covered_ranges = list(metadata.get("covered_ranges", []))
+            if incoming_start is not None and incoming_end is not None:
+                covered_start = incoming_start
+                covered_end = incoming_end
+                if requested_start is not None and requested_end is not None:
+                    request_start = pd.Timestamp(requested_start).normalize()
+                    request_end = pd.Timestamp(requested_end).normalize()
+                    boundary_tolerance = pd.Timedelta(days=14)
+                    if incoming_start <= request_start + boundary_tolerance:
+                        covered_start = request_start
+                    if incoming_end >= request_end - boundary_tolerance:
+                        covered_end = request_end
+                covered_ranges.append(
+                    {
+                        "start": covered_start.strftime("%Y%m%d"),
+                        "end": covered_end.strftime("%Y%m%d"),
+                    }
+                )
+            metadata["covered_ranges"] = _merge_date_ranges(covered_ranges)
+
+            if listing_date_authoritative and listing_date is not None:
+                metadata["listing_date"] = _normalise_cache_date(listing_date)
+                metadata["listing_date_authoritative"] = True
+            else:
+                metadata.setdefault("listing_date", None)
+                metadata.setdefault("listing_date_authoritative", False)
+            _write_cache_metadata(metadata_path, metadata)
     except Exception as e:
         _log.warning(f"Failed to save cache for {security}: {e}")
 
@@ -258,7 +398,13 @@ def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd
 
     df = fetch_stock_data(security, start_date, end_date, adjust)
     if not df.empty:
-        _save_to_disk(df, security, adjust)
+        _save_to_disk(
+            df,
+            security,
+            adjust,
+            requested_start=start_str,
+            requested_end=end_str,
+        )
 
     return df
 
@@ -406,7 +552,13 @@ class PreloadedData:
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
-                    _save_to_disk(df, sec, adjust)
+                    _save_to_disk(
+                        df,
+                        sec,
+                        adjust,
+                        requested_start=start_str,
+                        requested_end=end_str,
+                    )
                     save_stock_local(sec, start_date, end_date, adjust)
                     return (sec, df, "network", None)
                 else:
@@ -416,12 +568,23 @@ class PreloadedData:
                 if df is not None:
                     return (sec, df, "disk_cache", None)
                 if _cache_starts_after_request_end(sec, end_str, adjust):
-                    return (sec, None, None, "cached data starts after requested end")
+                    return (
+                        sec,
+                        None,
+                        None,
+                        "authoritative listing date is after requested end",
+                    )
                 # Disk cache miss, try network fetch
                 from eqlib.data import fetch_stock_data
                 df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
-                    _save_to_disk(df, sec, adjust)
+                    _save_to_disk(
+                        df,
+                        sec,
+                        adjust,
+                        requested_start=start_str,
+                        requested_end=end_str,
+                    )
                     return (sec, df, "network", None)
                 else:
                     return (sec, None, None, "disk cache miss and network fetch failed")
@@ -493,7 +656,6 @@ class PreloadedData:
         )
 
         # --- Memory-aware: decide whether to build dict caches ---
-        n_sec = len(frames)
         n_rows = len(next(iter(frames.values())))
         mem = estimate_memory_mb(list(frames.keys()), n_rows)
 
@@ -793,8 +955,6 @@ class PreloadedData:
         ``datetime.date`` of the previous trading day, or ``None`` if *day* is
         on or before the first date in the index.
         """
-        import numpy as np
-
         if self._dates is None or len(self._dates) == 0:
             return None
         day_ts = pd.Timestamp(day)
@@ -956,7 +1116,6 @@ def get_local_date_range(security: str, adjust: str = "qfq") -> Optional[tuple]:
         return None
 
     try:
-        df = pd.read_csv(path, index_col=0, parse_dates=True, nrows=1)
         # We only need first/last dates, read just those
         import csv
         with open(path, 'r') as f:
