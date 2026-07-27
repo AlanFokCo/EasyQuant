@@ -890,18 +890,36 @@ def test_none_returning_exit_adapter_stays_conservatively_pending(monkeypatch):
         exposure=0.90,
         params=params,
     )
+    context.current_dt = pd.Timestamp("2026-07-03 09:30").to_pydatetime()
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+    rebalance_robust_portfolio(
+        context,
+        [renewed_primary],
+        exposure=0.90,
+        params=params,
+    )
 
-    assert queued == [("target", "600519", 0)]
+    assert queued == [
+        ("target", "600519", 0),
+        ("target", "600519", 0),
+    ]
     assert context._sr_pending_exit_codes == {"600519"}
     assert set(context._sr_pending_exit_orders) == {"600519"}
 
 
-def test_unfamiliar_exit_status_stays_conservatively_pending(monkeypatch):
+@pytest.mark.parametrize(
+    "adapter_order",
+    [
+        SimpleNamespace(order_id="adapter-exit-1"),
+        SimpleNamespace(order_id="adapter-exit-1", status="accepted_by_broker"),
+    ],
+    ids=["statusless", "unknown"],
+)
+def test_opaque_exit_retries_zero_once_then_stays_pending(
+    monkeypatch,
+    adapter_order,
+):
     queued = []
-    adapter_order = SimpleNamespace(
-        order_id="adapter-exit-1",
-        status="accepted_by_broker",
-    )
     monkeypatch.setattr(
         "eqlib.order_target",
         lambda code, amount: queued.append(("target", code, amount))
@@ -942,13 +960,27 @@ def test_unfamiliar_exit_status_stays_conservatively_pending(monkeypatch):
         exposure=0.90,
         params=params,
     )
+    context.current_dt = pd.Timestamp("2026-07-03 09:30").to_pydatetime()
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+    rebalance_robust_portfolio(
+        context,
+        [renewed_primary],
+        exposure=0.90,
+        params=params,
+    )
 
-    assert queued == [("target", "600519", 0)]
+    assert queued == [
+        ("target", "600519", 0),
+        ("target", "600519", 0),
+    ]
     assert context._sr_pending_exit_codes == {"600519"}
     assert context._sr_pending_exit_orders == {"600519": adapter_order}
 
 
-@pytest.mark.parametrize("failed_status", [Order.STATUS_CANCELLED, Order.STATUS_REJECTED])
+@pytest.mark.parametrize(
+    "failed_status",
+    [Order.STATUS_CANCELLED, Order.STATUS_REJECTED, Order.STATUS_EXPIRED],
+)
 def test_failed_exit_is_retried_once_without_allowing_nonzero_target(
     monkeypatch,
     failed_status,
@@ -1011,6 +1043,184 @@ def test_failed_exit_is_retried_once_without_allowing_nonzero_target(
     ]
     assert context._sr_pending_exit_codes == {"600519"}
     assert context._sr_pending_exit_orders == {"600519": exit_orders[1]}
+
+
+def test_none_returning_fallback_entry_keeps_channel_after_fill(monkeypatch):
+    queued = []
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append(("value", code, value)),
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(total_value=1_000_000, positions={}),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    fallback = RobustCandidate(
+        "600519",
+        CandidateChannel.FALLBACK,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        fallback_exposure_cap=0.10,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=1.0,
+        level_window=3,
+        short_level_window=3,
+        atr_period=2,
+        max_position_drawdown=0.0,
+        fallback_trailing_drawdown=0.10,
+    )
+
+    rebalance_robust_portfolio(context, [fallback], exposure=0.80, params=params)
+    rebalance_robust_portfolio(context, [fallback], exposure=0.80, params=params)
+
+    assert context._sr_pending_entry_codes == {"600519"}
+    assert context.sr_code_channels == {
+        "600519": CandidateChannel.FALLBACK.value
+    }
+
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    context.portfolio.positions = {
+        "600519": SimpleNamespace(total_value=50_000),
+    }
+    primary = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    rebalance_robust_portfolio(context, [primary], exposure=0.80, params=params)
+
+    assert queued == [
+        ("value", "600519", pytest.approx(100_000)),
+        ("value", "600519", pytest.approx(100_000)),
+    ]
+    assert context._sr_pending_entry_codes == set()
+    assert context.sr_code_channels["600519"] == CandidateChannel.FALLBACK.value
+    assert context.sr_entry_channel_history == [
+        {
+            "security": "600519",
+            "channel": CandidateChannel.FALLBACK.value,
+            "intent_date": "2026-07-01",
+            "resolved_date": "2026-07-02",
+            "status": "filled",
+        }
+    ]
+
+    trailing_frame = _ohlcv_from_close([10.0, 11.0, 12.0, 12.0, 10.7])
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: trailing_frame)
+    queued.clear()
+
+    _risk_review(context, params)
+
+    assert queued == []
+
+
+@pytest.mark.parametrize(
+    "failed_status",
+    [Order.STATUS_CANCELLED, Order.STATUS_REJECTED, Order.STATUS_EXPIRED],
+)
+def test_failed_entry_intent_retires_channel(monkeypatch, failed_status):
+    entry_order = Order(
+        "600519",
+        10_000,
+        side="buy",
+        order_id="entry-600519",
+    )
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda *args: entry_order,
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(total_value=1_000_000, positions={}),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    fallback = RobustCandidate(
+        "600519",
+        CandidateChannel.FALLBACK,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        fallback_exposure_cap=0.10,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=1.0,
+    )
+
+    rebalance_robust_portfolio(context, [fallback], exposure=0.80, params=params)
+    if failed_status == Order.STATUS_REJECTED:
+        entry_order.transition_to(Order.STATUS_SUBMITTED)
+    entry_order.transition_to(failed_status)
+    rebalance_robust_portfolio(context, [], exposure=0.0, params=params)
+
+    assert context._sr_pending_entry_codes == set()
+    assert context._sr_pending_entry_intents == {}
+    assert context.sr_code_channels == {}
+    assert context.sr_entry_channel_history[-1]["status"] == failed_status
+
+
+def test_opaque_unfilled_entry_intent_times_out_on_next_date(monkeypatch):
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr("eqlib.order_target_value", lambda *args: None)
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(total_value=1_000_000, positions={}),
+        current_dt=pd.Timestamp("2026-07-01 09:30").to_pydatetime(),
+        sr_order_channels={},
+        sr_code_channels={},
+        sr_risk_tracker=PortfolioRiskTracker.initial(1_000_000),
+    )
+    fallback = RobustCandidate(
+        "600519",
+        CandidateChannel.FALLBACK,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        fallback_exposure_cap=0.10,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=1.0,
+    )
+
+    rebalance_robust_portfolio(context, [fallback], exposure=0.80, params=params)
+    context.current_dt = pd.Timestamp("2026-07-02 09:30").to_pydatetime()
+    rebalance_robust_portfolio(context, [], exposure=0.0, params=params)
+
+    assert context._sr_pending_entry_codes == set()
+    assert context._sr_pending_entry_intents == {}
+    assert context.sr_code_channels == {}
+    assert context.sr_entry_channel_history[-1]["status"] == "no_fill_timeout"
 
 
 def test_robust_candidates_use_fallback_only_when_primary_is_short():
