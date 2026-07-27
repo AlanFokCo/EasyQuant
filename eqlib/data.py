@@ -474,9 +474,9 @@ def _validate_ohlcv(df, source_name):
     if not required.issubset(df.columns):
         log.debug("validate_ohlcv: %s missing columns", source_name)
         return False
-    # Check for NaN values in critical columns
-    if df[list(required)].isnull().any().any():
-        log.debug("validate_ohlcv: %s has NaN values in OHLCV", source_name)
+    critical = df[list(required)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(critical.to_numpy(dtype=float)).all():
+        log.debug("validate_ohlcv: %s has non-finite values in OHLCV", source_name)
         return False
     if (df['close'] <= 0).any():
         log.debug("validate_ohlcv: %s has non-positive close", source_name)

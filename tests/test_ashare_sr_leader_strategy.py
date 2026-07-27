@@ -181,6 +181,50 @@ def test_market_volatility_factor_is_bounded_and_never_leverages():
     assert budget == pytest.approx(0.36)
 
 
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_market_inputs_fail_closed(invalid):
+    params = StrategyParams(market_volatility_window=3)
+    benchmark = _ohlcv_from_close([10.0, 10.2, 10.1, 10.3, 10.4])
+    benchmark.loc[benchmark.index[-1], "close"] = invalid
+
+    factor = market_volatility_factor(benchmark, params)
+
+    assert factor is None
+    assert not risk_data_complete(benchmark, factor)
+    assert (
+        final_risk_budget(
+            MarketState.STRONG,
+            volatility_factor=invalid,
+            risk_state=PortfolioRiskState.NORMAL,
+            params=params,
+        )
+        == 0.0
+    )
+
+
+@pytest.mark.parametrize(
+    ("target_volatility", "floor"),
+    [
+        (float("nan"), 0.55),
+        (0.18, float("inf")),
+        (0.18, -0.1),
+        (0.18, 1.1),
+    ],
+)
+def test_market_volatility_factor_rejects_invalid_configuration(
+    target_volatility,
+    floor,
+):
+    params = StrategyParams(
+        market_volatility_window=3,
+        target_annual_volatility=target_volatility,
+        market_volatility_floor=floor,
+    )
+    benchmark = _ohlcv_from_close([10.0, 10.2, 10.1, 10.3, 10.4])
+
+    assert market_volatility_factor(benchmark, params) is None
+
+
 def test_final_risk_budget_preserves_clamped_product_precision():
     params = StrategyParams(strong_market_exposure=0.90)
     volatility_factor = 0.8123456789012345
@@ -330,6 +374,51 @@ def test_fallback_snapshot_rejects_falling_or_benchmark_lagging_stock():
 
     assert build_fallback_snapshot(falling, benchmark, params) is None
     assert build_fallback_snapshot(lagging, benchmark, params) is None
+
+
+@pytest.mark.parametrize("field", ["open", "high", "low", "close", "volume"])
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_primary_and_fallback_snapshots_reject_nonfinite_ohlcv(field, invalid):
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+        fallback_trend_window=30,
+        fallback_medium_window=15,
+        fallback_trend_lookback=5,
+        min_avg_volume=1,
+    )
+    stock = _ohlcv_from_close(list(np.linspace(10, 14, 70)))
+    benchmark = _ohlcv_from_close(list(np.linspace(10, 11, 70)))
+    stock.loc[stock.index[-1], field] = invalid
+
+    assert build_signal_snapshot(stock, benchmark, params) is None
+    assert build_fallback_snapshot(stock, benchmark, params) is None
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_snapshots_reject_nonfinite_benchmark_close(invalid):
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=20,
+        short_level_window=10,
+        atr_period=5,
+        volume_window=5,
+        rs_window=20,
+        fallback_trend_window=30,
+        fallback_medium_window=15,
+        fallback_trend_lookback=5,
+        min_avg_volume=1,
+    )
+    stock = _ohlcv_from_close(list(np.linspace(10, 14, 70)))
+    benchmark = _ohlcv_from_close(list(np.linspace(10, 11, 70)))
+    benchmark.loc[benchmark.index[-1], "close"] = invalid
+
+    assert build_signal_snapshot(stock, benchmark, params) is None
+    assert build_fallback_snapshot(stock, benchmark, params) is None
 
 
 def _robust_candidate(
@@ -1096,10 +1185,10 @@ def test_robust_weights_leave_cap_induced_unused_exposure_as_cash():
 
 @pytest.mark.parametrize(
     "volatility",
-    [float("nan"), float("inf"), float("-inf"), 0.0, -0.02],
-    ids=["nan", "positive-infinity", "negative-infinity", "zero", "negative"],
+    [float("nan"), float("inf"), float("-inf"), -0.02],
+    ids=["nan", "positive-infinity", "negative-infinity", "negative"],
 )
-def test_robust_weights_floor_zero_or_invalid_volatility(volatility):
+def test_robust_weights_reject_invalid_volatility(volatility):
     params = StrategyParams(
         robust_enabled=True,
         top_n=2,
@@ -1108,6 +1197,23 @@ def test_robust_weights_floor_zero_or_invalid_volatility(volatility):
     )
     candidates = [
         _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, volatility),
+        _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.02),
+    ]
+
+    weights = robust_target_weights(candidates, exposure=0.60, params=params)
+
+    assert weights == {"300750": pytest.approx(0.60)}
+
+
+def test_robust_weights_floor_zero_volatility():
+    params = StrategyParams(
+        robust_enabled=True,
+        top_n=2,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+    )
+    candidates = [
+        _robust_candidate("600519", CandidateChannel.PRIMARY, 10.0, 0.0),
         _robust_candidate("300750", CandidateChannel.PRIMARY, 9.0, 0.02),
     ]
 
@@ -1526,6 +1632,47 @@ def test_monthly_incomplete_data_still_reduces_existing_exposure(
     assert context.sr_order_channels == {
         "reduce-600519": CandidateChannel.PRIMARY.value
     }
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_monthly_nonfinite_benchmark_only_reduces_existing_risk(
+    monkeypatch,
+    invalid,
+):
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=4,
+        short_level_window=3,
+        rs_window=3,
+        atr_period=2,
+        market_volatility_window=3,
+    )
+    benchmark = _ohlcv_from_close([10.0, 10.2, 10.1, 10.3, 10.4, 10.5])
+    benchmark.loc[benchmark.index[-1], "close"] = invalid
+    queued = []
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: benchmark)
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.select_robust_candidates",
+        lambda *args: pytest.fail("non-finite benchmark data reached selection"),
+    )
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append((code, value))
+        or SimpleNamespace(order_id=f"reduce-{code}"),
+    )
+    context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
+    context.portfolio.positions = {
+        "600519": SimpleNamespace(total_value=500_000),
+    }
+    context.sr_code_channels = {"600519": CandidateChannel.PRIMARY.value}
+
+    callbacks["monthly"][0](context)
+
+    assert queued
+    assert all(
+        code == "600519" and np.isfinite(target) and 0.0 <= target <= 500_000
+        for code, target in queued
+    )
 
 
 def test_weekly_review_records_recovery_with_real_risk_operations(monkeypatch):
