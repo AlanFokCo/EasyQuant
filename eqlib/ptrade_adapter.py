@@ -31,6 +31,7 @@ Usage in QMT strategy editor:
 
 import datetime
 import math
+import sys
 import pandas as pd
 import numpy as np
 from collections import defaultdict
@@ -151,10 +152,11 @@ class Position:
     """Simulated position, mirroring eqlib.objects.Position."""
 
     def __init__(self, security, amount=0, avg_cost=0.0,
-                 closeable_amount=None):
+                 closeable_amount=None, market_value=None):
         self.security = security
         self.amount = amount
         self.avg_cost = avg_cost
+        self._market_value = market_value
         # T+1: shares bought today cannot be sold until next trading day
         self.closeable_amount = (closeable_amount if closeable_amount
                                  is not None else amount)
@@ -164,8 +166,14 @@ class Position:
         return self.amount
 
     @property
-    def value(self):
+    def total_value(self):
+        if self._market_value is not None:
+            return float(self._market_value)
         return self.amount * self.avg_cost
+
+    @property
+    def value(self):
+        return self.total_value
 
 
 class Portfolio:
@@ -223,8 +231,10 @@ class Portfolio:
                             getattr(pos, 'm_dOpenPrice', 0)))
                         closeable = int(getattr(
                             pos, 'm_nCanUseVolume', amount))
+                        market_value = float(getattr(
+                            pos, 'm_dMarketValue', amount * avg_price))
                         self.positions[eq_code] = Position(
-                            eq_code, amount, avg_price, closeable)
+                            eq_code, amount, avg_price, closeable, market_value)
                     elif eq_code in self.positions:
                         del self.positions[eq_code]
                 # Remove positions that QMT no longer reports
@@ -244,6 +254,7 @@ class Context:
 
     def __init__(self, qmt_context, starting_cash=100000.0):
         self._qmt = qmt_context
+        self._eqlib_runtime_api = sys.modules[__name__]
         self.portfolio = Portfolio(starting_cash)
         self.current_dt = None
         self.run_params = None
@@ -598,7 +609,7 @@ def order(security, amount, price=None, ContextInfo=None):
 
     # QMT's order_shares: positive shares = buy, negative shares = sell
     if amount != 0:
-        _call_qmt_builtin(
+        return _call_qmt_builtin(
             'order_shares', qmt_code, amount, style, price or 0, ci, _account)
 
 
@@ -617,7 +628,7 @@ def order_target(security, amount, price=None, ContextInfo=None):
 
     diff = amount - current
     if diff != 0:
-        order(security, diff, price, ContextInfo)
+        return order(security, diff, price, ContextInfo)
 
 
 def order_value(security, value, price=None, ContextInfo=None):
@@ -632,7 +643,7 @@ def order_value(security, value, price=None, ContextInfo=None):
         return
 
     if value != 0:
-        _call_qmt_builtin(
+        return _call_qmt_builtin(
             'order_value', qmt_code, value, 'LATEST', price or 0, ci, _account)
 
 
@@ -646,7 +657,7 @@ def order_target_value(security, target_value, price=None, ContextInfo=None):
     if ci is None:
         return
 
-    _call_qmt_builtin(
+    return _call_qmt_builtin(
         'order_target_value', qmt_code, target_value, 'LATEST',
         price or 0, ci, _account)
 
@@ -775,6 +786,14 @@ def start(ContextInfo):
     starting_cash = getattr(ContextInfo, 'capital', 100000.0)
     _context = Context(ContextInfo, starting_cash)
 
+    # Establish the account snapshot and strategy date before initialization.
+    _context.portfolio.update_from_qmt(ContextInfo)
+    try:
+        bar_time = ContextInfo.get_bar_timetag()
+        _context.current_dt = datetime.datetime.fromtimestamp(bar_time / 1000)
+    except Exception:
+        _context.current_dt = datetime.datetime.now()
+
     # Run EasyQuant's initialize
     if _initialize_func is not None:
         try:
@@ -787,10 +806,7 @@ def start(ContextInfo):
     # Note: before_trading_start callbacks are called in on_bar() on each
     # new trading day, not here during initialization.
 
-    # Sync portfolio
-    _context.portfolio.update_from_qmt(ContextInfo)
-
-    now = datetime.datetime.now()
+    now = _context.current_dt
     _last_trade_day = now.date()
     _last_week = now.isocalendar()[:2]  # (year, week)
     _last_month = now.month

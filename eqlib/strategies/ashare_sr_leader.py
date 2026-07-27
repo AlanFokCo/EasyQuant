@@ -78,6 +78,15 @@ def _all_finite(*values: object) -> bool:
     return all(_finite_number(value) is not None for value in values)
 
 
+def _runtime_api(context):
+    api = getattr(context, "_eqlib_runtime_api", None)
+    if api is not None:
+        return api
+    import eqlib
+
+    return eqlib
+
+
 @dataclass(frozen=True)
 class StrategyParams:
     """Parameter set for support/resistance leader strategies."""
@@ -1015,10 +1024,10 @@ def liquidity_capped_rebalance_target_value(
     return min(requested_target_value, current_value + liquidity_cap)
 
 
-def _set_costs():
-    from eqlib import OrderCost, set_order_cost
+def _set_costs(context=None):
+    from eqlib.objects import OrderCost
 
-    set_order_cost(
+    _runtime_api(context).set_order_cost(
         OrderCost(
             open_tax=0,
             close_tax=0.0005,
@@ -1039,7 +1048,7 @@ def select_candidates(
 ) -> list[tuple[str, SignalSnapshot, float]]:
     """Rank candidates using only history available to the current callback."""
 
-    from eqlib import attribute_history
+    attribute_history = _runtime_api(context).attribute_history
 
     selections: list[tuple[str, SignalSnapshot, float]] = []
     lookback = (
@@ -1098,7 +1107,7 @@ def select_fallback_candidates(
 ) -> list[RobustCandidate]:
     """Rank eligible fallback candidates from completed daily bars."""
 
-    from eqlib import attribute_history
+    attribute_history = _runtime_api(context).attribute_history
 
     lookback = max(
         params.level_window,
@@ -1191,7 +1200,10 @@ def rebalance_portfolio(
 ) -> None:
     """Move portfolio toward ranked target weights."""
 
-    from eqlib import order_target, order_target_value, record
+    api = _runtime_api(context)
+    order_target = api.order_target
+    order_target_value = api.order_target_value
+    record = api.record
 
     held_codes = list(context.portfolio.positions.keys())
     final_selections = choose_portfolio_candidates(
@@ -1289,7 +1301,7 @@ def _sync_robust_order_lifecycle(context) -> set[str]:
 
 
 def _refresh_robust_order_lifecycle(context) -> None:
-    from eqlib import order_target
+    order_target = _runtime_api(context).order_target
 
     for code in sorted(_sync_robust_order_lifecycle(context)):
         channel = CandidateChannel(
@@ -1308,7 +1320,10 @@ def rebalance_robust_portfolio(
 ) -> None:
     """Move the robust portfolio toward channel-aware target weights."""
 
-    from eqlib import order_target, order_target_value, record
+    api = _runtime_api(context)
+    order_target = api.order_target
+    order_target_value = api.order_target_value
+    record = api.record
 
     _refresh_robust_order_lifecycle(context)
     held_codes = list(context.portfolio.positions.keys())
@@ -1391,7 +1406,7 @@ def rebalance_robust_portfolio(
 def reduce_portfolio_to_budget(context, exposure_budget: float) -> None:
     """Reduce positions proportionally; never increase exposure."""
 
-    from eqlib import order_target_value
+    order_target_value = _runtime_api(context).order_target_value
 
     _refresh_robust_order_lifecycle(context)
     total_value = float(context.portfolio.total_value)
@@ -1416,7 +1431,9 @@ def reduce_portfolio_to_budget(context, exposure_budget: float) -> None:
 def _risk_review(context, params: StrategyParams) -> None:
     """Weekly structural risk review; exits valid breakdowns."""
 
-    from eqlib import attribute_history, order_target
+    api = _runtime_api(context)
+    attribute_history = api.attribute_history
+    order_target = api.order_target
 
     lookback = max(params.level_window, params.short_level_window, params.atr_period) + 5
     if not params.robust_enabled:
@@ -1496,10 +1513,15 @@ def make_initialize(
     universe = list(universe or get_default_leader_universe())
 
     def initialize(context):
-        from eqlib import attribute_history, g, run_monthly, run_weekly, set_benchmark
+        api = _runtime_api(context)
+        attribute_history = api.attribute_history
+        g = api.g
+        run_monthly = api.run_monthly
+        run_weekly = api.run_weekly
+        set_benchmark = api.set_benchmark
 
         set_benchmark(benchmark)
-        _set_costs()
+        _set_costs(context)
         context.universe = universe + [benchmark]
         g.sr_kind = kind
         g.sr_params = params
