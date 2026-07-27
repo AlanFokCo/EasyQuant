@@ -51,6 +51,16 @@ class CandidateChannel(str, Enum):
 
 _OPAQUE_PENDING_EXIT = object()
 _OHLCV_COLUMNS = ("open", "high", "low", "close", "volume")
+_OPEN_ORDER_STATUSES = {"pending", "submitted", "partial_fill"}
+_FAILED_ORDER_STATUSES = {
+    "cancelled",
+    "canceled",
+    "rejected",
+    "expired",
+    "failed",
+    "error",
+}
+_SUCCESS_ORDER_STATUSES = {"filled"}
 
 
 def _finite_number(value: object) -> float | None:
@@ -1253,51 +1263,188 @@ def _tag_order(context, order, code: str, channel: CandidateChannel) -> None:
     context.sr_code_channels.setdefault(code, channel.value)
 
 
-def _register_pending_exit(context, code: str, order) -> None:
+def _order_intent_date(context):
+    current_dt = getattr(context, "current_dt", None)
+    return current_dt.date() if current_dt is not None else None
+
+
+def _normalise_order_status(order) -> str | None:
+    status = getattr(order, "status", None)
+    if not isinstance(status, str):
+        return None
+    return status.strip().lower()
+
+
+def _register_pending_exit(
+    context,
+    code: str,
+    order,
+    *,
+    is_retry: bool = False,
+) -> None:
+    intent_date = _order_intent_date(context)
+    exit_meta = getattr(context, "_sr_pending_exit_meta", {})
+    previous = exit_meta.get(code, {})
     context._sr_pending_exit_codes.add(code)
     context._sr_pending_exit_orders[code] = (
         order if order is not None else _OPAQUE_PENDING_EXIT
     )
+    exit_meta[code] = {
+        "created_date": previous.get("created_date", intent_date),
+        "attempt_date": intent_date,
+        "last_review_date": intent_date,
+        "review_count": int(previous.get("review_count", 0)),
+        "retry_count": int(previous.get("retry_count", 0)) + int(is_retry),
+    }
+    context._sr_pending_exit_meta = exit_meta
     context._sr_pending_entry_codes.discard(code)
 
 
+def _register_pending_entry_intent(
+    context,
+    code: str,
+    channel: CandidateChannel,
+) -> dict:
+    intent_date = _order_intent_date(context)
+    intent_date_text = intent_date.isoformat() if intent_date is not None else None
+    history = getattr(context, "sr_entry_channel_history", [])
+    record = {
+        "security": code,
+        "channel": channel.value,
+        "intent_date": intent_date_text,
+        "resolved_date": None,
+        "status": "pending",
+    }
+    history.append(record)
+    context.sr_entry_channel_history = history
+
+    intents = getattr(context, "_sr_pending_entry_intents", {})
+    intent = {
+        "channel": channel.value,
+        "created_date": intent_date,
+        "order": None,
+        "history": record,
+    }
+    intents[code] = intent
+    context._sr_pending_entry_intents = intents
+    context._sr_pending_entry_codes.add(code)
+    context.sr_code_channels[code] = channel.value
+    return intent
+
+
+def _resolve_pending_entry(
+    context,
+    code: str,
+    intent: dict,
+    status: str,
+    current_date,
+) -> None:
+    history_record = intent.get("history")
+    if isinstance(history_record, dict):
+        history_record["status"] = status
+        history_record["resolved_date"] = (
+            current_date.isoformat() if current_date is not None else None
+        )
+    context._sr_pending_entry_codes.discard(code)
+    context._sr_pending_entry_intents.pop(code, None)
+
+
 def _sync_robust_order_lifecycle(context) -> set[str]:
-    current_dt = getattr(context, "current_dt", None)
-    current_date = current_dt.date() if current_dt is not None else None
-    previous_date = getattr(context, "_sr_order_intent_date", current_date)
+    current_date = _order_intent_date(context)
     pending_entries = getattr(context, "_sr_pending_entry_codes", set())
+    pending_entry_intents = getattr(context, "_sr_pending_entry_intents", {})
     pending_exits = getattr(context, "_sr_pending_exit_codes", set())
     pending_exit_orders = getattr(context, "_sr_pending_exit_orders", {})
-    if previous_date != current_date:
-        pending_entries.clear()
+    pending_exit_meta = getattr(context, "_sr_pending_exit_meta", {})
     context._sr_order_intent_date = current_date
     context._sr_pending_entry_codes = pending_entries
+    context._sr_pending_entry_intents = pending_entry_intents
     context._sr_pending_exit_codes = pending_exits
     context._sr_pending_exit_orders = pending_exit_orders
+    context._sr_pending_exit_meta = pending_exit_meta
 
     held_codes = set(context.portfolio.positions)
-    refreshable_statuses = {"cancelled", "rejected"}
+    for code in list(pending_entries):
+        intent = pending_entry_intents.get(code)
+        if intent is None:
+            continue
+        if code in held_codes:
+            context.sr_code_channels[code] = intent["channel"]
+            _resolve_pending_entry(
+                context,
+                code,
+                intent,
+                "filled",
+                current_date,
+            )
+            continue
+        status = _normalise_order_status(intent.get("order"))
+        if status in _FAILED_ORDER_STATUSES:
+            _resolve_pending_entry(
+                context,
+                code,
+                intent,
+                status,
+                current_date,
+            )
+            continue
+        if (
+            status not in _OPEN_ORDER_STATUSES
+            and current_date != intent.get("created_date")
+        ):
+            _resolve_pending_entry(
+                context,
+                code,
+                intent,
+                "no_fill_timeout",
+                current_date,
+            )
+
+    retryable_exits = set()
     for code, order in list(pending_exit_orders.items()):
-        status = getattr(order, "status", None)
-        if code not in held_codes or status in refreshable_statuses:
+        if code not in held_codes:
             pending_exit_orders.pop(code, None)
-            if code not in held_codes:
-                pending_exits.discard(code)
-        else:
-            pending_exits.add(code)
+            pending_exit_meta.pop(code, None)
+            pending_exits.discard(code)
+            continue
+
+        pending_exits.add(code)
+        status = _normalise_order_status(order)
+        metadata = pending_exit_meta.setdefault(
+            code,
+            {
+                "created_date": current_date,
+                "attempt_date": current_date,
+                "last_review_date": current_date,
+                "review_count": 0,
+                "retry_count": 0,
+            },
+        )
+        if current_date != metadata.get("last_review_date"):
+            metadata["last_review_date"] = current_date
+            metadata["review_count"] = int(metadata.get("review_count", 0)) + 1
+        retryable_status = (
+            status in _FAILED_ORDER_STATUSES
+            or status
+            not in _OPEN_ORDER_STATUSES | _SUCCESS_ORDER_STATUSES
+        )
+        if (
+            retryable_status
+            and current_date != metadata.get("attempt_date")
+            and int(metadata.get("retry_count", 0)) < 1
+        ):
+            retryable_exits.add(code)
+
     for code in list(pending_exits):
         if code not in held_codes:
             pending_exits.discard(code)
             pending_exit_orders.pop(code, None)
+            pending_exit_meta.pop(code, None)
     for code in list(context.sr_code_channels):
         if code in held_codes or code in pending_entries:
             continue
         context.sr_code_channels.pop(code, None)
-    return {
-        code
-        for code in pending_exits
-        if code in held_codes and code not in pending_exit_orders
-    }
+    return retryable_exits
 
 
 def _refresh_robust_order_lifecycle(context) -> None:
@@ -1309,7 +1456,7 @@ def _refresh_robust_order_lifecycle(context) -> None:
         )
         order = order_target(code, 0)
         _tag_order(context, order, code, channel)
-        _register_pending_exit(context, code, order)
+        _register_pending_exit(context, code, order, is_retry=True)
 
 
 def rebalance_robust_portfolio(
@@ -1388,13 +1535,22 @@ def rebalance_robust_portfolio(
             continue
         if target_value < 1000:
             continue
+        if position is None and code in context._sr_pending_entry_codes:
+            continue
         channel = CandidateChannel(
             context.sr_code_channels.get(code, candidate.channel.value)
         )
+        pending_entry = None
+        if position is None:
+            pending_entry = _register_pending_entry_intent(
+                context,
+                code,
+                channel,
+            )
         order = order_target_value(code, target_value)
         _tag_order(context, order, code, channel)
-        if order is not None and position is None:
-            context._sr_pending_entry_codes.add(code)
+        if pending_entry is not None:
+            pending_entry["order"] = order
 
     record(
         total_value=context.portfolio.total_value,
@@ -1536,8 +1692,11 @@ def make_initialize(
             )
             context._sr_order_intent_date = context.current_dt.date()
             context._sr_pending_entry_codes = set()
+            context._sr_pending_entry_intents = {}
             context._sr_pending_exit_codes = set()
             context._sr_pending_exit_orders = {}
+            context._sr_pending_exit_meta = {}
+            context.sr_entry_channel_history = []
 
         def monthly_scan(ctx):
             if g.sr_params.robust_enabled:
