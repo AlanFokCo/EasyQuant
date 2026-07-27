@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import math
 
+import numpy as np
 import pandas as pd
 
 from eqlib.constants import TRADING_DAYS_PER_YEAR
@@ -49,6 +50,32 @@ class CandidateChannel(str, Enum):
 
 
 _OPAQUE_PENDING_EXIT = object()
+_OHLCV_COLUMNS = ("open", "high", "low", "close", "volume")
+
+
+def _finite_number(value: object) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _frame_has_finite_columns(
+    frame: pd.DataFrame,
+    columns: tuple[str, ...],
+) -> bool:
+    if frame.empty or any(column not in frame.columns for column in columns):
+        return False
+    try:
+        values = frame.loc[:, list(columns)].apply(pd.to_numeric, errors="coerce")
+        return bool(np.isfinite(values.to_numpy(dtype=float)).all())
+    except (TypeError, ValueError):
+        return False
+
+
+def _all_finite(*values: object) -> bool:
+    return all(_finite_number(value) is not None for value in values)
 
 
 @dataclass(frozen=True)
@@ -295,6 +322,8 @@ def classify_market(frame: pd.DataFrame, params: StrategyParams) -> MarketState:
 
     if len(frame) < params.level_window + 1:
         return MarketState.NEUTRAL
+    if not _frame_has_finite_columns(frame, _OHLCV_COLUMNS):
+        return MarketState.WEAK
 
     close = float(frame["close"].iloc[-1])
     ma = frame["close"].rolling(
@@ -304,6 +333,8 @@ def classify_market(frame: pd.DataFrame, params: StrategyParams) -> MarketState:
     ma_value = _last_float(ma)
     resistance, support = rolling_levels(frame, params.level_window)
     atr_value = float(compute_atr(frame, params.atr_period).iloc[-1])
+    if not _all_finite(close, ma_value, resistance, support, atr_value):
+        return MarketState.WEAK
 
     if close < support - params.atr_multiplier * atr_value:
         return MarketState.WEAK
@@ -347,7 +378,9 @@ def update_portfolio_risk(
 ) -> PortfolioRiskTracker:
     """Downgrade immediately and recover at most one state per review."""
 
-    if total_value <= 0:
+    if _finite_number(total_value) is None or total_value <= 0:
+        return tracker
+    if not _all_finite(tracker.high_water, tracker.trough):
         return tracker
     high_water = max(tracker.high_water, total_value)
     trough = min(tracker.trough, total_value)
@@ -384,16 +417,34 @@ def market_volatility_factor(
     close = benchmark_frame.get("close")
     if close is None or len(close) < params.market_volatility_window + 1:
         return None
-    returns = close.astype(float).pct_change().dropna().tail(params.market_volatility_window)
+    if not _frame_has_finite_columns(benchmark_frame, ("close",)):
+        return None
+    target = _finite_number(params.target_annual_volatility)
+    floor = _finite_number(params.market_volatility_floor)
+    if (
+        target is None
+        or target < 0.0
+        or floor is None
+        or not 0.0 <= floor <= 1.0
+    ):
+        return None
+    close_values = close.astype(float)
+    if (close_values <= 0.0).any():
+        return None
+    returns = (
+        close_values.pct_change(fill_method=None)
+        .dropna()
+        .tail(params.market_volatility_window)
+    )
     if len(returns) < params.market_volatility_window:
         return None
     realized = float(returns.std()) * (TRADING_DAYS_PER_YEAR**0.5)
+    if not math.isfinite(realized):
+        return None
     if realized <= 0:
         return 1.0
-    return max(
-        params.market_volatility_floor,
-        min(1.0, params.target_annual_volatility / realized),
-    )
+    factor = max(floor, min(1.0, target / realized))
+    return factor if math.isfinite(factor) and floor <= factor <= 1.0 else None
 
 
 def risk_data_complete(
@@ -402,7 +453,12 @@ def risk_data_complete(
 ) -> bool:
     """Return whether a callback may increase portfolio risk."""
 
-    return not benchmark_frame.empty and volatility_factor is not None
+    factor = _finite_number(volatility_factor)
+    return (
+        _frame_has_finite_columns(benchmark_frame, ("close",))
+        and factor is not None
+        and 0.0 <= factor <= 1.0
+    )
 
 
 def drawdown_risk_multiplier(state: PortfolioRiskState) -> float:
@@ -418,19 +474,27 @@ def drawdown_risk_multiplier(state: PortfolioRiskState) -> float:
 
 def final_risk_budget(
     market_state: MarketState,
-    volatility_factor: float,
+    volatility_factor: float | None,
     risk_state: PortfolioRiskState,
     params: StrategyParams,
 ) -> float:
     """Return the final unlevered equity exposure budget."""
 
+    exposure = _finite_number(market_exposure(market_state, params))
+    factor = _finite_number(volatility_factor)
+    multiplier = _finite_number(drawdown_risk_multiplier(risk_state))
+    if (
+        exposure is None
+        or factor is None
+        or multiplier is None
+        or not 0.0 <= factor <= 1.0
+    ):
+        return 0.0
     return max(
         0.0,
         min(
             1.0,
-            market_exposure(market_state, params)
-            * volatility_factor
-            * drawdown_risk_multiplier(risk_state),
+            exposure * factor * multiplier,
         ),
     )
 
@@ -442,8 +506,21 @@ def _relative_strength(
 ) -> float:
     if len(stock_close) < window + 1 or len(benchmark_close) < window + 1:
         return 0.0
-    stock_ret = float(stock_close.iloc[-1] / stock_close.iloc[-window - 1] - 1)
-    bench_ret = float(benchmark_close.iloc[-1] / benchmark_close.iloc[-window - 1] - 1)
+    stock_now = _finite_number(stock_close.iloc[-1])
+    stock_then = _finite_number(stock_close.iloc[-window - 1])
+    benchmark_now = _finite_number(benchmark_close.iloc[-1])
+    benchmark_then = _finite_number(benchmark_close.iloc[-window - 1])
+    if (
+        stock_now is None
+        or stock_then is None
+        or benchmark_now is None
+        or benchmark_then is None
+        or stock_then <= 0.0
+        or benchmark_then <= 0.0
+    ):
+        return float("nan")
+    stock_ret = stock_now / stock_then - 1
+    bench_ret = benchmark_now / benchmark_then - 1
     return stock_ret - bench_ret
 
 
@@ -464,6 +541,10 @@ def build_signal_snapshot(
         + 1
     )
     if len(stock_frame) < required or len(benchmark_frame) < params.rs_window + 1:
+        return None
+    if not _frame_has_finite_columns(stock_frame, _OHLCV_COLUMNS):
+        return None
+    if not _frame_has_finite_columns(benchmark_frame, ("close",)):
         return None
 
     close = float(stock_frame["close"].iloc[-1])
@@ -505,6 +586,19 @@ def build_signal_snapshot(
     breakdown = close < support - params.atr_multiplier * atr_value
     support_distance = (close - support) / close if close > 0 else float("inf")
     resistance_distance = (resistance - close) / close if close > 0 else float("inf")
+    if not _all_finite(
+        close,
+        avg_volume,
+        resistance,
+        support,
+        atr_value,
+        volume_ratio,
+        rel_strength,
+        volatility,
+        support_distance,
+        resistance_distance,
+    ):
+        return None
     if not breakdown and rel_strength < params.min_relative_strength:
         return None
 
@@ -555,6 +649,10 @@ def build_fallback_snapshot(
     ) + 1
     if len(stock_frame) < required or len(benchmark_frame) < params.rs_window + 1:
         return None
+    if not _frame_has_finite_columns(stock_frame, _OHLCV_COLUMNS):
+        return None
+    if not _frame_has_finite_columns(benchmark_frame, ("close",)):
+        return None
 
     close_series = stock_frame["close"].astype(float)
     close = float(close_series.iloc[-1])
@@ -592,6 +690,19 @@ def build_fallback_snapshot(
     returns = close_series.pct_change().tail(20).dropna()
     volatility = float(returns.std()) if not returns.empty else 0.0
     medium_trend_change = medium_now / medium_then - 1 if medium_then > 0 else 0.0
+    if not _all_finite(
+        close,
+        avg_volume,
+        long_value,
+        medium_now,
+        medium_then,
+        relative_strength,
+        support,
+        atr_value,
+        volatility,
+        medium_trend_change,
+    ):
+        return None
     return FallbackSnapshot(
         close=close,
         avg_volume=avg_volume,
@@ -605,6 +716,12 @@ def build_fallback_snapshot(
 def score_fallback_snapshot(snapshot: FallbackSnapshot) -> float:
     """Rank fallback candidates by trend, relative strength, and low volatility."""
 
+    if not _all_finite(
+        snapshot.medium_trend_change,
+        snapshot.relative_strength,
+        snapshot.volatility,
+    ):
+        return float("-inf")
     trend_score = max(0.0, snapshot.medium_trend_change) * 100
     relative_strength_score = max(0.0, snapshot.relative_strength) * 100
     low_volatility_score = max(0.0, 0.04 - snapshot.volatility) * 50
@@ -618,8 +735,25 @@ def filter_fallback_by_volatility(
 
     if not candidates:
         return []
-    median = float(pd.Series([item.volatility for item in candidates]).median())
-    return [item for item in candidates if item.volatility <= median]
+    finite_candidates = [
+        item
+        for item in candidates
+        if _all_finite(
+            item.score,
+            item.volatility,
+            item.close,
+            item.avg_volume,
+        )
+        and item.volatility >= 0.0
+        and item.close > 0.0
+        and item.avg_volume >= 0.0
+    ]
+    if not finite_candidates:
+        return []
+    median = float(
+        pd.Series([item.volatility for item in finite_candidates]).median()
+    )
+    return [item for item in finite_candidates if item.volatility <= median]
 
 
 def score_snapshot(snapshot: SignalSnapshot, kind: StrategyKind) -> float:
@@ -730,7 +864,21 @@ def robust_target_weights(
 ) -> dict[str, float]:
     """Allocate primary first, then a capped fallback sleeve without redistribution."""
 
-    selected = candidates[: params.top_n]
+    if _finite_number(exposure) is None or exposure <= 0.0:
+        return {}
+    selected = [
+        candidate
+        for candidate in candidates[: params.top_n]
+        if _all_finite(
+            candidate.score,
+            candidate.volatility,
+            candidate.close,
+            candidate.avg_volume,
+        )
+        and candidate.volatility >= 0.0
+        and candidate.close > 0.0
+        and candidate.avg_volume >= 0.0
+    ]
     primary = [item for item in selected if item.channel is CandidateChannel.PRIMARY]
     fallback = [item for item in selected if item.channel is CandidateChannel.FALLBACK]
     weights: dict[str, float] = {}

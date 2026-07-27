@@ -4,6 +4,7 @@ import datetime
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 from eqlib.data import (
     _code_to_akshare,
     _compact_date_to_iso,
@@ -158,6 +159,15 @@ class TestLongRangeSourceCoverage:
 
         assert result.index.min() == pd.Timestamp("2023-11-15")
         assert len(result) == len(truncated)
+
+    @pytest.mark.parametrize("invalid", [float("inf"), float("-inf")])
+    def test_validate_ohlcv_rejects_nonfinite_values(self, invalid):
+        import eqlib.data as data_mod
+
+        frame = _sample_ohlcv("2020-01-02", 10)
+        frame.loc[frame.index[-1], "volume"] = invalid
+
+        assert not data_mod._validate_ohlcv(frame, "test")
 
     def test_disk_cache_falls_back_to_pickle_without_parquet(self, monkeypatch, tmp_path):
         """Disk cache should still work when optional parquet engines are absent."""
