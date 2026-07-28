@@ -193,6 +193,53 @@ class TestLongRangeSourceCoverage:
         assert loaded.index.min() == pd.Timestamp("2020-01-02")
         assert len(loaded) == len(df)
 
+    def test_fetch_cached_refetches_sparse_response_without_listing_provenance(
+        self, monkeypatch, tmp_path
+    ):
+        import eqlib.data as data_mod
+        import eqlib.data_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "_CACHE_DIR", str(tmp_path))
+        monkeypatch.setattr(cache_mod, "_parquet_engine", lambda: None)
+        calls = []
+        sparse = _sample_ohlcv("2024-01-15", 5)
+
+        def fake_fetch(*args, **kwargs):
+            calls.append(args)
+            return sparse
+
+        monkeypatch.setattr(data_mod, "fetch_stock_data", fake_fetch)
+
+        cache_mod.fetch_cached("002594", "2024-01-01", "2024-01-31")
+        cache_mod.fetch_cached("002594", "2024-01-01", "2024-01-31")
+
+        assert len(calls) == 2
+
+    def test_fetch_cached_honors_authoritative_listing_provenance_from_provider(
+        self, monkeypatch, tmp_path
+    ):
+        import eqlib.data as data_mod
+        import eqlib.data_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "_CACHE_DIR", str(tmp_path))
+        monkeypatch.setattr(cache_mod, "_parquet_engine", lambda: None)
+        calls = []
+        listed = _sample_ohlcv("2024-01-15", 5)
+        listed.attrs["listing_date"] = "2024-01-15"
+        listed.attrs["listing_date_authoritative"] = True
+
+        def fake_fetch(*args, **kwargs):
+            calls.append(args)
+            return listed
+
+        monkeypatch.setattr(data_mod, "fetch_stock_data", fake_fetch)
+
+        cache_mod.fetch_cached("002594", "2024-01-01", "2024-01-19")
+        cached = cache_mod.fetch_cached("002594", "2024-01-01", "2024-01-19")
+
+        assert len(calls) == 1
+        pd.testing.assert_frame_equal(cached, listed)
+
     def test_stale_cache_lookup_never_deletes_user_file(self, monkeypatch, tmp_path):
         import eqlib.data_cache as cache_mod
 
