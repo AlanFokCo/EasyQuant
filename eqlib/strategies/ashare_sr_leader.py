@@ -147,7 +147,13 @@ class PortfolioRiskTracker:
 
     @classmethod
     def initial(cls, total_value: float) -> "PortfolioRiskTracker":
-        return cls(PortfolioRiskState.NORMAL, total_value, total_value)
+        finite_total = _finite_number(total_value)
+        safe_total = (
+            finite_total
+            if finite_total is not None and finite_total > 0
+            else 0.0
+        )
+        return cls(PortfolioRiskState.NORMAL, safe_total, safe_total)
 
 
 @dataclass(frozen=True)
@@ -1015,6 +1021,8 @@ def should_rebalance_position(
 ) -> bool:
     """Return True when target drift is large enough to justify a trade."""
 
+    if not _all_finite(current_value, target_value, total_value):
+        return False
     if target_value <= 0:
         return current_value > 0
     if current_value <= 0:
@@ -1512,6 +1520,17 @@ def rebalance_robust_portfolio(
     record = api.record
 
     _refresh_robust_order_lifecycle(context)
+    position_values = [
+        _finite_number(position.total_value)
+        for position in context.portfolio.positions.values()
+    ]
+    if (
+        _finite_number(context.portfolio.total_value) is None
+        or _finite_number(exposure) is None
+        or any(value is None or value < 0 for value in position_values)
+    ):
+        reduce_portfolio_to_budget(context, 0.0)
+        return
     held_codes = list(context.portfolio.positions.keys())
     effective_candidates = [
         RobustCandidate(
@@ -1604,18 +1623,46 @@ def reduce_portfolio_to_budget(context, exposure_budget: float) -> None:
     order_target_value = _runtime_api(context).order_target_value
 
     _refresh_robust_order_lifecycle(context)
-    total_value = float(context.portfolio.total_value)
-    invested = sum(
-        float(position.total_value)
-        for position in context.portfolio.positions.values()
+    total_value = _finite_number(context.portfolio.total_value)
+    finite_budget = _finite_number(exposure_budget)
+    position_values = {
+        code: _finite_number(position.total_value)
+        for code, position in context.portfolio.positions.items()
+    }
+    invalid_portfolio = (
+        total_value is None
+        or total_value <= 0
+        or finite_budget is None
+        or finite_budget < 0
+        or any(value is None or value < 0 for value in position_values.values())
     )
-    if total_value <= 0 or invested <= total_value * exposure_budget:
+    if invalid_portfolio:
+        for code in context.portfolio.positions:
+            if code in context._sr_pending_exit_codes:
+                continue
+            order = order_target_value(code, 0.0)
+            channel = CandidateChannel(
+                context.sr_code_channels.get(
+                    code,
+                    CandidateChannel.PRIMARY.value,
+                )
+            )
+            _tag_order(context, order, code, channel)
         return
-    ratio = total_value * exposure_budget / invested
-    for code, position in context.portfolio.positions.items():
+
+    valid_position_values = {
+        code: float(value)
+        for code, value in position_values.items()
+        if value is not None
+    }
+    invested = sum(valid_position_values.values())
+    if invested <= total_value * finite_budget:
+        return
+    ratio = total_value * finite_budget / invested
+    for code in context.portfolio.positions:
         if code in context._sr_pending_exit_codes:
             continue
-        target = float(position.total_value) * ratio
+        target = valid_position_values[code] * ratio
         order = order_target_value(code, target)
         channel = CandidateChannel(
             context.sr_code_channels.get(code, CandidateChannel.PRIMARY.value)
