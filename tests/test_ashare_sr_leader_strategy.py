@@ -475,6 +475,90 @@ def test_reduce_portfolio_to_budget_only_queues_smaller_targets(monkeypatch):
     assert queued == [("600519", 150_000), ("600036", 100_000)]
 
 
+@pytest.mark.parametrize(
+    ("total_value", "first_position_value"),
+    [
+        (float("nan"), 300_000),
+        (float("inf"), 300_000),
+        (1_000_000, float("nan")),
+        (1_000_000, float("inf")),
+    ],
+)
+def test_reduce_portfolio_to_budget_fails_closed_for_nonfinite_portfolio_values(
+    monkeypatch,
+    total_value,
+    first_position_value,
+):
+    queued = []
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append((code, value)) or None,
+    )
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=total_value,
+            positions={
+                "600519": SimpleNamespace(total_value=first_position_value),
+                "600036": SimpleNamespace(total_value=200_000),
+            },
+        ),
+        sr_order_channels={},
+        sr_code_channels={
+            "600519": CandidateChannel.PRIMARY.value,
+            "600036": CandidateChannel.FALLBACK.value,
+        },
+    )
+
+    reduce_portfolio_to_budget(context, exposure_budget=0.25)
+
+    assert queued == [("600519", 0.0), ("600036", 0.0)]
+    assert all(np.isfinite(target) for _code, target in queued)
+
+
+@pytest.mark.parametrize("total_value", [float("nan"), float("inf")])
+def test_robust_rebalance_does_not_submit_nonfinite_targets(
+    monkeypatch,
+    total_value,
+):
+    queued = []
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append((code, value)) or None,
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(total_value=total_value, positions={}),
+        sr_order_channels={},
+        sr_code_channels={},
+        sr_risk_tracker=PortfolioRiskTracker.initial(total_value),
+    )
+    candidate = RobustCandidate(
+        "600519",
+        CandidateChannel.PRIMARY,
+        10.0,
+        0.02,
+        100.0,
+        10_000_000.0,
+    )
+
+    rebalance_robust_portfolio(
+        context,
+        [candidate],
+        exposure=0.50,
+        params=StrategyParams(
+            top_n=1,
+            max_stock_weight=1.0,
+            max_industry_weight=1.0,
+            rebalance_threshold=0.001,
+            liquidity_volume_pct=1.0,
+        ),
+    )
+
+    assert queued == []
+    assert context._sr_pending_entry_codes == set()
+
+
 def test_missing_benchmark_or_volatility_data_blocks_risk_increase():
     assert not risk_data_complete(pd.DataFrame(), None)
     assert not risk_data_complete(_ohlcv_from_close([10, 11]), None)
@@ -1935,6 +2019,41 @@ def test_monthly_nonfinite_benchmark_only_reduces_existing_risk(
         code == "600519" and np.isfinite(target) and 0.0 <= target <= 500_000
         for code, target in queued
     )
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf")])
+def test_monthly_nonfinite_portfolio_total_fails_closed_without_invalid_orders(
+    monkeypatch,
+    invalid,
+):
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=4,
+        short_level_window=3,
+        rs_window=3,
+        atr_period=2,
+        market_volatility_window=3,
+    )
+    benchmark = _ohlcv_from_close([10.0, 10.2, 10.1, 10.3, 10.4, 10.5])
+    queued = []
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: benchmark)
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: queued.append((code, value)) or None,
+    )
+    monkeypatch.setattr("eqlib.record", lambda **values: None)
+    context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
+    context.portfolio.total_value = invalid
+    context.portfolio.positions = {
+        "600519": SimpleNamespace(total_value=500_000),
+    }
+    context.sr_code_channels = {"600519": CandidateChannel.PRIMARY.value}
+
+    callbacks["monthly"][0](context)
+
+    assert queued == [("600519", 0.0)]
+    assert all(np.isfinite(target) for _code, target in queued)
 
 
 def test_weekly_review_records_recovery_with_real_risk_operations(monkeypatch):
