@@ -1980,7 +1980,12 @@ def write_outputs(rows: list[dict]) -> None:
         "params",
     ]
     with (REPORT_DIR / "summary.csv").open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=fieldnames,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row in sorted_rows:
             writer.writerow(row)
