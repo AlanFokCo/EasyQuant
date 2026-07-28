@@ -578,4 +578,4 @@ To understand the implementation from code, read in this order:
 - Monthly rebalancing and weekly breakdown review reduce churn and structural risk.
 - Stability scoring selects parameters instead of simply maximizing return.
 
-The 2020-2025 report does not conclude that a new variant won; it retains the `adaptive_composite` baseline under the predeclared fallback rule. The coverage-audited grade improved to `A / 70.3`, but the selected baseline disables the robustness extension and no robust candidate passed the hard gate, so these mechanisms still must not be interpreted as validated robust return capability.
+The 2020-2025 report does not conclude that a new variant won; it retains the `adaptive_composite` baseline under the predeclared fallback rule. The coverage-audited rerun produced `A / 70.3`, but the selected baseline disables the robustness extension and no robust candidate passed the hard gate, so these mechanisms still must not be interpreted as validated robust return capability.
