@@ -427,6 +427,45 @@ def update_portfolio_risk(
     return PortfolioRiskTracker(state, high_water, trough)
 
 
+def _update_and_record_portfolio_risk(
+    context,
+    market_state: MarketState,
+    params: StrategyParams,
+    *,
+    allow_recovery: bool,
+    data_complete: bool,
+) -> PortfolioRiskTracker:
+    previous = context.sr_risk_tracker
+    updated = update_portfolio_risk(
+        previous,
+        context.portfolio.total_value,
+        market_state,
+        params,
+        allow_recovery=allow_recovery,
+        data_complete=data_complete,
+    )
+    context.sr_risk_tracker = updated
+    if updated.state is previous.state:
+        return updated
+
+    total_value = _finite_number(context.portfolio.total_value)
+    high_water = _finite_number(updated.high_water)
+    drawdown = (
+        max(0.0, 1.0 - total_value / high_water)
+        if total_value is not None and high_water is not None and high_water > 0
+        else 0.0
+    )
+    context.sr_risk_events.append(
+        {
+            "date": context.current_dt.date().isoformat(),
+            "from": previous.state.name.lower(),
+            "to": updated.state.name.lower(),
+            "drawdown": round(drawdown, 6),
+        }
+    )
+    return updated
+
+
 def market_volatility_factor(
     benchmark_frame: pd.DataFrame,
     params: StrategyParams,
@@ -1683,6 +1722,9 @@ def make_initialize(
         g.sr_params = params
         g.sr_universe = universe
         g.sr_benchmark = benchmark
+        context.sr_robust_telemetry_available = bool(
+            g.sr_params.robust_enabled
+        )
         if g.sr_params.robust_enabled:
             context.sr_order_channels = {}
             context.sr_code_channels = {}
@@ -1724,9 +1766,8 @@ def make_initialize(
                 )
                 volatility_factor = market_volatility_factor(bench, g.sr_params)
                 complete = risk_data_complete(bench, volatility_factor)
-                ctx.sr_risk_tracker = update_portfolio_risk(
-                    ctx.sr_risk_tracker,
-                    ctx.portfolio.total_value,
+                updated = _update_and_record_portfolio_risk(
+                    ctx,
                     state,
                     g.sr_params,
                     allow_recovery=False,
@@ -1737,10 +1778,10 @@ def make_initialize(
                     volatility_factor
                     if volatility_factor is not None
                     else g.sr_params.market_volatility_floor,
-                    ctx.sr_risk_tracker.state,
+                    updated.state,
                     g.sr_params,
                 )
-                if ctx.sr_risk_tracker.state is PortfolioRiskState.PROTECT:
+                if updated.state is PortfolioRiskState.PROTECT:
                     reduce_portfolio_to_budget(ctx, exposure)
                     return
                 if not complete:
@@ -1753,7 +1794,7 @@ def make_initialize(
                     g.sr_universe,
                     bench,
                     state,
-                    ctx.sr_risk_tracker.state,
+                    updated.state,
                 )
                 rebalance_robust_portfolio(
                     ctx,
@@ -1816,28 +1857,13 @@ def make_initialize(
                 )
                 volatility_factor = market_volatility_factor(bench, g.sr_params)
                 complete = risk_data_complete(bench, volatility_factor)
-                previous = ctx.sr_risk_tracker
-                updated = update_portfolio_risk(
-                    previous,
-                    ctx.portfolio.total_value,
+                updated = _update_and_record_portfolio_risk(
+                    ctx,
                     state,
                     g.sr_params,
                     allow_recovery=True,
                     data_complete=complete,
                 )
-                ctx.sr_risk_tracker = updated
-                if updated.state is not previous.state:
-                    ctx.sr_risk_events.append(
-                        {
-                            "date": ctx.current_dt.date().isoformat(),
-                            "from": previous.state.name.lower(),
-                            "to": updated.state.name.lower(),
-                            "drawdown": round(
-                                1 - ctx.portfolio.total_value / updated.high_water,
-                                6,
-                            ),
-                        }
-                    )
                 _risk_review(ctx, g.sr_params)
                 exposure = final_risk_budget(
                     state,

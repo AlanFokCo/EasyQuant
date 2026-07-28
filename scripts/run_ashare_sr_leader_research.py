@@ -428,16 +428,36 @@ def _valid_date_key(value: object) -> str | None:
     return timestamp.strftime("%Y-%m-%d")
 
 
-def _channel_defaults() -> dict[str, float | int]:
+def _robust_telemetry_available(result: dict) -> bool:
+    context = result.get("context")
+    if context is None:
+        return False
+    explicit = getattr(context, "sr_robust_telemetry_available", None)
+    if explicit is not None:
+        return bool(explicit)
+    return any(
+        hasattr(context, attribute)
+        for attribute in (
+            "sr_order_channels",
+            "sr_entry_channel_history",
+            "sr_risk_events",
+        )
+    )
+
+
+def _channel_defaults(
+    available: bool = True,
+) -> dict[str, float | int | None]:
+    unavailable = None if not available else 0
     return {
-        "primary_trade_count": 0,
-        "fallback_trade_count": 0,
-        "primary_average_exposure": 0.0,
-        "fallback_average_exposure": 0.0,
-        "primary_average_holdings": 0.0,
-        "fallback_average_holdings": 0.0,
-        "primary_return_contribution": 0.0,
-        "fallback_return_contribution": 0.0,
+        "primary_entry_fill_count": unavailable,
+        "fallback_entry_fill_count": unavailable,
+        "primary_average_exposure": None if not available else 0.0,
+        "fallback_average_exposure": None if not available else 0.0,
+        "primary_average_holdings": None if not available else 0.0,
+        "fallback_average_holdings": None if not available else 0.0,
+        "primary_return_contribution": None if not available else 0.0,
+        "fallback_return_contribution": None if not available else 0.0,
     }
 
 
@@ -482,7 +502,7 @@ def _close_history(frame: object) -> dict[str, float]:
     return history
 
 
-def channel_diagnostics(result: dict) -> dict[str, float | int]:
+def channel_diagnostics(result: dict) -> dict[str, float | int | None]:
     """Attribute holdings, exposure, and next-close return by entry channel.
 
     Exposure carries each security's latest prior-or-current valid close. A
@@ -491,13 +511,38 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
     actual valid close is recorded, so the carry does not fabricate returns.
     """
 
-    defaults = _channel_defaults()
+    telemetry_available = _robust_telemetry_available(result)
+    defaults = _channel_defaults(telemetry_available)
+    if not telemetry_available:
+        return defaults
+
     context = result.get("context")
     raw_channels = getattr(context, "sr_order_channels", {}) if context else {}
     if not isinstance(raw_channels, dict):
         raw_channels = {}
     order_channels = {str(key): value for key, value in raw_channels.items()}
     valid_channels = ("primary", "fallback")
+    entry_intents: dict[str, list[tuple[str, int, str]]] = {}
+    raw_history = getattr(context, "sr_entry_channel_history", [])
+    for index, intent in enumerate(raw_history or []):
+        if not isinstance(intent, dict):
+            continue
+        security = intent.get("security")
+        channel = intent.get("channel")
+        intent_date = _valid_date_key(intent.get("intent_date"))
+        if (
+            not security
+            or channel not in valid_channels
+            or intent_date is None
+            or intent.get("status") not in {"pending", "filled"}
+        ):
+            continue
+        entry_intents.setdefault(str(security), []).append(
+            (intent_date, index, channel)
+        )
+    for intents in entry_intents.values():
+        intents.sort()
+
     lots: dict[str, dict[str, list[dict[str, float | None]]]] = {
         channel: {} for channel in valid_channels
     }
@@ -506,10 +551,23 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
     for trade in result.get("trade_log", []) or []:
         if not isinstance(trade, dict):
             continue
-        channel = order_channels.get(str(trade.get("order_id")))
         security = trade.get("security")
         amount = _finite_float(trade.get("amount"))
         trade_date = _valid_date_key(trade.get("date"))
+        channel = order_channels.get(str(trade.get("order_id")))
+        if (
+            channel not in valid_channels
+            and trade.get("type") == "BUY"
+            and security
+            and trade_date is not None
+        ):
+            matching_intents = [
+                item
+                for item in entry_intents.get(str(security), [])
+                if item[0] <= trade_date
+            ]
+            if matching_intents:
+                channel = matching_intents[-1][2]
         if (
             channel not in valid_channels
             or not security
@@ -522,7 +580,7 @@ def channel_diagnostics(result: dict) -> dict[str, float | int]:
             (trade, channel, str(security), amount)
         )
         if trade.get("type") == "BUY":
-            defaults[f"{channel}_trade_count"] += 1
+            defaults[f"{channel}_entry_fill_count"] += 1
 
     close_histories = {
         str(security): _close_history(frame)
@@ -696,6 +754,13 @@ def _portfolio_risk_state(value: object) -> PortfolioRiskState | None:
 
 def risk_state_diagnostics(result: dict) -> dict:
     """Count recorded-day risk states and ordered state transitions."""
+
+    if not _robust_telemetry_available(result):
+        return {
+            "risk_state_days": None,
+            "risk_state_trigger_count": None,
+            "risk_state_recovery_count": None,
+        }
 
     context = result.get("context")
     raw_events = getattr(context, "sr_risk_events", []) if context else []
@@ -881,15 +946,19 @@ def summarize_result(result: dict) -> dict:
 
 
 def _attach_research_diagnostics(summary: dict, result: dict | None = None) -> dict:
+    telemetry_available = (
+        _robust_telemetry_available(result) if result is not None else False
+    )
+    summary["robust_telemetry_available"] = telemetry_available
     if result is not None:
         summary.update(channel_diagnostics(result))
         summary.update(risk_state_diagnostics(result))
     else:
-        for key, value in _channel_defaults().items():
+        for key, value in _channel_defaults(False).items():
             summary.setdefault(key, value)
-        summary.setdefault("risk_state_days", {})
-        summary.setdefault("risk_state_trigger_count", 0)
-        summary.setdefault("risk_state_recovery_count", 0)
+        summary.setdefault("risk_state_days", None)
+        summary.setdefault("risk_state_trigger_count", None)
+        summary.setdefault("risk_state_recovery_count", None)
     summary.setdefault("gate_failures", [])
     summary.setdefault("robust_gate_pass", False)
     summary.setdefault("neighbor_pass_rate", 0.0)
@@ -1324,10 +1393,21 @@ def _markdown_research_sections(full_rows: list[dict]) -> str:
         for index, row in enumerate(robust_seeds, start=1):
             failures = list(row.get("gate_failures", []) or [])
             is_finalist = any(row is finalist for finalist in robust_rows)
+            validation_status = row.get("validation_status")
+            if validation_status == "not_validated_finalist_cap":
+                result_label = "未验证"
+                failure_codes = validation_status
+            else:
+                result_label = (
+                    "通过" if row.get("robust_gate_pass") is True else "未通过"
+                )
+                failure_codes = (
+                    ", ".join(str(code) for code in failures) or "无"
+                )
             lines.append(
                 f"| {_report_candidate_label(row, index)} | "
-                f"{'通过' if row.get('robust_gate_pass') is True else '未通过'} | "
-                f"{', '.join(str(code) for code in failures) or '无'} | "
+                f"{result_label} | "
+                f"{failure_codes} | "
                 f"{_fmt_pct(_float_metric(row, 'neighbor_pass_rate', 0.0)) if is_finalist else '不可用'} | "
                 f"{_fmt_pct(_float_metric(row, 'worst_validation_excess', 0.0)) if is_finalist else '不可用'} |"
             )
@@ -1373,32 +1453,43 @@ def _markdown_research_sections(full_rows: list[dict]) -> str:
     )
     for row in diagnostic_rows:
         label = candidate_label(row)
-        state_days = row.get("risk_state_days", {}) or {}
-        days = ", ".join(f"{state}: {count}" for state, count in state_days.items())
-        lines.append(
-            f"| {label} | {days or '无'} | "
-            f"{row.get('risk_state_trigger_count', 0)} | "
-            f"{row.get('risk_state_recovery_count', 0)} |"
-        )
+        if not row.get("robust_telemetry_available"):
+            lines.append(f"| {label} | 不可用 | 不可用 | 不可用 |")
+        else:
+            state_days = row.get("risk_state_days", {}) or {}
+            days = ", ".join(
+                f"{state}: {count}" for state, count in state_days.items()
+            )
+            lines.append(
+                f"| {label} | {days or '无'} | "
+                f"{row.get('risk_state_trigger_count', 0)} | "
+                f"{row.get('risk_state_recovery_count', 0)} |"
+            )
 
     lines.extend(
         [
             "",
             "## 主/候补通道",
             "",
-            "| Candidate | Channel | Trades | Average exposure | Average holdings | Return contribution |",
+            "| Candidate | Channel | Entry fills | Average exposure | Average holdings | Return contribution |",
             "|---|---|---:|---:|---:|---:|",
         ]
     )
     for row in diagnostic_rows:
         label = candidate_label(row)
         for channel, name in (("primary", "主通道"), ("fallback", "候补通道")):
-            lines.append(
-                f"| {label} | {name} | {row.get(f'{channel}_trade_count', 0)} | "
-                f"{_fmt_pct(_float_metric(row, f'{channel}_average_exposure', 0.0))} | "
-                f"{_fmt_num(row.get(f'{channel}_average_holdings', 0.0), 2)} | "
-                f"{_fmt_pct(_float_metric(row, f'{channel}_return_contribution', 0.0))} |"
-            )
+            if not row.get("robust_telemetry_available"):
+                lines.append(
+                    f"| {label} | {name} | 不可用 | 不可用 | 不可用 | 不可用 |"
+                )
+            else:
+                lines.append(
+                    f"| {label} | {name} | "
+                    f"{row.get(f'{channel}_entry_fill_count', 0)} | "
+                    f"{_fmt_pct(_float_metric(row, f'{channel}_average_exposure', 0.0))} | "
+                    f"{_fmt_num(row.get(f'{channel}_average_holdings', 0.0), 2)} | "
+                    f"{_fmt_pct(_float_metric(row, f'{channel}_return_contribution', 0.0))} |"
+                )
 
     lines.extend(
         [
@@ -1847,12 +1938,14 @@ def write_outputs(rows: list[dict]) -> None:
         "grade_weakest",
         "stability_score",
         "robust_gate_pass",
+        "validation_status",
         "neighbor_pass_rate",
         "worst_validation_excess",
+        "robust_telemetry_available",
         "risk_state_trigger_count",
         "risk_state_recovery_count",
-        "primary_trade_count",
-        "fallback_trade_count",
+        "primary_entry_fill_count",
+        "fallback_entry_fill_count",
         "primary_average_exposure",
         "fallback_average_exposure",
         "primary_average_holdings",
@@ -1999,7 +2092,12 @@ def main() -> int:
         reverse=True,
     )
 
-    for row, kind, params in robust_finalists[:3]:
+    validated_finalists = robust_finalists[:3]
+    for row, _kind, _params in robust_finalists[3:]:
+        row["validation_status"] = "not_validated_finalist_cap"
+
+    for row, kind, params in validated_finalists:
+        row["validation_status"] = "validated"
         neighbor_rows: list[dict] = []
         for neighbor_params in neighbor_param_sets(params):
             result = cached_result(kind, neighbor_params, START_DATE, END_DATE)
