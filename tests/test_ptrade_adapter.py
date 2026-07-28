@@ -1,9 +1,12 @@
 """Tests for ptrade_adapter.py — verifies code conversion, Position/Portfolio,
 g namespace, and API surface without requiring QMT runtime."""
 
+import builtins
 import datetime
+import importlib.util
 import inspect
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -30,13 +33,43 @@ class _FakeQMTContext:
     def __init__(self, frames=None, timestamp=None):
         self.frames = frames or {}
         self.timestamp = timestamp or datetime.datetime(2026, 7, 21, 9, 30)
+        self.barpos = 0
 
-    def get_bar_timetag(self):
+    def get_bar_timetag(self, barpos):
+        assert barpos == self.barpos
         return int(self.timestamp.timestamp() * 1000)
 
     def get_market_data(self, fields, stock_code, **_kwargs):
         frame = self.frames.get(stock_code[0], pd.DataFrame())
         return frame.loc[:, [field for field in fields if field in frame.columns]]
+
+
+class _StrictTimeQMTContext(_FakeQMTContext):
+    def __init__(self, frames=None, timestamp=None):
+        super().__init__(frames=frames, timestamp=timestamp)
+        self.barpos = 17
+        self.timetag_calls = []
+
+    def get_bar_timetag(self, barpos):
+        self.timetag_calls.append(barpos)
+        if barpos != self.barpos:
+            raise AssertionError(f"expected barpos {self.barpos}, got {barpos}")
+        return int(self.timestamp.timestamp() * 1000)
+
+
+class _HistoryQMTContext:
+    def __init__(self):
+        self.requested_counts = []
+        self.frame = pd.DataFrame(
+            {"close": [10.0, 11.0]},
+            index=pd.to_datetime(
+                ["2026-07-20 15:00:00", "2026-07-21 09:30:00"]
+            ),
+        )
+
+    def get_market_data(self, fields, stock_code, **kwargs):
+        self.requested_counts.append(kwargs["count"])
+        return self.frame.loc[:, fields].tail(kwargs["count"])
 
 
 def _ohlcv(close_values):
@@ -202,6 +235,73 @@ class TestPortfolioSource:
 class TestOrderFunctions:
     """Order functions should use _call_qmt_builtin, not bare QMT builtins."""
 
+    def test_native_builtins_do_not_overwrite_compatibility_wrapper(
+        self,
+        monkeypatch,
+    ):
+        calls = []
+
+        def native_order_target_value(
+            stockcode,
+            target_value,
+            style,
+            price,
+            ContextInfo,
+            accId="",
+        ):
+            calls.append(
+                (stockcode, target_value, style, price, ContextInfo, accId)
+            )
+
+        native_names = (
+            "order_shares",
+            "order_value",
+            "order_percent",
+            "order_target_value",
+            "order_target_percent",
+            "order_lots",
+            "get_trade_detail_data",
+            "get_last_order_id",
+            "get_value_by_order_id",
+            "can_cancel_order",
+            "cancel",
+            "cancel_task",
+            "pause_task",
+            "resume_task",
+            "do_order",
+            "passorder",
+            "algo_passorder",
+            "smart_algo_passorder",
+            "get_etf_info",
+            "get_etf_iopv",
+            "query_credit_opvolume",
+            "credit_opvolume_callback",
+        )
+        for name in native_names:
+            monkeypatch.setattr(
+                builtins,
+                name,
+                native_order_target_value,
+                raising=False,
+            )
+
+        module_name = "eqlib._ptrade_adapter_native_test"
+        spec = importlib.util.spec_from_file_location(module_name, pa.__file__)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+            qmt_context = object()
+            module._context = SimpleNamespace(_qmt=qmt_context)
+
+            module.order_target_value("600519", 250_000)
+        finally:
+            sys.modules.pop(module_name, None)
+
+        assert calls == [
+            ("600519.SH", 250_000, "LATEST", 0, qmt_context, "")
+        ]
+
     def test_order_uses_builtin(self):
         src = inspect.getsource(pa.order)
         assert '_call_qmt_builtin' in src
@@ -221,6 +321,26 @@ class TestOrderFunctions:
         assert callable(pa.order_pct)
 
 
+class TestHistory:
+    def test_history_requests_and_returns_completed_bars_only(self, monkeypatch):
+        _reset_adapter(monkeypatch)
+        qmt = _HistoryQMTContext()
+        pa._context = SimpleNamespace(_qmt=qmt)
+
+        result = pa.history(
+            end_date=datetime.date(2026, 7, 21),
+            count=1,
+            fields=["close"],
+            security_list=["600519"],
+        )
+
+        assert qmt.requested_counts == [2]
+        assert result["close"].tolist() == [10.0]
+        assert result.index.tolist() == [
+            pd.Timestamp("2026-07-20 15:00:00")
+        ]
+
+
 class TestLifecycle:
     """start() and on_bar() should have correct timing logic."""
 
@@ -238,6 +358,96 @@ class TestLifecycle:
         src = inspect.getsource(pa.on_bar)
         assert "t.split(':')" in src
         assert 'total_seconds()' in src
+
+    def test_lifecycle_uses_bar_position_for_qmt_current_time(self, monkeypatch):
+        _reset_adapter(monkeypatch)
+        start_dt = datetime.datetime(2026, 7, 21, 9, 30)
+        qmt = _StrictTimeQMTContext(timestamp=start_dt)
+
+        pa.start(qmt)
+
+        assert pa._context.current_dt == start_dt
+        assert qmt.timetag_calls == [17]
+
+        bar_dt = datetime.datetime(2026, 7, 21, 9, 31)
+        qmt.barpos = 18
+        qmt.timestamp = bar_dt
+        pa.on_bar(qmt)
+
+        assert pa._context.current_dt == bar_dt
+        assert qmt.timetag_calls == [17, 18]
+
+    def test_weekly_callback_executes_on_configured_friday(self, monkeypatch):
+        _reset_adapter(monkeypatch)
+        callback_dates = []
+
+        def initialize(_context):
+            pa.run_weekly(
+                lambda context: callback_dates.append(context.current_dt.date()),
+                day_of_week=4,
+                time="09:30",
+            )
+
+        pa._initialize_func = initialize
+        qmt = _StrictTimeQMTContext(
+            timestamp=datetime.datetime(2026, 7, 20, 9, 30)
+        )
+        pa.start(qmt)
+
+        qmt.barpos = 18
+        qmt.timestamp = datetime.datetime(2026, 7, 24, 9, 30)
+        pa.on_bar(qmt)
+        qmt.barpos = 19
+        qmt.timestamp = datetime.datetime(2026, 7, 24, 9, 31)
+        pa.on_bar(qmt)
+
+        assert callback_dates == [datetime.date(2026, 7, 24)]
+
+    def test_monthly_day_one_executes_on_first_trading_day(self, monkeypatch):
+        _reset_adapter(monkeypatch)
+        callback_dates = []
+
+        def initialize(_context):
+            pa.run_monthly(
+                lambda context: callback_dates.append(context.current_dt.date()),
+                day_of_month=1,
+                time="09:30",
+            )
+
+        pa._initialize_func = initialize
+        qmt = _StrictTimeQMTContext(
+            timestamp=datetime.datetime(2026, 8, 31, 9, 30)
+        )
+        pa.start(qmt)
+
+        qmt.barpos = 18
+        qmt.timestamp = datetime.datetime(2026, 9, 2, 9, 30)
+        pa.on_bar(qmt)
+        qmt.barpos = 19
+        qmt.timestamp = datetime.datetime(2026, 9, 2, 9, 31)
+        pa.on_bar(qmt)
+
+        assert callback_dates == [datetime.date(2026, 9, 2)]
+
+    def test_monthly_day_one_does_not_execute_midmonth(self, monkeypatch):
+        _reset_adapter(monkeypatch)
+        callback_dates = []
+
+        def initialize(_context):
+            pa.run_monthly(
+                lambda context: callback_dates.append(context.current_dt.date()),
+                day_of_month=1,
+                time="09:30",
+            )
+
+        pa._initialize_func = initialize
+        qmt = _StrictTimeQMTContext(
+            timestamp=datetime.datetime(2026, 7, 21, 9, 30)
+        )
+        pa.start(qmt)
+        pa.on_bar(qmt)
+
+        assert callback_dates == []
 
     def test_start_initializes_robust_factory_with_adapter_runtime(self, monkeypatch):
         _reset_adapter(monkeypatch)

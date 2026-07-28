@@ -392,7 +392,7 @@ def attribute_history(security, count, unit='1d', fields=('close',),
 def history(end_date, count, unit='1d', fields=('close',),
             security_list=None, skip_paused=True, df=True,
             period='1d', dividend_type='front', fill_paused=True):
-    """Get historical data up to end_date.
+    """Get completed historical bars up to end_date.
 
     Maps to QMT's get_market_data with explicit time range.
     """
@@ -413,9 +413,10 @@ def history(end_date, count, unit='1d', fields=('close',),
         data = ci.get_market_data(
             list(fields), stock_code=qmt_codes,
             skip_paused=skip_paused, period=period,
-            dividend_type=dividend_type, count=count
+            dividend_type=dividend_type, count=count + 1
         )
-        return _format_market_data(data, fields)
+        frame = _format_market_data(data, fields)
+        return frame.iloc[:-1].tail(count)
     except Exception:
         return pd.DataFrame()
 
@@ -761,6 +762,16 @@ def _qmt_order_target_value(stockcode, target_value, style='LATEST',
 # Lifecycle bridge
 # =====================================================================
 
+def _get_qmt_current_dt(ContextInfo):
+    """Return the datetime for QMT's current bar."""
+    try:
+        bar_time = ContextInfo.get_bar_timetag(ContextInfo.barpos)
+        return datetime.datetime.fromtimestamp(bar_time / 1000)
+    except Exception as e:
+        print(f'[PTrade Adapter] current bar time error: {e}')
+        return datetime.datetime.now()
+
+
 def start(ContextInfo):
     """Call this in QMT's init() to start the EasyQuant strategy.
 
@@ -788,11 +799,7 @@ def start(ContextInfo):
 
     # Establish the account snapshot and strategy date before initialization.
     _context.portfolio.update_from_qmt(ContextInfo)
-    try:
-        bar_time = ContextInfo.get_bar_timetag()
-        _context.current_dt = datetime.datetime.fromtimestamp(bar_time / 1000)
-    except Exception:
-        _context.current_dt = datetime.datetime.now()
+    _context.current_dt = _get_qmt_current_dt(ContextInfo)
 
     # Run EasyQuant's initialize
     if _initialize_func is not None:
@@ -809,7 +816,7 @@ def start(ContextInfo):
     now = _context.current_dt
     _last_trade_day = now.date()
     _last_week = now.isocalendar()[:2]  # (year, week)
-    _last_month = now.month
+    _last_month = (now.year, now.month)
 
     log('PTrade adapter started. EQ strategy initialized.')
 
@@ -832,11 +839,7 @@ def on_bar(ContextInfo):
     _context.portfolio.update_from_qmt(ContextInfo)
 
     # Update current datetime
-    try:
-        bar_time = ContextInfo.get_bar_timetag()
-        _context.current_dt = datetime.datetime.fromtimestamp(bar_time / 1000)
-    except Exception:
-        _context.current_dt = datetime.datetime.now()
+    _context.current_dt = _get_qmt_current_dt(ContextInfo)
 
     now = _context.current_dt
     today = now.date()
@@ -878,28 +881,37 @@ def on_bar(ContextInfo):
         except Exception as e:
             print(f'[PTrade Adapter] run_daily({t}) error: {e}')
 
-    # Run weekly functions
-    # Use (year, week) tuple to handle year boundary correctly
+    # Run weekly functions once on their configured weekday.
     current_iso = now.isocalendar()[:2]  # (year, week_number)
-    if current_iso != _last_week:
-        _last_week = current_iso
-        weekday = now.weekday()  # 0=Mon
-        for day_of_week, _, func in _weekly_funcs:
-            if weekday == day_of_week:
-                try:
-                    func(_context)
-                except Exception as e:
-                    print(f'[PTrade Adapter] run_weekly() error: {e}')
+    if not hasattr(_context, '_weekly_done_periods'):
+        _context._weekly_done_periods = {}
+    for index, (day_of_week, _, func) in enumerate(_weekly_funcs):
+        if (now.weekday() == day_of_week
+                and _context._weekly_done_periods.get(index) != current_iso):
+            _context._weekly_done_periods[index] = current_iso
+            try:
+                func(_context)
+            except Exception as e:
+                print(f'[PTrade Adapter] run_weekly() error: {e}')
 
-    # Run monthly functions
-    if now.month != _last_month:
-        _last_month = now.month
-        for day_of_month, _, func in _monthly_funcs:
-            if now.day == day_of_month:
-                try:
-                    func(_context)
-                except Exception as e:
-                    print(f'[PTrade Adapter] run_monthly() error: {e}')
+    # Run monthly functions on the first trading day on or after the
+    # configured calendar day.
+    current_month = (now.year, now.month)
+    is_first_trading_day = current_month != _last_month
+    if is_first_trading_day:
+        _last_month = current_month
+    if not hasattr(_context, '_monthly_done_periods'):
+        _context._monthly_done_periods = {}
+    for index, (day_of_month, _, func) in enumerate(_monthly_funcs):
+        is_due = (is_first_trading_day if day_of_month == 1
+                  else now.day >= day_of_month)
+        if (is_due
+                and _context._monthly_done_periods.get(index) != current_month):
+            _context._monthly_done_periods[index] = current_month
+            try:
+                func(_context)
+            except Exception as e:
+                print(f'[PTrade Adapter] run_monthly() error: {e}')
 
     # Run handle_data
     if _handle_data_func is not None:
@@ -1051,13 +1063,15 @@ def handlebar(ContextInfo):
 # Users can import these directly when they need QMT-specific features
 # =====================================================================
 
-# The following are QMT's native functions that are already in the global
-# namespace when running in QMT. We re-assign them here so the module
-# can be imported without error during local development (they'll be
-# overwritten by QMT's runtime when the strategy actually runs).
+# QMT provides these functions through builtins. Native order functions use
+# qmt_ aliases so they cannot replace the EasyQuant compatibility wrappers.
 try:
-    from builtins import order_shares, order_value, order_percent
-    from builtins import order_target_value, order_target_percent, order_lots
+    from builtins import order_shares as qmt_order_shares
+    from builtins import order_value as qmt_order_value
+    from builtins import order_percent as qmt_order_percent
+    from builtins import order_target_value as qmt_order_target_value
+    from builtins import order_target_percent as qmt_order_target_percent
+    from builtins import order_lots as qmt_order_lots
     from builtins import get_trade_detail_data, get_last_order_id
     from builtins import get_value_by_order_id, can_cancel_order, cancel
     from builtins import cancel_task, pause_task, resume_task, do_order
