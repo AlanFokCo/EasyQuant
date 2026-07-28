@@ -84,7 +84,7 @@ Parameters are managed by `StrategyParams`. The defaults reflect a medium-to-low
 
 ### Exact Current Baseline Parameters
 
-The fallback baseline is the `adaptive_composite` parameter set identified as `A / 71.3` in the historical baseline report. `A / 71.3` is the established label for that parameter set, not its grade in this rerun; the actual fresh result is `D / 29.8`, as shown later.
+The fallback baseline is the `adaptive_composite` parameter set identified as `A / 71.3` in the historical baseline report. `A / 71.3` is the established label for that parameter set, not its grade in this rerun; the coverage-audited fresh result is `A / 70.3`, as shown later.
 
 | Parameter | Baseline | Parameter | Baseline |
 |-----------|---------:|-----------|---------:|
@@ -478,7 +478,7 @@ A candidate may replace the baseline only after passing the full-period, rolling
 
 ## 2020-2025 Report Variant
 
-The actual full research run on 2026-07-26 found no robust candidate that passed the first full-period gate: every robust candidate triggered both `annual_return_below_12pct` and `grade_below_a`, so the designed pipeline did not proceed to rolling or neighborhood evaluation. It retained the exact `adaptive_composite` baseline historically identified as `A / 71.3`, while the fresh measurement of that same parameter set is `D / 29.8` under the current data and code state.
+The coverage-audited full research run on 2026-07-26 found no robust candidate that passed the first full-period gate: all ten robust candidates triggered both `annual_return_below_12pct` and `grade_below_a`, so the designed pipeline did not proceed to rolling or neighborhood evaluation. It retained the exact `adaptive_composite` baseline historically identified as `A / 71.3`; the fresh measurement of that same parameter set is `A / 70.3` under the current data and code state.
 
 The first selected full-period row in `summary.json` and the native report records:
 
@@ -487,19 +487,19 @@ The first selected full-period row in `summary.json` and the native report recor
 | Selection reason | `baseline_retained_no_robust_candidate` |
 | Strategy variant | `adaptive_composite` |
 | Backtest period | 2020-01-01 to 2025-12-31 |
-| Total return | 12.08% |
+| Total return | 125.91% |
 | Benchmark return | 11.50% |
-| Excess return | 0.57% |
-| Annual return | 1.93% |
-| Annual volatility | 8.79% |
-| Sharpe | -0.08 |
-| Sortino | -0.11 |
-| Max drawdown | -17.33% |
-| Grade | D / 29.8 |
-| Trade count | 7 |
-| Raw trade count | 22 |
+| Excess return | 114.41% |
+| Annual return | 14.66% |
+| Annual volatility | 16.60% |
+| Sharpe | 0.73 |
+| Sortino | 1.06 |
+| Max drawdown | -20.27% |
+| Grade | A / 70.3 |
+| Trade count | 35 |
+| Raw trade count | 78 |
 
-This selected row itself fails the annual-return and grade-A gates; it is selected only by the honest fallback rule. The standalone 2025 stress-validation period returned 3.61% annualized with -11.42% maximum drawdown and -17.61% excess return, materially lagging the benchmark, so it cannot be described as an untouched out-of-sample win.
+This selected row meets the annual-return and grade-A gates, but its -20.27% maximum drawdown misses the strict “absolute drawdown below 20%” gate. It also keeps `robust_enabled=False`, so selection remains an honest fallback rather than a win for the new robustness mechanisms. The standalone 2025 stress-validation period returned 6.68% annualized with -9.74% maximum drawdown and -14.57% excess return, still materially lagging the benchmark, so it cannot be described as an untouched out-of-sample win.
 
 Generated results live under `reports/ashare_sr_leader/`: `summary.json`, `summary.csv`, `final_report.md`, `final_report.html`, and `eqlib_best_backtest_2020_2025.html`. Together they record baseline retention, not a robust-candidate victory.
 
@@ -548,7 +548,7 @@ Many support/resistance systems buy near support, buy breakouts, and sell breakd
    Weak-market de-risking controls drawdown but can miss strong counter-trend stocks.
 
 5. **Parameters come from historical backtests**  
-   The retained `adaptive_composite` baseline received only `D / 29.8` in the current backtest, and the 2025 stress-validation period materially lagged the benchmark. New out-of-sample tests, walk-forward validation, and parameter sensitivity checks are still needed.
+   The retained `adaptive_composite` baseline reached `A / 70.3` in the current backtest, but its maximum drawdown narrowly missed the 20% hard gate and the 2025 stress-validation period materially lagged the benchmark. New out-of-sample tests, walk-forward validation, and parameter sensitivity checks are still needed.
 
 6. **Data processing matters**  
    A-share daily bars, suspensions, adjustments, volume, and index data can materially affect signals and fills.
@@ -578,4 +578,4 @@ To understand the implementation from code, read in this order:
 - Monthly rebalancing and weekly breakdown review reduce churn and structural risk.
 - Stability scoring selects parameters instead of simply maximizing return.
 
-The 2020-2025 report does not conclude that a new variant won; it retains the `adaptive_composite` baseline under the predeclared fallback rule. The fresh `D / 29.8` result means these risk mechanisms must not be interpreted as validated robust return capability.
+The 2020-2025 report does not conclude that a new variant won; it retains the `adaptive_composite` baseline under the predeclared fallback rule. The coverage-audited grade improved to `A / 70.3`, but the selected baseline disables the robustness extension and no robust candidate passed the hard gate, so these mechanisms still must not be interpreted as validated robust return capability.

@@ -3,30 +3,30 @@
 - 最终推荐策略: `adaptive_composite`
 - 选择原因: baseline_retained_no_robust_candidate
 - 没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。
-- 历史参数集标签 A/71.3；本次重跑评级 D/29.8。
-- 评级: `D / 29.8`
-- 稳定性评分: `-0.4727`
-- 年化收益: `1.93%`
+- 历史参数集标签 A/71.3；本次重跑评级 A/70.3。
+- 评级: `A / 70.3`
+- 稳定性评分: `1.5375`
+- 年化收益: `14.66%`
 - 基准收益: `11.50%`
-- 超额收益: `0.57%`
-- 最大回撤: `-17.33%`
-- Sharpe: `-0.08`
-- 交易次数: `7`
+- 超额收益: `114.41%`
+- 最大回撤: `-20.27%`
+- Sharpe: `0.73`
+- 交易次数: `35`
 
 ## 全周期候选排名
 
 | Rank | Strategy | Profile | Period | Grade | Annual | Benchmark | Excess | Max DD | Sharpe | Trades | Raw Trades |
 |---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | adaptive_composite | balanced | 2020-01-01 to 2025-12-31 | D / 29.8 | 1.93% | 11.50% | 0.57% | -17.33% | -0.08 | 7 | 22 |
-| 2 | defensive_support | balanced | 2020-01-01 to 2025-12-31 | D / 36.2 | 4.08% | 11.50% | 15.42% | -14.56% | 0.16 | 4 | 15 |
-| 3 | adaptive_composite | balanced | 2020-01-01 to 2025-12-31 | D / 36.2 | 4.08% | 11.50% | 15.42% | -14.56% | 0.16 | 4 | 15 |
-| 4 | resistance_breakout | balanced | 2020-01-01 to 2025-12-31 | D / 34.6 | 3.47% | 11.50% | 11.01% | -16.27% | 0.09 | 7 | 25 |
-| 5 | resistance_breakout | balanced | 2020-01-01 to 2025-12-31 | D / 34.4 | 3.73% | 11.50% | 12.91% | -14.19% | 0.12 | 4 | 15 |
-| 6 | pullback_market_gate | balanced | 2020-01-01 to 2025-12-31 | D / 34.4 | 3.73% | 11.50% | 12.91% | -14.19% | 0.12 | 4 | 15 |
-| 7 | defensive_support | balanced | 2020-01-01 to 2025-12-31 | D / 34.2 | 3.47% | 11.50% | 11.03% | -16.50% | 0.09 | 9 | 29 |
-| 8 | adaptive_composite | balanced | 2020-01-01 to 2025-12-31 | D / 34.0 | 3.52% | 11.50% | 11.37% | -16.50% | 0.10 | 8 | 27 |
-| 9 | pullback_market_gate | balanced | 2020-01-01 to 2025-12-31 | D / 33.7 | 3.39% | 11.50% | 10.47% | -16.50% | 0.08 | 8 | 27 |
-| 10 | adaptive_composite | balanced | 2020-01-01 to 2025-12-31 | D / 32.5 | 2.44% | 11.50% | 3.97% | -15.65% | -0.01 | 5 | 21 |
+| 1 | adaptive_composite | balanced | 2020-01-01 to 2025-12-31 | A / 70.3 | 14.66% | 11.50% | 114.41% | -20.27% | 0.73 | 35 | 78 |
+| 2 | adaptive_composite | balanced | 2020-01-01 to 2025-12-31 | A / 72.9 | 14.40% | 11.50% | 111.45% | -18.07% | 0.81 | 31 | 71 |
+| 3 | pullback_market_gate | active-balanced | 2020-01-01 to 2025-12-31 | A / 71.2 | 11.37% | 11.50% | 78.52% | -17.59% | 0.69 | 13 | 33 |
+| 4 | defensive_support | balanced | 2020-01-01 to 2025-12-31 | B / 69.0 | 13.99% | 11.50% | 106.65% | -25.43% | 0.71 | 21 | 48 |
+| 5 | defensive_support | risk-managed | 2020-01-01 to 2025-12-31 | B / 65.6 | 10.79% | 11.50% | 72.62% | -23.57% | 0.64 | 10 | 29 |
+| 6 | pullback_market_gate | risk-managed | 2020-01-01 to 2025-12-31 | B / 65.3 | 10.78% | 11.50% | 72.55% | -23.37% | 0.63 | 11 | 31 |
+| 7 | defensive_support | guarded | 2020-01-01 to 2025-12-31 | B / 65.1 | 11.03% | 11.50% | 75.03% | -21.42% | 0.60 | 27 | 64 |
+| 8 | adaptive_composite | guarded | 2020-01-01 to 2025-12-31 | B / 65.1 | 10.64% | 11.50% | 71.16% | -21.72% | 0.58 | 23 | 56 |
+| 9 | defensive_support | balanced | 2020-01-01 to 2025-12-31 | B / 64.6 | 13.35% | 11.50% | 99.49% | -30.10% | 0.61 | 28 | 65 |
+| 10 | resistance_breakout | guarded | 2020-01-01 to 2025-12-31 | B / 64.5 | 8.22% | 11.50% | 48.57% | -18.78% | 0.46 | 23 | 57 |
 
 ## 稳健门槛
 
@@ -59,20 +59,20 @@
 
 | Candidate | Days by state | Triggers | Recoveries |
 |---|---|---:|---:|
-| baseline | normal: 1455 | 0 | 0 |
+| baseline | 不可用 | 不可用 | 不可用 |
 
 ## 主/候补通道
 
-| Candidate | Channel | Trades | Average exposure | Average holdings | Return contribution |
+| Candidate | Channel | Entry fills | Average exposure | Average holdings | Return contribution |
 |---|---|---:|---:|---:|---:|
-| baseline | 主通道 | 0 | 0.00% | 0.00 | 0.00% |
-| baseline | 候补通道 | 0 | 0.00% | 0.00 | 0.00% |
+| baseline | 主通道 | 不可用 | 不可用 | 不可用 | 不可用 |
+| baseline | 候补通道 | 不可用 | 不可用 | 不可用 | 不可用 |
 
 ## 基线与稳健候选对比
 
 | Candidate | Annual | Max DD | Sharpe | Grade | Full gate | 2023 gate | 2024 gate | 2025 gate | Neighborhood gate | Overall |
 |---|---:|---:|---:|---|---|---|---|---|---|---|
-| baseline | 1.93% | -17.33% | -0.08 | D / 29.8 | 未通过: annual_return_below_12pct, grade_below_a | 未通过: 2023_validation_unavailable | 未通过: 2024_validation_unavailable | 未通过: 2025_validation_unavailable | 未通过: neighbor_pass_rate_below_60pct | 未通过: annual_return_below_12pct, grade_below_a, 2023_validation_unavailable, 2024_validation_unavailable, 2025_validation_unavailable, neighbor_pass_rate_below_60pct |
+| baseline | 14.66% | -20.27% | 0.73 | A / 70.3 | 未通过: max_drawdown_not_below_20pct | 未通过: 2023_validation_unavailable | 未通过: 2024_validation_unavailable | 未通过: 2025_validation_unavailable | 未通过: neighbor_pass_rate_below_60pct | 未通过: max_drawdown_not_below_20pct, 2023_validation_unavailable, 2024_validation_unavailable, 2025_validation_unavailable, neighbor_pass_rate_below_60pct |
 
 ## 长期回测压力诊断
 
@@ -81,37 +81,37 @@
 ### 2020-2021
 
 - 该长期策略: `adaptive_composite`
-- 年化收益: `0.00%`
-- 最大回撤: `0.00%`
-- 超额收益: `-18.98%`
-- 交易次数: `0`
-- 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑输基准，回撤可控，交易次数没有表现出高频或中高频特征。
+- 年化收益: `30.01%`
+- 最大回撤: `-18.32%`
+- 超额收益: `49.49%`
+- 交易次数: `10`
+- 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ### 2022
 
 - 该长期策略: `adaptive_composite`
-- 年化收益: `0.00%`
-- 最大回撤: `0.00%`
-- 超额收益: `21.27%`
-- 交易次数: `0`
+- 年化收益: `-13.74%`
+- 最大回撤: `-18.83%`
+- 超额收益: `7.69%`
+- 交易次数: `12`
 - 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ### 2023-2024
 
 - 该长期策略: `adaptive_composite`
-- 年化收益: `4.82%`
-- 最大回撤: `-14.05%`
-- 超额收益: `8.55%`
-- 交易次数: `6`
+- 年化收益: `16.52%`
+- 最大回撤: `-15.59%`
+- 超额收益: `34.14%`
+- 交易次数: `8`
 - 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑赢基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ### 2025
 
 - 该长期策略: `adaptive_composite`
-- 年化收益: `3.61%`
-- 最大回撤: `-11.42%`
-- 超额收益: `-17.61%`
-- 交易次数: `1`
+- 年化收益: `6.68%`
+- 最大回撤: `-9.74%`
+- 超额收益: `-14.57%`
+- 交易次数: `0`
 - 解释: 该阶段结果仅用于诊断所保留 adaptive_composite 基线参数集的承压环境，不参与策略推荐。跑输基准，回撤可控，交易次数没有表现出高频或中高频特征。
 
 ## 最终推荐
@@ -122,11 +122,11 @@
 
 - 选择原因: baseline_retained_no_robust_candidate
 - 没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。
-- 历史参数集标签 A/71.3；本次重跑评级 D/29.8。
-- 本次重跑稳定性评分为 `-0.4727`。
-- 本次重跑年化收益为 `1.93%`，超额收益为 `0.57%`。
-- 本次重跑最大回撤为 `-17.33%`。
-- 本次重跑交易次数为 `7`，交易次数没有表现出高频或中高频特征。
+- 历史参数集标签 A/71.3；本次重跑评级 A/70.3。
+- 本次重跑稳定性评分为 `1.5375`。
+- 本次重跑年化收益为 `14.66%`，超额收益为 `114.41%`。
+- 本次重跑最大回撤为 `-20.27%`。
+- 本次重跑交易次数为 `35`，交易次数没有表现出高频或中高频特征。
 
 ## 风险提示
 
