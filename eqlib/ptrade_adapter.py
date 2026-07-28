@@ -785,6 +785,21 @@ def _get_qmt_previous_dt(ContextInfo):
         return None
 
 
+def _is_first_trading_day_of_month(current_dt):
+    """Return whether current_dt is the first local A-share session."""
+    try:
+        from eqlib.data import _get_trading_days_range
+
+        month_start = current_dt.date().replace(day=1)
+        trading_days = _get_trading_days_range(month_start, current_dt.date())
+        return bool(
+            trading_days
+            and pd.Timestamp(trading_days[0]).date() == current_dt.date()
+        )
+    except Exception:
+        return current_dt.day == 1 and current_dt.weekday() < 5
+
+
 def start(ContextInfo):
     """Call this in QMT's init() to start the EasyQuant strategy.
 
@@ -830,11 +845,12 @@ def start(ContextInfo):
     _last_trade_day = now.date()
     _last_week = now.isocalendar()[:2]  # (year, week)
     previous_dt = _get_qmt_previous_dt(ContextInfo)
-    _last_month = (
-        (previous_dt.year, previous_dt.month)
-        if previous_dt is not None
-        else (now.year, now.month)
-    )
+    if previous_dt is not None:
+        _last_month = (previous_dt.year, previous_dt.month)
+    elif _is_first_trading_day_of_month(now):
+        _last_month = None
+    else:
+        _last_month = (now.year, now.month)
 
     log('PTrade adapter started. EQ strategy initialized.')
 
