@@ -382,9 +382,10 @@ def attribute_history(security, count, unit='1d', fields=('close',),
         data = ci.get_market_data(
             list(fields), stock_code=[qmt_code],
             skip_paused=skip_paused, period=period,
-            dividend_type=dividend_type, count=count
+            dividend_type=dividend_type, count=count + 1
         )
-        return _format_market_data(data, fields)
+        frame = _format_market_data(data, fields)
+        return frame.iloc[:-1].tail(count)
     except Exception:
         return pd.DataFrame()
 
@@ -772,6 +773,18 @@ def _get_qmt_current_dt(ContextInfo):
         return datetime.datetime.now()
 
 
+def _get_qmt_previous_dt(ContextInfo):
+    """Return the previous QMT bar datetime when one is available."""
+    try:
+        barpos = int(ContextInfo.barpos)
+        if barpos <= 0:
+            return None
+        bar_time = ContextInfo.get_bar_timetag(barpos - 1)
+        return datetime.datetime.fromtimestamp(bar_time / 1000)
+    except Exception:
+        return None
+
+
 def start(ContextInfo):
     """Call this in QMT's init() to start the EasyQuant strategy.
 
@@ -816,7 +829,12 @@ def start(ContextInfo):
     now = _context.current_dt
     _last_trade_day = now.date()
     _last_week = now.isocalendar()[:2]  # (year, week)
-    _last_month = (now.year, now.month)
+    previous_dt = _get_qmt_previous_dt(ContextInfo)
+    _last_month = (
+        (previous_dt.year, previous_dt.month)
+        if previous_dt is not None
+        else (now.year, now.month)
+    )
 
     log('PTrade adapter started. EQ strategy initialized.')
 

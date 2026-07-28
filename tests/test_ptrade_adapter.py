@@ -72,6 +72,16 @@ class _HistoryQMTContext:
         return self.frame.loc[:, fields].tail(kwargs["count"])
 
 
+class _TimelineQMTContext(_FakeQMTContext):
+    def __init__(self, timestamps):
+        super().__init__(timestamp=timestamps[-1])
+        self.timestamps = list(timestamps)
+        self.barpos = len(self.timestamps) - 1
+
+    def get_bar_timetag(self, barpos):
+        return int(self.timestamps[barpos].timestamp() * 1000)
+
+
 def _ohlcv(close_values):
     close = pd.Series(close_values, dtype=float)
     return pd.DataFrame(
@@ -322,6 +332,26 @@ class TestOrderFunctions:
 
 
 class TestHistory:
+    def test_attribute_history_requests_and_returns_completed_bars_only(
+        self,
+        monkeypatch,
+    ):
+        _reset_adapter(monkeypatch)
+        qmt = _HistoryQMTContext()
+        pa._context = SimpleNamespace(_qmt=qmt)
+
+        result = pa.attribute_history(
+            "600519",
+            count=1,
+            fields=["close"],
+        )
+
+        assert qmt.requested_counts == [2]
+        assert result["close"].tolist() == [10.0]
+        assert result.index.tolist() == [
+            pd.Timestamp("2026-07-20 15:00:00")
+        ]
+
     def test_history_requests_and_returns_completed_bars_only(self, monkeypatch):
         _reset_adapter(monkeypatch)
         qmt = _HistoryQMTContext()
@@ -367,7 +397,7 @@ class TestLifecycle:
         pa.start(qmt)
 
         assert pa._context.current_dt == start_dt
-        assert qmt.timetag_calls == [17]
+        assert qmt.timetag_calls == [17, 16]
 
         bar_dt = datetime.datetime(2026, 7, 21, 9, 31)
         qmt.barpos = 18
@@ -375,7 +405,7 @@ class TestLifecycle:
         pa.on_bar(qmt)
 
         assert pa._context.current_dt == bar_dt
-        assert qmt.timetag_calls == [17, 18]
+        assert qmt.timetag_calls == [17, 16, 18]
 
     def test_weekly_callback_executes_on_configured_friday(self, monkeypatch):
         _reset_adapter(monkeypatch)
@@ -425,6 +455,33 @@ class TestLifecycle:
         pa.on_bar(qmt)
         qmt.barpos = 19
         qmt.timestamp = datetime.datetime(2026, 9, 2, 9, 31)
+        pa.on_bar(qmt)
+
+        assert callback_dates == [datetime.date(2026, 9, 2)]
+
+    def test_monthly_day_one_executes_when_started_on_first_trading_day(
+        self,
+        monkeypatch,
+    ):
+        _reset_adapter(monkeypatch)
+        callback_dates = []
+
+        def initialize(_context):
+            pa.run_monthly(
+                lambda context: callback_dates.append(context.current_dt.date()),
+                day_of_month=1,
+                time="09:30",
+            )
+
+        pa._initialize_func = initialize
+        qmt = _TimelineQMTContext(
+            [
+                datetime.datetime(2026, 8, 31, 15, 0),
+                datetime.datetime(2026, 9, 2, 9, 30),
+            ]
+        )
+
+        pa.start(qmt)
         pa.on_bar(qmt)
 
         assert callback_dates == [datetime.date(2026, 9, 2)]
