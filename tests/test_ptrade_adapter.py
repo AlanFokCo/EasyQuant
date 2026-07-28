@@ -486,6 +486,31 @@ class TestLifecycle:
 
         assert callback_dates == [datetime.date(2026, 9, 2)]
 
+    def test_monthly_day_one_executes_at_bar_zero_on_first_trading_day(
+        self,
+        monkeypatch,
+    ):
+        _reset_adapter(monkeypatch)
+        callback_dates = []
+
+        def initialize(_context):
+            pa.run_monthly(
+                lambda context: callback_dates.append(context.current_dt.date()),
+                day_of_month=1,
+                time="09:30",
+            )
+
+        pa._initialize_func = initialize
+        qmt = _TimelineQMTContext(
+            [datetime.datetime(2026, 9, 1, 9, 30)]
+        )
+
+        pa.start(qmt)
+        pa.on_bar(qmt)
+
+        assert qmt.barpos == 0
+        assert callback_dates == [datetime.date(2026, 9, 1)]
+
     def test_monthly_day_one_does_not_execute_midmonth(self, monkeypatch):
         _reset_adapter(monkeypatch)
         callback_dates = []
