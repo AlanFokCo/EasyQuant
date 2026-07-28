@@ -281,6 +281,86 @@ class TestMultiStockKline:
         assert chart["symbol"] == "002594"
         assert chart["candlestick_data"][0]["time"] == "2020-01-02"
 
+    def test_html_report_uses_structured_benchmark_without_refetch(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        """Native benchmark chart and headline must share engine data."""
+        import eqlib.attribution as attribution
+        import eqlib.report as report_mod
+
+        result = _make_result_for_chart(["600519"])
+        first = result["recorded_values"][0]["date"]
+        last = result["recorded_values"][-1]["date"]
+        result.update(
+            {
+                "benchmark": "000300.XSHG",
+                "benchmark_values": [
+                    {"date": first, "value": 100.0},
+                    {"date": last, "value": 110.0},
+                ],
+            }
+        )
+        analytics = {
+            "total_return": 0.05,
+            "annual_return": 0.05,
+            "annual_volatility": 0.10,
+            "sharpe_ratio": 0.50,
+            "sortino_ratio": 0.60,
+            "max_drawdown": -0.04,
+            "win_rate_trade": 0.50,
+            "win_rate_daily": 0.50,
+            "alpha": 0.0,
+            "beta": 1.0,
+            "information_ratio": 0.0,
+            "calmar_ratio": 1.25,
+            "profit_loss_ratio": 1.0,
+            "win_count": 1,
+            "loss_count": 1,
+            "benchmark_volatility": 0.10,
+            "trade_count": 0,
+            "benchmark_return": 0.99,
+            "excess_return": -0.94,
+            "monthly_returns": {},
+            "rolling_sharpe_60d": [],
+            "rolling_volatility_60d": [],
+            "daily_returns_stats": {},
+            "drawdown_periods": [],
+        }
+        monkeypatch.setattr(attribution, "analyze_returns", lambda _result: analytics)
+        monkeypatch.setattr(
+            report_mod,
+            "_calc_strategy_score",
+            lambda _analytics: {
+                "overall": "B",
+                "score": 60,
+                "dimensions": [],
+                "summary_text": "",
+            },
+        )
+        monkeypatch.setattr(report_mod, "_fetch_index_returns", lambda *args: [])
+
+        def unexpected_refetch(*_args):
+            raise AssertionError("structured benchmark data must not be refetched")
+
+        monkeypatch.setattr(
+            report_mod,
+            "_fetch_benchmark_returns",
+            unexpected_refetch,
+        )
+        out_path = tmp_path / "native.html"
+
+        report_mod.generate_html_report(result, out_path)
+
+        html = out_path.read_text(encoding="utf-8")
+        assert (
+            'benchmarkLine.setData([{"time": "2024-01-02", "value": 0.0}'
+            in html
+        )
+        assert f'{{"time": "{last}", "value": 10.0}}]' in html
+        assert '<div class="mc-val" id="mv-bm_ret">10.00%</div>' in html
+
     def test_compute_symbol_kline_returns_tech_stats(self):
         """_compute_symbol_kline includes tech_stats dict."""
         from eqlib.report import _compute_symbol_kline

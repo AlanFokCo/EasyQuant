@@ -278,7 +278,7 @@ def test_report_json_includes_data_diagnostics(tmp_path, monkeypatch):
         "information_ratio": 0.4,
         "excess_return": 0.02,
         "benchmark_return": 0.08,
-        "monthly_returns": {},
+        "monthly_returns": {"2024-01": float("nan")},
         "rolling_sharpe_60d": [],
         "rolling_volatility_60d": [],
         "drawdown_periods": [],
@@ -338,7 +338,13 @@ def test_report_json_includes_data_diagnostics(tmp_path, monkeypatch):
 
     out_path = tmp_path / "report.json"
     generate_report_json(result, out_path)
-    payload = json.loads(out_path.read_text())
+    def reject_nonstandard_constant(value):
+        raise ValueError(f"non-standard JSON constant: {value}")
+
+    payload = json.loads(
+        out_path.read_text(),
+        parse_constant=reject_nonstandard_constant,
+    )
 
     assert payload["data_diagnostics"]["requested"] == 2
     assert payload["data_diagnostics"]["loaded"] == 1
@@ -348,3 +354,4 @@ def test_report_json_includes_data_diagnostics(tmp_path, monkeypatch):
         "disk_cache": 0,
         "network": 0,
     }
+    assert payload["time_series"]["monthly_returns"]["2024-01"] is None
