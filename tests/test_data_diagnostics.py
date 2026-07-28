@@ -216,22 +216,18 @@ def test_authoritative_post_window_listing_skips_network(monkeypatch, tmp_path):
 
     monkeypatch.setattr(dc, "_CACHE_DIR", str(tmp_path))
     monkeypatch.setattr(dc, "_parquet_engine", lambda: None)
-    dc._save_to_disk(
-        _sample_frame("2024-01-02"),
-        "600941",
-        "qfq",
-        requested_start="2024-01-01",
-        requested_end="2024-01-10",
-        listing_date="2022-01-05",
-        listing_date_authoritative=True,
+    listed = _sample_frame("2024-01-02")
+    listed.attrs["listing_date"] = "2022-01-05"
+    listed.attrs["listing_date_authoritative"] = True
+    benchmark = _sample_frame("2020-01-02")
+    monkeypatch.setattr(
+        data_mod,
+        "fetch_stock_data",
+        lambda sec, *args, **kwargs: listed if sec == "600941" else benchmark,
     )
-    dc._save_to_disk(
-        _sample_frame("2020-01-02"),
-        "000300.XSHG",
-        "qfq",
-        requested_start="2020-01-01",
-        requested_end="2020-01-10",
-    )
+    dc.fetch_cached("600941", "2024-01-01", "2024-01-07")
+    dc.fetch_cached("000300.XSHG", "2020-01-01", "2020-01-07")
+
     network_calls = []
     monkeypatch.setattr(
         data_mod,
@@ -243,7 +239,7 @@ def test_authoritative_post_window_listing_skips_network(monkeypatch, tmp_path):
     preloaded.load(
         ["000300.XSHG", "600941"],
         "2020-01-01",
-        "2020-01-10",
+        "2020-01-07",
         progress=False,
         use_local=False,
     )

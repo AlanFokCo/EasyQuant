@@ -194,6 +194,19 @@ def _cache_covers_request(
             return False
         requested_start = max(requested_start, listing_date)
 
+    if requested_start > requested_end:
+        return False
+
+    try:
+        from eqlib.data import _get_trading_days_range
+
+        trading_days = _get_trading_days_range(requested_start, requested_end)
+    except Exception:
+        trading_days = ()
+    if trading_days:
+        requested_start = pd.Timestamp(trading_days[0]).normalize()
+        requested_end = pd.Timestamp(trading_days[-1]).normalize()
+
     return any(
         pd.Timestamp(item["start"]) <= requested_start
         and pd.Timestamp(item["end"]) >= requested_end
@@ -339,20 +352,10 @@ def _save_to_disk(
 
             covered_ranges = list(metadata.get("covered_ranges", []))
             if incoming_start is not None and incoming_end is not None:
-                covered_start = incoming_start
-                covered_end = incoming_end
-                if requested_start is not None and requested_end is not None:
-                    request_start = pd.Timestamp(requested_start).normalize()
-                    request_end = pd.Timestamp(requested_end).normalize()
-                    boundary_tolerance = pd.Timedelta(days=14)
-                    if incoming_start <= request_start + boundary_tolerance:
-                        covered_start = request_start
-                    if incoming_end >= request_end - boundary_tolerance:
-                        covered_end = request_end
                 covered_ranges.append(
                     {
-                        "start": covered_start.strftime("%Y%m%d"),
-                        "end": covered_end.strftime("%Y%m%d"),
+                        "start": incoming_start.strftime("%Y%m%d"),
+                        "end": incoming_end.strftime("%Y%m%d"),
                     }
                 )
             metadata["covered_ranges"] = _merge_date_ranges(covered_ranges)
