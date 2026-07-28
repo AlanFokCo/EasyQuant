@@ -3584,6 +3584,40 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
     assert retention not in selected_markdown
 
 
+def test_write_outputs_emits_strict_json_for_nonfinite_metrics(
+    tmp_path,
+    monkeypatch,
+):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+    row = {
+        "kind": "adaptive_composite",
+        "period_name": "full",
+        "annual_return": float("nan"),
+        "max_drawdown": float("-inf"),
+        "validation": {
+            "2025": {
+                "excess_return": float("inf"),
+            }
+        },
+        "params": BASELINE_ADAPTIVE_PARAMS.__dict__,
+    }
+
+    write_outputs([row])
+
+    def reject_nonstandard_constant(value):
+        raise ValueError(f"non-standard JSON constant: {value}")
+
+    payload = json.loads(
+        (tmp_path / "summary.json").read_text(encoding="utf-8"),
+        parse_constant=reject_nonstandard_constant,
+    )
+    assert payload[0]["annual_return"] is None
+    assert payload[0]["max_drawdown"] is None
+    assert payload[0]["validation"]["2025"]["excess_return"] is None
+
+
 def _review_report_rows():
     common = {
         "period_name": "full",

@@ -13,6 +13,7 @@ import html
 import json
 import math
 from dataclasses import asdict, replace
+from numbers import Integral, Real
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -467,6 +468,25 @@ def _finite_float(value: object) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _sanitize_json_value(value: object) -> object:
+    """Recursively replace non-finite numerics with strict-JSON values."""
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_json_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json_value(item) for item in value]
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return value
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, Real):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    return value
 
 
 def _finite_product(*values: float) -> float | None:
@@ -1913,7 +1933,12 @@ def write_outputs(rows: list[dict]) -> None:
         reverse=True,
     )
     (REPORT_DIR / "summary.json").write_text(
-        json.dumps(sorted_rows, ensure_ascii=False, indent=2),
+        json.dumps(
+            _sanitize_json_value(sorted_rows),
+            ensure_ascii=False,
+            indent=2,
+            allow_nan=False,
+        ),
         encoding="utf-8",
     )
 

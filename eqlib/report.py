@@ -25,6 +25,22 @@ import pandas as pd
 import numpy as np
 
 
+def _sanitize_json_value(value):
+    """Recursively replace non-finite numeric values with JSON null."""
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_json_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json_value(item) for item in value]
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float) and not np.isfinite(value):
+        return None
+    return value
+
+
 def _to_tv_date(date_val):
     """Convert date/datetime to lightweight-charts time string (YYYY-MM-DD).
 
@@ -387,6 +403,53 @@ def _fetch_benchmark_returns(benchmark_code, start, end, recorded):
     else:
         ak_symbol = "sz" + code
     return _fetch_index_returns(ak_symbol, start, end, recorded)
+
+
+def _benchmark_returns_from_result(result, recorded):
+    """Build aligned cumulative benchmark returns from engine output."""
+    raw_values = result.get("benchmark_values")
+    if not isinstance(raw_values, list) or not raw_values:
+        return []
+
+    entries = (
+        sorted(
+            recorded.values(),
+            key=lambda item: item.get("date", datetime.date.min),
+        )
+        if isinstance(recorded, dict)
+        else recorded
+    )
+    target_times = [
+        _to_tv_date(item["date"])
+        for item in entries
+        if isinstance(item, dict)
+        and item.get("date") is not None
+        and "total_value" in item
+    ]
+    if not target_times:
+        return []
+
+    rows = []
+    for item in raw_values:
+        if not isinstance(item, dict):
+            continue
+        try:
+            date = pd.Timestamp(item.get("date"))
+            value = float(item.get("value"))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if pd.isna(date) or not np.isfinite(value) or value <= 0:
+            continue
+        rows.append((date, value))
+    if not rows:
+        return []
+
+    frame = pd.DataFrame(
+        {"close": [value for _date, value in rows]},
+        index=pd.DatetimeIndex([date for date, _value in rows]),
+    )
+    frame = frame[~frame.index.duplicated(keep="last")].sort_index()
+    return _align_index_close_to_times(target_times, frame)
 
 
 def generate_chart(result, out_path):
@@ -860,7 +923,9 @@ def generate_html_report(result, out_path):
     dd_sse = _build_drawdown_from_cumulative_pct(ret_sse)
 
     # Benchmark data for metrics calculation
-    bench_data = _fetch_benchmark_returns(benchmark, start, end, recorded)
+    bench_data = _benchmark_returns_from_result(result, recorded)
+    if not bench_data:
+        bench_data = _fetch_benchmark_returns(benchmark, start, end, recorded)
     dd_benchmark = _build_drawdown_from_cumulative_pct(bench_data)
 
     # ============================================================
@@ -1120,8 +1185,24 @@ def _calc_metrics(result, bench_data):
 
     total_ret = analytics["total_return"]
     ann_ret = analytics["annual_return"]
-    bench_ret = analytics.get("benchmark_return", 0.0)
-    excess_ret = analytics.get("excess_return", total_ret - bench_ret)
+    chart_benchmark_return = None
+    if bench_data:
+        try:
+            final_benchmark_pct = float(bench_data[-1]["value"])
+        except (KeyError, TypeError, ValueError, OverflowError):
+            final_benchmark_pct = float("nan")
+        if np.isfinite(final_benchmark_pct):
+            chart_benchmark_return = final_benchmark_pct / 100.0
+
+    report_analytics = dict(analytics)
+    if chart_benchmark_return is not None:
+        bench_ret = chart_benchmark_return
+        excess_ret = total_ret - bench_ret
+        report_analytics["benchmark_return"] = bench_ret
+        report_analytics["excess_return"] = excess_ret
+    else:
+        bench_ret = analytics.get("benchmark_return", 0.0)
+        excess_ret = analytics.get("excess_return", total_ret - bench_ret)
 
     return {
         "sharpe": f"{analytics['sharpe_ratio']:.2f}",
@@ -1153,9 +1234,9 @@ def _calc_metrics(result, bench_data):
         # For benchmark return chart (configured benchmark cumulative return %)
         "bench_last": f"{bench_data[-1]['value'] if bench_data else 0:.2f}",
         # Grade data for HTML template
-        "grade_data": _calc_strategy_score(analytics),
+        "grade_data": _calc_strategy_score(report_analytics),
         # Raw analytics for HTML template (avoid redundant analyze_returns call)
-        "_raw_analytics": analytics,
+        "_raw_analytics": report_analytics,
     }
 
 
@@ -3447,6 +3528,12 @@ def generate_report_json(result, out_path, *,
     report["cumulative_returns"] = cumulative_returns
 
     with open(out_path, "w") as f:
-        json.dump(report, f, indent=2, ensure_ascii=False)
+        json.dump(
+            _sanitize_json_value(report),
+            f,
+            indent=2,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
 
     print(f"Data saved: {out_path}")
