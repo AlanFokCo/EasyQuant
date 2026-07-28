@@ -1793,6 +1793,55 @@ def test_monthly_protect_reduces_with_missing_volatility_and_never_selects(
 
 
 @pytest.mark.parametrize(
+    ("total_value", "expected_state"),
+    [
+        (900_000, PortfolioRiskState.CAUTIOUS),
+        (860_000, PortfolioRiskState.DEFENSIVE),
+        (800_000, PortfolioRiskState.PROTECT),
+    ],
+)
+def test_monthly_risk_transitions_are_recorded(
+    monkeypatch,
+    total_value,
+    expected_state,
+):
+    params = StrategyParams(
+        robust_enabled=True,
+        level_window=4,
+        rs_window=3,
+        atr_period=2,
+        market_volatility_window=3,
+    )
+    benchmark = _ohlcv_from_close([10.0, 10.1, 10.2, 10.3, 10.4, 10.5])
+    monkeypatch.setattr("eqlib.attribute_history", lambda *args: benchmark)
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.classify_market",
+        lambda *args: MarketState.NEUTRAL,
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.select_robust_candidates",
+        lambda *args: [],
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.rebalance_robust_portfolio",
+        lambda *args: None,
+    )
+    context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
+    context.portfolio.total_value = total_value
+
+    callbacks["monthly"][0](context)
+
+    assert context.sr_risk_events == [
+        {
+            "date": "2026-07-21",
+            "from": "normal",
+            "to": expected_state.name.lower(),
+            "drawdown": round(1 - total_value / 1_000_000, 6),
+        }
+    ]
+
+
+@pytest.mark.parametrize(
     ("risk_state", "risk_multiplier"),
     [
         (PortfolioRiskState.CAUTIOUS, 0.75),
@@ -2336,14 +2385,78 @@ def test_channel_diagnostics_attributes_next_day_returns_by_order_channel():
     diagnostics = channel_diagnostics(result)
 
     assert diagnostics == {
-        "primary_trade_count": 1,
-        "fallback_trade_count": 1,
+        "primary_entry_fill_count": 1,
+        "fallback_entry_fill_count": 1,
         "primary_average_exposure": 0.104455,
         "fallback_average_exposure": 0.094554,
         "primary_average_holdings": 1.0,
         "fallback_average_holdings": 1.0,
         "primary_return_contribution": 0.01,
         "fallback_return_contribution": -0.01,
+    }
+
+
+def test_channel_diagnostics_attributes_no_return_entry_history():
+    date = pd.Timestamp("2025-01-02")
+    result = {
+        "context": SimpleNamespace(
+            sr_robust_telemetry_available=True,
+            sr_order_channels={},
+            sr_entry_channel_history=[
+                {
+                    "security": "600519",
+                    "channel": "fallback",
+                    "intent_date": "2025-01-02",
+                    "resolved_date": "2025-01-03",
+                    "status": "filled",
+                }
+            ],
+        ),
+        "trade_log": [
+            {
+                "date": "2025-01-02",
+                "type": "BUY",
+                "security": "600519",
+                "amount": 100,
+                "order_id": "opaque-adapter-order",
+            }
+        ],
+        "recorded_values": [{"date": "2025-01-02", "total_value": 10_000}],
+        "ohlcv_data": {
+            "600519": pd.DataFrame({"close": [10.0]}, index=[date]),
+        },
+    }
+
+    diagnostics = channel_diagnostics(result)
+
+    assert diagnostics["fallback_entry_fill_count"] == 1
+    assert diagnostics["fallback_average_holdings"] == 1.0
+
+
+def test_default_off_robust_diagnostics_are_explicitly_unavailable():
+    result = {
+        "context": SimpleNamespace(sr_robust_telemetry_available=False),
+        "trade_log": [],
+        "recorded_values": [
+            {"date": "2025-01-02", "total_value": 1_000_000},
+        ],
+        "ohlcv_data": {},
+    }
+
+    assert channel_diagnostics(result) == {
+        "primary_entry_fill_count": None,
+        "fallback_entry_fill_count": None,
+        "primary_average_exposure": None,
+        "fallback_average_exposure": None,
+        "primary_average_holdings": None,
+        "fallback_average_holdings": None,
+        "primary_return_contribution": None,
+        "fallback_return_contribution": None,
+    }
+    assert risk_state_diagnostics(result) == {
+        "risk_state_days": None,
+        "risk_state_trigger_count": None,
+        "risk_state_recovery_count": None,
     }
 
 
@@ -2404,8 +2517,8 @@ def test_channel_diagnostics_applies_fills_after_return_and_skips_bad_prices():
 
     diagnostics = channel_diagnostics(result)
 
-    assert diagnostics["primary_trade_count"] == 1
-    assert diagnostics["fallback_trade_count"] == 1
+    assert diagnostics["primary_entry_fill_count"] == 1
+    assert diagnostics["fallback_entry_fill_count"] == 1
     assert diagnostics["primary_average_holdings"] == pytest.approx(2 / 3)
     assert diagnostics["fallback_average_holdings"] == pytest.approx(2 / 3)
     assert diagnostics["primary_return_contribution"] == 0.01
@@ -2421,14 +2534,14 @@ def test_channel_diagnostics_returns_defaults_without_context_and_does_not_mutat
     diagnostics = channel_diagnostics(result)
 
     assert diagnostics == {
-        "primary_trade_count": 0,
-        "fallback_trade_count": 0,
-        "primary_average_exposure": 0.0,
-        "fallback_average_exposure": 0.0,
-        "primary_average_holdings": 0.0,
-        "fallback_average_holdings": 0.0,
-        "primary_return_contribution": 0.0,
-        "fallback_return_contribution": 0.0,
+        "primary_entry_fill_count": None,
+        "fallback_entry_fill_count": None,
+        "primary_average_exposure": None,
+        "fallback_average_exposure": None,
+        "primary_average_holdings": None,
+        "fallback_average_holdings": None,
+        "primary_return_contribution": None,
+        "fallback_return_contribution": None,
     }
     assert result == original
 
@@ -2491,7 +2604,7 @@ def test_channel_diagnostics_bridges_missing_close_with_fill_lot_anchors():
 
     diagnostics = channel_diagnostics(result)
 
-    assert diagnostics["primary_trade_count"] == 3
+    assert diagnostics["primary_entry_fill_count"] == 3
     assert diagnostics["primary_average_exposure"] == 0.116037
     assert diagnostics["primary_average_holdings"] == 1.0
     assert diagnostics["primary_return_contribution"] == 0.016
@@ -2650,8 +2763,8 @@ def test_diagnostics_skip_invalid_dates_and_keep_all_outputs_finite():
     channel = channel_diagnostics(result)
     risk = risk_state_diagnostics(result)
 
-    assert channel["primary_trade_count"] == 1
-    assert channel["fallback_trade_count"] == 0
+    assert channel["primary_entry_fill_count"] == 1
+    assert channel["fallback_entry_fill_count"] == 0
     assert channel["primary_return_contribution"] == 0.0
     assert all(np.isfinite(value) for value in channel.values())
     assert risk == {
@@ -2736,11 +2849,11 @@ def test_risk_state_diagnostics_sorts_dates_and_preserves_same_day_event_order()
     }
 
 
-def test_risk_state_diagnostics_returns_normal_defaults_without_context():
+def test_risk_state_diagnostics_returns_unavailable_without_context():
     assert risk_state_diagnostics({"recorded_values": []}) == {
-        "risk_state_days": {},
-        "risk_state_trigger_count": 0,
-        "risk_state_recovery_count": 0,
+        "risk_state_days": None,
+        "risk_state_trigger_count": None,
+        "risk_state_recovery_count": None,
     }
 
 
@@ -2917,8 +3030,9 @@ def test_run_one_attaches_diagnostics_and_serializable_gate_defaults(monkeypatch
         ["600519"],
     )
 
-    assert row["primary_trade_count"] == 0
-    assert row["risk_state_days"] == {}
+    assert row["robust_telemetry_available"] is False
+    assert row["primary_entry_fill_count"] is None
+    assert row["risk_state_days"] is None
     assert row["gate_failures"] == []
     assert row["robust_gate_pass"] is False
     assert row["neighbor_pass_rate"] == 0.0
@@ -3333,17 +3447,18 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
         "neighbor_pass_rate": 0.0,
         "worst_validation_excess": 0.0,
         "validation": {},
-        "risk_state_days": {"normal": 100},
-        "risk_state_trigger_count": 0,
-        "risk_state_recovery_count": 0,
-        "primary_trade_count": 30,
-        "fallback_trade_count": 0,
-        "primary_average_exposure": 0.66,
-        "fallback_average_exposure": 0.0,
-        "primary_average_holdings": 7.0,
-        "fallback_average_holdings": 0.0,
-        "primary_return_contribution": 0.42,
-        "fallback_return_contribution": 0.0,
+        "robust_telemetry_available": False,
+        "risk_state_days": None,
+        "risk_state_trigger_count": None,
+        "risk_state_recovery_count": None,
+        "primary_entry_fill_count": None,
+        "fallback_entry_fill_count": None,
+        "primary_average_exposure": None,
+        "fallback_average_exposure": None,
+        "primary_average_holdings": None,
+        "fallback_average_holdings": None,
+        "primary_return_contribution": None,
+        "fallback_return_contribution": None,
         "params": BASELINE_ADAPTIVE_PARAMS.__dict__,
     }
     robust = {
@@ -3357,6 +3472,7 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
         "gate_failures": ["2025_excess_<script>"],
         "neighbor_pass_rate": 0.58,
         "worst_validation_excess": -0.06,
+        "robust_telemetry_available": True,
         "validation": {
             "2023": {
                 "annual_return": 0.10,
@@ -3380,8 +3496,8 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
         "risk_state_days": {"normal": 90, "cautious": 10},
         "risk_state_trigger_count": 2,
         "risk_state_recovery_count": 1,
-        "primary_trade_count": 20,
-        "fallback_trade_count": 8,
+        "primary_entry_fill_count": 20,
+        "fallback_entry_fill_count": 8,
         "primary_average_exposure": 0.48,
         "fallback_average_exposure": 0.14,
         "primary_average_holdings": 5.5,
@@ -3406,6 +3522,8 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
     assert csv_rows[0]["selected"] == "True"
     assert csv_rows[1]["neighbor_pass_rate"] == "0.58"
     assert "primary_return_contribution" in csv_fields
+    assert "primary_entry_fill_count" in csv_fields
+    assert "robust_telemetry_available" in csv_fields
     assert "risk_state_trigger_count" in csv_fields
     assert not {"validation", "risk_state_days", "gate_failures"} & csv_fields
 
@@ -3427,6 +3545,7 @@ def test_write_outputs_renders_robust_diagnostics_without_flattening_nested_data
     assert "2025_excess_<script>" not in html_report
     assert "58.00%" in markdown
     assert "normal: 90" in markdown
+    assert "| baseline | 不可用 | 不可用 | 不可用 |" in markdown
     retention = "没有稳健候选通过全部稳健门槛，因此精确保留 adaptive_composite 基线参数集。"
     grade_context = "历史参数集标签 A/71.3；本次重跑评级 A/71.3。"
     assert retention in markdown
@@ -3501,6 +3620,7 @@ def _review_report_rows():
         "selected": False,
         "annual_return": 0.14,
         "grade_score": 90.0,
+        "validation_status": "not_validated_finalist_cap",
         "params": {**BASELINE_ADAPTIVE_PARAMS.__dict__, "robust_enabled": True},
     }
     finalist = {
@@ -3551,9 +3671,19 @@ def test_reports_include_only_validated_finalists_and_mark_unavailable_metrics(
     rolling_html = html_report.split("<h2>滚动验证</h2>", 1)[1].split(
         "<h2>风险状态</h2>", 1
     )[0]
+    gate_markdown = markdown.split("## 稳健门槛", 1)[1].split(
+        "## 滚动验证", 1
+    )[0]
 
     assert "seed_not_validated" not in rolling_markdown
     assert "seed_not_validated" not in rolling_html
+    non_finalist_gate_row = next(
+        line
+        for line in gate_markdown.splitlines()
+        if "seed_not_validated" in line
+    )
+    assert "| 未验证 |" in non_finalist_gate_row
+    assert "not_validated_finalist_cap" in non_finalist_gate_row
     assert "validated_finalist" in rolling_markdown
     unavailable_row = next(
         line
@@ -4080,6 +4210,7 @@ def test_main_evaluates_only_top_three_robust_pre_gate_passers(monkeypatch):
     expected_finalists = [seeds[1], seeds[2], seeds[3]]
     neighbor_calls = []
     run_calls = []
+    captured = {}
     monkeypatch.setattr("sys.argv", ["run_ashare_sr_leader_research.py"])
     monkeypatch.setattr(research, "get_default_leader_universe", lambda: ["600519"])
     monkeypatch.setattr(research, "RESEARCH_UNIVERSE", ["600519"])
@@ -4122,7 +4253,11 @@ def test_main_evaluates_only_top_three_robust_pre_gate_passers(monkeypatch):
         lambda result, start, end: {"validation_period": start[:4]},
     )
     monkeypatch.setattr(research, "summarize_result", fake_summary)
-    monkeypatch.setattr(research, "write_outputs", lambda _rows: None)
+    monkeypatch.setattr(
+        research,
+        "write_outputs",
+        lambda rows: captured.update(rows=rows),
+    )
     monkeypatch.setattr(research, "write_eqlib_html_report", lambda _result: None)
 
     assert research.main() == 0
@@ -4142,6 +4277,15 @@ def test_main_evaluates_only_top_three_robust_pre_gate_passers(monkeypatch):
         params == seeds[0] and (start, end) in formation_ranges
         for params, start, end in run_calls
     )
+    outside_cap = next(
+        row
+        for row in captured["rows"]
+        if row.get("period_name") == "full"
+        and row.get("params") == seeds[0].__dict__
+    )
+    assert outside_cap["validation_status"] == "not_validated_finalist_cap"
+    assert outside_cap["gate_failures"] == []
+    assert outside_cap["robust_gate_pass"] is False
 
 
 def test_main_nonfinite_full_metric_never_reaches_robust_finalists(monkeypatch):
