@@ -3322,6 +3322,29 @@ def test_write_outputs_keeps_long_full_rows_first(tmp_path, monkeypatch):
     assert saved[0]["period_name"] == "full"
 
 
+def test_write_outputs_uses_lf_line_endings_for_summary_csv(tmp_path, monkeypatch):
+    import scripts.run_ashare_sr_leader_research as research
+
+    monkeypatch.setattr(research, "REPORT_DIR", tmp_path)
+
+    write_outputs(
+        [
+            {
+                "period_name": "full",
+                "kind": "adaptive_composite",
+                "selected": True,
+                "grade_score": 70.0,
+                "stability_score": 1.0,
+                "params": {},
+            }
+        ]
+    )
+
+    csv_bytes = (tmp_path / "summary.csv").read_bytes()
+    assert b"\r\n" not in csv_bytes
+    assert b"\n" in csv_bytes
+
+
 def test_write_outputs_ranks_full_rows_by_grade_before_stability(tmp_path, monkeypatch):
     import scripts.run_ashare_sr_leader_research as research
 
