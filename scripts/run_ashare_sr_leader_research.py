@@ -1659,10 +1659,9 @@ def render_html_report(rows: list[dict]) -> str:
         )
 
     benchmark_note = (
-        """
-        <p class="notice">注意：本次结果中基准收益为 0，说明大盘基准序列没有有效接入。
-        因此本报告当前优先看策略自身收益、回撤和交易频率，超额收益暂不作为跑赢大盘证据。</p>
-        """
+        "      <p class=\"notice\">注意：本次结果中基准收益为 0，说明大盘基准序列没有有效接入。\n"
+        "      因此本报告当前优先看策略自身收益、回撤和交易频率，"
+        "超额收益暂不作为跑赢大盘证据。</p>"
         if benchmark_missing
         else ""
     )
@@ -1679,7 +1678,7 @@ def render_html_report(rows: list[dict]) -> str:
     )
     recommendation = recommendation_text(audit_issues)
 
-    return f"""<!doctype html>
+    html = f"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -1809,7 +1808,7 @@ def render_html_report(rows: list[dict]) -> str:
       <div class="metrics">
         {cards}
       </div>
-      {benchmark_note}
+{benchmark_note}
     </header>
 
     <h2>全周期候选排名</h2>
@@ -1868,6 +1867,7 @@ def render_html_report(rows: list[dict]) -> str:
 </body>
 </html>
 """
+    return "\n".join(line.rstrip() for line in html.splitlines()) + "\n"
 
 
 def run_one(
