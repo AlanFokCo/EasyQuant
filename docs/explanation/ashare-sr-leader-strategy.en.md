@@ -535,22 +535,22 @@ Many support/resistance systems buy near support, buy breakouts, and sell breakd
 
 ## Key Risks and Limitations
 
-1. **Industry-leader universe bias**  
+1. **Industry-leader universe bias**
    A predefined universe may include companies that look successful in hindsight. Production-grade research should consider point-in-time tradable universes.
 
-2. **Support/resistance is descriptive, not causal**  
+2. **Support/resistance is descriptive, not causal**
    Support and resistance describe historical price structure. They do not guarantee future rebounds or successful breakouts.
 
-3. **Monthly rebalancing can react slowly**  
+3. **Monthly rebalancing can react slowly**
    Monthly scans reduce turnover but may miss fast regime shifts.
 
-4. **The market gate sacrifices some upside**  
+4. **The market gate sacrifices some upside**
    Weak-market de-risking controls drawdown but can miss strong counter-trend stocks.
 
-5. **Parameters come from historical backtests**  
+5. **Parameters come from historical backtests**
    The retained `adaptive_composite` baseline reached `A / 70.3` in the current backtest, but its maximum drawdown narrowly missed the 20% hard gate and the 2025 stress-validation period materially lagged the benchmark. New out-of-sample tests, walk-forward validation, and parameter sensitivity checks are still needed.
 
-6. **Data processing matters**  
+6. **Data processing matters**
    A-share daily bars, suspensions, adjustments, volume, and index data can materially affect signals and fills.
 
 ## Recommended Code Reading Order

@@ -3462,6 +3462,10 @@ def test_write_outputs_uses_lf_line_endings_for_summary_csv(tmp_path, monkeypatc
     csv_bytes = (tmp_path / "summary.csv").read_bytes()
     assert b"\r\n" not in csv_bytes
     assert b"\n" in csv_bytes
+    html_lines = (tmp_path / "final_report.html").read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert all(line == line.rstrip() for line in html_lines)
 
 
 def test_write_outputs_ranks_full_rows_by_grade_before_stability(tmp_path, monkeypatch):
