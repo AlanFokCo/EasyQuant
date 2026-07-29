@@ -39,6 +39,7 @@ from eqlib.strategies.ashare_sr_leader import (
     rolling_levels,
     robust_target_weights,
     reduce_portfolio_to_budget,
+    rebalance_portfolio,
     rebalance_robust_portfolio,
     risk_data_complete,
     score_snapshot,
@@ -1757,6 +1758,52 @@ def test_risk_review_uses_fallback_stop_and_tags_the_exit(monkeypatch):
     }
 
 
+def test_default_risk_review_exits_breakdown_and_trailing_drawdown(monkeypatch):
+    frames = {
+        "600519": _ohlcv_from_close([10.0, 10.0, 10.0, 10.0, 10.0, 1.0]),
+        "600036": _ohlcv_from_close([10.0, 11.0, 12.0, 12.0, 10.7]),
+        "300750": None,
+    }
+    history_calls = []
+    queued = []
+
+    def fake_history(code, count, unit, fields):
+        history_calls.append((code, count, unit, fields))
+        return frames[code]
+
+    monkeypatch.setattr("eqlib.attribute_history", fake_history)
+    monkeypatch.setattr(
+        "eqlib.order_target",
+        lambda code, amount: queued.append((code, amount)),
+    )
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            positions={
+                "600519": SimpleNamespace(total_value=100_000),
+                "600036": SimpleNamespace(total_value=100_000),
+                "300750": SimpleNamespace(total_value=100_000),
+            }
+        )
+    )
+    params = StrategyParams(
+        robust_enabled=False,
+        level_window=3,
+        short_level_window=3,
+        atr_period=2,
+        atr_multiplier=0.5,
+        max_position_drawdown=0.10,
+    )
+
+    _risk_review(context, params)
+
+    assert queued == [("600519", 0), ("600036", 0)]
+    assert [call[:3] for call in history_calls] == [
+        ("600519", 8, "1d"),
+        ("600036", 8, "1d"),
+        ("300750", 8, "1d"),
+    ]
+
+
 def _capture_strategy_callbacks(monkeypatch, params, total_value=1_000_000):
     callbacks = {}
     monkeypatch.setattr(
@@ -2200,6 +2247,153 @@ def test_default_off_initialize_preserves_legacy_callbacks(monkeypatch):
         ("select",),
         ("rebalance", params.neutral_market_exposure),
         ("review",),
+    ]
+
+
+@pytest.mark.parametrize(
+    "benchmark",
+    [None, pd.DataFrame()],
+    ids=["missing", "empty"],
+)
+def test_default_monthly_scan_stops_when_benchmark_is_unavailable(
+    monkeypatch,
+    benchmark,
+):
+    history_calls = []
+    monkeypatch.setattr(
+        "eqlib.attribute_history",
+        lambda *args: history_calls.append(args) or benchmark,
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.classify_market",
+        lambda *args: pytest.fail("unavailable benchmark reached market classifier"),
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.select_candidates",
+        lambda *args: pytest.fail("unavailable benchmark reached candidate selection"),
+    )
+    monkeypatch.setattr(
+        "eqlib.strategies.ashare_sr_leader.rebalance_portfolio",
+        lambda *args: pytest.fail("unavailable benchmark reached rebalance"),
+    )
+    params = StrategyParams(
+        robust_enabled=False,
+        level_window=20,
+        rs_window=10,
+        atr_period=5,
+    )
+    context, callbacks = _capture_strategy_callbacks(monkeypatch, params)
+
+    callbacks["monthly"][0](context)
+
+    assert history_calls == [
+        (
+            "000300.XSHG",
+            25,
+            "1d",
+            ["open", "high", "low", "close", "volume"],
+        )
+    ]
+
+
+def test_default_rebalance_exits_unselected_holding_and_caps_increase(
+    monkeypatch,
+):
+    target_orders = []
+    value_orders = []
+    records = []
+    monkeypatch.setattr(
+        "eqlib.order_target",
+        lambda code, amount: target_orders.append((code, amount)),
+    )
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: value_orders.append((code, value)),
+    )
+    monkeypatch.setattr(
+        "eqlib.record",
+        lambda **values: records.append(values),
+    )
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={
+                "600036": SimpleNamespace(total_value=100_000),
+                "000858": SimpleNamespace(total_value=50_000),
+            },
+        )
+    )
+    snapshot = _make_snapshot(close=10.0, avg_volume=100_000.0)
+    params = StrategyParams(
+        robust_enabled=False,
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        rebalance_threshold=0.001,
+        liquidity_volume_pct=0.10,
+    )
+
+    rebalance_portfolio(
+        context,
+        [("000858", snapshot, 10.0)],
+        exposure=0.50,
+        params=params,
+    )
+
+    assert target_orders == [("600036", 0)]
+    assert value_orders == [("000858", pytest.approx(150_000))]
+    assert records == [
+        {
+            "total_value": 1_000_000,
+            "exposure": 0.50,
+            "holdings": 1,
+        }
+    ]
+
+
+def test_default_rebalance_skips_position_with_drift_below_threshold(monkeypatch):
+    value_orders = []
+    records = []
+    monkeypatch.setattr("eqlib.order_target", lambda *args: None)
+    monkeypatch.setattr(
+        "eqlib.order_target_value",
+        lambda code, value: value_orders.append((code, value)),
+    )
+    monkeypatch.setattr(
+        "eqlib.record",
+        lambda **values: records.append(values),
+    )
+    context = SimpleNamespace(
+        portfolio=SimpleNamespace(
+            total_value=1_000_000,
+            positions={
+                "600519": SimpleNamespace(total_value=100_000),
+            },
+        )
+    )
+    params = StrategyParams(
+        robust_enabled=False,
+        top_n=1,
+        max_stock_weight=1.0,
+        max_industry_weight=1.0,
+        rebalance_threshold=0.02,
+        liquidity_volume_pct=1.0,
+    )
+
+    rebalance_portfolio(
+        context,
+        [("600519", _make_snapshot(), 10.0)],
+        exposure=0.10,
+        params=params,
+    )
+
+    assert value_orders == []
+    assert records == [
+        {
+            "total_value": 1_000_000,
+            "exposure": 0.10,
+            "holdings": 1,
+        }
     ]
 
 
