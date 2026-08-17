@@ -87,6 +87,9 @@ node_modules/
 # Generated artifacts
 artifacts/
 
+# Isolated Git worktrees managed by Codex
+.worktrees/
+
 # SQLite temporary files
 *.sqlite3-shm
 *.sqlite3-wal
