@@ -32,7 +32,7 @@
 | eqlib/data.py and eqlib/static/ashare_trading_days.json | Canonical OHLCV, Tencent fix, and audited calendar fallback. |
 | eqlib/utils/equity.py, eqlib/portfolio_risk.py, eqlib/utils/stats.py | Equity normalization, portfolio-risk, and loss-metric remediation. |
 | eqlib/ml/models.py | Deterministic alignment, training-only imputation, and probability semantics. |
-| requirements and .github/workflows/eqlib-evaluator.yml | Reproducible dependency constraints and CI lanes. |
+| requirements and .github/workflows/eqlib-evaluator.yml | pyproject-generated, hash-locked Python 3.10 constraints and CI lanes. |
 
 ### Task 1: Finding and report model
 
@@ -79,6 +79,8 @@ Expected: PASS.
 - Test: tests/evaluator/test_wheel.py
 - Modify: pyproject.toml
 - Modify: requirements.txt
+- Create: requirements/constraints-py310.txt
+- Create: requirements/README.md
 
 **Interfaces:** read_project_dependencies(root), scan_runtime_imports(root), evaluate_inventory(root), build_and_audit_wheel(root, work_dir).
 
@@ -107,7 +109,7 @@ The scanner must parse source via ast, never import it.
 
 Installation/pip-check failure is DEP-003 P0. A blocked index is DEP-004 status unavailable, never success.
 
-- [ ] **Step 5: Declare requests>=2.28.0 and align requirements.txt to these eight primary distributions: akshare, chinese_calendar, pandas, numpy, matplotlib, scipy, scikit-learn, requests. Add tomli for Python <3.11 and build to dev. Make fastparquet/xgboost explicit extras or intentional optional findings.**
+- [ ] **Step 5: Declare requests>=2.28.0 and align requirements.txt to these eight primary distributions: akshare, chinese_calendar, pandas, numpy, matplotlib, scipy, scikit-learn, requests. Add tomli for Python <3.11, build, and pip-tools to dev. Make fastparquet/xgboost explicit extras or intentional optional findings. Under a clean Python 3.10 environment, generate `requirements/constraints-py310.txt` with `pip-compile --generate-hashes --extra dev --output-file requirements/constraints-py310.txt pyproject.toml`. Document that command, its Python version, and CI's `--require-hashes` then `--no-deps -e ".[dev]"` install sequence in `requirements/README.md`; test that the lock has hashes and matching direct pins.**
 
 - [ ] **Step 6: Re-run focused tests and commit with fix: align eqlib runtime dependencies.**
 
@@ -196,7 +198,9 @@ Require finite positive OHLC, low <= min(open, close) <= max(open, close) <= hig
 
 **Files:**
 - Create: eqlib/static/ashare_trading_days.json
+- Create: eqlib/static/__init__.py
 - Modify: eqlib/data.py
+- Modify: pyproject.toml
 - Modify: tests/test_calendar.py
 - Modify: tests/test_data_source_contracts.py
 
@@ -216,7 +220,7 @@ Patch provider access to fail before each assertion.
 
 Expected: current fallback incorrectly admits 2024-02-09 and has no strict coverage failure.
 
-- [ ] **Step 3: Commit a complete, versioned trading-days JSON generated from the exchange endpoint, covering every published day from 2020 through the final complete year. Record source, generation date, version, and coverage.**
+- [ ] **Step 3: Commit a complete, versioned trading-days JSON generated from the exchange endpoint, covering every published day from 2020 through the final complete year. Record source, generation date, version, and coverage. Add `eqlib/static/__init__.py` and include `static/*.json` in setuptools package data so `importlib.resources.files("eqlib.static")` is valid in an installed wheel.**
 
 - [ ] **Step 4: On provider failure, read the resource only within its coverage. strict=False logs and returns []; strict=True raises DataFetchError. Remove statutory-workday inference using chinese_calendar.is_workday.**
 
@@ -361,4 +365,3 @@ Every task has named files, inputs/outputs, a first failure, minimal implementat
 ### Type consistency
 
 Evaluator modules exchange Finding and EvaluationReport. Data consumers retain DataFrame returns. Portfolio code retains RiskReport. ML code retains BaseMLModel public methods. Each new helper is defined before its consuming task.
-

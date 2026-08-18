@@ -40,7 +40,7 @@
 | eqlib/portfolio_risk.py | NAV 加权 VaR、MDD 和单调 alert 聚合。 |
 | eqlib/utils/stats.py | LPM2 下行偏差和 VaR/CVaR 语义。 |
 | eqlib/ml/models.py | X/y 对齐、训练期填补、有限性和正类概率。 |
-| requirements/ | 可再生成的带 hash 约束。 |
+| requirements/ | 由 pyproject.toml 生成、带 hash 的 Python 3.10 约束及其生成说明。 |
 | .github/workflows/eqlib-evaluator.yml | 离线 PR 门禁与定时/手动 live 检查。 |
 
 ### Task 1: 建立 finding 和报告模型
@@ -143,6 +143,8 @@ Expected: PASS.
 - Test: tests/evaluator/test_wheel.py
 - Modify: pyproject.toml
 - Modify: requirements.txt
+- Create: requirements/constraints-py310.txt
+- Create: requirements/README.md
 
 **Interfaces:**
 - Produces: read_project_dependencies(root), scan_runtime_imports(root), evaluate_inventory(root).
@@ -228,9 +230,11 @@ Expected: FAIL because evaluator inventory/wheel APIs are absent.
 
 Use zipfile.ZipFile and email.message_from_bytes to parse the sole dist-info/METADATA. A blocked package index yields DEP-004 with status unavailable, never a pass.
 
-- [ ] **Step 5: Align release metadata.**
+- [ ] **Step 5: Align release metadata and commit a reproducible constraint.**
 
-Add requests>=2.28.0 to project.dependencies. Make requirements.txt contain exactly akshare, chinese_calendar, pandas, numpy, matplotlib, scipy, scikit-learn, and requests with matching lower bounds. Add tomli>=2.0; python_version < "3.11" and build>=1.2 to dev. Give fastparquet and xgboost explicit extras, or let inventory report their intentional optional status.
+Add requests>=2.28.0 to project.dependencies. Make requirements.txt contain exactly akshare, chinese_calendar, pandas, numpy, matplotlib, scipy, scikit-learn, and requests with matching lower bounds. Add tomli>=2.0; python_version < "3.11", build>=1.2, and pip-tools>=7.4 to dev. Give fastparquet and xgboost explicit extras, or let inventory report their intentional optional status.
+
+Under a clean Python 3.10 environment, generate `requirements/constraints-py310.txt` from the release metadata with `pip-compile --generate-hashes --extra dev --output-file requirements/constraints-py310.txt pyproject.toml`. `requirements/README.md` records this exact command, Python version, and the two-stage installation used by CI: `pip install --require-hashes -r requirements/constraints-py310.txt` followed by `pip install --no-deps -e ".[dev]"`. The evaluator tests that the lock has hashes and that its direct pins match the release metadata; a missing, malformed, or stale lock is a visible dependency finding rather than an implicit pass.
 
 - [ ] **Step 6: Run focused validation and commit.**
 
@@ -240,7 +244,7 @@ Run: python -c "from evaluator.inventory import evaluate_inventory; from pathlib
 
 Expected: PASS.
 
-    git add evaluator/inventory.py evaluator/wheel.py tests/evaluator/test_inventory.py tests/evaluator/test_wheel.py pyproject.toml requirements.txt
+    git add evaluator/inventory.py evaluator/wheel.py tests/evaluator/test_inventory.py tests/evaluator/test_wheel.py pyproject.toml requirements.txt requirements/
     git commit -m "fix: align eqlib runtime dependencies"
 
 ### Task 3: 实现 CLI、离线契约和退出码
@@ -389,7 +393,9 @@ Expected: PASS without provider network access.
 
 **Files:**
 - Create: eqlib/static/ashare_trading_days.json
+- Create: eqlib/static/__init__.py
 - Modify: eqlib/data.py:840-1050
+- Modify: pyproject.toml
 - Modify: tests/test_calendar.py
 - Modify: tests/test_data_source_contracts.py
 
@@ -425,7 +431,7 @@ Expected: FAIL for 2024-02-09 and strict unavailable coverage.
       "trading_days": ["2024-02-08", "2024-02-16"]
     }
 
-The committed list contains every published exchange trading day from 2020 through the final complete published year, not only the examples. Generation command and AkShare version are report evidence.
+The committed list contains every published exchange trading day from 2020 through the final complete published year, not only the examples. Generation command and AkShare version are report evidence. Add `eqlib/static/__init__.py` and include `static/*.json` in setuptools package data so `importlib.resources.files("eqlib.static")` works from an installed wheel, not merely a source checkout.
 
 - [ ] **Step 4: Read the resource and fail conservatively.**
 
@@ -445,7 +451,7 @@ Run: python -m pytest tests/test_calendar.py tests/test_data_diagnostics.py test
 
 Expected: PASS.
 
-    git add eqlib/static/ashare_trading_days.json eqlib/data.py tests/test_calendar.py tests/test_data_source_contracts.py
+    git add eqlib/static/__init__.py eqlib/static/ashare_trading_days.json eqlib/data.py pyproject.toml tests/test_calendar.py tests/test_data_source_contracts.py
     git commit -m "fix: use bundled exchange trading calendar fallback"
 
 ### Task 6: 规范化净值/收益并修复组合风控 P0
@@ -844,4 +850,3 @@ Every task names files, interfaces, a failing test, command, expected outcome, m
 ### Type consistency
 
 Evaluator modules exchange Finding and EvaluationReport. Data-source consumers retain DataFrame return types. Portfolio monitoring retains RiskReport. ML consumers retain BaseMLModel methods. New helper signatures appear before tasks that consume them.
-
