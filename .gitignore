@@ -90,6 +90,9 @@ artifacts/
 # Isolated Git worktrees managed by Codex
 .worktrees/
 
+# Local task-execution ledger
+.superpowers/
+
 # SQLite temporary files
 *.sqlite3-shm
 *.sqlite3-wal
