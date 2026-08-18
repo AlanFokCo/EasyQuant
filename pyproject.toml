@@ -7,7 +7,7 @@ name = "easyquant-eqlib"
 version = "1.0.3"
 description = "Event-driven quantitative trading framework for China A-share backtesting and research"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "AlanFokCo", email = "alanfok2868@gmail.com"},
 ]
@@ -30,12 +30,24 @@ dependencies = [
     "matplotlib>=3.6.0",
     "scipy>=1.10.0",
     "scikit-learn>=1.2.0",
+    "requests>=2.28.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov>=4.0", "pydantic-settings>=2.2.0", "structlog>=24.1.0"]
-cache = ["pyarrow>=12.0.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pydantic-settings>=2.2.0",
+    "structlog>=24.1.0",
+    'tomli>=2.0; python_version < "3.11"',
+    "packaging>=23.0",
+    "build>=1.2",
+    "pip-tools>=7.4",
+]
+cache = ["pyarrow>=12.0.0", "fastparquet>=2023.0.0"]
+ml = ["xgboost>=1.7.0"]
 sources = ["baostock>=0.9.0"]
+timezone = ["pytz>=2022.1"]
 docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.0",
