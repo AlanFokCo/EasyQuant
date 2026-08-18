@@ -137,6 +137,34 @@ def test_write_report_marks_lone_unicode_surrogates_explicitly(tmp_path):
     assert "invalid_unicode" in markdown_path.read_text(encoding="utf-8")
 
 
+def test_write_report_sanitizes_malformed_unsupported_type_labels(tmp_path):
+    malformed_type = type("MalformedType", (), {})
+    malformed_type.__module__ = "malformed\ud800module"
+    malformed_type.__qualname__ = "Malformed\ud800Type"
+    report = EvaluationReport.create(
+        profile="offline",
+        findings=[
+            Finding(
+                "DEP-007",
+                Severity.P1,
+                "malformed type label",
+                "details",
+                evidence={"unsupported": malformed_type()},
+            )
+        ],
+    )
+
+    json_path, _ = write_report(report, tmp_path)
+
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert payload["findings"][0]["evidence"] == {
+        "unsupported": {
+            "$type": "unsupported",
+            "python_type": "malformed\\ud800module.Malformed\\ud800Type",
+        }
+    }
+
+
 def test_render_markdown_bounds_untrusted_finding_content():
     report = EvaluationReport(
         profile="offline",

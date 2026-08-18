@@ -136,13 +136,18 @@ def _json_safe_string(value: str) -> Any:
         return value
     return {
         "$type": "invalid_unicode",
-        "value": value.encode("utf-8", errors="backslashreplace").decode("utf-8"),
+        "value": _utf8_safe_text(value),
     }
 
 
 def _contains_surrogate(value: str) -> bool:
     """Return whether *value* contains a Unicode surrogate code point."""
     return any(0xD800 <= ord(character) <= 0xDFFF for character in value)
+
+
+def _utf8_safe_text(value: str) -> str:
+    """Escape invalid Unicode code points while preserving readable text."""
+    return value.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
 
 def _nonfinite_float_label(value: float) -> str:
@@ -155,7 +160,7 @@ def _nonfinite_float_label(value: float) -> str:
 def _python_type_name(value: Any) -> str:
     """Return a stable type label without relying on arbitrary object reprs."""
     value_type = type(value)
-    return f"{value_type.__module__}.{value_type.__qualname__}"
+    return _utf8_safe_text(f"{value_type.__module__}.{value_type.__qualname__}")
 
 
 def _sorted_json_values(values: list[Any]) -> list[Any]:
