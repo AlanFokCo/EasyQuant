@@ -69,3 +69,6 @@ eqlib = ["static/logo-icon.png"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "network: bounded live contract that may access an external provider",
+]
