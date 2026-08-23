@@ -103,3 +103,39 @@ class TestBaseMLModel:
         model.fit(X, y)
         importances = model.feature_importances()
         assert len(importances) == X.shape[1]
+
+    def test_fit_aligns_labels_by_index_not_position(self):
+        from eqlib.ml.models import BaseMLModel
+
+        X = pd.DataFrame({"x": [1.0, 2.0, 3.0]}, index=["a", "b", "c"])
+        y = pd.Series([7.0, 5.0, 3.0], index=["c", "b", "a"])
+        model = BaseMLModel("logistic_regression", is_classifier=False)
+
+        model.fit(X, y)
+
+        assert model.predict(pd.DataFrame({"x": [4.0]}))[0] == pytest.approx(9.0)
+
+    def test_classifier_returns_zero_positive_probability_when_class_one_is_absent(
+        self,
+    ):
+        from eqlib.ml.models import BaseMLModel
+
+        X = pd.DataFrame({"x": [0.0, 1.0, 2.0, 3.0]})
+        model = BaseMLModel("random_forest", n_estimators=10)
+        model.fit(X, pd.Series([0, 0, 0, 0]))
+
+        assert np.all(model.predict(X) == 0.0)
+
+    def test_prediction_of_missing_row_is_independent_of_other_prediction_rows(self):
+        from eqlib.ml.models import BaseMLModel
+
+        X = pd.DataFrame({"x": [0.0, 1.0, 2.0, 3.0], "z": [1.0, 2.0, 3.0, 4.0]})
+        model = BaseMLModel("logistic_regression")
+        model.fit(X, pd.Series([0, 0, 1, 1]))
+
+        one = model.predict(pd.DataFrame({"x": [np.nan], "z": [2.0]}))[0]
+        together = model.predict(
+            pd.DataFrame({"x": [np.nan, 1000.0], "z": [2.0, 2.0]})
+        )[0]
+
+        assert one == pytest.approx(together)

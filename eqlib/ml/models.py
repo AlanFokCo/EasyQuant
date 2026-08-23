@@ -49,7 +49,9 @@ class BaseMLModel:
         "xgboost",
     }
 
-    def __init__(self, model_type: str = "random_forest", is_classifier: bool = True, **kwargs):
+    def __init__(
+        self, model_type: str = "random_forest", is_classifier: bool = True, **kwargs
+    ):
         if model_type not in self._SUPPORTED_TYPES:
             raise ValueError(
                 f"Unsupported model_type '{model_type}'. "
@@ -61,6 +63,7 @@ class BaseMLModel:
         self._model = None
         self._feature_names: list[str] = []
         self._is_classifier: bool = is_classifier
+        self._imputation_values: Optional[pd.Series] = None
         self._build_model()
 
     def _build_model(self):
@@ -72,6 +75,7 @@ class BaseMLModel:
         if mt == "random_forest":
             if is_clf:
                 from sklearn.ensemble import RandomForestClassifier
+
                 self._model = RandomForestClassifier(
                     n_estimators=kw.get("n_estimators", 100),
                     max_depth=kw.get("max_depth", 5),
@@ -81,6 +85,7 @@ class BaseMLModel:
                 )
             else:
                 from sklearn.ensemble import RandomForestRegressor
+
                 self._model = RandomForestRegressor(
                     n_estimators=kw.get("n_estimators", 100),
                     max_depth=kw.get("max_depth", 5),
@@ -92,6 +97,7 @@ class BaseMLModel:
         elif mt == "logistic_regression":
             if is_clf:
                 from sklearn.linear_model import LogisticRegression
+
                 self._model = LogisticRegression(
                     max_iter=kw.get("max_iter", 1000),
                     C=kw.get("C", 1.0),
@@ -99,11 +105,13 @@ class BaseMLModel:
                 )
             else:
                 from sklearn.linear_model import LinearRegression
+
                 self._model = LinearRegression()
 
         elif mt == "gradient_boosting":
             if is_clf:
                 from sklearn.ensemble import GradientBoostingClassifier
+
                 self._model = GradientBoostingClassifier(
                     n_estimators=kw.get("n_estimators", 100),
                     max_depth=kw.get("max_depth", 3),
@@ -112,6 +120,7 @@ class BaseMLModel:
                 )
             else:
                 from sklearn.ensemble import GradientBoostingRegressor
+
                 self._model = GradientBoostingRegressor(
                     n_estimators=kw.get("n_estimators", 100),
                     max_depth=kw.get("max_depth", 3),
@@ -123,6 +132,7 @@ class BaseMLModel:
             try:
                 if is_clf:
                     from xgboost import XGBClassifier
+
                     self._model = XGBClassifier(
                         n_estimators=kw.get("n_estimators", 100),
                         max_depth=kw.get("max_depth", 5),
@@ -133,6 +143,7 @@ class BaseMLModel:
                     )
                 else:
                     from xgboost import XGBRegressor
+
                     self._model = XGBRegressor(
                         n_estimators=kw.get("n_estimators", 100),
                         max_depth=kw.get("max_depth", 5),
@@ -145,7 +156,7 @@ class BaseMLModel:
                     "Install with: pip install xgboost"
                 ) from exc
 
-    def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> "BaseMLModel":
         """Fit the underlying model.
 
         Parameters
@@ -159,20 +170,9 @@ class BaseMLModel:
             raise RuntimeError("Model has not been initialized.")
 
         self._feature_names = list(X.columns)
-
-        # Handle NaN values - simple forward fill + drop
-        X_clean = X.copy()
-        X_clean = X_clean.fillna(X_clean.median())
-
-        # Drop rows where y is NaN
-        valid_idx = y.notna()
-        X_clean = X_clean[valid_idx]
-        y_clean = y[valid_idx]
-
-        if len(X_clean) < 2:
-            raise ValueError("Insufficient data to train model (need >= 2 samples).")
-
+        X_clean, y_clean = self._prepare_fit_data(X, y)
         self._model.fit(X_clean, y_clean)
+        return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Return model predictions.
@@ -185,13 +185,18 @@ class BaseMLModel:
             raise RuntimeError("Model has not been trained.")
 
         # Align columns
-        X_aligned = self._align_columns(X)
-        X_aligned = X_aligned.fillna(X_aligned.median())
+        X_aligned = self._prepare_predict_data(X)
 
         if self._is_classifier and hasattr(self._model, "predict_proba"):
             # Return probability of positive class (class 1)
             proba = self._model.predict_proba(X_aligned)
-            return proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
+            classes = np.asarray(self._model.classes_)
+            positive_index = np.flatnonzero(classes == 1)
+            return (
+                proba[:, positive_index[0]]
+                if len(positive_index)
+                else np.zeros(len(X_aligned))
+            )
         else:
             return self._model.predict(X_aligned)
 
@@ -208,8 +213,7 @@ class BaseMLModel:
         if not hasattr(self._model, "predict_proba"):
             raise AttributeError(f"{self.model_type} does not support predict_proba.")
 
-        X_aligned = self._align_columns(X)
-        X_aligned = X_aligned.fillna(X_aligned.median())
+        X_aligned = self._prepare_predict_data(X)
         return self._model.predict_proba(X_aligned)
 
     def feature_importances(self) -> pd.Series:
@@ -252,6 +256,7 @@ class BaseMLModel:
             "is_classifier": self._is_classifier,
             "kwargs": self.kwargs,
             "feature_names": self._feature_names,
+            "imputation_values": self._imputation_values,
             "model": self._model,
         }
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -275,10 +280,19 @@ class BaseMLModel:
         with open(path, "rb") as f:
             data = pickle.load(f)
 
-        instance = cls(data["model_type"], is_classifier=data.get("is_classifier", True), **data["kwargs"])
+        instance = cls(
+            data["model_type"],
+            is_classifier=data.get("is_classifier", True),
+            **data["kwargs"],
+        )
         instance._model = data["model"]
         instance._feature_names = data["feature_names"]
         instance._is_classifier = data.get("is_classifier", True)
+        instance._imputation_values = data.get("imputation_values")
+        if instance._imputation_values is None:
+            raise ValueError(
+                "Model imputation statistics are unavailable in this saved model."
+            )
         return instance
 
     def _align_columns(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -287,3 +301,35 @@ class BaseMLModel:
             return X
         # Reindex columns, fill missing with NaN
         return X.reindex(columns=self._feature_names)
+
+    def _prepare_fit_data(
+        self, X: pd.DataFrame, y: pd.Series
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        """Align labels and derive imputation values exclusively from training data."""
+        if not X.index.is_unique or not y.index.is_unique:
+            raise ValueError("X and y indexes must be unique")
+        y_aligned = y.reindex(X.index)
+        valid = y_aligned.notna()
+        X_clean = X.loc[valid].replace([np.inf, -np.inf], np.nan)
+        y_clean = y_aligned.loc[valid]
+        if len(X_clean) < 2:
+            raise ValueError("Insufficient data to train model (need >= 2 samples).")
+        imputation = X_clean.median(numeric_only=True).reindex(X_clean.columns)
+        if imputation.isna().any():
+            raise ValueError(
+                "Each feature must have at least one finite training value"
+            )
+        self._imputation_values = imputation
+        return X_clean.fillna(imputation), y_clean
+
+    def _prepare_predict_data(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Align and impute prediction features using persisted training medians."""
+        if self._imputation_values is None:
+            raise RuntimeError("Model imputation statistics are unavailable.")
+        prepared = self._align_columns(X).replace([np.inf, -np.inf], np.nan)
+        prepared = prepared.fillna(self._imputation_values)
+        if not np.isfinite(prepared.to_numpy(dtype=float)).all():
+            raise ValueError(
+                "Prediction features must be finite after training-data imputation"
+            )
+        return prepared
