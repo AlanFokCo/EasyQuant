@@ -5,11 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from email import message_from_bytes, policy
 from hashlib import sha256
+import json
+import os
 from pathlib import Path
-import re
+import signal
+import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from typing import Any, Sequence
 from zipfile import BadZipFile, ZipFile
 
@@ -27,7 +31,8 @@ from .models import Finding, Severity
 
 _COMMAND_TIMEOUT_SECONDS = 180
 _MAX_EVIDENCE_CHARS = 4_000
-_REQUIREMENT_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
+_STREAM_CHUNK_SIZE = 64 * 1024
+_TERMINATION_GRACE_SECONDS = 1.0
 _INDEX_UNAVAILABLE_MARKERS = (
     "could not fetch url",
     "connection broken",
@@ -37,11 +42,11 @@ _INDEX_UNAVAILABLE_MARKERS = (
     "proxyerror",
     "read timed out",
     "temporary failure in name resolution",
-    "timed out",
     "too many requests",
     "certificate verify failed",
     "sslerror",
 )
+_INDEX_MARKER_TAIL_CHARS = max(len(marker) for marker in _INDEX_UNAVAILABLE_MARKERS)
 
 
 @dataclass(frozen=True)
@@ -56,6 +61,42 @@ class _CommandResult:
     index_unavailable: bool = False
 
 
+@dataclass
+class _BoundedStreamCapture:
+    """Capture bounded evidence while scanning all streamed subprocess output."""
+
+    prefix: str = ""
+    suffix: str = ""
+    marker_tail: str = ""
+    total_chars: int = 0
+    index_unavailable: bool = False
+
+    def add(self, chunk: bytes) -> None:
+        text = chunk.decode("utf-8", errors="replace")
+        self.total_chars += len(text)
+        if len(self.prefix) < _MAX_EVIDENCE_CHARS:
+            remaining = _MAX_EVIDENCE_CHARS - len(self.prefix)
+            self.prefix += text[:remaining]
+
+        half = (_MAX_EVIDENCE_CHARS - 80) // 2
+        self.suffix = (self.suffix + text)[-half:]
+        indexed_text = (self.marker_tail + text).lower()
+        if any(marker in indexed_text for marker in _INDEX_UNAVAILABLE_MARKERS):
+            self.index_unavailable = True
+        self.marker_tail = indexed_text[-_INDEX_MARKER_TAIL_CHARS:]
+
+    def evidence(self) -> str:
+        if self.total_chars <= _MAX_EVIDENCE_CHARS:
+            return self.prefix
+        half = (_MAX_EVIDENCE_CHARS - 80) // 2
+        omitted = self.total_chars - (half * 2)
+        return (
+            f"{self.prefix[:half]}\n"
+            f"... [{omitted} characters truncated] ...\n"
+            f"{self.suffix}"
+        )
+
+
 def build_and_audit_wheel(
     root: Path, work_dir: Path
 ) -> tuple[dict[str, Any], list[Finding]]:
@@ -67,10 +108,21 @@ def build_and_audit_wheel(
     audit_dir = Path(tempfile.mkdtemp(prefix="eqlib-wheel-audit-", dir=work_dir))
     dist_dir = audit_dir / "dist"
     dist_dir.mkdir()
+    source_dir = audit_dir / "source"
+    try:
+        _copy_source_for_build(root, source_dir)
+    except OSError as exc:
+        build = _CommandResult(
+            command=(),
+            returncode=1,
+            stdout="",
+            stderr=_bounded_text(str(exc)),
+        )
+        return _empty_evidence(audit_dir, build=build), [_build_failure(build)]
 
     build = _run(
         [sys.executable, "-m", "build", "--wheel", "--outdir", str(dist_dir)],
-        cwd=root,
+        cwd=source_dir,
         check=False,
     )
     if build.returncode != 0:
@@ -167,10 +219,13 @@ def build_and_audit_wheel(
 
 def requirement_name(requirement: str) -> str:
     """Return the normalized distribution name encoded in a Requires-Dist field."""
-    match = _REQUIREMENT_NAME.match(requirement)
-    if match is None:
+    try:
+        parsed = Requirement(requirement)
+    except InvalidRequirement as exc:
+        raise ValueError(f"invalid requirement: {requirement!r}") from exc
+    if not parsed.name:
         raise ValueError(f"invalid requirement: {requirement!r}")
-    return normalize_distribution_name(match.group(1))
+    return normalize_distribution_name(parsed.name)
 
 
 def _read_wheel_metadata(wheel_path: Path) -> dict[str, Any]:
@@ -283,8 +338,87 @@ def _canonical_requirement(requirement: str) -> str:
     else:
         name += str(parsed.specifier)
     if parsed.marker:
-        name += f"; {parsed.marker}"
+        name += f"; {_canonical_marker(parsed.marker)}"
     return name
+
+
+def _canonical_marker(marker: Any) -> str:
+    """Render a parsed marker with stable ordering for commutative clauses.
+
+    ``packaging.Requirement`` owns validation and tokenization.  Its marker tree
+    preserves the input order of ``and``/``or`` clauses, even though that order
+    has no PEP 508 meaning.  Normalize that tree here so equivalent wheel and
+    project metadata compare equal without discarding marker semantics.
+    """
+    markers = getattr(marker, "_markers", None)
+    if not isinstance(markers, list):
+        raise ValueError("packaging marker has no parse tree")
+    return _render_marker_tree(_marker_tree(markers))
+
+
+def _marker_tree(value: object) -> tuple[Any, ...]:
+    if isinstance(value, tuple) and len(value) == 3:
+        variable, operator, marker_value = value
+        return ("comparison", str(variable), str(operator), str(marker_value))
+    if not isinstance(value, list) or not value:
+        raise ValueError("invalid packaging marker tree")
+
+    operands: list[tuple[Any, ...]] = []
+    operators: list[str] = []
+    expecting_operand = True
+    for item in value:
+        if isinstance(item, str):
+            if expecting_operand or item not in {"and", "or"}:
+                raise ValueError("invalid packaging marker operator")
+            while operators and _marker_precedence(operators[-1]) >= _marker_precedence(
+                item
+            ):
+                _reduce_marker_tree(operands, operators.pop())
+            operators.append(item)
+            expecting_operand = True
+            continue
+        if not expecting_operand:
+            raise ValueError("invalid packaging marker expression")
+        operands.append(_marker_tree(item))
+        expecting_operand = False
+
+    if expecting_operand:
+        raise ValueError("invalid packaging marker expression")
+    while operators:
+        _reduce_marker_tree(operands, operators.pop())
+    if len(operands) != 1:
+        raise ValueError("invalid packaging marker expression")
+    return operands[0]
+
+
+def _marker_precedence(operator: str) -> int:
+    return 2 if operator == "and" else 1
+
+
+def _reduce_marker_tree(operands: list[tuple[Any, ...]], operator: str) -> None:
+    if len(operands) < 2:
+        raise ValueError("invalid packaging marker expression")
+    right = operands.pop()
+    left = operands.pop()
+    children: list[tuple[Any, ...]] = []
+    for node in (left, right):
+        if node[0] == operator:
+            children.extend(node[1])
+        else:
+            children.append(node)
+    operands.append((operator, tuple(sorted(children, key=_render_marker_tree))))
+
+
+def _render_marker_tree(tree: tuple[Any, ...]) -> str:
+    if tree[0] == "comparison":
+        _, variable, operator, value = tree
+        return f"{variable} {operator} {json.dumps(value)}"
+    operator, children = tree
+    return (
+        "("
+        + f" {operator} ".join(_render_marker_tree(child) for child in children)
+        + ")"
+    )
 
 
 def _canonical_requires_python(value: str | None) -> str | None:
@@ -370,9 +504,15 @@ def _build_failure(build: _CommandResult) -> Finding:
 
 
 def _is_index_unavailable(result: _CommandResult) -> bool:
-    if result.timed_out or result.index_unavailable:
-        return True
-    return _output_indicates_index_unavailable(result.stdout, result.stderr)
+    """Return true only for captured package-index or network evidence.
+
+    A timeout can be caused by a local build deadlock, a stalled interpreter, or a
+    network issue.  It is therefore a DEP-003 failure unless the subprocess output
+    itself contains a package-index/network marker.
+    """
+    return result.index_unavailable or _output_indicates_index_unavailable(
+        result.stdout, result.stderr
+    )
 
 
 def _output_indicates_index_unavailable(stdout: str, stderr: str) -> bool:
@@ -385,41 +525,154 @@ def _run(
     *,
     cwd: Path | None = None,
     check: bool = False,
-    timeout: int = _COMMAND_TIMEOUT_SECONDS,
+    timeout: float = _COMMAND_TIMEOUT_SECONDS,
 ) -> _CommandResult:
-    """Run a bounded subprocess and retain only bounded, UTF-8-safe evidence."""
+    """Run a command with bounded streamed evidence and a bounded process group.
+
+    Output is drained concurrently so a noisy child cannot deadlock on a full pipe.
+    The complete stream is scanned for index/network errors, while only capped
+    head/tail evidence is retained for reports.
+    """
     del check  # Evaluation failures are findings rather than subprocess exceptions.
     command_tuple = tuple(str(part) for part in command)
-    try:
-        completed = subprocess.run(
-            command_tuple,
-            cwd=str(cwd) if cwd is not None else None,
-            check=False,
-            capture_output=True,
-            text=True,
-            errors="replace",
-            timeout=timeout,
+    popen_kwargs: dict[str, Any] = {
+        "cwd": str(cwd) if cwd is not None else None,
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
         )
-    except subprocess.TimeoutExpired as exc:
-        stdout = _coerce_text(exc.stdout)
-        stderr = _coerce_text(exc.stderr)
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    try:
+        process = subprocess.Popen(command_tuple, **popen_kwargs)
+    except OSError as exc:
         return _CommandResult(
             command_tuple,
-            None,
-            _bounded_text(stdout),
-            _bounded_text(stderr),
-            timed_out=True,
-            index_unavailable=_output_indicates_index_unavailable(stdout, stderr),
+            1,
+            "",
+            _bounded_text(str(exc)),
         )
-    stdout = completed.stdout
-    stderr = completed.stderr
+
+    stdout_capture = _BoundedStreamCapture()
+    stderr_capture = _BoundedStreamCapture()
+    readers = _start_stream_readers(process, stdout_capture, stderr_capture)
+    timed_out = False
+    try:
+        returncode = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        _terminate_process_group(process)
+        returncode = None
+    finally:
+        _finish_stream_readers(process, readers)
+
     return _CommandResult(
         command_tuple,
-        completed.returncode,
-        _bounded_text(stdout),
-        _bounded_text(stderr),
-        index_unavailable=_output_indicates_index_unavailable(stdout, stderr),
+        returncode,
+        stdout_capture.evidence(),
+        stderr_capture.evidence(),
+        timed_out=timed_out,
+        index_unavailable=(
+            stdout_capture.index_unavailable or stderr_capture.index_unavailable
+        ),
     )
+
+
+def _start_stream_readers(
+    process: subprocess.Popen[bytes],
+    stdout_capture: _BoundedStreamCapture,
+    stderr_capture: _BoundedStreamCapture,
+) -> tuple[threading.Thread, threading.Thread]:
+    """Start concurrent, bounded readers for the process's two output pipes."""
+    if (
+        process.stdout is None or process.stderr is None
+    ):  # pragma: no cover - Popen contract
+        raise RuntimeError("subprocess output pipes were not created")
+    readers = (
+        threading.Thread(
+            target=_drain_stream,
+            args=(process.stdout, stdout_capture),
+            name="eqlib-wheel-stdout",
+            daemon=True,
+        ),
+        threading.Thread(
+            target=_drain_stream,
+            args=(process.stderr, stderr_capture),
+            name="eqlib-wheel-stderr",
+            daemon=True,
+        ),
+    )
+    for reader in readers:
+        reader.start()
+    return readers
+
+
+def _drain_stream(stream: Any, capture: _BoundedStreamCapture) -> None:
+    """Drain a binary pipe without retaining unbounded output in memory."""
+    try:
+        while chunk := stream.read(_STREAM_CHUNK_SIZE):
+            capture.add(chunk)
+    finally:
+        stream.close()
+
+
+def _finish_stream_readers(
+    process: subprocess.Popen[bytes], readers: Sequence[threading.Thread]
+) -> None:
+    """Join readers; close a leaked child pipe only after terminating its group."""
+    for reader in readers:
+        reader.join(timeout=_TERMINATION_GRACE_SECONDS)
+    if any(reader.is_alive() for reader in readers):
+        _terminate_process_group(process)
+        for stream in (process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
+        for reader in readers:
+            reader.join(timeout=_TERMINATION_GRACE_SECONDS)
+
+
+def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+    """Terminate a timed-out evaluator command and every child in its group."""
+    if os.name == "nt":  # pragma: no cover - exercised on Windows runners
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            process.wait(timeout=_TERMINATION_GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            pass
+        return
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (PermissionError, ProcessLookupError):
+        _wait_for_process_exit(process)
+        return
+    # The group leader can exit before a child that ignores SIGTERM.  Escalate
+    # against the original process group even when the leader has already been
+    # reaped, then wait for that leader so no evaluator-owned process remains.
+    _wait_for_process_exit(process)
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (PermissionError, ProcessLookupError):
+        pass
+    _wait_for_process_exit(process)
+
+
+def _wait_for_process_exit(process: subprocess.Popen[bytes]) -> None:
+    try:
+        process.wait(timeout=_TERMINATION_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:  # pragma: no cover - kernel/process failure
+        pass
 
 
 def _venv_python(venv_dir: Path) -> Path:
@@ -430,6 +683,22 @@ def _venv_python(venv_dir: Path) -> Path:
     if not candidate.is_file():
         raise ValueError(f"venv did not create a Python executable at {candidate}")
     return candidate
+
+
+def _copy_source_for_build(root: Path, destination: Path) -> None:
+    """Copy a clean build input outside the repository before invoking build."""
+    shutil.copytree(
+        root,
+        destination,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".worktrees",
+            "__pycache__",
+            "*.egg-info",
+            "build",
+        ),
+    )
 
 
 def _evidence(

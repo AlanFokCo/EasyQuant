@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import sys
+import time
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -38,6 +41,11 @@ def test_wheel_metadata_parser_reads_metadata_from_wheel_not_egg_info(tmp_path):
     assert metadata["requires_dist"] == ["requests (>=2.28)"]
 
 
+def test_requirement_name_uses_pep508_parser_for_invalid_metadata():
+    with pytest.raises(ValueError, match="invalid requirement"):
+        requirement_name("requests @")
+
+
 def test_wheel_metadata_comparison_accepts_declared_extra_requirements(tmp_path):
     (tmp_path / "pyproject.toml").write_text(
         """[project]
@@ -59,6 +67,33 @@ dev = ["pytest>=7.0"]
             "requires_dist": [
                 "requests>=2.28",
                 'pytest>=7.0; extra == "dev"',
+            ],
+        },
+    )
+
+    assert findings == []
+
+
+def test_wheel_metadata_comparison_normalizes_equivalent_marker_order(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        """[project]
+name = "wheel-fixture"
+version = "0.0.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7; python_version < '3.11'"]
+""",
+        encoding="utf-8",
+    )
+
+    findings = _metadata_findings(
+        tmp_path,
+        {
+            "requires_python": ">=3.10",
+            "requires_dist": [
+                'pytest >= 7; extra == "dev" and python_version < "3.11"',
             ],
         },
     )
@@ -156,6 +191,125 @@ def test_truncated_index_error_remains_an_unavailable_finding():
 
     assert "connection broken" not in install.stdout
     assert [finding.id for finding in findings] == ["DEP-004"]
+
+
+def test_run_streams_far_more_than_evidence_cap_without_capture_output(monkeypatch):
+    import evaluator.wheel as wheel
+
+    original_run = wheel.subprocess.run
+
+    def reject_capture_output(*args, **kwargs):
+        assert "capture_output" not in kwargs
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(wheel.subprocess, "run", reject_capture_output)
+
+    result = _run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.write('x' * 1000000); sys.stderr.write('connection broken')",
+        ],
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    assert len(result.stdout) <= 4_000
+    assert result.index_unavailable
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="process-group assertion uses POSIX signals"
+)
+def test_run_timeout_terminates_entire_child_process_group(tmp_path):
+    child_marker = tmp_path / "child.pid"
+    command = [
+        sys.executable,
+        "-c",
+        "import pathlib, subprocess, sys, time; "
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)']); "
+        f"pathlib.Path({str(child_marker)!r}).write_text(str(child.pid)); "
+        "time.sleep(30)",
+    ]
+
+    result = _run(command, timeout=0.2)
+
+    assert result.timed_out
+    child_pid = int(child_marker.read_text(encoding="utf-8"))
+    try:
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                os.kill(child_pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.05)
+        else:
+            pytest.fail("timeout left a child process running")
+    finally:
+        try:
+            os.kill(child_pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="process-group assertion uses POSIX signals"
+)
+def test_run_timeout_escalates_when_a_child_ignores_sigterm(tmp_path):
+    child_marker = tmp_path / "child.pid"
+    command = [
+        sys.executable,
+        "-c",
+        "import pathlib, subprocess, sys, time; "
+        "child = subprocess.Popen([sys.executable, '-c', "
+        "'import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)']); "
+        f"pathlib.Path({str(child_marker)!r}).write_text(str(child.pid)); "
+        "time.sleep(30)",
+    ]
+
+    result = _run(command, timeout=0.2)
+
+    assert result.timed_out
+    child_pid = int(child_marker.read_text(encoding="utf-8"))
+    try:
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                os.kill(child_pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.05)
+        else:
+            pytest.fail("timeout did not escalate to kill a SIGTERM-ignoring child")
+    finally:
+        try:
+            os.kill(child_pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def test_generic_subprocess_timeout_is_not_an_index_unavailable_finding():
+    install = _CommandResult(
+        command=("python", "-m", "pip", "install", "fixture.whl"),
+        returncode=None,
+        stdout="",
+        stderr="",
+        timed_out=True,
+        index_unavailable=False,
+    )
+    pip_check = _CommandResult(
+        command=("python", "-m", "pip", "check"),
+        returncode=None,
+        stdout="",
+        stderr="",
+        timed_out=True,
+        index_unavailable=False,
+    )
+
+    findings = _installation_findings(install, pip_check)
+
+    assert [finding.id for finding in findings] == ["DEP-003"]
 
 
 def test_wheel_audit_install_disables_cache_and_inherited_pip_config(

@@ -11,9 +11,11 @@ on more than one supported platform; it is not a dependency resolver.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 import json
 import os
 import re
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -33,6 +35,8 @@ _AUGMENTATION_MARKER = (
     "# Hashes below were augmented from official PyPI release metadata for every "
     "pinned artifact.\n"
 )
+_LOCK_INPUT_FINGERPRINT_PREFIX = "# eqlib-lock-input-sha256: v1:"
+_LOCK_INPUT_FINGERPRINT = re.compile(r"# eqlib-lock-input-sha256: v1:[0-9a-f]{64}")
 
 
 class PinnedEntry(NamedTuple):
@@ -46,21 +50,28 @@ class PinnedEntry(NamedTuple):
     newline: str
 
 
-def parse_entry(lines: list[str], start: int) -> PinnedEntry | None:
+def parse_entry(lines: list[str], start: int) -> PinnedEntry:
     """Parse one pip-compile exact pin and its immediately following hashes."""
     source = lines[start]
     stripped = source.strip()
-    if not stripped or source[:1].isspace() or stripped.startswith(("#", "-")):
-        return None
+    if not stripped or source[:1].isspace() or stripped.startswith("#"):
+        raise ValueError(f"line {start + 1}: expected a top-level exact requirement")
+    if stripped.startswith("-"):
+        raise ValueError(f"line {start + 1}: unsupported lock directive {stripped!r}")
 
     newline = "\r\n" if source.endswith("\r\n") else "\n"
     requirement_text = source.removesuffix("\r\n").removesuffix("\n").rstrip()
-    if requirement_text.endswith("\\"):
-        requirement_text = requirement_text[:-1].rstrip()
+    if not requirement_text.endswith("\\"):
+        raise ValueError(
+            f"line {start + 1}: exact pins must use a pip-compile hash continuation"
+        )
+    requirement_text = requirement_text[:-1].rstrip()
     try:
         requirement = Requirement(requirement_text)
-    except InvalidRequirement:
-        return None
+    except InvalidRequirement as exc:
+        raise ValueError(
+            f"line {start + 1}: invalid requirement {requirement_text!r}"
+        ) from exc
 
     specifiers = list(requirement.specifier)
     exact_pins = [specifier for specifier in specifiers if specifier.operator == "=="]
@@ -70,8 +81,29 @@ def parse_entry(lines: list[str], start: int) -> PinnedEntry | None:
         )
 
     stop = start + 1
-    while stop < len(lines) and _is_hash_line(lines[stop]):
+    hashes = 0
+    while stop < len(lines):
+        candidate = lines[stop]
+        candidate_stripped = candidate.strip()
+        if candidate_stripped.startswith("#"):
+            break
+        if not candidate[:1].isspace():
+            break
+        if not candidate_stripped.startswith("--hash"):
+            raise ValueError(
+                f"line {stop + 1}: unsupported requirement continuation {candidate_stripped!r}"
+            )
+        continuation = _hash_continuation(candidate, stop + 1)
+        hashes += 1
         stop += 1
+        if not continuation:
+            if stop < len(lines) and lines[stop].strip().startswith("--hash"):
+                raise ValueError(
+                    f"line {stop + 1}: hash follows a non-continuing hash line"
+                )
+            break
+    if not hashes:
+        raise ValueError(f"line {start + 1}: exact pin has no SHA-256 hash")
     return PinnedEntry(
         start=start,
         stop=stop,
@@ -110,6 +142,8 @@ def fetch_hashes(
             if len(raw) > MAX_RESPONSE_BYTES:
                 raise ValueError(f"{name}=={version}: PyPI response exceeds size limit")
             payload = json.loads(raw)
+            if not isinstance(payload, Mapping):
+                raise ValueError(f"{name}=={version}: PyPI response is not an object")
             files = payload.get("urls")
             if not isinstance(files, list) or not files:
                 raise ValueError(f"{name}=={version}: PyPI returned no release files")
@@ -117,19 +151,23 @@ def fetch_hashes(
                 raise ValueError(
                     f"{name}=={version}: {len(files)} files exceeds limit {max_files}"
                 )
-            hashes = {
-                item.get("digests", {}).get("sha256", "").lower()
-                for item in files
-                if isinstance(item, dict)
-            }
-            hashes.discard("")
-            if not hashes or any(
-                _HASH_VALUE.fullmatch(digest) is None for digest in hashes
-            ):
-                raise ValueError(
-                    f"{name}=={version}: PyPI response has an invalid or missing SHA256"
-                )
-            return sorted(hashes)
+            hashes = []
+            for file in files:
+                if not isinstance(file, dict):
+                    raise ValueError(
+                        f"{name}=={version}: PyPI response has an invalid release file"
+                    )
+                digests = file.get("digests")
+                digest = digests.get("sha256") if isinstance(digests, Mapping) else None
+                if (
+                    not isinstance(digest, str)
+                    or _HASH_VALUE.fullmatch(digest.lower()) is None
+                ):
+                    raise ValueError(
+                        f"{name}=={version}: PyPI response has an invalid or missing SHA256"
+                    )
+                hashes.append(digest.lower())
+            return sorted(set(hashes))
         except (
             HTTPError,
             URLError,
@@ -155,10 +193,18 @@ def enrich(
     max_entries: int,
     max_files: int,
     deadline: float | None = None,
+    lock_input_fingerprint: str | None = None,
 ) -> tuple[int, int]:
     """Atomically write a lock with every exact pin's official release hashes."""
     _validate_limits(timeout, retries, max_entries, max_files, deadline)
     source_lines = input_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    fingerprint = _validate_lock_input_fingerprint(lock_input_fingerprint)
+    if fingerprint is not None:
+        source_lines = [
+            line
+            for line in source_lines
+            if not line.lstrip().startswith(_LOCK_INPUT_FINGERPRINT_PREFIX)
+        ]
     entries = _find_entries(source_lines)
     if not entries:
         raise ValueError("no exact pinned requirements found")
@@ -181,7 +227,12 @@ def enrich(
                 deadline_at,
             )
 
-    rendered = _render_lock(source_lines, entries, hashes_by_release)
+    rendered = _render_lock(
+        source_lines,
+        entries,
+        hashes_by_release,
+        lock_input_fingerprint=fingerprint,
+    )
     _atomic_write(output_path, rendered)
     return len(entries), sum(len(hashes) for hashes in hashes_by_release.values())
 
@@ -190,26 +241,35 @@ def _find_entries(lines: list[str]) -> list[PinnedEntry]:
     entries = []
     index = 0
     while index < len(lines):
-        entry = parse_entry(lines, index)
-        if entry is None:
+        if _is_ignorable_lock_line(lines[index]):
             index += 1
-        else:
-            entries.append(entry)
-            index = entry.stop
+            continue
+        entry = parse_entry(lines, index)
+        entries.append(entry)
+        index = entry.stop
     return entries
 
 
-def _is_hash_line(line: str) -> bool:
+def _hash_continuation(line: str, line_number: int) -> bool:
     value = line.strip()
-    if value.endswith("\\"):
+    continuation = value.endswith("\\")
+    if continuation:
         value = value[:-1].rstrip()
-    return bool(re.fullmatch(r"--hash=sha256:[0-9a-fA-F]{64}", value))
+    if not re.fullmatch(r"--hash=sha256:[0-9a-fA-F]{64}", value):
+        raise ValueError(f"line {line_number}: malformed SHA-256 hash continuation")
+    return continuation
+
+
+def _is_ignorable_lock_line(line: str) -> bool:
+    return not line.strip() or line.lstrip().startswith("#")
 
 
 def _render_lock(
     source_lines: list[str],
     entries: list[PinnedEntry],
     hashes_by_release: dict[tuple[str, str], list[str]],
+    *,
+    lock_input_fingerprint: str | None = None,
 ) -> str:
     result: list[str] = []
     cursor = 0
@@ -218,6 +278,8 @@ def _render_lock(
     )
     for position, entry in enumerate(entries):
         result.extend(source_lines[cursor : entry.start])
+        if position == 0 and lock_input_fingerprint is not None:
+            result.append(lock_input_fingerprint + "\n")
         if position == 0 and not has_marker:
             result.extend([_AUGMENTATION_MARKER, "\n"])
         result.extend(
@@ -226,6 +288,26 @@ def _render_lock(
         cursor = entry.stop
     result.extend(source_lines[cursor:])
     return "".join(result)
+
+
+def _validate_lock_input_fingerprint(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.rstrip("\r\n")
+    if _LOCK_INPUT_FINGERPRINT.fullmatch(normalized) is None:
+        raise ValueError("lock input fingerprint must be one v1 SHA-256 header line")
+    return normalized
+
+
+def _lock_input_fingerprint_for_project(project_root: Path) -> str:
+    """Load the evaluator's canonical metadata fingerprint without target imports."""
+    repository_root = Path(__file__).resolve().parents[1]
+    repository_text = str(repository_root)
+    if repository_text not in sys.path:
+        sys.path.insert(0, repository_text)
+    from evaluator.inventory import lock_input_fingerprint_header
+
+    return lock_input_fingerprint_header(project_root).rstrip("\r\n")
 
 
 def _render_entry(entry: PinnedEntry, hashes: Iterable[str]) -> list[str]:
@@ -285,6 +367,12 @@ def main() -> None:
     parser.add_argument("--deadline", type=float, default=180.0)
     parser.add_argument("--max-entries", type=int, default=100)
     parser.add_argument("--max-files", type=int, default=500)
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=Path.cwd(),
+        help="project whose canonical lock inputs are recorded in the output header",
+    )
     args = parser.parse_args()
     entries, hashes = enrich(
         args.input,
@@ -294,6 +382,7 @@ def main() -> None:
         max_entries=args.max_entries,
         max_files=args.max_files,
         deadline=args.deadline,
+        lock_input_fingerprint=_lock_input_fingerprint_for_project(args.project_root),
     )
     print(f"enriched {entries} pins with {hashes} release SHA256 hashes: {args.output}")
 

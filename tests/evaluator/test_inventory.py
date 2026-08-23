@@ -8,6 +8,8 @@ from pathlib import Path
 
 from evaluator.inventory import (
     evaluate_inventory,
+    lock_input_fingerprint,
+    lock_input_fingerprint_header,
     normalize_distribution_name,
     read_project_dependencies,
     scan_runtime_imports,
@@ -92,6 +94,86 @@ def test_inventory_reports_stale_requirements_file(tmp_path):
     assert _finding(findings, "DEP-002").severity.value == "P1"
 
 
+def test_inventory_compares_pep508_requirements_semantically(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=['Requests[socks] >= 2.28 ; python_version < "3.11"'],
+    )
+    _write_runtime_module(tmp_path, "import requests\n")
+    (tmp_path / "requirements.txt").write_text(
+        "requests[socks]>=2.28; python_version < '3.11'\n",
+        encoding="utf-8",
+    )
+
+    findings = evaluate_inventory(tmp_path)
+
+    assert not [finding for finding in findings if finding.id == "DEP-002"]
+
+
+def test_inventory_normalizes_equivalent_pep508_marker_order(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=[
+            'requests>=2.28; python_version < "3.11" and sys_platform == "darwin"'
+        ],
+    )
+    _write_runtime_module(tmp_path, "import requests\n")
+    (tmp_path / "requirements.txt").write_text(
+        'requests>=2.28; sys_platform == "darwin" and python_version < "3.11"\n',
+        encoding="utf-8",
+    )
+
+    findings = evaluate_inventory(tmp_path)
+
+    assert not [finding for finding in findings if finding.id == "DEP-002"]
+
+
+def test_inventory_rejects_duplicate_canonical_requirement_names(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.0"])
+    _write_runtime_module(tmp_path, "import requests\n")
+    (tmp_path / "requirements.txt").write_text(
+        "requests>=2.0\nRequests>=2.0\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-002")
+
+    assert "duplicate" in finding.detail.lower()
+
+
+def test_inventory_reports_invalid_project_pep508_declaration(tmp_path):
+    _write_project(tmp_path, dependencies=["requests @"])
+    _write_runtime_module(tmp_path, "import requests\n")
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-002")
+
+    assert "invalid" in finding.detail.lower()
+    assert "project" in finding.title.lower()
+
+
+def test_inventory_rejects_duplicate_inactive_direct_declarations(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=[
+            'requests>=2 ; sys_platform == "win32"',
+            'Requests>=2 ; sys_platform == "win32"',
+        ],
+    )
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + "tomli==2.0.0 --hash=sha256:"
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-002")
+
+    assert "duplicate" in finding.detail.lower()
+
+
 def test_ast_scan_never_imports_target_code_and_skips_non_third_party_imports(tmp_path):
     _write_project(tmp_path, dependencies=[])
     _write_runtime_module(
@@ -119,6 +201,81 @@ def test_ast_scan_never_imports_target_code_and_skips_non_third_party_imports(tm
     assert imports == {"chinese-calendar", "fancy-package", "scikit-learn"}
 
 
+def test_ast_scan_skips_type_checking_and_provably_dead_import_branches(tmp_path):
+    _write_project(tmp_path, dependencies=[])
+    _write_runtime_module(
+        tmp_path,
+        "\n".join(
+            [
+                "import typing",
+                "from typing import TYPE_CHECKING",
+                "if TYPE_CHECKING:",
+                "    import type_only",
+                "else:",
+                "    import type_checked_else",
+                "if typing.TYPE_CHECKING:",
+                "    import typing_type_only",
+                "if False:",
+                "    import false_only",
+                "if 0:",
+                "    import zero_only",
+                "if []:",
+                "    import empty_only",
+                "if True:",
+                "    import always_runtime",
+                "else:",
+                "    import true_else_only",
+                "if runtime_condition:",
+                "    import conditional_runtime",
+            ]
+        )
+        + "\n",
+    )
+
+    imports = scan_runtime_imports(tmp_path)
+
+    assert imports == {
+        "always-runtime",
+        "conditional-runtime",
+        "type-checked-else",
+    }
+
+
+def test_ast_scan_skips_only_setuptools_shipped_root_packages(tmp_path):
+    _write_project(tmp_path, dependencies=[])
+    (tmp_path / "pyproject.toml").write_text(
+        (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
+        + '\n[tool.setuptools.packages.find]\ninclude = ["eqlib*", "published*"]\n',
+        encoding="utf-8",
+    )
+    _write_runtime_module(
+        tmp_path,
+        "import published.module\nimport local_only.module\n",
+    )
+    for package in ("published", "local_only"):
+        package_dir = tmp_path / package
+        package_dir.mkdir()
+        (package_dir / "__init__.py").write_text("", encoding="utf-8")
+
+    imports = scan_runtime_imports(tmp_path)
+
+    assert imports == {"local-only"}
+
+
+def test_ast_scan_does_not_hide_scanned_root_excluded_by_setuptools(tmp_path):
+    _write_project(tmp_path, dependencies=[])
+    (tmp_path / "pyproject.toml").write_text(
+        (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
+        + '\n[tool.setuptools.packages.find]\ninclude = ["published*"]\n',
+        encoding="utf-8",
+    )
+    _write_runtime_module(tmp_path, "import eqlib.external\n")
+
+    imports = scan_runtime_imports(tmp_path)
+
+    assert imports == {"eqlib"}
+
+
 def test_inventory_recognizes_declared_optional_imports_without_hiding_real_ones(
     tmp_path,
 ):
@@ -144,6 +301,86 @@ def test_inventory_reports_missing_hash_lock(tmp_path):
     finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
 
     assert "constraints-py310.txt" in finding.detail
+
+
+def test_inventory_rejects_hash_lock_without_lock_input_fingerprint(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        "requests==2.34.2 --hash=sha256:" + "0" * 64 + "\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "fingerprint" in finding.detail.lower()
+
+
+def test_lock_input_fingerprint_is_stable_for_equivalent_metadata_order(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=["Requests >= 2.28", "numpy>=1.23"],
+        optional_dependencies={"dev": ["pytest >= 7", "coverage[toml]>=7"]},
+    )
+
+    initial = lock_input_fingerprint(tmp_path)
+
+    _write_project(
+        tmp_path,
+        dependencies=["numpy >= 1.23", "requests>=2.28"],
+        optional_dependencies={"dev": ["coverage[toml] >= 7", "pytest>=7"]},
+    )
+
+    assert lock_input_fingerprint(tmp_path) == initial
+
+
+def test_inventory_rejects_lock_when_input_fingerprint_drifts_despite_valid_pin(
+    tmp_path,
+):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    lock_path = requirements_dir / "constraints-py310.txt"
+    lock_path.write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + "requests==2.34.2 --hash=sha256:"
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    _write_project(tmp_path, dependencies=["requests>=2.29"])
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "fingerprint" in finding.detail.lower()
+    assert finding.evidence["fingerprint_state"] == "valid"
+    assert (
+        finding.evidence["actual_lock_input_fingerprint"]
+        != finding.evidence["expected_lock_input_fingerprint"]
+    )
+
+
+def test_inventory_rejects_multiple_lock_input_fingerprints(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + lock_input_fingerprint_header(tmp_path)
+        + "requests==2.34.2 --hash=sha256:"
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert finding.evidence["fingerprint_state"] == "malformed"
 
 
 def test_inventory_reports_hashless_or_stale_hash_lock(tmp_path):
@@ -194,6 +431,118 @@ def test_inventory_rejects_lock_pin_below_metadata_specifier(tmp_path):
     assert "requests==1.0.0" in finding.detail
 
 
+def test_inventory_evaluates_direct_markers_for_python310_targets(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=[
+            "requests>=2.28",
+            'future-only>=1; python_version >= "3.11"',
+        ],
+    )
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    lock_path = requirements_dir / "constraints-py310.txt"
+    lock_path.write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + "requests==2.34.2 --hash=sha256:"
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    findings = evaluate_inventory(tmp_path)
+
+    assert not [finding for finding in findings if finding.id == "DEP-005"]
+
+
+def test_inventory_rejects_lock_pin_inactive_on_all_python310_targets(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + 'requests==2.34.2 ; sys_platform == "win32" --hash=sha256:'
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "active" in finding.detail.lower()
+    assert "requests" in finding.detail
+
+
+def test_inventory_allows_mutually_exclusive_direct_lock_markers(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=[
+            'platform-demo==1 ; sys_platform == "linux"',
+            'platform-demo==2 ; sys_platform == "darwin"',
+        ],
+    )
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + 'platform-demo==1 ; sys_platform == "linux" --hash=sha256:'
+        + "0" * 64
+        + "\n"
+        + 'platform-demo==2 ; sys_platform == "darwin" --hash=sha256:'
+        + "1" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    findings = evaluate_inventory(tmp_path)
+
+    assert not [finding for finding in findings if finding.id == "DEP-005"]
+
+
+def test_inventory_uses_python310_full_version_for_direct_lock_markers(tmp_path):
+    _write_project(
+        tmp_path,
+        dependencies=[
+            "requests>=2.28",
+            'patch-only>=1; python_full_version < "3.10.1"',
+        ],
+    )
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + "requests==2.34.2 --hash=sha256:"
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "patch-only" in finding.detail
+
+
+def test_inventory_reports_duplicate_project_metadata_declarations(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28", "Requests>=2.28"])
+    _write_runtime_module(tmp_path, "import requests\n")
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(tmp_path)
+        + "requests==2.34.2 --hash=sha256:"
+        + "0" * 64
+        + "\n",
+        encoding="utf-8",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-002")
+
+    assert "duplicate" in finding.detail.lower()
+
+
 def test_repository_metadata_requirements_and_hash_lock_are_consistent():
     findings = evaluate_inventory(ROOT)
     lock_text = (ROOT / "requirements" / "constraints-py310.txt").read_text(
@@ -219,16 +568,32 @@ def test_repository_hash_lock_covers_multiple_platform_artifacts():
         assert len(hashes[package]) > 1, package
 
 
+def test_repository_hash_lock_keeps_explicit_linux_and_macos_branches():
+    lock_text = (ROOT / "requirements" / "constraints-py310.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'akracer==0.0.14 ; sys_platform == "linux"' in lock_text
+    assert 'py-mini-racer==0.6.0 ; sys_platform == "linux"' in lock_text
+    assert 'mini-racer==0.14.1 ; sys_platform != "linux"' in lock_text
+
+
 def test_lock_readme_records_reproducible_python310_installation():
     readme = (ROOT / "requirements" / "README.md").read_text(encoding="utf-8")
 
     assert "Python 3.10" in readme
-    assert (
-        "pip-compile --generate-hashes --extra dev --output-file "
-        "requirements/constraints-py310.txt pyproject.toml"
-    ) in readme
+    assert "pip-compile" in readme
+    assert "--allow-unsafe" in readme
+    assert "--no-emit-find-links" in readme
+    assert "uv 0.12.5" in readme
+    assert "--universal --generate-hashes --no-strip-markers" in readme
+    assert "select_py310_targets.py" in readme
+    assert "verify_target_lock.py" in readme
     assert (
         "pip install --require-hashes -r requirements/constraints-py310.txt" in readme
     )
     assert 'pip install --no-deps -e ".[dev]"' in readme
     assert "official PyPI release hashes" in readme
+    assert "pip download --require-hashes --no-deps" not in readme
+    assert "does not prove closure" in readme
+    assert "does not reproduce a future mutable-index" in readme

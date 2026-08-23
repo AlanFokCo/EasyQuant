@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -63,3 +66,111 @@ coverage[toml]==7.15.4 \\
     assert "    # via pytest-cov" in rendered
     assert rendered.count("--hash=sha256:") == 3
     assert "coverage[toml]==7.15.4" in rendered
+
+
+def test_enricher_writes_one_replacement_lock_input_fingerprint(monkeypatch, tmp_path):
+    enricher = _load_enricher()
+    source = tmp_path / "base.txt"
+    output = tmp_path / "portable.txt"
+    source.write_text(
+        "# eqlib-lock-input-sha256: v1:" + "a" * 64 + "\n"
+        "requests==2.34.2 \\\n"
+        "    --hash=sha256:" + "b" * 64 + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(enricher, "fetch_hashes", lambda *_args: ["1" * 64])
+
+    enricher.enrich(
+        source,
+        output,
+        timeout=1,
+        retries=1,
+        max_entries=10,
+        max_files=10,
+        lock_input_fingerprint="# eqlib-lock-input-sha256: v1:" + "c" * 64,
+    )
+
+    rendered = output.read_text(encoding="utf-8")
+    assert rendered.count("eqlib-lock-input-sha256:") == 1
+    assert "# eqlib-lock-input-sha256: v1:" + "c" * 64 in rendered
+
+
+@pytest.mark.parametrize(
+    "invalid_tail",
+    [
+        "not a valid requirement @@@\n",
+        "--index-url https://example.invalid/simple\n",
+        "requests @ https://example.invalid/requests.whl \\\n"
+        "    --hash=sha256:" + "c" * 64 + "\n",
+        "    --hash=sha256:" + "z" * 64 + "\n",
+    ],
+)
+def test_enricher_fails_closed_without_replacing_output_on_unsupported_lock_syntax(
+    monkeypatch, tmp_path, invalid_tail
+):
+    enricher = _load_enricher()
+    source = tmp_path / "base.txt"
+    output = tmp_path / "portable.txt"
+    source.write_text(
+        "requests==2.34.2 \\\n" "    --hash=sha256:" + "a" * 64 + "\n" + invalid_tail,
+        encoding="utf-8",
+    )
+    output.write_text("sentinel\n", encoding="utf-8")
+    monkeypatch.setattr(enricher, "fetch_hashes", lambda *_args: ["1" * 64])
+
+    with pytest.raises(ValueError):
+        enricher.enrich(
+            source,
+            output,
+            timeout=1,
+            retries=1,
+            max_entries=10,
+            max_files=10,
+        )
+
+    assert output.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_enricher_rejects_pypi_release_when_any_file_lacks_valid_sha256(monkeypatch):
+    enricher = _load_enricher()
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _limit):
+            return json.dumps(
+                {
+                    "urls": [
+                        {"digests": {"sha256": "1" * 64}},
+                        {"digests": {}},
+                    ]
+                }
+            ).encode("utf-8")
+
+    monkeypatch.setattr(enricher, "urlopen", lambda *_args, **_kwargs: Response())
+
+    with pytest.raises(RuntimeError, match="invalid or missing SHA256"):
+        enricher.fetch_hashes("requests", "2.34.2", 1, 1, 10)
+
+
+def test_enricher_rejects_non_mapping_pypi_digests(monkeypatch):
+    enricher = _load_enricher()
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _limit):
+            return json.dumps({"urls": [{"digests": []}]}).encode("utf-8")
+
+    monkeypatch.setattr(enricher, "urlopen", lambda *_args, **_kwargs: Response())
+
+    with pytest.raises(RuntimeError, match="invalid or missing SHA256"):
+        enricher.fetch_hashes("requests", "2.34.2", 1, 1, 10)
