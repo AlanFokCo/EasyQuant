@@ -2,15 +2,27 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 from eqlib.utils.stats import (
-    rolling_corr, rolling_beta, rolling_sharpe,
-    zscore, percentile_rank,
+    rolling_corr,
+    rolling_beta,
+    rolling_sharpe,
+    zscore,
+    percentile_rank,
     linear_regression,
-    downside_deviation, value_at_risk, conditional_var,
-    drawdown, max_drawdown,
-    consecutive_wins, consecutive_losses,
-    fibonacci, comb, perm,
-    compound_return, cagr, log_return,
+    downside_deviation,
+    value_at_risk,
+    conditional_var,
+    drawdown,
+    max_drawdown,
+    consecutive_wins,
+    consecutive_losses,
+    fibonacci,
+    comb,
+    perm,
+    compound_return,
+    cagr,
+    log_return,
 )
 
 
@@ -72,6 +84,35 @@ class TestLinearRegression:
 
 
 class TestRisk:
+    def test_downside_deviation_uses_all_observations_for_lpm2(self):
+        returns = pd.Series([-0.01, 0.01])
+        expected = np.sqrt(np.mean(np.minimum(returns.to_numpy(), 0.0) ** 2)) * np.sqrt(
+            244
+        )
+
+        assert downside_deviation(returns) == pytest.approx(expected)
+
+    @pytest.mark.parametrize("confidence", [0.0, 1.0, -0.1, 1.1])
+    def test_var_rejects_invalid_tail_probability(self, confidence):
+        with pytest.raises(ValueError, match="confidence"):
+            value_at_risk(pd.Series([-0.01, 0.02]), confidence=confidence)
+
+    def test_var_and_cvar_are_nonnegative_losses_for_all_positive_returns(self):
+        returns = pd.Series([0.01, 0.02])
+
+        assert value_at_risk(returns) == 0.0
+        assert conditional_var(returns) == 0.0
+
+    def test_risk_metrics_reject_nonfinite_returns(self):
+        returns = pd.Series([-0.01, np.inf])
+
+        with pytest.raises(ValueError, match="finite"):
+            downside_deviation(returns)
+        with pytest.raises(ValueError, match="finite"):
+            value_at_risk(returns)
+        with pytest.raises(ValueError, match="finite"):
+            conditional_var(returns)
+
     def test_downside_deviation(self):
         np.random.seed(42)
         returns = pd.Series(np.random.randn(100) * 0.02)
