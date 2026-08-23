@@ -11,8 +11,7 @@ Provides:
 
 import numpy as np
 import pandas as pd
-from math import sqrt, log, factorial
-from itertools import combinations, permutations
+from math import sqrt, factorial
 from typing import Optional
 
 from eqlib.constants import TRADING_DAYS_PER_YEAR
@@ -22,21 +21,27 @@ from eqlib.constants import TRADING_DAYS_PER_YEAR
 # Rolling Statistics
 # ============================================================
 
+
 def rolling_corr(x: pd.Series, y: pd.Series, window: int) -> pd.Series:
     """Rolling correlation between two series."""
     return x.rolling(window).corr(y)
 
 
-def rolling_beta(series: pd.Series, benchmark: pd.Series,
-                 window: int, risk_free: float = 0.0) -> pd.Series:
+def rolling_beta(
+    series: pd.Series, benchmark: pd.Series, window: int, risk_free: float = 0.0
+) -> pd.Series:
     """Rolling beta against a benchmark."""
     cov = series.rolling(window).cov(benchmark)
     var = benchmark.rolling(window).var()
     return cov / var.replace(0, np.nan)
 
 
-def rolling_sharpe(returns: pd.Series, window: int,
-                   risk_free: float = 0.0, annualize: int = TRADING_DAYS_PER_YEAR) -> pd.Series:
+def rolling_sharpe(
+    returns: pd.Series,
+    window: int,
+    risk_free: float = 0.0,
+    annualize: int = TRADING_DAYS_PER_YEAR,
+) -> pd.Series:
     """Rolling annualized Sharpe ratio."""
     # mean * annualize = annualized return (daily mean scaled to yearly)
     mean = returns.rolling(window).mean() * annualize
@@ -47,6 +52,7 @@ def rolling_sharpe(returns: pd.Series, window: int,
 # ============================================================
 # Distributions
 # ============================================================
+
 
 def zscore(series: pd.Series, window: Optional[int] = None) -> pd.Series:
     """Z-score normalization.
@@ -80,6 +86,7 @@ def percentile_rank(series: pd.Series, window: Optional[int] = None) -> pd.Serie
 # Linear Regression
 # ============================================================
 
+
 def linear_regression(x: pd.Series, y: pd.Series):
     """Simple linear regression: y = alpha + beta * x.
 
@@ -109,7 +116,7 @@ def linear_regression(x: pd.Series, y: pd.Series):
     y_pred = alpha + beta * x_arr
     residuals = y_arr - y_pred
 
-    ss_res = np.sum(residuals ** 2)
+    ss_res = np.sum(residuals**2)
     r_squared = 1 - ss_res / ss_yy if ss_yy > 0 else 0
 
     # Standard error
@@ -130,8 +137,10 @@ def linear_regression(x: pd.Series, y: pd.Series):
 # Risk Metrics
 # ============================================================
 
-def downside_deviation(returns: pd.Series, target: float = 0.0,
-                       annualize: int = TRADING_DAYS_PER_YEAR) -> float:
+
+def downside_deviation(
+    returns: pd.Series, target: float = 0.0, annualize: int = TRADING_DAYS_PER_YEAR
+) -> float:
     """Downside deviation (semi-standard deviation).
 
     Computes ``sqrt(mean(min(r - target, 0)^2)) * sqrt(annualize)``, the
@@ -144,13 +153,14 @@ def downside_deviation(returns: pd.Series, target: float = 0.0,
             same frequency as ``returns`` (e.g. ``0.03 / 244`` for daily).
         annualize: number of periods per year for annualization (default 244)
     """
-    downside_sq = (returns - target)[returns - target < 0] ** 2
-    downside_dev = (downside_sq.mean() ** 0.5) * sqrt(annualize) if len(downside_sq) > 0 else 0.0
-    return downside_dev
+    values = _validated_returns(returns)
+    downside = np.minimum(values.to_numpy() - target, 0.0)
+    return float(np.sqrt(np.mean(downside**2)) * sqrt(annualize))
 
 
-def value_at_risk(returns: pd.Series, confidence: float = 0.05,
-                  method: str = "historical") -> float:
+def value_at_risk(
+    returns: pd.Series, confidence: float = 0.05, method: str = "historical"
+) -> float:
     """Value at Risk at a given confidence level.
 
     Parameters:
@@ -166,41 +176,68 @@ def value_at_risk(returns: pd.Series, confidence: float = 0.05,
               which are typically negatively skewed and heavy-tailed.
 
     Returns:
-        VaR as a negative number (loss amount).
+        VaR as a nonnegative loss.
     """
-    if method == "parametric":
-        mu = returns.mean()
-        sigma = returns.std()
-        from scipy.stats import norm
-        return -(mu + norm.ppf(confidence) * sigma)
-    if method == "cornish_fisher":
-        from scipy.stats import norm
-        mu = returns.mean()
-        sigma = returns.std(ddof=1)
-        skew = float(returns.skew())
-        kurt = float(returns.kurtosis())  # Fisher kurtosis (excess)
-        z = norm.ppf(confidence)
-        # Cornish-Fisher expansion
-        z_cf = (
-            z
-            + (z ** 2 - 1) * skew / 6
-            + (z ** 3 - 3 * z) * kurt / 24
-            - (2 * z ** 3 - 5 * z) * skew ** 2 / 36
-        )
-        return -(mu + z_cf * sigma)
-    return -returns.quantile(confidence)
+    _validate_confidence(confidence)
+    loss_quantile = _quantile_by_method(_validated_returns(returns), confidence, method)
+    return float(max(0.0, -loss_quantile))
 
 
 def conditional_var(returns: pd.Series, confidence: float = 0.05) -> float:
     """Conditional Value at Risk (Expected Shortfall)."""
-    var = value_at_risk(returns, confidence)
-    tail = returns[returns <= -var]
-    return -tail.mean() if len(tail) > 0 else 0.0
+    _validate_confidence(confidence)
+    values = _validated_returns(returns)
+    loss_quantile = _quantile_by_method(values, confidence, "historical")
+    if loss_quantile >= 0:
+        return 0.0
+    tail = values[values <= loss_quantile]
+    return float(max(0.0, -tail.mean())) if len(tail) > 0 else 0.0
+
+
+def _validated_returns(returns: pd.Series) -> pd.Series:
+    """Convert returns to finite numeric observations or fail visibly."""
+    values = pd.to_numeric(returns, errors="coerce").dropna()
+    if values.empty or not np.isfinite(values.to_numpy(dtype=float)).all():
+        raise ValueError("returns must contain finite observations")
+    return values.astype(float)
+
+
+def _validate_confidence(confidence: float) -> None:
+    """Validate the lower-tail probability shared by VaR and CVaR."""
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be between 0 and 1")
+
+
+def _quantile_by_method(values: pd.Series, confidence: float, method: str) -> float:
+    """Return the return-space lower-tail quantile for one supported method."""
+    if method == "historical":
+        return float(values.quantile(confidence))
+    from scipy.stats import norm
+
+    mu = float(values.mean())
+    sigma = float(values.std(ddof=1))
+    if not np.isfinite(sigma):
+        raise ValueError("returns must contain at least two finite observations")
+    if method == "parametric":
+        return float(mu + norm.ppf(confidence) * sigma)
+    if method == "cornish_fisher":
+        skew = float(values.skew())
+        kurt = float(values.kurtosis())  # Fisher kurtosis (excess)
+        z = norm.ppf(confidence)
+        z_cf = (
+            z
+            + (z**2 - 1) * skew / 6
+            + (z**3 - 3 * z) * kurt / 24
+            - (2 * z**3 - 5 * z) * skew**2 / 36
+        )
+        return float(mu + z_cf * sigma)
+    raise ValueError(f"unsupported VaR method: {method}")
 
 
 # ============================================================
 # Drawdown Analysis
 # ============================================================
+
 
 def drawdown(equity: pd.Series) -> pd.Series:
     """Drawdown series from an equity curve."""
@@ -224,6 +261,7 @@ def max_drawdown(equity: pd.Series):
 # ============================================================
 # Win/Loss Streaks
 # ============================================================
+
 
 def consecutive_wins(returns: pd.Series) -> pd.Series:
     """Count consecutive winning days up to each point.
@@ -252,6 +290,7 @@ def consecutive_losses(returns: pd.Series) -> pd.Series:
 # ============================================================
 # Math Utilities
 # ============================================================
+
 
 def fibonacci(n: int) -> list[int]:
     """Generate first n Fibonacci numbers."""
