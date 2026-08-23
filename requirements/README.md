@@ -1,10 +1,12 @@
-# Python 3.10 dual-target hash lock
+# Python 3.10 four-target hash lock
 
 `constraints-py310.txt` is the hash-checked closure for the release
 dependencies plus the `dev` extra on these explicit targets:
 
-- CPython 3.10 macOS arm64
-- CPython 3.10 manylinux x86_64
+- CPython 3.10.0 macOS arm64
+- CPython 3.10.20 macOS arm64
+- CPython 3.10.0 manylinux x86_64
+- CPython 3.10.20 manylinux x86_64
 
 It keeps platform conditions in the lock: `akracer` and `py-mini-racer` are
 Linux-only, while `mini-racer` is active everywhere except Linux.
@@ -23,12 +25,13 @@ python3.10 -m venv /private/tmp/eqlib-lock-py310
   --output-file /private/tmp/eqlib-pip-compile-base.txt pyproject.toml
 ```
 
-The dual-target branch comes from `uv 0.12.5` in universal mode. It emits
-explicit platform markers; the selector keeps only entries active for the two
-Python 3.10 targets above. Run the commands from the repository root:
+The four-target branch comes from `uv 0.12.5` in universal mode. It emits
+explicit platform markers; the selector keeps only entries active for the four
+Python 3.10 target environments above. Run the commands from the repository
+root:
 
 ```bash
-uv pip compile pyproject.toml --extra dev --python python3.10 \
+uv pip compile pyproject.toml --extra dev --python python3.10 --python-version 3.10 \
   --universal --generate-hashes --no-strip-markers --no-progress \
   --output-file /private/tmp/eqlib-universal.txt
 python requirements/select_py310_targets.py \
@@ -51,6 +54,31 @@ from the already validated lock and use `--no-upgrade --reuse-hashes` only to
 re-emit the known Python 3.10 baseline. The `uv` universal command above is
 the fresh dual-target resolver step.
 
+## Checked resolver evidence
+
+`constraints-py310-resolver-evidence.json` binds the exact lock SHA-256 and
+lock-input fingerprint to deterministic active-pin maps for all four targets.
+The 3.10.0 maps are evaluated from the marker-preserving universal output; the
+3.10.20 maps come from explicit platform-targeted UV resolves. Regenerate the
+evidence after regenerating the lock:
+
+```bash
+uv pip compile pyproject.toml --extra dev --python python3.10 --python-version 3.10.20 \
+  --python-platform aarch64-apple-darwin --no-header --no-annotate --no-progress \
+  --output-file /private/tmp/eqlib-macos-cp31020.txt
+uv pip compile pyproject.toml --extra dev --python python3.10 --python-version 3.10.20 \
+  --python-platform x86_64-manylinux_2_17 --no-header --no-annotate --no-progress \
+  --output-file /private/tmp/eqlib-linux-cp31020.txt
+python requirements/generate_target_lock_evidence.py \
+  requirements/constraints-py310.txt requirements/constraints-py310-resolver-evidence.json \
+  --universal-resolved /private/tmp/eqlib-universal.txt \
+  --macos-resolved /private/tmp/eqlib-macos-cp31020.txt \
+  --linux-resolved /private/tmp/eqlib-linux-cp31020.txt
+```
+
+This is checked resolver evidence, not a host-independent runtime install
+proof. Task 9 will run the native target gate before CI accepts a refresh.
+
 ## What the fingerprint guarantees
 
 The `# eqlib-lock-input-sha256: v1:...` header covers canonical primary and
@@ -67,7 +95,7 @@ resolution. This comparison fails if a platform-marker transitive dependency
 such as `exceptiongroup` is omitted from the lock:
 
 ```bash
-uv pip compile pyproject.toml --extra dev --python python3.10 \
+uv pip compile pyproject.toml --extra dev --python python3.10 --python-version 3.10.20 \
   --python-platform x86_64-manylinux_2_17 --no-header --no-annotate \
   --no-progress --output-file /private/tmp/eqlib-linux-cp310.txt
 python requirements/verify_target_lock.py requirements/constraints-py310.txt \

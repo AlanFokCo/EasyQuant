@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 import re
 from pathlib import Path
 
 from evaluator.inventory import (
+    _LOCK_TARGET_MATRIX,
+    _active_hash_lock_pins,
+    _read_hash_lock,
+    _resolver_evidence_resolver,
     evaluate_inventory,
     lock_input_fingerprint,
     lock_input_fingerprint_header,
@@ -74,6 +79,46 @@ def _lock_hashes(lock_text: str) -> dict[str, set[str]]:
         if current_name is not None and hash_match:
             hashes[current_name].add(hash_match.group(1))
     return hashes
+
+
+def _write_valid_requests_hash_lock(root: Path, suffix: str = "") -> None:
+    requirements_dir = root / "requirements"
+    requirements_dir.mkdir(exist_ok=True)
+    (requirements_dir / "constraints-py310.txt").write_text(
+        lock_input_fingerprint_header(root)
+        + "requests==2.34.2 \\\n"
+        + "    --hash=sha256:"
+        + "0" * 64
+        + "\n"
+        + suffix,
+        encoding="utf-8",
+    )
+
+
+def _hash_lock_pin(requirement: str, digest: str = "0") -> str:
+    return f"{requirement} \\\n    --hash=sha256:{digest * 64}\n"
+
+
+def _write_matching_resolver_evidence(root: Path) -> None:
+    lock_path = root / "requirements" / "constraints-py310.txt"
+    pins = _read_hash_lock(lock_path)
+    payload = {
+        "schema": "eqlib-py310-resolver-evidence-v1",
+        "lock_sha256": sha256(lock_path.read_bytes()).hexdigest(),
+        "lock_input_fingerprint": "v1:" + lock_input_fingerprint(root),
+        "resolver": _resolver_evidence_resolver(),
+        "targets": {
+            target["id"]: {
+                "platform": target["platform"],
+                "python_full_version": target["python_full_version"],
+                "pins": _active_hash_lock_pins(pins, target),
+            }
+            for target in _LOCK_TARGET_MATRIX
+        },
+    }
+    lock_path.with_name("constraints-py310-resolver-evidence.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def test_inventory_reports_direct_runtime_import_missing_from_metadata(tmp_path):
@@ -303,13 +348,108 @@ def test_inventory_reports_missing_hash_lock(tmp_path):
     assert "constraints-py310.txt" in finding.detail
 
 
+def test_inventory_rejects_unknown_hash_lock_directive(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(
+        tmp_path,
+        "--extra-index-url https://example.invalid/simple\n",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "malformed" in finding.title.lower()
+    assert "extra-index-url" in finding.detail
+
+
+def test_inventory_rejects_unpinned_hash_lock_requirement(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(
+        tmp_path,
+        "urllib3>=2.0 \\\n" + "    --hash=sha256:" + "1" * 64 + "\n",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "malformed" in finding.title.lower()
+    assert "exact == pin" in finding.detail
+
+
+def test_inventory_rejects_garbage_hash_lock_line(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(tmp_path, "this is not a lock requirement\n")
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "malformed" in finding.title.lower()
+    assert "invalid requirement" in finding.detail
+
+
+def test_inventory_rejects_orphan_hash_lock_continuation(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(
+        tmp_path,
+        "    --hash=sha256:" + "1" * 64 + "\n",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "malformed" in finding.title.lower()
+    assert "orphan" in finding.detail
+
+
+def test_inventory_rejects_direct_url_hash_lock_requirement(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(
+        tmp_path,
+        "other @ https://example.invalid/other.whl \\\n"
+        + "    --hash=sha256:"
+        + "1" * 64
+        + "\n",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "malformed" in finding.title.lower()
+    assert "direct URL" in finding.detail
+
+
+def test_inventory_rejects_duplicate_active_hash_lock_pin(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(
+        tmp_path,
+        "urllib3==2.7.0 ; sys_platform == 'linux' \\\n"
+        + "    --hash=sha256:"
+        + "1" * 64
+        + "\n"
+        + "urllib3==2.7.0 ; sys_platform == 'linux' \\\n"
+        + "    --hash=sha256:"
+        + "2" * 64
+        + "\n",
+    )
+
+    finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
+
+    assert "malformed" in finding.title.lower()
+    assert "duplicate active pin" in finding.detail
+
+
+def test_inventory_accepts_documented_via_comment_in_hash_lock(tmp_path):
+    _write_project(tmp_path, dependencies=["requests>=2.28"])
+    _write_valid_requests_hash_lock(tmp_path, "# via project\n")
+    _write_matching_resolver_evidence(tmp_path)
+
+    findings = evaluate_inventory(tmp_path)
+
+    assert not [finding for finding in findings if finding.id == "DEP-005"]
+
+
 def test_inventory_rejects_hash_lock_without_lock_input_fingerprint(tmp_path):
     _write_project(tmp_path, dependencies=["requests>=2.28"])
     _write_runtime_module(tmp_path, "import requests\n")
     requirements_dir = tmp_path / "requirements"
     requirements_dir.mkdir()
     (requirements_dir / "constraints-py310.txt").write_text(
-        "requests==2.34.2 --hash=sha256:" + "0" * 64 + "\n",
+        _hash_lock_pin("requests==2.34.2"),
         encoding="utf-8",
     )
 
@@ -345,10 +485,7 @@ def test_inventory_rejects_lock_when_input_fingerprint_drifts_despite_valid_pin(
     requirements_dir.mkdir()
     lock_path = requirements_dir / "constraints-py310.txt"
     lock_path.write_text(
-        lock_input_fingerprint_header(tmp_path)
-        + "requests==2.34.2 --hash=sha256:"
-        + "0" * 64
-        + "\n",
+        lock_input_fingerprint_header(tmp_path) + _hash_lock_pin("requests==2.34.2"),
         encoding="utf-8",
     )
 
@@ -372,9 +509,7 @@ def test_inventory_rejects_multiple_lock_input_fingerprints(tmp_path):
     (requirements_dir / "constraints-py310.txt").write_text(
         lock_input_fingerprint_header(tmp_path)
         + lock_input_fingerprint_header(tmp_path)
-        + "requests==2.34.2 --hash=sha256:"
-        + "0" * 64
-        + "\n",
+        + _hash_lock_pin("requests==2.34.2"),
         encoding="utf-8",
     )
 
@@ -395,7 +530,7 @@ def test_inventory_reports_hashless_or_stale_hash_lock(tmp_path):
     assert "hash" in malformed.detail.lower()
 
     lock_path.write_text(
-        "numpy==1.26.4 --hash=sha256:" + "0" * 64 + "\n",
+        _hash_lock_pin("numpy==1.26.4"),
         encoding="utf-8",
     )
     stale = _finding(evaluate_inventory(tmp_path), "DEP-005")
@@ -413,7 +548,7 @@ def test_inventory_detects_hashless_lock_entry_with_extras(tmp_path):
 
     finding = _finding(evaluate_inventory(tmp_path), "DEP-005")
 
-    assert finding.evidence["hashless"] == ["coverage"]
+    assert "exact pin must begin a hash continuation" in finding.detail
 
 
 def test_inventory_rejects_lock_pin_below_metadata_specifier(tmp_path):
@@ -444,12 +579,10 @@ def test_inventory_evaluates_direct_markers_for_python310_targets(tmp_path):
     requirements_dir.mkdir()
     lock_path = requirements_dir / "constraints-py310.txt"
     lock_path.write_text(
-        lock_input_fingerprint_header(tmp_path)
-        + "requests==2.34.2 --hash=sha256:"
-        + "0" * 64
-        + "\n",
+        lock_input_fingerprint_header(tmp_path) + _hash_lock_pin("requests==2.34.2"),
         encoding="utf-8",
     )
+    _write_matching_resolver_evidence(tmp_path)
 
     findings = evaluate_inventory(tmp_path)
 
@@ -463,9 +596,7 @@ def test_inventory_rejects_lock_pin_inactive_on_all_python310_targets(tmp_path):
     requirements_dir.mkdir()
     (requirements_dir / "constraints-py310.txt").write_text(
         lock_input_fingerprint_header(tmp_path)
-        + 'requests==2.34.2 ; sys_platform == "win32" --hash=sha256:'
-        + "0" * 64
-        + "\n",
+        + _hash_lock_pin('requests==2.34.2 ; sys_platform == "win32"'),
         encoding="utf-8",
     )
 
@@ -487,14 +618,11 @@ def test_inventory_allows_mutually_exclusive_direct_lock_markers(tmp_path):
     requirements_dir.mkdir()
     (requirements_dir / "constraints-py310.txt").write_text(
         lock_input_fingerprint_header(tmp_path)
-        + 'platform-demo==1 ; sys_platform == "linux" --hash=sha256:'
-        + "0" * 64
-        + "\n"
-        + 'platform-demo==2 ; sys_platform == "darwin" --hash=sha256:'
-        + "1" * 64
-        + "\n",
+        + _hash_lock_pin('platform-demo==1 ; sys_platform == "linux"')
+        + _hash_lock_pin('platform-demo==2 ; sys_platform == "darwin"', "1"),
         encoding="utf-8",
     )
+    _write_matching_resolver_evidence(tmp_path)
 
     findings = evaluate_inventory(tmp_path)
 
@@ -513,10 +641,7 @@ def test_inventory_uses_python310_full_version_for_direct_lock_markers(tmp_path)
     requirements_dir = tmp_path / "requirements"
     requirements_dir.mkdir()
     (requirements_dir / "constraints-py310.txt").write_text(
-        lock_input_fingerprint_header(tmp_path)
-        + "requests==2.34.2 --hash=sha256:"
-        + "0" * 64
-        + "\n",
+        lock_input_fingerprint_header(tmp_path) + _hash_lock_pin("requests==2.34.2"),
         encoding="utf-8",
     )
 
@@ -597,3 +722,7 @@ def test_lock_readme_records_reproducible_python310_installation():
     assert "pip download --require-hashes --no-deps" not in readme
     assert "does not prove closure" in readme
     assert "does not reproduce a future mutable-index" in readme
+    assert "CPython 3.10.0" in readme
+    assert "CPython 3.10.20" in readme
+    assert "constraints-py310-resolver-evidence.json" in readme
+    assert "Task 9" in readme

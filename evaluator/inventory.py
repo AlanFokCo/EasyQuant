@@ -31,15 +31,14 @@ _IMPORT_NAME_TO_DISTRIBUTION = {
     "sklearn": "scikit-learn",
 }
 _NORMALIZE_NAME = re.compile(r"[-_.]+")
-_LOCK_PIN = re.compile(
-    r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[A-Za-z0-9._,-]+\])?\s*==\s*([^\s\\]+)"
-)
-_SHA256_HASH = re.compile(r"--hash=sha256:[0-9a-fA-F]{64}\b")
+_SHA256_HASH = re.compile(r"^--hash=sha256:([0-9a-fA-F]{64})$")
 _LOCK_INPUT_FINGERPRINT_PREFIX = "# eqlib-lock-input-sha256: v1:"
 _LOCK_INPUT_FINGERPRINT = re.compile(
     r"^\s*#\s*eqlib-lock-input-sha256:\s*v1:([0-9a-fA-F]{64})\s*$"
 )
 _LOCK_INPUT_SCHEMA = "eqlib-lock-input-v1"
+_RESOLVER_EVIDENCE_FILENAME = "constraints-py310-resolver-evidence.json"
+_RESOLVER_EVIDENCE_SCHEMA = "eqlib-py310-resolver-evidence-v1"
 _LOCK_RESOLVER_SCHEMA = {
     "input_groups": ["project.dependencies", "project.optional-dependencies.dev"],
     "pipeline": [
@@ -54,11 +53,15 @@ _LOCK_RESOLVER_SCHEMA = {
         },
         {
             "tool": "eqlib-select-py310-targets",
-            "schema": "macos-arm64-manylinux-x86_64-v1",
+            "schema": "py310-boundary-and-runtime-macos-arm64-manylinux-x86_64-v2",
         },
         {
             "tool": "eqlib-enrich-pypi-hashes",
             "schema": "all-release-sha256-v1",
+        },
+        {
+            "tool": "eqlib-generate-target-resolver-evidence",
+            "schema": _RESOLVER_EVIDENCE_SCHEMA,
         },
     ],
 }
@@ -115,19 +118,20 @@ def _marker_environment(
     platform_machine: str,
     platform_system: str,
     sys_platform: str,
+    python_full_version: str,
 ) -> dict[str, str]:
     environment = default_environment()
     environment.update(
         {
             "implementation_name": "cpython",
-            "implementation_version": "3.10.0",
+            "implementation_version": python_full_version,
             "os_name": "posix",
             "platform_machine": platform_machine,
             "platform_python_implementation": "CPython",
             "platform_release": "",
             "platform_system": platform_system,
             "platform_version": "",
-            "python_full_version": "3.10.0",
+            "python_full_version": python_full_version,
             "python_version": "3.10",
             "sys_platform": sys_platform,
             "extra": "",
@@ -136,23 +140,60 @@ def _marker_environment(
     return {key: str(value) for key, value in environment.items()}
 
 
+def _lock_target(
+    *,
+    platform: str,
+    resolver_platform: str,
+    python_full_version: str,
+    evidence_source: str,
+) -> dict[str, Any]:
+    """Describe one supported CPython 3.10 marker environment."""
+    settings = {
+        "macos": ("arm64", "Darwin", "darwin"),
+        "linux": ("x86_64", "Linux", "linux"),
+    }
+    platform_machine, platform_system, sys_platform = settings[platform]
+    target_platform = "macos-arm64" if platform == "macos" else "manylinux-x86_64"
+    return {
+        "id": f"cpython-{python_full_version}-{target_platform}",
+        "platform": platform,
+        "resolver_platform": resolver_platform,
+        "python_full_version": python_full_version,
+        "evidence_source": evidence_source,
+        "marker_environment": _marker_environment(
+            platform_machine=platform_machine,
+            platform_system=platform_system,
+            sys_platform=sys_platform,
+            python_full_version=python_full_version,
+        ),
+    }
+
+
 _LOCK_TARGET_MATRIX = (
-    {
-        "id": "cpython-3.10-macos-arm64",
-        "marker_environment": _marker_environment(
-            platform_machine="arm64",
-            platform_system="Darwin",
-            sys_platform="darwin",
-        ),
-    },
-    {
-        "id": "cpython-3.10-manylinux-x86_64",
-        "marker_environment": _marker_environment(
-            platform_machine="x86_64",
-            platform_system="Linux",
-            sys_platform="linux",
-        ),
-    },
+    _lock_target(
+        platform="macos",
+        resolver_platform="aarch64-apple-darwin",
+        python_full_version="3.10.0",
+        evidence_source="universal",
+    ),
+    _lock_target(
+        platform="macos",
+        resolver_platform="aarch64-apple-darwin",
+        python_full_version="3.10.20",
+        evidence_source="runtime",
+    ),
+    _lock_target(
+        platform="linux",
+        resolver_platform="x86_64-manylinux_2_17",
+        python_full_version="3.10.0",
+        evidence_source="universal",
+    ),
+    _lock_target(
+        platform="linux",
+        resolver_platform="x86_64-manylinux_2_17",
+        python_full_version="3.10.20",
+        evidence_source="runtime",
+    ),
 )
 
 
@@ -710,7 +751,17 @@ def _validate_py310_hash_lock(root: Path) -> Finding | None:
             remediation="Generate the Python 3.10 lock with pip-compile --generate-hashes.",
         )
 
-    pins, hashless = _read_hash_lock(lock_path)
+    try:
+        pins = _read_hash_lock(lock_path)
+    except ValueError as exc:
+        return Finding(
+            "DEP-005",
+            Severity.P1,
+            "Python 3.10 hash lock is malformed",
+            str(exc),
+            evidence={"lock_path": str(lock_path)},
+            remediation="Regenerate the lock with pip-compile --generate-hashes.",
+        )
     if not pins:
         return Finding(
             "DEP-005",
@@ -720,16 +771,6 @@ def _validate_py310_hash_lock(root: Path) -> Finding | None:
             evidence={"lock_path": str(lock_path)},
             remediation="Regenerate the lock with pip-compile --generate-hashes.",
         )
-    if hashless:
-        return Finding(
-            "DEP-005",
-            Severity.P1,
-            "Python 3.10 hash lock is malformed",
-            "constraints-py310.txt has pinned requirements without SHA-256 hashes",
-            evidence={"lock_path": str(lock_path), "hashless": hashless},
-            remediation="Regenerate the lock with pip-compile --generate-hashes.",
-        )
-
     try:
         direct_requirements = _direct_lock_requirements(root)
     except ValueError as exc:
@@ -792,7 +833,242 @@ def _validate_py310_hash_lock(root: Path) -> Finding | None:
             },
             remediation="Regenerate the Python 3.10 lock after changing its inputs.",
         )
+    return _validate_resolver_evidence(
+        lock_path,
+        pins,
+        actual_fingerprint,
+    )
+
+
+def _validate_resolver_evidence(
+    lock_path: Path,
+    pins: Mapping[str, list[_HashLockPin]],
+    lock_fingerprint: str | None,
+) -> Finding | None:
+    """Verify checked resolver output for every supported Python 3.10 target."""
+    evidence_path = lock_path.with_name(_RESOLVER_EVIDENCE_FILENAME)
+    if not evidence_path.is_file():
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence is missing",
+        )
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _resolver_evidence_finding(
+            evidence_path,
+            f"resolver evidence is malformed: {exc}",
+        )
+    if not isinstance(payload, Mapping):
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence is malformed: top level must be an object",
+        )
+
+    expected_keys = {
+        "schema",
+        "lock_sha256",
+        "lock_input_fingerprint",
+        "resolver",
+        "targets",
+    }
+    if set(payload) != expected_keys:
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence is malformed: unexpected top-level fields",
+        )
+    if payload.get("schema") != _RESOLVER_EVIDENCE_SCHEMA:
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence is malformed: unsupported schema",
+        )
+
+    expected_lock_sha256 = sha256(lock_path.read_bytes()).hexdigest()
+    if payload.get("lock_sha256") != expected_lock_sha256:
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence lock SHA256 does not match constraints-py310.txt",
+        )
+    if lock_fingerprint is None or payload.get("lock_input_fingerprint") != (
+        f"v1:{lock_fingerprint}"
+    ):
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence lock-input fingerprint does not match constraints-py310.txt",
+        )
+
+    if payload.get("resolver") != _resolver_evidence_resolver():
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence is malformed: resolver command evidence does not match the documented target commands",
+        )
+    targets = payload.get("targets")
+    if not isinstance(targets, Mapping) or set(targets) != {
+        target["id"] for target in _LOCK_TARGET_MATRIX
+    }:
+        return _resolver_evidence_finding(
+            evidence_path,
+            "resolver evidence is malformed: expected exactly the four Python 3.10 boundary and runtime targets",
+        )
+
+    for target in _LOCK_TARGET_MATRIX:
+        target_id = target["id"]
+        target_payload = targets.get(target_id)
+        if not isinstance(target_payload, Mapping) or set(target_payload) != {
+            "platform",
+            "python_full_version",
+            "pins",
+        }:
+            return _resolver_evidence_finding(
+                evidence_path,
+                f"resolver evidence is malformed for {target_id}",
+            )
+        if (
+            target_payload.get("platform") != target["platform"]
+            or target_payload.get("python_full_version")
+            != target["python_full_version"]
+        ):
+            return _resolver_evidence_finding(
+                evidence_path,
+                f"resolver evidence target metadata differs for {target_id}",
+            )
+        try:
+            evidence_pins = _canonical_evidence_pins(target_payload["pins"])
+        except ValueError as exc:
+            return _resolver_evidence_finding(
+                evidence_path,
+                f"resolver evidence is malformed for {target_id}: {exc}",
+            )
+        locked_pins = _active_hash_lock_pins(pins, target)
+        detail = _resolver_pin_difference_detail(
+            target_id,
+            locked_pins,
+            evidence_pins,
+        )
+        if detail is not None:
+            return _resolver_evidence_finding(evidence_path, detail)
     return None
+
+
+def _resolver_evidence_resolver() -> dict[str, object]:
+    """Return the normalized, reproducible uv commands recorded in evidence."""
+    base = [
+        "uv",
+        "pip",
+        "compile",
+        "pyproject.toml",
+        "--extra",
+        "dev",
+        "--python",
+        "python3.10",
+    ]
+    universal = [
+        *base,
+        "--python-version",
+        "3.10",
+        "--universal",
+        "--generate-hashes",
+        "--no-strip-markers",
+        "--no-progress",
+    ]
+    runtime_suffix = ["--no-header", "--no-annotate", "--no-progress"]
+    return {
+        "tool": "uv",
+        "version": "0.12.5",
+        "commands": {
+            target["id"]: [
+                *(
+                    universal
+                    if target["evidence_source"] == "universal"
+                    else [
+                        *base,
+                        "--python-version",
+                        target["python_full_version"],
+                        "--python-platform",
+                        target["resolver_platform"],
+                        *runtime_suffix,
+                    ]
+                ),
+            ]
+            for target in _LOCK_TARGET_MATRIX
+        },
+    }
+
+
+def _canonical_evidence_pins(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        raise ValueError("pins must be an object")
+    pins = {}
+    for raw_name, raw_version in value.items():
+        if not isinstance(raw_name, str) or not isinstance(raw_version, str):
+            raise ValueError("pin names and versions must be strings")
+        name = normalize_distribution_name(raw_name)
+        if name != raw_name or not name:
+            raise ValueError(f"pin name is not normalized: {raw_name!r}")
+        if name in pins:
+            raise ValueError(f"duplicate pin name: {name}")
+        try:
+            Version(raw_version)
+        except InvalidVersion as exc:
+            raise ValueError(
+                f"invalid pin version for {name}: {raw_version!r}"
+            ) from exc
+        pins[name] = raw_version
+    return pins
+
+
+def _active_hash_lock_pins(
+    pins: Mapping[str, list[_HashLockPin]], target: Mapping[str, Any]
+) -> dict[str, str]:
+    active_pins = {}
+    environment = target["marker_environment"]
+    for name, candidates in pins.items():
+        active = [
+            pin
+            for pin in candidates
+            if pin.requirement.marker is None
+            or pin.requirement.marker.evaluate(environment)
+        ]
+        if len(active) > 1:
+            raise ValueError(f"duplicate active pin for {name} on {target['id']}")
+        if active:
+            active_pins[name] = active[0].version
+    return active_pins
+
+
+def _resolver_pin_difference_detail(
+    target_id: str,
+    locked: Mapping[str, str],
+    evidence: Mapping[str, str],
+) -> str | None:
+    missing = sorted(set(locked) - set(evidence))
+    extra = sorted(set(evidence) - set(locked))
+    version_mismatch = sorted(
+        f"{name}: lock {locked[name]}, evidence {evidence[name]}"
+        for name in set(locked) & set(evidence)
+        if locked[name] != evidence[name]
+    )
+    if not (missing or extra or version_mismatch):
+        return None
+    parts = [f"resolver evidence pins differ for {target_id}"]
+    if missing:
+        parts.append("missing " + ", ".join(missing))
+    if extra:
+        parts.append("extra " + ", ".join(extra))
+    if version_mismatch:
+        parts.append("version mismatch " + "; ".join(version_mismatch))
+    return ": ".join(parts)
+
+
+def _resolver_evidence_finding(evidence_path: Path, detail: str) -> Finding:
+    return Finding(
+        "DEP-005",
+        Severity.P1,
+        "Python 3.10 resolver evidence is malformed or stale",
+        detail,
+        evidence={"resolver_evidence_path": str(evidence_path)},
+        remediation="Regenerate checked macOS and Linux resolver evidence with the current lock.",
+    )
 
 
 def _direct_lock_requirements(root: Path) -> list[Requirement]:
@@ -876,26 +1152,112 @@ def _validate_direct_lock_pins(
     )
 
 
-def _read_hash_lock(path: Path) -> tuple[dict[str, list[_HashLockPin]], list[str]]:
+def _read_hash_lock(path: Path) -> dict[str, list[_HashLockPin]]:
+    """Parse only the exact continuation grammar used by the checked-in lock."""
     pins: dict[str, list[_HashLockPin]] = {}
-    hashless = []
-    for line in _logical_lock_lines(path.read_text(encoding="utf-8")):
-        match = _LOCK_PIN.match(line)
-        if match is None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = 0
+    while index < len(lines):
+        raw_line = lines[index]
+        line_number = index + 1
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            index += 1
             continue
-        name = normalize_distribution_name(match.group(1))
-        requirement_text = line.split(" --hash=", 1)[0].strip()
+        if raw_line[:1].isspace():
+            raise ValueError(f"line {line_number}: orphan hash continuation")
+        if not raw_line.rstrip().endswith("\\"):
+            if stripped.startswith("-"):
+                raise ValueError(
+                    f"line {line_number}: unsupported lock directive {stripped!r}"
+                )
+            try:
+                parsed = _parse_pep508_requirement(stripped)
+            except ValueError as exc:
+                raise ValueError(
+                    f"line {line_number}: invalid requirement {stripped!r}"
+                ) from exc
+            if parsed.url:
+                raise ValueError(
+                    f"line {line_number}: direct URL requirements are unsupported"
+                )
+            raise ValueError(
+                f"line {line_number}: exact pin must begin a hash continuation"
+            )
+
+        requirement_text = raw_line.rstrip()[:-1].rstrip()
         try:
             requirement = _parse_pep508_requirement(requirement_text)
-        except ValueError:
-            hashless.append(name)
-            continue
+        except ValueError as exc:
+            raise ValueError(
+                f"line {line_number}: invalid requirement {requirement_text!r}"
+            ) from exc
+        if requirement.url:
+            raise ValueError(
+                f"line {line_number}: direct URL requirements are unsupported"
+            )
+        specifiers = list(requirement.specifier)
+        exact = [specifier for specifier in specifiers if specifier.operator == "=="]
+        if len(specifiers) != 1 or len(exact) != 1 or exact[0].version.endswith(".*"):
+            raise ValueError(f"line {line_number}: expected one exact == pin")
+
+        name = normalize_distribution_name(requirement.name)
+        version = exact[0].version
+        index += 1
+        hashes = set()
+        while True:
+            if index >= len(lines):
+                raise ValueError(
+                    f"line {line_number}: exact pin is missing a hash continuation"
+                )
+            hash_raw_line = lines[index]
+            hash_line_number = index + 1
+            if not hash_raw_line[:1].isspace():
+                raise ValueError(
+                    f"line {hash_line_number}: exact pin is missing a hash continuation"
+                )
+            hash_text = hash_raw_line.strip()
+            continued = hash_text.endswith("\\")
+            if continued:
+                hash_text = hash_text[:-1].rstrip()
+            hash_match = _SHA256_HASH.fullmatch(hash_text)
+            if hash_match is None:
+                raise ValueError(
+                    f"line {hash_line_number}: malformed SHA-256 hash continuation"
+                )
+            digest = hash_match.group(1).lower()
+            if digest in hashes:
+                raise ValueError(
+                    f"line {hash_line_number}: duplicate SHA-256 hash continuation"
+                )
+            hashes.add(digest)
+            index += 1
+            if not continued:
+                break
+
         pins.setdefault(name, []).append(
-            _HashLockPin(version=match.group(2), requirement=requirement)
+            _HashLockPin(version=version, requirement=requirement)
         )
-        if _SHA256_HASH.search(line) is None:
-            hashless.append(name)
-    return pins, sorted(hashless)
+
+    _validate_unique_active_hash_lock_pins(pins)
+    return pins
+
+
+def _validate_unique_active_hash_lock_pins(
+    pins: Mapping[str, list[_HashLockPin]],
+) -> None:
+    """Reject two pins for one distribution on any supported lock target."""
+    for target in _LOCK_TARGET_MATRIX:
+        environment = target["marker_environment"]
+        for name, candidates in pins.items():
+            active = [
+                pin
+                for pin in candidates
+                if pin.requirement.marker is None
+                or pin.requirement.marker.evaluate(environment)
+            ]
+            if len(active) > 1:
+                raise ValueError(f"duplicate active pin for {name} on {target['id']}")
 
 
 def _read_lock_input_fingerprint(lock_path: Path) -> tuple[str, str | None]:
@@ -914,18 +1276,3 @@ def _read_lock_input_fingerprint(lock_path: Path) -> tuple[str, str | None]:
     if not matching:
         return "missing", None
     return "valid", matching[0]
-
-
-def _logical_lock_lines(text: str) -> Iterable[str]:
-    parts = []
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-        if stripped.endswith("\\"):
-            parts.append(stripped[:-1].rstrip())
-            continue
-        parts.append(stripped)
-        if parts:
-            yield " ".join(part for part in parts if part)
-        parts = []
-    if parts:
-        yield " ".join(part for part in parts if part)

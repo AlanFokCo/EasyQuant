@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from zipfile import ZipFile
 
 import pytest
@@ -287,6 +289,75 @@ def test_run_timeout_escalates_when_a_child_ignores_sigterm(tmp_path):
             os.kill(child_pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+
+
+def test_windows_taskkill_timeout_is_bounded_and_becomes_dep003(monkeypatch):
+    import evaluator.wheel as wheel
+
+    class TimedOutProcess:
+        pid = 4242
+
+        def wait(self, timeout=None):
+            raise subprocess.TimeoutExpired("fixture", timeout)
+
+    taskkill_calls = []
+
+    def timed_out_taskkill(command, **kwargs):
+        taskkill_calls.append((command, kwargs))
+        assert kwargs["timeout"] == wheel._TERMINATION_GRACE_SECONDS
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(wheel, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(
+        wheel.subprocess, "Popen", lambda *_args, **_kwargs: TimedOutProcess()
+    )
+    monkeypatch.setattr(wheel.subprocess, "run", timed_out_taskkill)
+    monkeypatch.setattr(wheel, "_start_stream_readers", lambda *_args: ())
+
+    result = wheel._run(("fixture",), timeout=0.01)
+    findings = wheel._installation_findings(
+        result,
+        _CommandResult(("pip", "check"), 0, "", ""),
+    )
+
+    assert result.returncode == 1
+    assert result.timed_out
+    assert result.cleanup_failed
+    assert "taskkill" in result.stderr.lower()
+    assert [call[0] for call in taskkill_calls] == [
+        ["taskkill", "/PID", "4242", "/T"],
+        ["taskkill", "/PID", "4242", "/T", "/F"],
+    ]
+    assert [finding.id for finding in findings] == ["DEP-003"]
+
+
+def test_windows_cleanup_reports_process_still_alive_after_forced_taskkill(monkeypatch):
+    import evaluator.wheel as wheel
+
+    class StillAliveProcess:
+        pid = 4242
+
+        def wait(self, timeout=None):
+            raise subprocess.TimeoutExpired("fixture", timeout)
+
+    taskkill_calls = []
+
+    def completed_taskkill(command, **kwargs):
+        taskkill_calls.append((command, kwargs))
+        assert kwargs["timeout"] == wheel._TERMINATION_GRACE_SECONDS
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(wheel, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(wheel.subprocess, "run", completed_taskkill)
+
+    error = wheel._terminate_process_group(StillAliveProcess())
+
+    assert error is not None
+    assert "remained alive" in error
+    assert [call[0] for call in taskkill_calls] == [
+        ["taskkill", "/PID", "4242", "/T"],
+        ["taskkill", "/PID", "4242", "/T", "/F"],
+    ]
 
 
 def test_generic_subprocess_timeout_is_not_an_index_unavailable_finding():
