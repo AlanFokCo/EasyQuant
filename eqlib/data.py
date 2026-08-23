@@ -19,24 +19,30 @@ import numpy as np
 # Custom exceptions for structured error reporting
 # ============================================================
 
+
 class DataFetchError(Exception):
     """Raised when all data sources fail to fetch data for a security."""
+
     pass
 
 
 class SecurityNotFoundError(Exception):
     """Raised when a requested security code cannot be found in any data source."""
+
     pass
 
 
 class DateRangeError(Exception):
     """Raised when the requested date range is invalid (e.g. start > end)."""
+
     pass
+
 
 # Chinese calendar — primary source for A-share holiday detection.
 # Falls back to hardcoded holidays + fixed-date rules if unavailable.
 try:
     import chinese_calendar as _cc
+
     _CC_AVAILABLE = True
 except ImportError:
     _CC_AVAILABLE = False
@@ -63,6 +69,7 @@ def _invalidate_spot_cache(max_age_seconds=60):
     """
     global _spot_cache, _spot_fetch_time
     import time
+
     if _spot_cache is not None and (time.time() - _spot_fetch_time) > max_age_seconds:
         _spot_cache = None
         _spot_fetch_time = 0
@@ -145,11 +152,13 @@ def _get_china_today() -> datetime.date:
     """
     try:
         from zoneinfo import ZoneInfo
-        china_tz = ZoneInfo('Asia/Shanghai')
+
+        china_tz = ZoneInfo("Asia/Shanghai")
     except ImportError:
         # Python < 3.9 fallback
         import pytz
-        china_tz = pytz.timezone('Asia/Shanghai')
+
+        china_tz = pytz.timezone("Asia/Shanghai")
 
     now_china = datetime.datetime.now(china_tz)
     return now_china.date()
@@ -179,7 +188,9 @@ def _validate_date_range(start_date, end_date) -> tuple[str, str]:
     return sd, ed
 
 
-def _validate_required_columns(df: pd.DataFrame, required_cols: list[str], context: str = ""):
+def _validate_required_columns(
+    df: pd.DataFrame, required_cols: list[str], context: str = ""
+):
     """Validate that DataFrame contains required columns.
 
     Args:
@@ -193,7 +204,9 @@ def _validate_required_columns(df: pd.DataFrame, required_cols: list[str], conte
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
         ctx = f" in {context}" if context else ""
-        raise ValueError(f"Missing required columns{ctx}: {missing}. Available: {list(df.columns)}")
+        raise ValueError(
+            f"Missing required columns{ctx}: {missing}. Available: {list(df.columns)}"
+        )
 
 
 def _to_numeric(df: pd.DataFrame, cols: list[str]):
@@ -222,6 +235,7 @@ def _rename_cols(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
 # ============================================================
 # Daily OHLCV
 # ============================================================
+
 
 def _is_etf(code: str) -> bool:
     """Heuristic: exchange-traded fund codes (incl. 588 STAR board ETFs).
@@ -256,20 +270,28 @@ def _is_index(code: str) -> bool:
 # Daily OHLCV — Multi-source fallback
 # ============================================================
 
-def _fetch_from_em(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+
+def _fetch_from_em(
+    symbol: str, start_date: str, end_date: str, adjust: str
+) -> pd.DataFrame:
     """Source 1: EastMoney via akshare (primary)."""
     return ak.stock_zh_a_hist(
-        symbol=symbol, period="daily",
-        start_date=start_date, end_date=end_date, adjust=adjust,
+        symbol=symbol,
+        period="daily",
+        start_date=start_date,
+        end_date=end_date,
+        adjust=adjust,
     )
 
 
-def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+def _fetch_from_tencent(
+    symbol: str, start_date: str, end_date: str, adjust: str
+) -> pd.DataFrame:
     """Source 2: Tencent Finance direct API.
 
     URL: https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get
     Returns JSON with kline data: [date, open, close, high, low, volume, {}, change%, amount, '']
-    Prices are ×100 (e.g., 1595.36 = ¥15.9536). Amount is in thousands of yuan.
+    Prices are quoted in yuan. Amount is quoted in ten-thousands of yuan.
     Note: Tencent requires YYYY-MM-DD date format (not YYYYMMDD).
     """
     prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
@@ -285,8 +307,11 @@ def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str
     )
     try:
         r = requests.get(
-            url, timeout=15,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            url,
+            timeout=15,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
         )
         data = r.json()
         raw_data = data.get("data", {})
@@ -295,9 +320,7 @@ def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str
         stock_data = raw_data.get(full_symbol, {})
         if not stock_data:
             return pd.DataFrame()
-        klines = stock_data.get(
-            f"{adjust}day" if adjust else "day", []
-        )
+        klines = stock_data.get(f"{adjust}day" if adjust else "day", [])
     except Exception as e:
         log.debug("unknown: %s", e)
         return pd.DataFrame()
@@ -311,13 +334,13 @@ def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str
         try:
             row = {
                 "date": k[0],
-                "open": float(k[1]) / 100,
-                "close": float(k[2]) / 100,
-                "high": float(k[3]) / 100,
-                "low": float(k[4]) / 100,
+                "open": float(k[1]),
+                "close": float(k[2]),
+                "high": float(k[3]),
+                "low": float(k[4]),
                 "volume": float(k[5]),  # already in lots (手)
                 "pct_change": float(k[7]) if len(k) > 7 else 0,
-                "money": float(k[8]) * 1000 if len(k) > 8 else 0,  # ×1000 → yuan
+                "money": float(k[8]) * 10_000 if len(k) > 8 else 0,
                 "price_change": 0,
                 "turnover": 0,
             }
@@ -329,25 +352,40 @@ def _fetch_from_tencent(symbol: str, start_date: str, end_date: str, adjust: str
         return pd.DataFrame()
 
     df = pd.DataFrame(records)
-    df["date"] = pd.to_datetime(df["date"])
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df.set_index("date", inplace=True)
     # Reorder columns to match standard format
-    cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+    cols = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "money",
+        "pct_change",
+        "price_change",
+        "turnover",
+    ]
     df = df[[c for c in cols if c in df.columns]]
-    return df
+    canonical = _canonicalize_ohlcv(df, "tencent", start_date, end_date)
+    return canonical if canonical is not None else pd.DataFrame()
 
 
-def _fetch_from_sina(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+def _fetch_from_sina(
+    symbol: str, start_date: str, end_date: str, adjust: str
+) -> pd.DataFrame:
     """Source 3: Sina Finance via akshare stock_zh_a_daily().
 
-    Prices are ×100 (e.g., 1595.36 = ¥15.9536). Volume is in shares (股), needs ÷100 → lots.
+    Prices are quoted in yuan. Volume is in shares (股), needs ÷100 → lots.
     """
     prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
     full_symbol = f"{prefix}{symbol}"
     adj_map = {"qfq": "qfq", "hfq": "hfq", "": ""}
     try:
         df = ak.stock_zh_a_daily(
-            symbol=full_symbol, start_date=start_date, end_date=end_date,
+            symbol=full_symbol,
+            start_date=start_date,
+            end_date=end_date,
             adjust=adj_map.get(adjust, ""),
         )
     except Exception as e:
@@ -363,10 +401,18 @@ def _fetch_from_sina(symbol: str, start_date: str, end_date: str, adjust: str) -
         df["volume"] = df["volume"] / 100
 
     # Rename to standard format
-    df = _rename_cols(df, {
-        "date": "date", "open": "open", "high": "high", "low": "low",
-        "close": "close", "volume": "volume", "amount": "money",
-    })
+    df = _rename_cols(
+        df,
+        {
+            "date": "date",
+            "open": "open",
+            "high": "high",
+            "low": "low",
+            "close": "close",
+            "volume": "volume",
+            "amount": "money",
+        },
+    )
 
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"])
@@ -377,7 +423,17 @@ def _fetch_from_sina(symbol: str, start_date: str, end_date: str, adjust: str) -
         if col not in df.columns:
             df[col] = 0
 
-    cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+    cols = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "money",
+        "pct_change",
+        "price_change",
+        "turnover",
+    ]
     df = df[[c for c in cols if c in df.columns]]
     return df
 
@@ -390,7 +446,9 @@ def _compact_date_to_iso(date_value: str) -> str:
     return value
 
 
-def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+def _fetch_from_baostock(
+    symbol: str, start_date: str, end_date: str, adjust: str
+) -> pd.DataFrame:
     """Source 4: BaoStock (optional dependency, pip install baostock).
 
     Uses its own socket protocol, works independently of EastMoney.
@@ -412,8 +470,10 @@ def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: st
         rs = bs.query_history_k_data_plus(
             full_symbol,
             "date,open,high,low,close,volume,amount,turn,pctChg",
-            start_date=start_fmt, end_date=end_fmt,
-            frequency="daily", adjustflag=adjust_flag,
+            start_date=start_fmt,
+            end_date=end_fmt,
+            frequency="daily",
+            adjustflag=adjust_flag,
         )
         if rs.error_code != "0":
             bs.logout()
@@ -431,7 +491,16 @@ def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: st
         return pd.DataFrame()
 
     df = pd.DataFrame(rows, columns=rs.fields)
-    numeric_cols = ["open", "high", "low", "close", "volume", "amount", "turn", "pctChg"]
+    numeric_cols = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "amount",
+        "turn",
+        "pctChg",
+    ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -441,11 +510,20 @@ def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: st
         df["volume"] = df["volume"] / 100
     # amount is already in 元
 
-    df = _rename_cols(df, {
-        "date": "date", "open": "open", "high": "high", "low": "low",
-        "close": "close", "volume": "volume", "amount": "money",
-        "pctChg": "pct_change", "turn": "turnover",
-    })
+    df = _rename_cols(
+        df,
+        {
+            "date": "date",
+            "open": "open",
+            "high": "high",
+            "low": "low",
+            "close": "close",
+            "volume": "volume",
+            "amount": "money",
+            "pctChg": "pct_change",
+            "turn": "turnover",
+        },
+    )
 
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"])
@@ -454,7 +532,17 @@ def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: st
     if "price_change" not in df.columns:
         df["price_change"] = 0
 
-    cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+    cols = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "money",
+        "pct_change",
+        "price_change",
+        "turnover",
+    ]
     df = df[[c for c in cols if c in df.columns]]
     return df
 
@@ -462,32 +550,77 @@ def _fetch_from_baostock(symbol: str, start_date: str, end_date: str, adjust: st
 # Data source priority chain — tried in order until one succeeds.
 _DATA_FETCHERS = [
     ("eastmoney", _fetch_from_em),
-    ("tencent", _fetch_from_tencent),
     ("sina", _fetch_from_sina),
+    ("tencent", _fetch_from_tencent),
     ("baostock", _fetch_from_baostock),
 ]
 
 
+def _canonicalize_ohlcv(df, source_name, start_date=None, end_date=None):
+    """Normalize a provider frame before validation, caching, or returning it."""
+    if df is None or df.empty:
+        return None
+    result = df.copy()
+    if not isinstance(result.index, pd.DatetimeIndex):
+        if "date" not in result.columns:
+            return None
+        result["date"] = pd.to_datetime(result["date"], errors="coerce")
+        result = result.set_index("date")
+    result.index = pd.to_datetime(result.index, errors="coerce").normalize()
+    result = result[~result.index.isna()].sort_index()
+    if result.index.has_duplicates:
+        return None
+    for column in ("open", "high", "low", "close", "volume", "money"):
+        if column in result.columns:
+            result[column] = pd.to_numeric(result[column], errors="coerce")
+    if start_date is not None:
+        result = result.loc[result.index >= pd.Timestamp(start_date).normalize()]
+    if end_date is not None:
+        result = result.loc[result.index <= pd.Timestamp(end_date).normalize()]
+    if not _validate_ohlcv(result, source_name):
+        return None
+    result.attrs["eqlib_source"] = source_name
+    result.attrs["eqlib_quality"] = "valid"
+    return result
+
+
 def _validate_ohlcv(df, source_name):
     """Sanity-check OHLCV data; return True if valid."""
-    required = {'open', 'high', 'low', 'close', 'volume'}
-    if not required.issubset(df.columns):
+    required = {"open", "high", "low", "close", "volume"}
+    if (
+        df is None
+        or df.empty
+        or not required.issubset(df.columns)
+        or not isinstance(df.index, pd.DatetimeIndex)
+        or df.index.has_duplicates
+        or not df.index.is_monotonic_increasing
+    ):
         log.debug("validate_ohlcv: %s missing columns", source_name)
         return False
-    critical = df[list(required)].apply(pd.to_numeric, errors="coerce")
+    numeric_columns = [*required, *(["money"] if "money" in df.columns else [])]
+    critical = df[numeric_columns].apply(pd.to_numeric, errors="coerce")
     if not np.isfinite(critical.to_numpy(dtype=float)).all():
         log.debug("validate_ohlcv: %s has non-finite values in OHLCV", source_name)
         return False
-    if (df['close'] <= 0).any():
-        log.debug("validate_ohlcv: %s has non-positive close", source_name)
+    if (critical[["open", "high", "low", "close"]] <= 0).any().any():
+        log.debug("validate_ohlcv: %s has non-positive price", source_name)
         return False
-    if (df['high'] < df['low']).any():
-        log.debug("validate_ohlcv: %s has high < low", source_name)
+    if (critical["volume"] < 0).any() or (
+        "money" in critical.columns and (critical["money"] < 0).any()
+    ):
+        log.debug("validate_ohlcv: %s has negative volume or amount", source_name)
+        return False
+    if (critical["low"] > critical[["open", "close"]].min(axis=1)).any() or (
+        critical[["open", "close"]].max(axis=1) > critical["high"]
+    ).any():
+        log.debug("validate_ohlcv: %s has invalid OHLC price bounds", source_name)
         return False
     return True
 
 
-def _covers_requested_start(df: pd.DataFrame, start_date: str, tolerance_days: int = 14) -> bool:
+def _covers_requested_start(
+    df: pd.DataFrame, start_date: str, tolerance_days: int = 14
+) -> bool:
     """Return True when fetched data starts near the requested start date.
 
     Some providers silently truncate long ranges.  In that case the fallback
@@ -503,10 +636,12 @@ def _covers_requested_start(df: pd.DataFrame, start_date: str, tolerance_days: i
     return first_date <= requested_start + pd.Timedelta(days=tolerance_days)
 
 
-def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd.DataFrame:
+def fetch_stock_data(
+    code: str, start_date, end_date, adjust: str = "qfq"
+) -> pd.DataFrame:
     """Fetch daily OHLCV data from multiple sources with automatic fallback.
 
-    Tries data sources in priority order: EastMoney → Tencent → Sina → BaoStock.
+    Tries data sources in priority order: EastMoney → Sina → Tencent → BaoStock.
     Returns data from the first source that succeeds.
     """
     symbol = _code_to_akshare(code)
@@ -556,26 +691,50 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
                 _cache.move_to_end(cache_key)
                 while len(_cache) > _MAX_CACHE_ENTRIES:
                     _cache.popitem(last=False)
-            return _slice_by_date(df, start_date, end_date) if start_date and end_date else df
+            return (
+                _slice_by_date(df, start_date, end_date)
+                if start_date and end_date
+                else df
+            )
 
         # Try csindex
         try:
             df = ak.stock_zh_index_hist_csindex(
-                symbol=symbol, start_date=start_str, end_date=end_str,
+                symbol=symbol,
+                start_date=start_str,
+                end_date=end_str,
             )
             if not df.empty:
-                df = _rename_cols(df, {
-                    "日期": "date", "开盘": "open", "最高": "high", "最低": "low",
-                    "收盘": "close", "成交量": "volume", "成交金额": "money",
-                    "涨跌幅": "pct_change",
-                })
+                df = _rename_cols(
+                    df,
+                    {
+                        "日期": "date",
+                        "开盘": "open",
+                        "最高": "high",
+                        "最低": "low",
+                        "收盘": "close",
+                        "成交量": "volume",
+                        "成交金额": "money",
+                        "涨跌幅": "pct_change",
+                    },
+                )
                 if "date" in df.columns:
                     df["date"] = pd.to_datetime(df["date"])
                     df.set_index("date", inplace=True)
                 for col in ["price_change", "turnover"]:
                     if col not in df.columns:
                         df[col] = 0
-                cols = ["open", "high", "low", "close", "volume", "money", "pct_change", "price_change", "turnover"]
+                cols = [
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "money",
+                    "pct_change",
+                    "price_change",
+                    "turnover",
+                ]
                 df = df[[c for c in cols if c in df.columns]]
                 with _cache_lock:
                     _cache[cache_key] = df
@@ -603,29 +762,46 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
             elif source_name == "eastmoney":
                 if _is_etf(symbol):
                     df = ak.fund_etf_hist_em(
-                        symbol=symbol, period="daily",
-                        start_date=start_str, end_date=end_str, adjust=adjust,
+                        symbol=symbol,
+                        period="daily",
+                        start_date=start_str,
+                        end_date=end_str,
+                        adjust=adjust,
                     )
                 else:
                     df = ak.stock_zh_a_hist(
-                        symbol=symbol, period="daily",
-                        start_date=start_str, end_date=end_str, adjust=adjust,
+                        symbol=symbol,
+                        period="daily",
+                        start_date=start_str,
+                        end_date=end_str,
+                        adjust=adjust,
                     )
             else:
                 df = pd.DataFrame()
 
             if not df.empty:
                 if source_name == "eastmoney":
-                    df = _rename_cols(df, {
-                        "日期": "date", "开盘": "open", "最高": "high", "最低": "low",
-                        "收盘": "close", "成交量": "volume", "成交额": "money",
-                        "涨跌幅": "pct_change", "涨跌额": "price_change", "换手率": "turnover",
-                    })
+                    df = _rename_cols(
+                        df,
+                        {
+                            "日期": "date",
+                            "开盘": "open",
+                            "最高": "high",
+                            "最低": "low",
+                            "收盘": "close",
+                            "成交量": "volume",
+                            "成交额": "money",
+                            "涨跌幅": "pct_change",
+                            "涨跌额": "price_change",
+                            "换手率": "turnover",
+                        },
+                    )
                     if "date" in df.columns:
                         df["date"] = pd.to_datetime(df["date"])
                         df.set_index("date", inplace=True)
 
-                if not _validate_ohlcv(df, source_name):
+                df = _canonicalize_ohlcv(df, source_name, start_str, end_str)
+                if df is None:
                     continue
 
                 if not _covers_requested_start(df, start_str):
@@ -634,22 +810,24 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
                     continue
 
                 with _cache_lock:
-                    _cache[cache_key] = df
+                    _cache[cache_key] = df.copy()
                     _cache.move_to_end(cache_key)
                     while len(_cache) > _MAX_CACHE_ENTRIES:
                         _cache.popitem(last=False)
-                return df
+                return df.copy()
         except Exception as e:
-            log.debug("fetch_stock_data: %s source %s failed: %s", symbol, source_name, e)
+            log.debug(
+                "fetch_stock_data: %s source %s failed: %s", symbol, source_name, e
+            )
             continue
 
     if not fallback_df.empty:
         with _cache_lock:
-            _cache[cache_key] = fallback_df
+            _cache[cache_key] = fallback_df.copy()
             _cache.move_to_end(cache_key)
             while len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
-        return fallback_df
+        return fallback_df.copy()
 
     # MED-32: bare 000xxx codes may actually be Shanghai indices.
     # If stock lookup fails, auto-retry as index with .XSHG suffix.
@@ -660,8 +838,14 @@ def fetch_stock_data(code: str, start_date, end_date, adjust: str = "qfq") -> pd
     return pd.DataFrame()
 
 
-def get_price(security, start_date=None, end_date=None, frequency: str = "daily",
-              fields=None, count=None):
+def get_price(
+    security,
+    start_date=None,
+    end_date=None,
+    frequency: str = "daily",
+    fields=None,
+    count=None,
+):
     """Get historical price data.
 
     Parameters:
@@ -672,14 +856,20 @@ def get_price(security, start_date=None, end_date=None, frequency: str = "daily"
         count: number of bars (alternative to date range)
     """
     if isinstance(security, (list, tuple)):
-        return {sec: f for sec in security
-                if not (f := get_price(sec, start_date, end_date, frequency, fields, count)).empty}
+        return {
+            sec: f
+            for sec in security
+            if not (
+                f := get_price(sec, start_date, end_date, frequency, fields, count)
+            ).empty
+        }
 
     if count is not None and start_date is None:
         # B2: In backtest mode, default to simulated time instead of real time
         if end_date is None:
             from eqlib._state import _context
-            end_date = getattr(_context, 'current_dt', None) or datetime.datetime.now()
+
+            end_date = getattr(_context, "current_dt", None) or datetime.datetime.now()
         lookback = end_date if isinstance(end_date, datetime.date) else end_date.date()
         start_date = datetime.datetime.combine(lookback, datetime.time())
         start_date = _compute_lookback(count, start_date)
@@ -687,7 +877,8 @@ def get_price(security, start_date=None, end_date=None, frequency: str = "daily"
     if end_date is None:
         # B2: In backtest mode, default to simulated time instead of real time
         from eqlib._state import _context
-        end_date = getattr(_context, 'current_dt', None) or datetime.datetime.now()
+
+        end_date = getattr(_context, "current_dt", None) or datetime.datetime.now()
     if start_date is None:
         start_date = end_date - datetime.timedelta(days=count * 2 if count else 365)
 
@@ -697,8 +888,9 @@ def get_price(security, start_date=None, end_date=None, frequency: str = "daily"
     return df
 
 
-def history(count: int, unit: str = "1d", field: str = "close",
-            security=None, df: bool = False):
+def history(
+    count: int, unit: str = "1d", field: str = "close", security=None, df: bool = False
+):
     """Get the most recent `count` bars ending at current_dt."""
     from eqlib._state import _context
 
@@ -729,9 +921,15 @@ def history(count: int, unit: str = "1d", field: str = "close",
     return pd.DataFrame()
 
 
-def attribute_history(security, count: int, unit: str = "1d",
-                      fields=("close",), df: bool = True,
-                      skip_paused: bool = True, fq: str = "pre"):
+def attribute_history(
+    security,
+    count: int,
+    unit: str = "1d",
+    fields=("close",),
+    df: bool = True,
+    skip_paused: bool = True,
+    fq: str = "pre",
+):
     """Get historical attribute data for a single security.
 
     Parameters:
@@ -779,9 +977,7 @@ def attribute_history(security, count: int, unit: str = "1d",
                     {f: sec_data[f][sec_data[f].index < cutoff] for f in available}
                 )
             else:
-                result = pd.DataFrame(
-                    {f: sec_data[f] for f in available}
-                )
+                result = pd.DataFrame({f: sec_data[f] for f in available})
             return result.tail(count)
         if preloaded.panel is None:
             return pd.DataFrame()
@@ -812,7 +1008,9 @@ def attribute_history(security, count: int, unit: str = "1d",
     start_date = _compute_lookback(count, end_date)
 
     adjust_map = {"pre": "qfq", "post": "hfq", None: ""}
-    df_data = fetch_stock_data(security, start_date, end_date, adjust=adjust_map.get(fq, "qfq"))
+    df_data = fetch_stock_data(
+        security, start_date, end_date, adjust=adjust_map.get(fq, "qfq")
+    )
     if df_data.empty:
         return pd.DataFrame()
 
@@ -831,6 +1029,7 @@ def attribute_history(security, count: int, unit: str = "1d",
 # ============================================================
 # Security lists
 # ============================================================
+
 
 def get_all_securities(types=None, date=None) -> pd.DataFrame:
     """Get list of all A-share stocks."""
@@ -872,8 +1071,11 @@ def get_trade_days(start_date=None, end_date=None, count=None) -> list[datetime.
         # This prevents including Chinese public holidays when akshare is offline.
         end_date = end_date or datetime.date.today()
         start_date = start_date or (end_date - datetime.timedelta(days=365))
-        return [d for d in _iter_days(start_date, end_date)
-                if d.weekday() < 5 and not _is_ashare_holiday(d)]
+        return [
+            d
+            for d in _iter_days(start_date, end_date)
+            if d.weekday() < 5 and not _is_ashare_holiday(d)
+        ]
 
 
 # ── Bundled A-share holiday calendar (fallback when akshare is unavailable) ────
@@ -882,80 +1084,167 @@ def get_trade_days(start_date=None, end_date=None, count=None) -> list[datetime.
 # Format: set of datetime.date objects.  This list covers 2020-2028 and should
 # be extended when adding backtests beyond that range.
 
+
 def _build_holiday_set() -> frozenset:
     """Return a frozenset of known A-share non-trading dates (2020-2028)."""
     raw = [
         # 2020
-        "2020-01-01", "2020-01-24", "2020-01-27", "2020-01-28", "2020-01-29",
-        "2020-01-30", "2020-01-31", "2020-04-04", "2020-04-06",
-        "2020-05-01", "2020-05-04", "2020-05-05",
-        "2020-06-25", "2020-06-26",
-        "2020-10-01", "2020-10-02", "2020-10-05", "2020-10-06", "2020-10-07",
+        "2020-01-01",
+        "2020-01-24",
+        "2020-01-27",
+        "2020-01-28",
+        "2020-01-29",
+        "2020-01-30",
+        "2020-01-31",
+        "2020-04-04",
+        "2020-04-06",
+        "2020-05-01",
+        "2020-05-04",
+        "2020-05-05",
+        "2020-06-25",
+        "2020-06-26",
+        "2020-10-01",
+        "2020-10-02",
+        "2020-10-05",
+        "2020-10-06",
+        "2020-10-07",
         "2020-10-08",
         # 2021
         "2021-01-01",
-        "2021-02-11", "2021-02-12", "2021-02-15", "2021-02-16", "2021-02-17",
+        "2021-02-11",
+        "2021-02-12",
+        "2021-02-15",
+        "2021-02-16",
+        "2021-02-17",
         "2021-04-05",
-        "2021-05-03", "2021-05-04", "2021-05-05",
+        "2021-05-03",
+        "2021-05-04",
+        "2021-05-05",
         "2021-06-14",
-        "2021-09-20", "2021-09-21",
-        "2021-10-01", "2021-10-04", "2021-10-05", "2021-10-06", "2021-10-07",
+        "2021-09-20",
+        "2021-09-21",
+        "2021-10-01",
+        "2021-10-04",
+        "2021-10-05",
+        "2021-10-06",
+        "2021-10-07",
         # 2022
         "2022-01-03",
-        "2022-01-31", "2022-02-01", "2022-02-02", "2022-02-03", "2022-02-04",
-        "2022-04-04", "2022-04-05",
-        "2022-05-02", "2022-05-03", "2022-05-04",
+        "2022-01-31",
+        "2022-02-01",
+        "2022-02-02",
+        "2022-02-03",
+        "2022-02-04",
+        "2022-04-04",
+        "2022-04-05",
+        "2022-05-02",
+        "2022-05-03",
+        "2022-05-04",
         "2022-06-03",
         "2022-09-12",
-        "2022-10-03", "2022-10-04", "2022-10-05", "2022-10-06", "2022-10-07",
+        "2022-10-03",
+        "2022-10-04",
+        "2022-10-05",
+        "2022-10-06",
+        "2022-10-07",
         # 2023
         "2023-01-02",
-        "2023-01-23", "2023-01-24", "2023-01-25", "2023-01-26", "2023-01-27",
+        "2023-01-23",
+        "2023-01-24",
+        "2023-01-25",
+        "2023-01-26",
+        "2023-01-27",
         "2023-04-05",
-        "2023-05-01", "2023-05-02", "2023-05-03",
-        "2023-06-22", "2023-06-23",
+        "2023-05-01",
+        "2023-05-02",
+        "2023-05-03",
+        "2023-06-22",
+        "2023-06-23",
         "2023-09-29",
-        "2023-10-02", "2023-10-03", "2023-10-04", "2023-10-05", "2023-10-06",
+        "2023-10-02",
+        "2023-10-03",
+        "2023-10-04",
+        "2023-10-05",
+        "2023-10-06",
         # 2024
         "2024-01-01",
-        "2024-02-12", "2024-02-13", "2024-02-14", "2024-02-15", "2024-02-16",
-        "2024-04-04", "2024-04-05",
-        "2024-05-01", "2024-05-02", "2024-05-03",
+        "2024-02-12",
+        "2024-02-13",
+        "2024-02-14",
+        "2024-02-15",
+        "2024-02-16",
+        "2024-04-04",
+        "2024-04-05",
+        "2024-05-01",
+        "2024-05-02",
+        "2024-05-03",
         "2024-06-10",
         "2024-09-17",
-        "2024-10-01", "2024-10-02", "2024-10-03", "2024-10-04", "2024-10-07",
+        "2024-10-01",
+        "2024-10-02",
+        "2024-10-03",
+        "2024-10-04",
+        "2024-10-07",
         # 2025
         "2025-01-01",
-        "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31", "2025-02-03",
+        "2025-01-28",
+        "2025-01-29",
+        "2025-01-30",
+        "2025-01-31",
+        "2025-02-03",
         "2025-04-04",
-        "2025-05-01", "2025-05-02",
+        "2025-05-01",
+        "2025-05-02",
         "2025-05-31",
-        "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07",
+        "2025-10-01",
+        "2025-10-02",
+        "2025-10-03",
+        "2025-10-06",
+        "2025-10-07",
         # 2026
         "2026-01-01",
-        "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20",
+        "2026-02-17",
+        "2026-02-18",
+        "2026-02-19",
+        "2026-02-20",
         "2026-04-06",
         "2026-05-01",
         "2026-06-19",
-        "2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
         # 2027
         "2027-01-01",
-        "2027-02-08", "2027-02-09", "2027-02-10", "2027-02-11",
+        "2027-02-08",
+        "2027-02-09",
+        "2027-02-10",
+        "2027-02-11",
         "2027-04-05",
         "2027-05-03",
         "2027-06-09",
-        "2027-10-01", "2027-10-04", "2027-10-05", "2027-10-06", "2027-10-07",
+        "2027-10-01",
+        "2027-10-04",
+        "2027-10-05",
+        "2027-10-06",
+        "2027-10-07",
         # 2028
         "2028-01-03",
-        "2028-01-27", "2028-01-28", "2028-01-31", "2028-02-01",
+        "2028-01-27",
+        "2028-01-28",
+        "2028-01-31",
+        "2028-02-01",
         "2028-04-04",
         "2028-05-01",
         "2028-05-29",
-        "2028-10-02", "2028-10-03", "2028-10-04", "2028-10-05", "2028-10-06",
+        "2028-10-02",
+        "2028-10-03",
+        "2028-10-04",
+        "2028-10-05",
+        "2028-10-06",
     ]
-    return frozenset(
-        datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in raw
-    )
+    return frozenset(datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in raw)
 
 
 _ASHARE_HOLIDAYS: frozenset = _build_holiday_set()
@@ -965,12 +1254,14 @@ _LAST_CALENDAR_YEAR = 2028
 
 def _warn_calendar_coverage(end_date):
     """Emit a warning if end_date is beyond the holiday calendar range."""
-    if hasattr(end_date, 'year') and end_date.year > _LAST_CALENDAR_YEAR:
+    if hasattr(end_date, "year") and end_date.year > _LAST_CALENDAR_YEAR:
         import warnings
+
         warnings.warn(
             f"Holiday calendar covers through {_LAST_CALENDAR_YEAR}; "
             f"dates in {end_date.year} may be inaccurate.",
-            UserWarning, stacklevel=3,
+            UserWarning,
+            stacklevel=3,
         )
 
 
@@ -978,10 +1269,10 @@ def _warn_calendar_coverage(end_date):
 # These occur on the same Gregorian date every year (though observance may
 # shift to adjacent weekdays; we mark the date itself).
 _FIXED_HOLIDAYS = [
-    (1, 1),   # New Year's Day
-    (5, 1),   # Labor Day
-    (5, 2),   # Labor Day extended
-    (5, 3),   # Labor Day extended
+    (1, 1),  # New Year's Day
+    (5, 1),  # Labor Day
+    (5, 2),  # Labor Day extended
+    (5, 3),  # Labor Day extended
     (10, 1),  # National Day
     (10, 2),  # National Day extended
     (10, 3),  # National Day extended
@@ -1028,7 +1319,8 @@ def _get_trading_days_range_raw(start_str: str, end_str: str) -> tuple:
     start_date = pd.Timestamp(start_str).date()
     end_date = pd.Timestamp(end_str).date()
     return tuple(
-        d for d in _iter_days(start_date, end_date)
+        d
+        for d in _iter_days(start_date, end_date)
         if d.weekday() < 5 and not _is_ashare_holiday(d)
     )
 
@@ -1050,36 +1342,59 @@ def _get_trading_days_range(
 # Market scanning / screening
 # ============================================================
 
-def scan_market(min_price=10, min_pct_change=3, max_pct_change=5,
-                max_pe=50) -> pd.DataFrame:
+
+def scan_market(
+    min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50
+) -> pd.DataFrame:
     """Scan A-shares and filter by price, change, and P/E."""
     try:
-        return _filter_spot({
-            "代码": "code", "名称": "name", "最新价": "price",
-            "涨跌幅": "pct_change", "市盈率-动态": "pe",
-        }, {
-            "price": min_price,
-            "pct_change": (min_pct_change, max_pct_change),
-            "pe": (None, max_pe),
-        })
+        return _filter_spot(
+            {
+                "代码": "code",
+                "名称": "name",
+                "最新价": "price",
+                "涨跌幅": "pct_change",
+                "市盈率-动态": "pe",
+            },
+            {
+                "price": min_price,
+                "pct_change": (min_pct_change, max_pct_change),
+                "pe": (None, max_pe),
+            },
+        )
     except Exception as e:
         log.debug("scan_market: %s", e)
         return pd.DataFrame()
 
 
-def get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None,
-                         min_roe=None, min_revenue=None, min_profit=None) -> pd.DataFrame:
+def get_financial_screen(
+    min_pe=None,
+    max_pe=None,
+    min_pb=None,
+    max_pb=None,
+    min_roe=None,
+    min_revenue=None,
+    min_profit=None,
+) -> pd.DataFrame:
     """Screen stocks by financial criteria using real-time market data."""
     try:
         filters = {
             "pe": (min_pe, max_pe),
             "pb": (min_pb, max_pb),
         }
-        return _filter_spot({
-            "代码": "code", "名称": "name", "最新价": "price",
-            "涨跌幅": "pct_change", "市盈率-动态": "pe",
-            "市净率": "pb", "总市值": "total_value", "换手率": "turnover",
-        }, filters)
+        return _filter_spot(
+            {
+                "代码": "code",
+                "名称": "name",
+                "最新价": "price",
+                "涨跌幅": "pct_change",
+                "市盈率-动态": "pe",
+                "市净率": "pb",
+                "总市值": "total_value",
+                "换手率": "turnover",
+            },
+            filters,
+        )
     except Exception as e:
         log.debug("get_financial_screen: %s", e)
         return pd.DataFrame()
@@ -1135,8 +1450,10 @@ def check_golden_cross(code, fast_period=5, slow_period=20, min_rows=30) -> bool
 # File I/O
 # ============================================================
 
-def download_stock_data(code, start_date, end_date, adjust: str = "qfq",
-                        output_dir=None, filename=None) -> Optional[str]:
+
+def download_stock_data(
+    code, start_date, end_date, adjust: str = "qfq", output_dir=None, filename=None
+) -> Optional[str]:
     """Download daily OHLCV data and save to CSV."""
     import os
 
@@ -1175,6 +1492,7 @@ def clear_cache():
 # Financial data
 # ============================================================
 
+
 def get_financial_abstract(code) -> pd.DataFrame:
     """Get financial summary for a stock."""
     try:
@@ -1198,15 +1516,21 @@ def get_fundamentals(code, date=None) -> pd.DataFrame:
 # Index and industry constituents
 # ============================================================
 
+
 def get_index_stocks(index_code) -> pd.DataFrame:
     """Get constituent stocks of an index."""
     try:
         df = ak.index_stock_cons(symbol=_code_to_akshare(index_code))
         if df.empty:
             return pd.DataFrame()
-        return _rename_cols(df, {
-            "品种代码": "code", "品种名称": "name", "纳入日期": "include_date",
-        })
+        return _rename_cols(
+            df,
+            {
+                "品种代码": "code",
+                "品种名称": "name",
+                "纳入日期": "include_date",
+            },
+        )
     except Exception as e:
         log.debug("get_index_stocks: %s", e)
         return pd.DataFrame()
@@ -1231,16 +1555,41 @@ def get_industry_stocks(industry_name) -> pd.DataFrame:
         df = ak.stock_board_industry_cons_em(symbol=industry_name)
         if df.empty:
             return pd.DataFrame()
-        df = _rename_cols(df, {
-            "代码": "code", "名称": "name", "最新价": "price",
-            "涨跌幅": "pct_change", "成交量": "volume", "成交额": "money",
-            "振幅": "amplitude", "最高": "high", "最低": "low",
-            "今开": "open", "昨收": "prev_close", "换手率": "turnover",
-            "市盈率-动态": "pe", "市净率": "pb", "总市值": "total_value",
-            "流通市值": "float_value",
-        })
-        _to_numeric(df, ["price", "pct_change", "volume", "money",
-                          "pe", "pb", "total_value", "float_value", "turnover"])
+        df = _rename_cols(
+            df,
+            {
+                "代码": "code",
+                "名称": "name",
+                "最新价": "price",
+                "涨跌幅": "pct_change",
+                "成交量": "volume",
+                "成交额": "money",
+                "振幅": "amplitude",
+                "最高": "high",
+                "最低": "low",
+                "今开": "open",
+                "昨收": "prev_close",
+                "换手率": "turnover",
+                "市盈率-动态": "pe",
+                "市净率": "pb",
+                "总市值": "total_value",
+                "流通市值": "float_value",
+            },
+        )
+        _to_numeric(
+            df,
+            [
+                "price",
+                "pct_change",
+                "volume",
+                "money",
+                "pe",
+                "pb",
+                "total_value",
+                "float_value",
+                "turnover",
+            ],
+        )
         return df.reset_index(drop=True)
     except Exception as e:
         log.debug("get_industry_stocks: %s", e)
@@ -1268,6 +1617,7 @@ def get_industry(code) -> Optional[dict]:
 # Concept/theme boards
 # ============================================================
 
+
 def get_concept_list() -> list[str]:
     """Get list of all concept/theme board names."""
     try:
@@ -1287,13 +1637,23 @@ def get_concept_stocks(concept_name) -> pd.DataFrame:
         df = ak.stock_board_concept_cons_em(symbol=concept_name)
         if df.empty:
             return pd.DataFrame()
-        df = _rename_cols(df, {
-            "代码": "code", "名称": "name", "最新价": "price",
-            "涨跌幅": "pct_change", "成交量": "volume", "成交额": "money",
-            "换手率": "turnover", "市盈率-动态": "pe", "市净率": "pb",
-        })
-        _to_numeric(df, ["price", "pct_change", "volume", "money",
-                          "turnover", "pe", "pb"])
+        df = _rename_cols(
+            df,
+            {
+                "代码": "code",
+                "名称": "name",
+                "最新价": "price",
+                "涨跌幅": "pct_change",
+                "成交量": "volume",
+                "成交额": "money",
+                "换手率": "turnover",
+                "市盈率-动态": "pe",
+                "市净率": "pb",
+            },
+        )
+        _to_numeric(
+            df, ["price", "pct_change", "volume", "money", "turnover", "pe", "pb"]
+        )
         return df.reset_index(drop=True)
     except Exception as e:
         log.debug("get_concept_stocks: %s", e)
@@ -1304,8 +1664,10 @@ def get_concept_stocks(concept_name) -> pd.DataFrame:
 # Minute-level K-line data
 # ============================================================
 
-def fetch_minute_data(code, period: str = "5m", start_date=None,
-                      end_date=None, adjust: str = "qfq") -> pd.DataFrame:
+
+def fetch_minute_data(
+    code, period: str = "5m", start_date=None, end_date=None, adjust: str = "qfq"
+) -> pd.DataFrame:
     """Fetch minute-level K-line data."""
     try:
         symbol = _code_to_akshare(code)
@@ -1316,12 +1678,22 @@ def fetch_minute_data(code, period: str = "5m", start_date=None,
         if df.empty:
             return pd.DataFrame()
 
-        df = _rename_cols(df, {
-            "时间": "datetime", "开盘": "open", "收盘": "close",
-            "最高": "high", "最低": "low", "涨跌幅": "pct_change",
-            "涨跌额": "price_change", "成交量": "volume", "成交额": "money",
-            "振幅": "amplitude", "换手率": "turnover",
-        })
+        df = _rename_cols(
+            df,
+            {
+                "时间": "datetime",
+                "开盘": "open",
+                "收盘": "close",
+                "最高": "high",
+                "最低": "low",
+                "涨跌幅": "pct_change",
+                "涨跌额": "price_change",
+                "成交量": "volume",
+                "成交额": "money",
+                "振幅": "amplitude",
+                "换手率": "turnover",
+            },
+        )
 
         if "datetime" in df.columns:
             df["datetime"] = pd.to_datetime(df["datetime"])
@@ -1338,12 +1710,16 @@ def fetch_minute_data(code, period: str = "5m", start_date=None,
         return pd.DataFrame()
 
 
-def get_price_minute(security, count=None, period: str = "5m",
-                     fields=None, adjust: str = "qfq"):
+def get_price_minute(
+    security, count=None, period: str = "5m", fields=None, adjust: str = "qfq"
+):
     """Get minute-level price data."""
     if isinstance(security, (list, tuple)):
-        return {sec: f for sec in security
-                if not (f := get_price_minute(sec, count, period, fields, adjust)).empty}
+        return {
+            sec: f
+            for sec in security
+            if not (f := get_price_minute(sec, count, period, fields, adjust)).empty
+        }
 
     df = fetch_minute_data(security, period=period, adjust=adjust)
     if df.empty:
@@ -1358,6 +1734,7 @@ def get_price_minute(security, count=None, period: str = "5m",
 # ============================================================
 # Tick data
 # ============================================================
+
 
 def get_tick_data(code, trade_date=None) -> pd.DataFrame:
     """Fetch intraday tick (transaction) data for current day."""
@@ -1393,6 +1770,7 @@ def get_tick_data(code, trade_date=None) -> pd.DataFrame:
 # P0: Market snapshot, security info
 # ============================================================
 
+
 def get_current_data() -> dict:
     """Get current market snapshot for all A-shares.
 
@@ -1405,18 +1783,45 @@ def get_current_data() -> dict:
         if df.empty:
             return {}
 
-        df = _rename_cols(df, {
-            "代码": "code", "名称": "name", "最新价": "price",
-            "涨跌幅": "pct_change", "成交量": "volume", "成交额": "money",
-            "最高": "high", "最低": "low", "今开": "open",
-            "昨收": "prev_close", "换手率": "turnover",
-            "市盈率-动态": "pe", "市净率": "pb", "总市值": "total_value",
-            "流通市值": "float_value",
-        })
+        df = _rename_cols(
+            df,
+            {
+                "代码": "code",
+                "名称": "name",
+                "最新价": "price",
+                "涨跌幅": "pct_change",
+                "成交量": "volume",
+                "成交额": "money",
+                "最高": "high",
+                "最低": "low",
+                "今开": "open",
+                "昨收": "prev_close",
+                "换手率": "turnover",
+                "市盈率-动态": "pe",
+                "市净率": "pb",
+                "总市值": "total_value",
+                "流通市值": "float_value",
+            },
+        )
 
-        _to_numeric(df, ["price", "pct_change", "volume", "money",
-                          "high", "low", "open", "prev_close",
-                          "turnover", "pe", "pb", "total_value", "float_value"])
+        _to_numeric(
+            df,
+            [
+                "price",
+                "pct_change",
+                "volume",
+                "money",
+                "high",
+                "low",
+                "open",
+                "prev_close",
+                "turnover",
+                "pe",
+                "pb",
+                "total_value",
+                "float_value",
+            ],
+        )
 
         if "code" not in df.columns:
             return {}
@@ -1489,6 +1894,7 @@ def _safe_float(val) -> float:
 # P1: Money flow, billboard, index weights, extras
 # ============================================================
 
+
 def get_money_flow(code, start_date=None, end_date=None, count=None) -> pd.DataFrame:
     """Get capital flow data for a stock.
 
@@ -1505,19 +1911,24 @@ def get_money_flow(code, start_date=None, end_date=None, count=None) -> pd.DataF
         if df.empty:
             return pd.DataFrame()
 
-        df = _rename_cols(df, {
-            "日期": "date", "收盘价": "close", "涨跌幅": "pct_change",
-            "主力净流入-净额": "main_net_inflow",
-            "主力净流入-净占比": "main_net_pct",
-            "超大单净流入-净额": "super_order_net",
-            "超大单净流入-净占比": "super_order_pct",
-            "大单净流入-净额": "big_order_net",
-            "大单净流入-净占比": "big_order_pct",
-            "中单净流入-净额": "mid_order_net",
-            "中单净流入-净占比": "mid_order_pct",
-            "小单净流入-净额": "small_order_net",
-            "小单净流入-净占比": "small_order_pct",
-        })
+        df = _rename_cols(
+            df,
+            {
+                "日期": "date",
+                "收盘价": "close",
+                "涨跌幅": "pct_change",
+                "主力净流入-净额": "main_net_inflow",
+                "主力净流入-净占比": "main_net_pct",
+                "超大单净流入-净额": "super_order_net",
+                "超大单净流入-净占比": "super_order_pct",
+                "大单净流入-净额": "big_order_net",
+                "大单净流入-净占比": "big_order_pct",
+                "中单净流入-净额": "mid_order_net",
+                "中单净流入-净占比": "mid_order_pct",
+                "小单净流入-净额": "small_order_net",
+                "小单净流入-净占比": "small_order_pct",
+            },
+        )
 
         if count > 0:
             df = df.tail(count)
@@ -1527,34 +1938,64 @@ def get_money_flow(code, start_date=None, end_date=None, count=None) -> pd.DataF
         return pd.DataFrame()
 
 
-def get_billboard_list(stock_list=None, date=None, start_date=None,
-                       end_date=None) -> pd.DataFrame:
+def get_billboard_list(
+    stock_list=None, date=None, start_date=None, end_date=None
+) -> pd.DataFrame:
     """Get dragon/tiger list (abnormal trading activity stocks)."""
     try:
         if date is not None:
             sd = ed = _normalize_date(date)
         else:
-            sd = _normalize_date(start_date) if start_date else _normalize_date(datetime.date.today())
+            sd = (
+                _normalize_date(start_date)
+                if start_date
+                else _normalize_date(datetime.date.today())
+            )
             ed = _normalize_date(end_date) if end_date else sd
 
         df = ak.stock_lhb_detail_em(start_date=sd, end_date=ed)
         if df.empty:
             return pd.DataFrame()
 
-        df = _rename_cols(df, {
-            "代码": "code", "名称": "name", "上榜日": "trade_date",
-            "收盘价": "close", "涨跌幅": "pct_change",
-            "龙虎榜净买额": "net_buy", "龙虎榜买入额": "total_buy",
-            "龙虎榜卖出额": "total_sell", "龙虎榜成交额": "total_amount",
-            "市场总成交额": "market_amount", "换手率": "turnover",
-            "上榜原因": "reason", "上榜后1日": "post_1d",
-            "上榜后2日": "post_2d", "上榜后5日": "post_5d",
-            "上榜后10日": "post_10d",
-        })
+        df = _rename_cols(
+            df,
+            {
+                "代码": "code",
+                "名称": "name",
+                "上榜日": "trade_date",
+                "收盘价": "close",
+                "涨跌幅": "pct_change",
+                "龙虎榜净买额": "net_buy",
+                "龙虎榜买入额": "total_buy",
+                "龙虎榜卖出额": "total_sell",
+                "龙虎榜成交额": "total_amount",
+                "市场总成交额": "market_amount",
+                "换手率": "turnover",
+                "上榜原因": "reason",
+                "上榜后1日": "post_1d",
+                "上榜后2日": "post_2d",
+                "上榜后5日": "post_5d",
+                "上榜后10日": "post_10d",
+            },
+        )
 
-        _to_numeric(df, ["close", "pct_change", "net_buy", "total_buy",
-                          "total_sell", "total_amount", "market_amount",
-                          "turnover", "post_1d", "post_2d", "post_5d", "post_10d"])
+        _to_numeric(
+            df,
+            [
+                "close",
+                "pct_change",
+                "net_buy",
+                "total_buy",
+                "total_sell",
+                "total_amount",
+                "market_amount",
+                "turnover",
+                "post_1d",
+                "post_2d",
+                "post_5d",
+                "post_10d",
+            ],
+        )
 
         if stock_list:
             df = df[df["code"].isin(stock_list)]
@@ -1570,9 +2011,14 @@ def get_index_weights(index_code, date=None) -> pd.DataFrame:
         df = ak.index_stock_cons_weight_csindex(symbol=_code_to_akshare(index_code))
         if df.empty:
             return pd.DataFrame()
-        df = _rename_cols(df, {
-            "成分券代码": "code", "成分券名称": "name", "权重": "weight",
-        })
+        df = _rename_cols(
+            df,
+            {
+                "成分券代码": "code",
+                "成分券名称": "name",
+                "权重": "weight",
+            },
+        )
         _to_numeric(df, ["weight"])
         return df.reset_index(drop=True)
     except Exception as e:
@@ -1580,8 +2026,7 @@ def get_index_weights(index_code, date=None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_extras(field: str, security_list=None, start_date=None,
-               end_date=None) -> dict:
+def get_extras(field: str, security_list=None, start_date=None, end_date=None) -> dict:
     """Get extra data fields (is_st, net_value, etc.) for securities.
 
     Uses vectorized operations instead of per-row iteration.
@@ -1600,7 +2045,11 @@ def get_extras(field: str, security_list=None, start_date=None,
             df["code"] = df["代码"]
             price = pd.to_numeric(df["最新价"], errors="coerce")
             pb = pd.to_numeric(df["市净率"], errors="coerce")
-            result = dict(zip(df["code"], (price / pb).replace([np.inf, -np.inf], pd.NA).fillna(0)))
+            result = dict(
+                zip(
+                    df["code"], (price / pb).replace([np.inf, -np.inf], pd.NA).fillna(0)
+                )
+            )
         else:
             return {}
 
@@ -1616,9 +2065,11 @@ def get_extras(field: str, security_list=None, start_date=None,
 # Universe management
 # ============================================================
 
+
 def set_universe(security_list):
     """Set the current stock universe for the strategy."""
     from eqlib._state import _context
+
     if _context is not None:
         _context.universe = security_list
 
@@ -1626,6 +2077,7 @@ def set_universe(security_list):
 def get_universe() -> list:
     """Get the current strategy's stock universe."""
     from eqlib._state import _context
+
     if _context is not None:
         return _context.universe or []
     return []
@@ -1635,15 +2087,18 @@ def get_universe() -> list:
 # P0: Lifecycle callbacks
 # ============================================================
 
+
 def before_trading_start(func):
     """Register a function to be called before market open (9:30)."""
     from eqlib.engine import _register_before_start
+
     _register_before_start(func)
 
 
 def after_trading_end(func):
     """Register a function to be called after market close (15:00)."""
     from eqlib.engine import _register_after_end
+
     _register_after_end(func)
 
 
@@ -1663,6 +2118,7 @@ def on_order_queued(func):
             print(f"Signal generated: {order.side} {order.security} {order.amount}")
     """
     from eqlib.engine import _register_on_order_queued
+
     _register_on_order_queued(func)
 
 
@@ -1683,12 +2139,14 @@ def on_order_filled(func):
             print(f"Order filled: {order.security} @ {trade_info['price']}")
     """
     from eqlib.engine import _register_on_order_filled
+
     _register_on_order_filled(func)
 
 
 # ============================================================
 # A-share market specific data
 # ============================================================
+
 
 def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
     """北向资金流向（汇总级别）
@@ -1723,13 +2181,14 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
         # 缓存检查 (带时间过期 - Bug 5, 15 fix)
         cache_key = f"north_flow_{sd}_{ed}"
         import time
+
         cache_ttl = 3600  # 1小时过期
         with _cache_lock:
             if cache_key in _cache:
                 cached_entry = _cache[cache_key]
-                cache_time = cached_entry.get('_cache_time', 0)
+                cache_time = cached_entry.get("_cache_time", 0)
                 if time.time() - cache_time < cache_ttl:
-                    return cached_entry['data'].copy()
+                    return cached_entry["data"].copy()
                 else:
                     # 过期，删除
                     del _cache[cache_key]
@@ -1743,12 +2202,15 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 列重命名和处理
         def process_df(df):
-            df = _rename_cols(df, {
-                "日期": "date",
-                "当日成交净买额": "net_buy",
-                "买入成交额": "total_buy",
-                "卖出成交额": "total_sell",
-            })
+            df = _rename_cols(
+                df,
+                {
+                    "日期": "date",
+                    "当日成交净买额": "net_buy",
+                    "买入成交额": "total_buy",
+                    "卖出成交额": "total_sell",
+                },
+            )
             # 验证必需列 (Bug 4 fix)
             _validate_required_columns(df, ["date", "net_buy"], "north money flow")
             # 处理 datetime.date 类型转换为 YYYY-MM-DD 字符串
@@ -1765,8 +2227,12 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
             # 按日期合并，数值相加
             df = pd.merge(df_sh, df_sz, on="date", how="outer", suffixes=("_sh", "_sz"))
             df["net_buy"] = df["net_buy_sh"].fillna(0) + df["net_buy_sz"].fillna(0)
-            df["total_buy"] = df["total_buy_sh"].fillna(0) + df["total_buy_sz"].fillna(0)
-            df["total_sell"] = df["total_sell_sh"].fillna(0) + df["total_sell_sz"].fillna(0)
+            df["total_buy"] = df["total_buy_sh"].fillna(0) + df["total_buy_sz"].fillna(
+                0
+            )
+            df["total_sell"] = df["total_sell_sh"].fillna(0) + df[
+                "total_sell_sz"
+            ].fillna(0)
             df = df[["date", "net_buy", "total_buy", "total_sell"]]
         elif not df_sh.empty:
             df = df_sh
@@ -1780,7 +2246,7 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
+            _cache[cache_key] = {"data": df.copy(), "_cache_time": time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
@@ -1830,13 +2296,14 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
         # 缓存检查 (带时间过期)
         cache_key = f"margin_data_{sd}_{ed}"
         import time
+
         cache_ttl = 3600  # 1小时过期
         with _cache_lock:
             if cache_key in _cache:
                 cached_entry = _cache[cache_key]
-                cache_time = cached_entry.get('_cache_time', 0)
+                cache_time = cached_entry.get("_cache_time", 0)
                 if time.time() - cache_time < cache_ttl:
-                    return cached_entry['data'].copy()
+                    return cached_entry["data"].copy()
                 else:
                     del _cache[cache_key]
 
@@ -1849,12 +2316,15 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 列重命名和处理
         def process_df(df):
-            df = _rename_cols(df, {
-                "日期": "date",
-                "融资余额": "margin_balance",
-                "融资买入额": "margin_buy",
-                "融券余额": "short_balance",
-            })
+            df = _rename_cols(
+                df,
+                {
+                    "日期": "date",
+                    "融资余额": "margin_balance",
+                    "融资买入额": "margin_buy",
+                    "融券余额": "short_balance",
+                },
+            )
             if "date" in df.columns:
                 df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
             # 转换为亿元 (原数据单位为元)
@@ -1871,9 +2341,15 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
         if not df_sh.empty and not df_sz.empty:
             # 按日期合并，数值相加
             df = pd.merge(df_sh, df_sz, on="date", how="outer", suffixes=("_sh", "_sz"))
-            df["margin_balance"] = df["margin_balance_sh"].fillna(0) + df["margin_balance_sz"].fillna(0)
-            df["margin_buy"] = df["margin_buy_sh"].fillna(0) + df["margin_buy_sz"].fillna(0)
-            df["short_balance"] = df["short_balance_sh"].fillna(0) + df["short_balance_sz"].fillna(0)
+            df["margin_balance"] = df["margin_balance_sh"].fillna(0) + df[
+                "margin_balance_sz"
+            ].fillna(0)
+            df["margin_buy"] = df["margin_buy_sh"].fillna(0) + df[
+                "margin_buy_sz"
+            ].fillna(0)
+            df["short_balance"] = df["short_balance_sh"].fillna(0) + df[
+                "short_balance_sz"
+            ].fillna(0)
             df = df[["date", "margin_balance", "margin_buy", "short_balance"]]
         elif not df_sh.empty:
             df = df_sh
@@ -1898,11 +2374,13 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
             # 用户可以通过 df.dropna() 或 df.fillna() 自行处理
 
         # 重新排列列顺序
-        df = df[["date", "margin_balance", "margin_buy", "margin_repay", "short_balance"]]
+        df = df[
+            ["date", "margin_balance", "margin_buy", "margin_repay", "short_balance"]
+        ]
 
         # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
+            _cache[cache_key] = {"data": df.copy(), "_cache_time": time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
@@ -1956,19 +2434,20 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
             log.warning(
                 "get_limit_up_down_stats: start_date %s is more than 30 days ago. "
                 "API only supports last 30 trading days. Results may be incomplete.",
-                sd
+                sd,
             )
 
         # 缓存检查 (带时间过期 - Bug 5, 15 fix)
         cache_key = f"limit_up_down_{sd}_{ed}"
         import time
+
         cache_ttl = 1800  # 30分钟过期（交易时段数据会变化）
         with _cache_lock:
             if cache_key in _cache:
                 cached_entry = _cache[cache_key]
-                cache_time = cached_entry.get('_cache_time', 0)
+                cache_time = cached_entry.get("_cache_time", 0)
                 if time.time() - cache_time < cache_ttl:
-                    return cached_entry['data'].copy()
+                    return cached_entry["data"].copy()
                 else:
                     del _cache[cache_key]
 
@@ -1996,7 +2475,9 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
                 df_up = ak.stock_zt_pool_em(date=date_str)
                 limit_up_count = len(df_up) if not df_up.empty else 0
             except Exception as e:
-                log.debug("get_limit_up_down_stats: 涨停池 API error for %s: %s", date_str, e)
+                log.debug(
+                    "get_limit_up_down_stats: 涨停池 API error for %s: %s", date_str, e
+                )
                 limit_up_count = 0
                 api_error = True
 
@@ -2005,7 +2486,9 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
                 df_down = ak.stock_zt_pool_dtgc_em(date=date_str)
                 limit_down_count = len(df_down) if not df_down.empty else 0
             except Exception as e:
-                log.debug("get_limit_up_down_stats: 跌停池 API error for %s: %s", date_str, e)
+                log.debug(
+                    "get_limit_up_down_stats: 跌停池 API error for %s: %s", date_str, e
+                )
                 limit_down_count = 0
                 api_error = True
 
@@ -2043,7 +2526,8 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
             log.warning(
                 "get_limit_up_down_stats: %d/%d API calls failed. "
                 "Data may be incomplete.",
-                api_error_count, len(trade_days) * 2
+                api_error_count,
+                len(trade_days) * 2,
             )
 
         # 删除临时列
@@ -2051,7 +2535,7 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
+            _cache[cache_key] = {"data": df.copy(), "_cache_time": time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
@@ -2103,31 +2587,37 @@ def get_restriction_release(days=30) -> pd.DataFrame:
         # 缓存检查 (带时间过期)
         cache_key = f"restriction_release_{start_str}_{end_str}"
         import time
+
         cache_ttl = 21600  # 6小时过期
         with _cache_lock:
             if cache_key in _cache:
                 cached_entry = _cache[cache_key]
-                cache_time = cached_entry.get('_cache_time', 0)
+                cache_time = cached_entry.get("_cache_time", 0)
                 if time.time() - cache_time < cache_ttl:
-                    return cached_entry['data'].copy()
+                    return cached_entry["data"].copy()
                 else:
                     del _cache[cache_key]
 
         # 获取解禁数据
-        df = ak.stock_restricted_release_detail_em(start_date=start_str, end_date=end_str)
+        df = ak.stock_restricted_release_detail_em(
+            start_date=start_str, end_date=end_str
+        )
 
         if df.empty:
             return pd.DataFrame()
 
         # 列重命名
-        df = _rename_cols(df, {
-            "股票代码": "code",
-            "股票简称": "name",
-            "解禁时间": "release_date",
-            "解禁数量": "release_amount",
-            "实际解禁市值": "release_value",
-            "占解禁前流通市值比例": "release_pct",
-        })
+        df = _rename_cols(
+            df,
+            {
+                "股票代码": "code",
+                "股票简称": "name",
+                "解禁时间": "release_date",
+                "解禁数量": "release_amount",
+                "实际解禁市值": "release_value",
+                "占解禁前流通市值比例": "release_pct",
+            },
+        )
 
         # 数值转换
         _to_numeric(df, ["release_amount", "release_value", "release_pct"])
@@ -2139,7 +2629,14 @@ def get_restriction_release(days=30) -> pd.DataFrame:
             df["release_amount"] = df["release_amount"] / 1e4  # 股 → 万股
 
         # 只保留需要的列（过滤掉不需要的列）
-        keep_cols = ["code", "name", "release_date", "release_amount", "release_value", "release_pct"]
+        keep_cols = [
+            "code",
+            "name",
+            "release_date",
+            "release_amount",
+            "release_value",
+            "release_pct",
+        ]
         available_cols = [c for c in keep_cols if c in df.columns]
         df = df[available_cols]
 
@@ -2149,7 +2646,7 @@ def get_restriction_release(days=30) -> pd.DataFrame:
 
         # 存入缓存 (带时间戳)
         with _cache_lock:
-            _cache[cache_key] = {'data': df.copy(), '_cache_time': time.time()}
+            _cache[cache_key] = {"data": df.copy(), "_cache_time": time.time()}
             if len(_cache) > _MAX_CACHE_ENTRIES:
                 _cache.popitem(last=False)
 
