@@ -1,10 +1,12 @@
 """Data fetching layer using akshare."""
 
 import datetime
+import json
 import threading
 import requests
 from collections import OrderedDict
 from functools import lru_cache
+from importlib import resources
 from typing import Optional, Union
 
 import akshare as ak
@@ -1045,12 +1047,19 @@ def get_all_securities(types=None, date=None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_trade_days(start_date=None, end_date=None, count=None) -> list[datetime.date]:
-    """Get list of trading days."""
+def get_trade_days(
+    start_date=None, end_date=None, count=None, *, strict: bool = False
+) -> list[datetime.date]:
+    """Get trading days, using the bundled exchange calendar when offline.
+
+    ``strict`` only affects the offline fallback: a request outside the
+    versioned resource's coverage raises :class:`DataFetchError` instead of
+    silently returning an inferred weekday list.
+    """
     try:
         df = ak.tool_trade_date_hist_sina()
         if df.empty:
-            return []
+            raise DataFetchError("provider returned an empty trading calendar")
         col = df.columns[0]
         dates = pd.to_datetime(df[col]).dt.date.unique()
         dates = sorted(dates.tolist())
@@ -1067,15 +1076,61 @@ def get_trade_days(start_date=None, end_date=None, count=None) -> list[datetime.
         return dates
     except Exception as e:
         log.debug("get_trade_days: %s", e)
-        # Fallback: use bundled A-share holiday list to exclude non-trading days.
-        # This prevents including Chinese public holidays when akshare is offline.
-        end_date = end_date or datetime.date.today()
-        start_date = start_date or (end_date - datetime.timedelta(days=365))
-        return [
-            d
-            for d in _iter_days(start_date, end_date)
-            if d.weekday() < 5 and not _is_ashare_holiday(d)
-        ]
+        try:
+            days = list(_bundled_ashare_trading_days(start_date, end_date))
+        except DataFetchError:
+            if strict:
+                raise
+            log.warning("get_trade_days: bundled calendar coverage is unavailable")
+            return []
+        return days[-count:] if count is not None else days
+
+
+@lru_cache(maxsize=1)
+def _read_bundled_ashare_calendar() -> dict:
+    """Read and validate the packaged exchange-calendar resource once."""
+    try:
+        resource = resources.files("eqlib.static").joinpath("ashare_trading_days.json")
+        payload = json.loads(resource.read_text(encoding="utf-8"))
+        coverage = payload["coverage"]
+        if (
+            payload.get("schema_version") != 1
+            or not isinstance(payload.get("trading_days"), list)
+            or not coverage.get("start")
+            or not coverage.get("end")
+        ):
+            raise ValueError("unsupported calendar schema")
+        return payload
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise DataFetchError("calendar coverage is unavailable") from exc
+
+
+def _bundled_ashare_trading_days(
+    start_date=None, end_date=None
+) -> tuple[datetime.date, ...]:
+    """Return exchange trading days only when the requested range is covered."""
+    payload = _read_bundled_ashare_calendar()
+    coverage = payload["coverage"]
+    coverage_start = pd.Timestamp(coverage["start"]).date()
+    coverage_end = pd.Timestamp(coverage["end"]).date()
+    start = (
+        pd.Timestamp(start_date).date() if start_date is not None else coverage_start
+    )
+    end = pd.Timestamp(end_date).date() if end_date is not None else coverage_end
+    if start > end or start < coverage_start or end > coverage_end:
+        raise DataFetchError("calendar coverage is unavailable for the requested range")
+    return tuple(
+        day.date()
+        for day in map(pd.Timestamp, payload["trading_days"])
+        if start <= day.date() <= end
+    )
 
 
 # ── Bundled A-share holiday calendar (fallback when akshare is unavailable) ────
