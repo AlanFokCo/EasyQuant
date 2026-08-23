@@ -14,31 +14,47 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from eqlib.utils.equity import daily_returns, normalize_recorded_values
+
 
 class AlertLevel(Enum):
     """预警级别"""
-    YELLOW = "yellow"      # 监控关注，不触发动作
-    RED = "red"            # 需要人工介入
-    KILL_SWITCH = "kill"   # 自动熔断 + 人工确认
+
+    YELLOW = "yellow"  # 监控关注，不触发动作
+    RED = "red"  # 需要人工介入
+    KILL_SWITCH = "kill"  # 自动熔断 + 人工确认
+
+
+_ALERT_RANK = {
+    AlertLevel.YELLOW: 0,
+    AlertLevel.RED: 1,
+    AlertLevel.KILL_SWITCH: 2,
+}
+
+
+def _escalate(current: AlertLevel, candidate: AlertLevel) -> AlertLevel:
+    """Keep the highest alert level regardless of enum string spelling."""
+    return candidate if _ALERT_RANK[candidate] > _ALERT_RANK[current] else current
 
 
 @dataclass
 class RiskThresholds:
     """风控阈值配置"""
+
     # 回撤阈值
-    max_drawdown_yellow: float = 0.15   # 黄色预警回撤
-    max_drawdown_red: float = 0.20      # 红色预警回撤
-    max_drawdown_kill: float = 0.25     # 熔断回撤
+    max_drawdown_yellow: float = 0.15  # 黄色预警回撤
+    max_drawdown_red: float = 0.20  # 红色预警回撤
+    max_drawdown_kill: float = 0.25  # 熔断回撤
 
     # 相关性阈值
-    correlation_yellow: float = 0.60    # 黄色预警相关性
-    correlation_red: float = 0.75       # 红色预警相关性
-    correlation_kill: float = 0.85      # 熔断相关性
+    correlation_yellow: float = 0.60  # 黄色预警相关性
+    correlation_red: float = 0.75  # 红色预警相关性
+    correlation_kill: float = 0.85  # 熔断相关性
 
     # 集中度阈值
-    single_stock_max: float = 0.10      # 单股票最大占比
-    single_sector_max: float = 0.30     # 单板块最大占比
-    small_cap_max: float = 0.20         # 微盘股最大占比（<50亿）
+    single_stock_max: float = 0.10  # 单股票最大占比
+    single_sector_max: float = 0.30  # 单板块最大占比
+    small_cap_max: float = 0.20  # 微盘股最大占比（<50亿）
 
     # VaR 置信水平
     var_confidence: float = 0.95
@@ -47,14 +63,15 @@ class RiskThresholds:
 @dataclass
 class RiskReport:
     """风控检查报告"""
+
     timestamp: pd.Timestamp
     alert_level: AlertLevel
-    triggers: List[str]              # 触发的预警信息列表
-    portfolio_var: Optional[float] = None   # 组合 VaR（金额）
-    portfolio_var_pct: Optional[float] = None # 组合 VaR（百分比）
+    triggers: List[str]  # 触发的预警信息列表
+    portfolio_var: Optional[float] = None  # 组合 VaR（金额）
+    portfolio_var_pct: Optional[float] = None  # 组合 VaR（百分比）
     correlation_matrix: Optional[pd.DataFrame] = None  # 策略相关性矩阵
-    concentration: Optional[Dict[str, float]] = None   # 集中度指标
-    regime: Optional[str] = None            # 当前市场 regime
+    concentration: Optional[Dict[str, float]] = None  # 集中度指标
+    regime: Optional[str] = None  # 当前市场 regime
     recommendations: List[str] = field(default_factory=list)  # 建议操作
 
 
@@ -63,22 +80,10 @@ def _extract_daily_returns(backtest_result: Dict) -> pd.Series:
     recorded = backtest_result.get("recorded_values", {})
     if not recorded:
         return pd.Series(dtype=float)
-
-    # recorded_values 可能是 dict 或 list
-    if isinstance(recorded, dict):
-        values = pd.Series(
-            {pd.Timestamp(d): float(v.get("total_value") or 0)  # 修复 None 值
-             for d, v in recorded.items()}
-        ).sort_index()
-    else:  # list
-        values = pd.Series(
-            {pd.Timestamp(r["date"]): float(r.get("total_value") or 0)  # 修复 None 值
-             for r in recorded}
-        ).sort_index()
-
-    # 修复 Inf 值：当 total_value 从 0 变为非零时 pct_change 会产生 inf
-    returns = values.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
-    return returns.astype(float)
+    try:
+        return daily_returns(recorded).astype(float)
+    except ValueError:
+        return pd.Series(dtype=float)
 
 
 class PortfolioRiskMonitor:
@@ -101,9 +106,9 @@ class PortfolioRiskMonitor:
         """
         if not backtest_result:
             raise ValueError(f"策略 '{name}' 的回测结果为空")
-        if 'recorded_values' not in backtest_result:
+        if "recorded_values" not in backtest_result:
             raise ValueError(f"策略 '{name}' 缺少 recorded_values 数据")
-        recorded_values = backtest_result['recorded_values']
+        recorded_values = backtest_result["recorded_values"]
         if not recorded_values:
             raise ValueError(f"策略 '{name}' 的 recorded_values 为空")
 
@@ -128,8 +133,8 @@ class PortfolioRiskMonitor:
             return (0.0, 0.0)
 
         # 收集所有策略的收益率序列
-        all_returns = []
-        total_value = 0.0
+        returns_by_strategy = {}
+        latest_values = {}
         insufficient_data_strategies = []  # 记录数据不足的策略
 
         for name, result in self._strategy_results.items():
@@ -137,16 +142,14 @@ class PortfolioRiskMonitor:
             if len(returns) < 30:  # 数据不足
                 insufficient_data_strategies.append(name)
                 continue
-            all_returns.append(returns)
-
-            # 获取当前总资产
-            recorded = result.get("recorded_values", {})
-            if recorded:
-                if isinstance(recorded, dict):
-                    last_val = list(recorded.values())[-1].get("total_value", 0)
-                else:
-                    last_val = recorded[-1].get("total_value", 0)
-                total_value += last_val
+            try:
+                latest_values[name] = normalize_recorded_values(
+                    result["recorded_values"]
+                ).iloc[-1]
+            except ValueError:
+                insufficient_data_strategies.append(name)
+                continue
+            returns_by_strategy[name] = returns
 
         # 记录数据不足问题（供 daily_check 使用）
         if insufficient_data_strategies:
@@ -156,22 +159,44 @@ class PortfolioRiskMonitor:
             ]
 
         # 所有策略数据都不足 → 返回 NaN
-        if not all_returns:
-            return (float('nan'), float('nan'))
+        if not returns_by_strategy:
+            return (float("nan"), float("nan"))
+
+        total_value = float(sum(latest_values.values()))
 
         if total_value == 0:
             return (0.0, 0.0)
 
-        # 简化：按等权重拼接组合收益率
-        combined_returns = pd.concat(all_returns, axis=1).mean(axis=1)
+        returns_frame = pd.DataFrame(returns_by_strategy).dropna()
+        if returns_frame.empty:
+            return (float("nan"), float("nan"))
+        weights = pd.Series(latest_values, dtype=float) / total_value
+        combined_returns = returns_frame.mul(weights, axis="columns").sum(axis=1)
 
         # 历史模拟法：取分布的负分位数
         loss_quantile = 1 - confidence
-        var_pct = max(0.0, -np.percentile(combined_returns, loss_quantile * 100))  # 确保 VaR 非负
+        var_pct = max(
+            0.0, -np.percentile(combined_returns, loss_quantile * 100)
+        )  # 确保 VaR 非负
 
         var_amount = total_value * var_pct
 
         return (float(var_amount), float(var_pct))
+
+    def _portfolio_drawdown(self) -> float | None:
+        """Return the positive peak-to-trough drawdown of the combined NAV."""
+        curves = []
+        for result in self._strategy_results.values():
+            try:
+                curves.append(normalize_recorded_values(result["recorded_values"]))
+            except (KeyError, ValueError):
+                continue
+        if not curves:
+            return None
+        combined = pd.concat(curves, axis=1).sum(axis=1, min_count=len(curves)).dropna()
+        if combined.empty:
+            return None
+        return float(-(combined / combined.cummax() - 1.0).min())
 
     def correlation_matrix(self) -> pd.DataFrame:
         """计算策略间相关性矩阵
@@ -242,7 +267,9 @@ class PortfolioRiskMonitor:
             }
 
         # 计算各持仓占比
-        position_values = {sec: data.get("value", 0) for sec, data in all_positions.items()}
+        position_values = {
+            sec: data.get("value", 0) for sec, data in all_positions.items()
+        }
         position_pcts = {sec: val / total_value for sec, val in position_values.items()}
 
         # 最大单股票占比
@@ -250,7 +277,9 @@ class PortfolioRiskMonitor:
 
         # 前三大持仓占比
         sorted_pcts = sorted(position_pcts.values(), reverse=True)
-        top3_concentration = sum(sorted_pcts[:3]) if len(sorted_pcts) >= 3 else sum(sorted_pcts)
+        top3_concentration = (
+            sum(sorted_pcts[:3]) if len(sorted_pcts) >= 3 else sum(sorted_pcts)
+        )
 
         # 板块和市值分析需要 akshare 数据，简化处理
         max_single_sector = max_single_stock  # 保守估计
@@ -276,7 +305,9 @@ class PortfolioRiskMonitor:
             end_date = pd.Timestamp.now().date()
             start_date = end_date - pd.Timedelta(days=90)
 
-            index_data = get_price("000300.XSHG", start_date=start_date, end_date=end_date)
+            index_data = get_price(
+                "000300.XSHG", start_date=start_date, end_date=end_date
+            )
 
             if index_data is None or len(index_data) < 60:
                 return "unknown"
@@ -310,6 +341,19 @@ class PortfolioRiskMonitor:
         # 1. 计算 VaR
         var_amount, var_pct = self.portfolio_var()
 
+        drawdown = self._portfolio_drawdown()
+        if drawdown is not None:
+            if drawdown >= self.thresholds.max_drawdown_kill:
+                triggers.append(f"熔断预警：组合回撤过大 ({drawdown:.2%})")
+                recommendations.append("建议暂停策略并等待人工确认")
+                alert_level = _escalate(alert_level, AlertLevel.KILL_SWITCH)
+            elif drawdown >= self.thresholds.max_drawdown_red:
+                triggers.append(f"红色预警：组合回撤较大 ({drawdown:.2%})")
+                recommendations.append("建议人工检查策略状态")
+                alert_level = _escalate(alert_level, AlertLevel.RED)
+            elif drawdown >= self.thresholds.max_drawdown_yellow:
+                triggers.append(f"黄色预警：组合回撤 ({drawdown:.2%})")
+
         # 2. 计算相关性矩阵
         corr_matrix = self.correlation_matrix()
         max_correlation = 0.0
@@ -323,11 +367,11 @@ class PortfolioRiskMonitor:
             if max_correlation >= self.thresholds.correlation_kill:
                 triggers.append(f"熔断预警：策略相关性过高 ({max_correlation:.2f})")
                 recommendations.append("建议降低高相关性策略仓位 50%")
-                alert_level = AlertLevel.KILL_SWITCH
+                alert_level = _escalate(alert_level, AlertLevel.KILL_SWITCH)
             elif max_correlation >= self.thresholds.correlation_red:
                 triggers.append(f"红色预警：策略相关性较高 ({max_correlation:.2f})")
                 recommendations.append("建议关注策略分散度")
-                alert_level = AlertLevel.RED
+                alert_level = _escalate(alert_level, AlertLevel.RED)
             elif max_correlation >= self.thresholds.correlation_yellow:
                 triggers.append(f"黄色预警：策略相关性 ({max_correlation:.2f})")
 
@@ -335,23 +379,21 @@ class PortfolioRiskMonitor:
         concentration = self.concentration_risk()
 
         if concentration["max_single_stock"] > self.thresholds.single_stock_max:
-            triggers.append(f"单股票持仓占比过高 ({concentration['max_single_stock']:.2%})")
+            triggers.append(
+                f"单股票持仓占比过高 ({concentration['max_single_stock']:.2%})"
+            )
             recommendations.append("建议减仓超占比股票")
             if concentration["max_single_stock"] > self.thresholds.single_stock_max * 2:
-                alert_level = AlertLevel.RED
-            elif alert_level.value < AlertLevel.YELLOW.value:
-                alert_level = AlertLevel.YELLOW
+                alert_level = _escalate(alert_level, AlertLevel.RED)
 
         if concentration["max_single_sector"] > self.thresholds.single_sector_max:
-            triggers.append(f"单板块持仓占比过高 ({concentration['max_single_sector']:.2%})")
-            if alert_level.value < AlertLevel.YELLOW.value:
-                alert_level = AlertLevel.YELLOW
+            triggers.append(
+                f"单板块持仓占比过高 ({concentration['max_single_sector']:.2%})"
+            )
 
         if concentration["small_cap_pct"] > self.thresholds.small_cap_max:
             triggers.append(f"微盘股占比过高 ({concentration['small_cap_pct']:.2%})")
             recommendations.append("微盘股流动性风险大，建议控制仓位")
-            if alert_level.value < AlertLevel.YELLOW.value:
-                alert_level = AlertLevel.YELLOW
 
         # 4. Regime 检测
         regime = self.regime_detection()
