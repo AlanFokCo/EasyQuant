@@ -47,6 +47,22 @@ def test_selector_keeps_exactly_python310_mac_and_linux_active_entries(tmp_path)
     assert rendered.index("common==") < rendered.index("linux-only==")
 
 
+def test_selector_keeps_entries_active_only_at_python31020_boundary(tmp_path):
+    selector = _load_selector()
+    source = tmp_path / "universal.txt"
+    output = tmp_path / "constraints-py310.txt"
+    source.write_text(
+        "runtime-patch-only==1.0.0 ; python_full_version >= '3.10.10' and python_full_version < '3.10.21' \\\n"
+        "    --hash=sha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
+
+    selected = selector.select(source, output)
+
+    assert selected == 1
+    assert "runtime-patch-only==1.0.0" in output.read_text(encoding="utf-8")
+
+
 def test_selector_fails_closed_for_direct_urls_without_replacing_output(tmp_path):
     selector = _load_selector()
     source = tmp_path / "universal.txt"

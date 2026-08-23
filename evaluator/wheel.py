@@ -59,6 +59,7 @@ class _CommandResult:
     stderr: str
     timed_out: bool = False
     index_unavailable: bool = False
+    cleanup_failed: bool = False
 
 
 @dataclass
@@ -510,8 +511,9 @@ def _is_index_unavailable(result: _CommandResult) -> bool:
     network issue.  It is therefore a DEP-003 failure unless the subprocess output
     itself contains a package-index/network marker.
     """
-    return result.index_unavailable or _output_indicates_index_unavailable(
-        result.stdout, result.stderr
+    return not result.cleanup_failed and (
+        result.index_unavailable
+        or _output_indicates_index_unavailable(result.stdout, result.stderr)
     )
 
 
@@ -562,24 +564,39 @@ def _run(
     stderr_capture = _BoundedStreamCapture()
     readers = _start_stream_readers(process, stdout_capture, stderr_capture)
     timed_out = False
+    cleanup_error: str | None = None
     try:
         returncode = process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         timed_out = True
-        _terminate_process_group(process)
+        cleanup_error = _terminate_process_group(process)
         returncode = None
     finally:
-        _finish_stream_readers(process, readers)
+        reader_cleanup_error = _finish_stream_readers(process, readers)
+        if cleanup_error is None:
+            cleanup_error = reader_cleanup_error
+
+    stderr = stderr_capture.evidence()
+    if cleanup_error is not None:
+        returncode = 1
+        stderr = _bounded_text(
+            "\n".join(
+                part
+                for part in (stderr, f"process-group cleanup failed: {cleanup_error}")
+                if part
+            )
+        )
 
     return _CommandResult(
         command_tuple,
         returncode,
         stdout_capture.evidence(),
-        stderr_capture.evidence(),
+        stderr,
         timed_out=timed_out,
         index_unavailable=(
             stdout_capture.index_unavailable or stderr_capture.index_unavailable
         ),
+        cleanup_failed=cleanup_error is not None,
     )
 
 
@@ -623,40 +640,46 @@ def _drain_stream(stream: Any, capture: _BoundedStreamCapture) -> None:
 
 def _finish_stream_readers(
     process: subprocess.Popen[bytes], readers: Sequence[threading.Thread]
-) -> None:
+) -> str | None:
     """Join readers; close a leaked child pipe only after terminating its group."""
     for reader in readers:
         reader.join(timeout=_TERMINATION_GRACE_SECONDS)
     if any(reader.is_alive() for reader in readers):
-        _terminate_process_group(process)
+        cleanup_error = _terminate_process_group(process)
         for stream in (process.stdout, process.stderr):
             if stream is not None:
                 stream.close()
         for reader in readers:
             reader.join(timeout=_TERMINATION_GRACE_SECONDS)
+        if cleanup_error is not None:
+            return cleanup_error
+        if any(reader.is_alive() for reader in readers):
+            return "stream reader remained alive after process-group cleanup"
+    return None
 
 
-def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+def _terminate_process_group(process: subprocess.Popen[bytes]) -> str | None:
     """Terminate a timed-out evaluator command and every child in its group."""
     if os.name == "nt":  # pragma: no cover - exercised on Windows runners
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            check=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        graceful_error = _run_windows_taskkill(process.pid, force=False)
+        if _wait_for_process_exit(process):
+            return None
+        forced_error = _run_windows_taskkill(process.pid, force=True)
+        if _wait_for_process_exit(process):
+            return None
+        details = [
+            error for error in (graceful_error, forced_error) if error is not None
+        ]
+        suffix = f" ({'; '.join(details)})" if details else ""
+        return (
+            f"process group {process.pid} remained alive after forced taskkill{suffix}"
         )
-        try:
-            process.wait(timeout=_TERMINATION_GRACE_SECONDS)
-        except subprocess.TimeoutExpired:
-            pass
-        return
 
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except (PermissionError, ProcessLookupError):
         _wait_for_process_exit(process)
-        return
+        return None
     # The group leader can exit before a child that ignores SIGTERM.  Escalate
     # against the original process group even when the leader has already been
     # reaped, then wait for that leader so no evaluator-owned process remains.
@@ -666,13 +689,38 @@ def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
     except (PermissionError, ProcessLookupError):
         pass
     _wait_for_process_exit(process)
+    return None
 
 
-def _wait_for_process_exit(process: subprocess.Popen[bytes]) -> None:
+def _run_windows_taskkill(pid: int, *, force: bool) -> str | None:
+    """Run one bounded ``taskkill`` attempt without trusting its exit alone."""
+    command = ["taskkill", "/PID", str(pid), "/T"]
+    if force:
+        command.append("/F")
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=_TERMINATION_GRACE_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return f"{'forced ' if force else ''}taskkill timed out"
+    except OSError as exc:
+        return f"{'forced ' if force else ''}taskkill could not run: {exc}"
+    if result.returncode not in (0, None):
+        return f"{'forced ' if force else ''}taskkill exited {result.returncode}"
+    return None
+
+
+def _wait_for_process_exit(process: subprocess.Popen[bytes]) -> bool:
     try:
         process.wait(timeout=_TERMINATION_GRACE_SECONDS)
+        return True
     except subprocess.TimeoutExpired:  # pragma: no cover - kernel/process failure
-        pass
+        return False
 
 
 def _venv_python(venv_dir: Path) -> Path:
@@ -786,6 +834,7 @@ def _command_evidence(result: _CommandResult | None) -> dict[str, Any] | None:
         "stderr": _bounded_text(result.stderr),
         "timed_out": result.timed_out,
         "index_unavailable": result.index_unavailable,
+        "cleanup_failed": result.cleanup_failed,
     }
 
 
@@ -794,6 +843,8 @@ def _command_detail(*results: _CommandResult) -> str:
     for result in results:
         command = " ".join(result.command)
         status = "timed out" if result.timed_out else f"exit {result.returncode}"
+        if result.cleanup_failed:
+            status += "; process-group cleanup failed"
         output = "\n".join(part for part in (result.stdout, result.stderr) if part)
         sections.append(f"{command} ({status})" + (f"\n{output}" if output else ""))
     return _bounded_text("\n\n".join(sections))
