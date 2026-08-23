@@ -6,6 +6,73 @@ import numpy as np
 from eqlib.portfolio_risk import AlertLevel, RiskThresholds, RiskReport
 
 
+def _result_from_values(values):
+    dates = pd.bdate_range("2024-01-01", periods=len(values))
+    return {
+        "recorded_values": {
+            date.date(): {"total_value": float(value)}
+            for date, value in zip(dates, values)
+        }
+    }
+
+
+def test_portfolio_var_is_nav_weighted_not_strategy_count_weighted():
+    from eqlib.portfolio_risk import PortfolioRiskMonitor
+
+    large_values = [1_000_000.0]
+    for _ in range(16):
+        large_values.extend([900_000.0, 1_000_000.0])
+    tiny_values = [1.0] * len(large_values)
+    monitor = PortfolioRiskMonitor()
+    monitor.add_strategy("large", _result_from_values(large_values))
+    monitor.add_strategy("tiny", _result_from_values(tiny_values))
+
+    _, var_pct = monitor.portfolio_var(confidence=0.95)
+
+    assert var_pct == pytest.approx(0.10, abs=0.002)
+
+
+def test_thirty_percent_drawdown_triggers_kill_switch(monkeypatch):
+    from eqlib.portfolio_risk import PortfolioRiskMonitor
+
+    monitor = PortfolioRiskMonitor()
+    monitor.add_strategy("strategy", _result_from_values([100.0] * 30 + [70.0]))
+    monkeypatch.setattr(monitor, "regime_detection", lambda: "unknown")
+
+    report = monitor.daily_check()
+
+    assert report.alert_level is AlertLevel.KILL_SWITCH
+    assert any("回撤" in item for item in report.triggers)
+
+
+def test_adding_concentration_to_existing_kill_switch_never_reduces_alert(monkeypatch):
+    from eqlib.portfolio_risk import PortfolioRiskMonitor
+
+    monitor = PortfolioRiskMonitor()
+    monkeypatch.setattr(monitor, "portfolio_var", lambda: (0.0, 0.0))
+    monkeypatch.setattr(
+        monitor,
+        "correlation_matrix",
+        lambda: pd.DataFrame(
+            [[1.0, 0.9], [0.9, 1.0]], index=["a", "b"], columns=["a", "b"]
+        ),
+    )
+    monkeypatch.setattr(
+        monitor,
+        "concentration_risk",
+        lambda: {
+            "max_single_stock": 0.15,
+            "max_single_sector": 0.0,
+            "small_cap_pct": 0.0,
+            "num_holdings": 1,
+            "top3_concentration": 0.15,
+        },
+    )
+    monkeypatch.setattr(monitor, "regime_detection", lambda: "unknown")
+
+    assert monitor.daily_check().alert_level is AlertLevel.KILL_SWITCH
+
+
 def _make_backtest_result(n_days=50, annual_return=0.15, seed=42):
     """Create a synthetic backtest result dict."""
     rng = np.random.RandomState(seed)
@@ -27,13 +94,21 @@ def _make_backtest_result(n_days=50, annual_return=0.15, seed=42):
     return {
         "recorded_values": recorded_values,
         "trade_log": [],
-        "context": type("Ctx", (), {
-            "portfolio": type("P", (), {
-                "starting_cash": starting_cash,
-                "positions": {},
-                "total_value": values[-1],
-            })(),
-        })(),
+        "context": type(
+            "Ctx",
+            (),
+            {
+                "portfolio": type(
+                    "P",
+                    (),
+                    {
+                        "starting_cash": starting_cash,
+                        "positions": {},
+                        "total_value": values[-1],
+                    },
+                )(),
+            },
+        )(),
         "benchmark": "000300.XSHG",
     }
 
@@ -84,6 +159,7 @@ class TestRiskReport:
 
     def test_risk_report_creation(self):
         from eqlib.portfolio_risk import RiskReport
+
         report = RiskReport(
             timestamp=pd.Timestamp("2024-01-01"),
             alert_level=AlertLevel.YELLOW,
@@ -101,6 +177,7 @@ class TestRiskReport:
 
     def test_risk_report_optional_fields(self):
         from eqlib.portfolio_risk import RiskReport
+
         report = RiskReport(
             timestamp=pd.Timestamp.now(),
             alert_level=AlertLevel.RED,
@@ -116,17 +193,20 @@ class TestPortfolioRiskMonitorInit:
 
     def test_init_default_thresholds(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         assert monitor.thresholds.max_drawdown_yellow == 0.15
 
     def test_init_custom_thresholds(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         custom = RiskThresholds(max_drawdown_kill=0.10)
         monitor = PortfolioRiskMonitor(thresholds=custom)
         assert monitor.thresholds.max_drawdown_kill == 0.10
 
     def test_add_strategy(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result()
         monitor.add_strategy("均线策略", result)
@@ -134,18 +214,21 @@ class TestPortfolioRiskMonitorInit:
 
     def test_add_strategy_empty_result_raises(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         with pytest.raises(ValueError, match="回测结果为空"):
             monitor.add_strategy("test", {})
 
     def test_add_strategy_missing_recorded_values_raises(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         with pytest.raises(ValueError, match="缺少 recorded_values"):
             monitor.add_strategy("test", {"trade_log": []})
 
     def test_add_strategy_empty_recorded_values_raises(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         with pytest.raises(ValueError, match="recorded_values 为空"):
             monitor.add_strategy("test", {"recorded_values": {}})
@@ -153,6 +236,7 @@ class TestPortfolioRiskMonitorInit:
     def test_add_strategy_overwrite_warns(self):
         import warnings
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result()
         monitor.add_strategy("均线策略", result)
@@ -169,6 +253,7 @@ class TestPortfolioVar:
 
     def test_portfolio_var_basic(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result1 = _make_backtest_result(n_days=100, seed=1)
         result2 = _make_backtest_result(n_days=100, seed=2)
@@ -182,6 +267,7 @@ class TestPortfolioVar:
 
     def test_portfolio_var_no_strategy(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         var_amount, var_pct = monitor.portfolio_var()
         assert var_amount == 0.0
@@ -189,6 +275,7 @@ class TestPortfolioVar:
 
     def test_portfolio_var_single_strategy(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result(n_days=100)
         monitor.add_strategy("单策略", result)
@@ -197,6 +284,7 @@ class TestPortfolioVar:
 
     def test_portfolio_var_confidence_override(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result(n_days=100)
         monitor.add_strategy("test", result)
@@ -208,6 +296,7 @@ class TestPortfolioVar:
 
     def test_portfolio_var_insufficient_data(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         # 只有 10 天数据，不足以计算 VaR
         result = _make_backtest_result(n_days=10)
@@ -224,6 +313,7 @@ class TestPortfolioVar:
     def test_portfolio_var_partial_insufficient_data(self):
         """部分策略数据不足时，跳过这些策略继续计算"""
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         # 一个数据不足的策略
         short_result = _make_backtest_result(n_days=10, seed=1)
@@ -246,6 +336,7 @@ class TestCorrelationMatrix:
 
     def test_correlation_matrix_basic(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result1 = _make_backtest_result(n_days=100, seed=1)
         result2 = _make_backtest_result(n_days=100, seed=2)
@@ -264,6 +355,7 @@ class TestCorrelationMatrix:
 
     def test_correlation_matrix_single_strategy(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result(n_days=100)
         monitor.add_strategy("单策略", result)
@@ -273,12 +365,14 @@ class TestCorrelationMatrix:
 
     def test_correlation_matrix_no_strategy(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         corr_matrix = monitor.correlation_matrix()
         assert corr_matrix.empty
 
     def test_correlation_values_in_range(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result1 = _make_backtest_result(n_days=100, seed=1)
         result2 = _make_backtest_result(n_days=100, seed=2)
@@ -296,6 +390,7 @@ class TestConcentrationRisk:
 
     def test_concentration_risk_no_positions(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result(n_days=50)
         monitor.add_strategy("test", result)
@@ -306,6 +401,7 @@ class TestConcentrationRisk:
 
     def test_concentration_risk_with_positions(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
 
         # 模拟有持仓的结果
@@ -324,6 +420,7 @@ class TestConcentrationRisk:
 
     def test_concentration_risk_returns_required_keys(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         result = _make_backtest_result(n_days=50)
         monitor.add_strategy("test", result)
@@ -345,18 +442,21 @@ class TestRegimeDetection:
 
     def test_regime_detection_returns_string(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         regime = monitor.regime_detection()
         assert regime in ["bull", "bear", "oscillation", "unknown"]
 
     def test_regime_detection_no_data(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         regime = monitor.regime_detection()
         assert regime is not None
 
     def test_regime_with_mock_index_data(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor
+
         monitor = PortfolioRiskMonitor()
         regime = monitor.regime_detection()
         assert isinstance(regime, str)
@@ -367,6 +467,7 @@ class TestDailyCheck:
 
     def test_daily_check_returns_risk_report(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor, RiskReport, AlertLevel
+
         monitor = PortfolioRiskMonitor()
         result1 = _make_backtest_result(n_days=100, seed=1)
         result2 = _make_backtest_result(n_days=100, seed=2)
@@ -375,10 +476,15 @@ class TestDailyCheck:
 
         report = monitor.daily_check()
         assert isinstance(report, RiskReport)
-        assert report.alert_level in [AlertLevel.YELLOW, AlertLevel.RED, AlertLevel.KILL_SWITCH]
+        assert report.alert_level in [
+            AlertLevel.YELLOW,
+            AlertLevel.RED,
+            AlertLevel.KILL_SWITCH,
+        ]
 
     def test_daily_check_no_strategy(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor, AlertLevel
+
         monitor = PortfolioRiskMonitor()
         report = monitor.daily_check()
         assert report.alert_level == AlertLevel.YELLOW
@@ -386,6 +492,7 @@ class TestDailyCheck:
 
     def test_daily_check_high_correlation_trigger(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor, AlertLevel
+
         monitor = PortfolioRiskMonitor()
 
         # 两个高度相关的策略（相同 seed）
@@ -396,7 +503,10 @@ class TestDailyCheck:
 
         report = monitor.daily_check()
         # 高相关性应触发预警
-        assert any("相关性" in t for t in report.triggers) or report.alert_level == AlertLevel.KILL_SWITCH
+        assert (
+            any("相关性" in t for t in report.triggers)
+            or report.alert_level == AlertLevel.KILL_SWITCH
+        )
 
 
 class TestCheckKillSwitch:
@@ -404,6 +514,7 @@ class TestCheckKillSwitch:
 
     def test_check_kill_switch_yellow_returns_empty(self):
         from eqlib.portfolio_risk import check_kill_switch
+
         report = RiskReport(
             timestamp=pd.Timestamp.now(),
             alert_level=AlertLevel.YELLOW,
@@ -414,6 +525,7 @@ class TestCheckKillSwitch:
 
     def test_check_kill_switch_red_returns_actions(self):
         from eqlib.portfolio_risk import check_kill_switch
+
         report = RiskReport(
             timestamp=pd.Timestamp.now(),
             alert_level=AlertLevel.RED,
@@ -426,6 +538,7 @@ class TestCheckKillSwitch:
 
     def test_check_kill_switch_kill_returns_strong_actions(self):
         from eqlib.portfolio_risk import check_kill_switch
+
         report = RiskReport(
             timestamp=pd.Timestamp.now(),
             alert_level=AlertLevel.KILL_SWITCH,
@@ -442,6 +555,7 @@ class TestModuleExports:
 
     def test_import_from_eqlib(self):
         from eqlib import PortfolioRiskMonitor, RiskThresholds, RiskReport, AlertLevel
+
         assert PortfolioRiskMonitor is not None
         assert RiskThresholds is not None
         assert RiskReport is not None
@@ -449,4 +563,5 @@ class TestModuleExports:
 
     def test_import_check_kill_switch(self):
         from eqlib import check_kill_switch
+
         assert check_kill_switch is not None
