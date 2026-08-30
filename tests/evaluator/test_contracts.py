@@ -46,3 +46,34 @@ def test_contract_failure_keeps_failed_node_ids_when_stdout_is_truncated(monkeyp
     assert finding.id == "CON-001"
     assert finding.evidence["failed_node_ids"] == [failure_node]
     assert "FAILED " + failure_node in finding.evidence["stdout"]
+
+
+def test_live_timeout_is_unavailable_and_sets_live_environment(monkeypatch):
+    captured = {}
+
+    def expire(*args, **kwargs):
+        captured.update(kwargs)
+        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
+
+    monkeypatch.setattr("evaluator.contracts.subprocess.run", expire)
+
+    finding = run_live_contracts(ROOT)[0]
+
+    assert (finding.id, finding.status) == ("DATA-190", "unavailable")
+    assert captured["timeout"] == 90
+    assert captured["env"]["EQLIB_EVALUATOR_LIVE"] == "1"
+
+
+def test_offline_contracts_exclude_network_marked_tests(monkeypatch):
+    captured = {}
+
+    def successful(*args, **kwargs):
+        captured["command"] = args[0]
+        return subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr("evaluator.contracts.subprocess.run", successful)
+
+    assert run_offline_contracts(ROOT) == []
+    assert "not network" in captured["command"]

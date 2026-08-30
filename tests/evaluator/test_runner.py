@@ -60,6 +60,9 @@ def test_live_profile_adds_live_contract_findings_only_for_live(monkeypatch):
         "evaluator.runner.build_and_audit_wheel", lambda root, work_dir: ({}, [])
     )
     monkeypatch.setattr(
+        "evaluator.runner.evaluate_benchmarks", lambda root, baseline: []
+    )
+    monkeypatch.setattr(
         "evaluator.runner.run_offline_contracts",
         lambda root: calls.append("offline") or [],
     )

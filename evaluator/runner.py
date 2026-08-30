@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import platform
+import sys
 import tempfile
 
+from .benchmarks import evaluate_benchmarks
 from .contracts import run_live_contracts, run_offline_contracts
 from .inventory import evaluate_inventory
 from .models import EvaluationReport, Finding, Severity
@@ -39,7 +43,24 @@ def collect_findings(root: Path, profile: str) -> list[Finding]:
     with tempfile.TemporaryDirectory(prefix="eqlib-evaluator-wheel-") as work_dir:
         _, wheel_findings = build_and_audit_wheel(root, Path(work_dir))
     findings.extend(wheel_findings)
+    findings.extend(evaluate_benchmarks(root, _benchmark_baseline(root)))
     findings.extend(run_offline_contracts(root))
     if profile == "live":
         findings.extend(run_live_contracts(root))
     return findings
+
+
+def _benchmark_baseline(root: Path) -> dict[str, dict[str, float]]:
+    """Load only the baseline recorded for the current controlled environment."""
+    path = root / "tests" / "evaluator" / "baselines" / "macos-py310.json"
+    if (
+        platform.system() != "Darwin"
+        or sys.version_info[:2] != (3, 10)
+        or not path.exists()
+    ):
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload["benchmarks"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return {}

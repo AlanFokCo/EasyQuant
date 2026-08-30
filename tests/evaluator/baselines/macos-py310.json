@@ -1,0 +1,12 @@
+{
+  "environment": {
+    "platform": "Darwin",
+    "python": "3.10"
+  },
+  "benchmarks": {
+    "import_eqlib": {
+      "seconds": 0.7,
+      "max_rss_mb": 128.0
+    }
+  }
+}

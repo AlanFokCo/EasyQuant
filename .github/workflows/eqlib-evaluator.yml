@@ -1,0 +1,53 @@
+name: eqlib evaluator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 1 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install eqlib
+        run: python -m pip install -e ".[dev]"
+      - name: Run offline evaluator
+        run: python scripts/evaluate_eqlib_dependencies.py --profile offline --strict --output artifacts/eqlib-evaluator
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eqlib-evaluator-offline-py${{ matrix.python-version }}
+          path: artifacts/eqlib-evaluator
+
+  live:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install eqlib
+        run: python -m pip install -e ".[dev]"
+      - name: Run bounded live evaluator
+        run: python scripts/evaluate_eqlib_dependencies.py --profile live --output artifacts/eqlib-evaluator
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eqlib-evaluator-live-py312
+          path: artifacts/eqlib-evaluator

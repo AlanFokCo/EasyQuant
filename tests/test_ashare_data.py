@@ -3,8 +3,10 @@
 
 import pytest
 import pandas as pd
-import numpy as np
 import datetime
+
+
+pytestmark = pytest.mark.network
 
 
 class TestNorthMoneyFlow:
@@ -13,6 +15,7 @@ class TestNorthMoneyFlow:
     def test_import_available(self):
         """验证函数可导入"""
         from eqlib.data import get_north_money_flow
+
         assert get_north_money_flow is not None
 
     def test_basic_fetch(self):
@@ -36,12 +39,15 @@ class TestNorthMoneyFlow:
             assert "total_sell" in df.columns
 
             # Bug 14 fix: 验证 dtype
-            assert pd.api.types.is_numeric_dtype(df["net_buy"]), \
-                f"net_buy should be numeric, got {df['net_buy'].dtype}"
-            assert pd.api.types.is_numeric_dtype(df["total_buy"]), \
-                f"total_buy should be numeric, got {df['total_buy'].dtype}"
-            assert pd.api.types.is_numeric_dtype(df["total_sell"]), \
-                f"total_sell should be numeric, got {df['total_sell'].dtype}"
+            assert pd.api.types.is_numeric_dtype(
+                df["net_buy"]
+            ), f"net_buy should be numeric, got {df['net_buy'].dtype}"
+            assert pd.api.types.is_numeric_dtype(
+                df["total_buy"]
+            ), f"total_buy should be numeric, got {df['total_buy'].dtype}"
+            assert pd.api.types.is_numeric_dtype(
+                df["total_sell"]
+            ), f"total_sell should be numeric, got {df['total_sell'].dtype}"
 
     def test_invalid_date_range(self):
         """验证 start_date > end_date 时返回空 DataFrame"""
@@ -89,6 +95,7 @@ class TestMarginData:
     def test_import_available(self):
         """验证函数可导入"""
         from eqlib.data import get_margin_data
+
         assert get_margin_data is not None
 
     def test_basic_fetch(self):
@@ -108,14 +115,16 @@ class TestMarginData:
             assert "margin_repay" in df.columns
 
             # Bug 14 fix: 验证 dtype
-            assert pd.api.types.is_numeric_dtype(df["margin_balance"]), \
-                f"margin_balance should be numeric, got {df['margin_balance'].dtype}"
+            assert pd.api.types.is_numeric_dtype(
+                df["margin_balance"]
+            ), f"margin_balance should be numeric, got {df['margin_balance'].dtype}"
 
             # Bug 7 fix: 验证第一行 margin_repay 是 NaN
             if len(df) > 0:
                 first_repay = df["margin_repay"].iloc[0]
-                assert pd.isna(first_repay), \
-                    f"First row margin_repay should be NaN, got {first_repay}"
+                assert pd.isna(
+                    first_repay
+                ), f"First row margin_repay should be NaN, got {first_repay}"
 
     def test_default_parameters(self):
         """验证默认参数工作"""
@@ -131,6 +140,7 @@ class TestLimitUpDownStats:
     def test_import_available(self):
         """验证函数可导入"""
         from eqlib.data import get_limit_up_down_stats
+
         assert get_limit_up_down_stats is not None
 
     def test_basic_fetch(self):
@@ -157,7 +167,6 @@ class TestLimitUpDownStats:
     def test_30_day_warning(self):
         """验证超过 30 天限制时发出警告"""
         from eqlib.data import get_limit_up_down_stats
-        import warnings
 
         # 请求超过 30 天的数据
         end_date = datetime.date.today()
@@ -181,6 +190,7 @@ class TestRestrictionRelease:
     def test_import_available(self):
         """验证函数可导入"""
         from eqlib.data import get_restriction_release
+
         assert get_restriction_release is not None
 
     def test_basic_fetch(self):
@@ -230,6 +240,7 @@ class TestModuleExports:
             get_limit_up_down_stats,
             get_restriction_release,
         )
+
         assert get_north_money_flow is not None
         assert get_margin_data is not None
         assert get_limit_up_down_stats is not None
