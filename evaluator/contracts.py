@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import re
 import subprocess
 import sys
@@ -11,8 +12,18 @@ from typing import Sequence
 from .models import Finding, Severity
 
 
-_CONTRACT_TIMEOUT_SECONDS = 180
-_OFFLINE_NODE_IDS = ("tests/test_imports.py", "tests/test_data_utils.py")
+_OFFLINE_CONTRACT_TIMEOUT_SECONDS = 180
+_LIVE_CONTRACT_TIMEOUT_SECONDS = 90
+_OFFLINE_NODE_IDS = (
+    "tests/test_imports.py",
+    "tests/test_data_source_contracts.py",
+    "tests/test_calendar.py",
+    "tests/test_data_utils.py",
+    "tests/test_portfolio_risk.py",
+    "tests/test_equity_normalization.py",
+    "tests/test_utils_stats.py",
+    "tests/test_ml_models.py",
+)
 _LIVE_MARKER = "network"
 _NO_TESTS_COLLECTED_RETURN_CODE = 5
 _FAILED_NODE_ID = re.compile(r"^FAILED\s+([^\s]+)", re.MULTILINE)
@@ -20,7 +31,9 @@ _FAILED_NODE_ID = re.compile(r"^FAILED\s+([^\s]+)", re.MULTILINE)
 
 def run_offline_contracts(root: Path) -> list[Finding]:
     """Run deterministic contracts that are required not to contact providers."""
-    return _run_pytest_contract(root, "offline", _OFFLINE_NODE_IDS)
+    return _run_pytest_contract(
+        root, "offline", ("-m", "not network", *_OFFLINE_NODE_IDS)
+    )
 
 
 def run_live_contracts(root: Path) -> list[Finding]:
@@ -32,6 +45,14 @@ def _run_pytest_contract(
     root: Path, profile: str, selectors: Sequence[str]
 ) -> list[Finding]:
     command = (sys.executable, "-m", "pytest", *selectors, "-q")
+    environment = os.environ.copy()
+    timeout = (
+        _LIVE_CONTRACT_TIMEOUT_SECONDS
+        if profile == "live"
+        else _OFFLINE_CONTRACT_TIMEOUT_SECONDS
+    )
+    if profile == "live":
+        environment["EQLIB_EVALUATOR_LIVE"] = "1"
     try:
         completed = subprocess.run(
             command,
@@ -39,7 +60,8 @@ def _run_pytest_contract(
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=_CONTRACT_TIMEOUT_SECONDS,
+            timeout=timeout,
+            env=environment,
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
@@ -84,6 +106,16 @@ def _contract_failure(
         "stderr": _bounded_text(stderr),
         "failed_node_ids": _failed_node_ids(stdout, stderr),
     }
+    if profile == "live" and timed_out:
+        return Finding(
+            "DATA-190",
+            Severity.P2,
+            "Live provider contract unavailable",
+            "The bounded live provider contract exceeded its total deadline.",
+            evidence=evidence,
+            status="unavailable",
+            remediation="Check provider availability and rerun the live evaluator profile.",
+        )
     detail = (
         "pytest contract exceeded its total deadline"
         if timed_out

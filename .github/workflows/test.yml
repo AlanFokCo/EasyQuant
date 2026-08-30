@@ -35,4 +35,4 @@ jobs:
 
       - name: Run tests
         shell: bash -el {0}
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short -m "not network"
