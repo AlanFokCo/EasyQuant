@@ -142,6 +142,7 @@ nav:
       - how-to/selection-strategy.md
       - how-to/portfolio-risk.md
       - how-to/param-optimization.md
+      - how-to/dependency-evaluator.md
       - Web 策略工作室:
           - how-to/web-studio.md
           - how-to/deploy-web-studio.md

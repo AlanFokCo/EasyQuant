@@ -47,7 +47,7 @@ pip install .
 
 ### Q: 需要安装哪些依赖？
 
-**最小集（已由 `pip install .` 或 `pip install easyquant-eqlib` 安装）：**`akshare`、`pandas`、`numpy`、`matplotlib`、`scipy`。
+**最小集（已由 `pip install .` 或 `pip install easyquant-eqlib` 安装）：**`akshare`、`chinese_calendar`、`pandas`、`numpy`、`matplotlib`、`scipy`、`scikit-learn`、`requests`。
 
 **可选：**`pip install pyarrow` 以提升部分磁盘缓存性能（见 `pyproject.toml` 的 `[project.optional-dependencies]`）。
 
