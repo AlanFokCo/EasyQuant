@@ -47,7 +47,7 @@ After installation, `import eqlib` will work from any working directory. Before 
 
 ### Q: What dependencies do I need to install?
 
-**Minimum set (already installed by `pip install .` or `pip install easyquant-eqlib`):** `akshare`, `pandas`, `numpy`, `matplotlib`, `scipy`.
+**Minimum set (already installed by `pip install .` or `pip install easyquant-eqlib`):** `akshare`, `chinese_calendar`, `pandas`, `numpy`, `matplotlib`, `scipy`, `scikit-learn`, and `requests`.
 
 **Optional:** `pip install pyarrow` to improve disk cache performance for some operations (see `[project.optional-dependencies]` in `pyproject.toml`).
 

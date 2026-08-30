@@ -1,0 +1,9 @@
+{
+  "environment": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "python": "3.10.20"
+  },
+  "findings": [],
+  "profile": "offline",
+  "started_at": "2026-08-30T14:12:14.073868+00:00"
+}
