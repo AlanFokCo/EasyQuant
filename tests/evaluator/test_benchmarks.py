@@ -51,3 +51,16 @@ def test_macos_time_parser_accepts_aligned_resource_output():
     )
 
     assert sample == BenchmarkSample(seconds=0.71, max_rss_mb=120.28125)
+
+
+def test_malformed_baseline_is_reported_as_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        "evaluator.benchmarks._samples",
+        lambda *args: [BenchmarkSample(seconds=1.0, max_rss_mb=10.0)],
+    )
+
+    findings = evaluate_benchmarks(ROOT, {"import_eqlib": {"seconds": 1.0}})
+
+    assert [(item.id, item.status) for item in findings] == [
+        ("PERF-302", "unavailable")
+    ]

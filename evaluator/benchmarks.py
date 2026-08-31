@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 import platform
 import re
@@ -73,7 +74,7 @@ def evaluate_benchmarks(
                 remediation="Run the evaluator on macOS or Linux with /usr/bin/time available.",
             )
         ]
-    expected = baseline.get(result.name)
+    expected = _valid_baseline(baseline.get(result.name))
     if expected is None:
         return [
             Finding(
@@ -101,6 +102,22 @@ def evaluate_benchmarks(
             )
         ]
     return []
+
+
+def _valid_baseline(value: object) -> dict[str, float] | None:
+    """Accept only finite, positive benchmark thresholds from reviewed JSON."""
+    if not isinstance(value, dict):
+        return None
+    try:
+        seconds = float(value["seconds"])
+        max_rss_mb = float(value["max_rss_mb"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (
+        isfinite(seconds) and isfinite(max_rss_mb) and seconds > 0 and max_rss_mb > 0
+    ):
+        return None
+    return {"seconds": seconds, "max_rss_mb": max_rss_mb}
 
 
 def _samples(command: Sequence[str], repeats: int) -> list[BenchmarkSample] | None:

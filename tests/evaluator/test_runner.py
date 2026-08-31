@@ -10,7 +10,7 @@ import sys
 import pytest
 
 from evaluator.models import Finding, Severity
-from evaluator.runner import run_evaluation
+from evaluator.runner import _benchmark_baseline, run_evaluation
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -90,3 +90,21 @@ def test_cli_runs_from_repository_root_without_an_editable_install():
 
     assert result.returncode == 0, result.stderr
     assert "Audit eqlib dependency contracts" in result.stdout
+
+
+def test_benchmark_baseline_rejects_mismatched_environment(tmp_path, monkeypatch):
+    baseline = tmp_path / "tests" / "evaluator" / "baselines" / "macos-py310.json"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_text(
+        json.dumps(
+            {
+                "environment": {"platform": "Linux", "python": "3.10"},
+                "benchmarks": {"import_eqlib": {"seconds": 1.0, "max_rss_mb": 10.0}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("evaluator.runner.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("evaluator.runner.sys.version_info", (3, 10, 20))
+
+    assert _benchmark_baseline(tmp_path) == {}
