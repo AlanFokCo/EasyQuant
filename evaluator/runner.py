@@ -61,6 +61,9 @@ def _benchmark_baseline(root: Path) -> dict[str, dict[str, float]]:
         return {}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        return payload["benchmarks"]
+        if payload.get("environment") != {"platform": "Darwin", "python": "3.10"}:
+            return {}
+        benchmarks = payload.get("benchmarks")
+        return benchmarks if isinstance(benchmarks, dict) else {}
     except (json.JSONDecodeError, KeyError, TypeError):
         return {}
