@@ -64,6 +64,26 @@ def test_live_timeout_is_unavailable_and_sets_live_environment(monkeypatch):
     assert captured["env"]["EQLIB_EVALUATOR_LIVE"] == "1"
 
 
+def test_live_provider_connection_failure_is_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        "evaluator.contracts.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0],
+            returncode=1,
+            stdout="requests.exceptions.ConnectionError: network is unreachable",
+            stderr="",
+        ),
+    )
+
+    finding = run_live_contracts(ROOT)[0]
+
+    assert (finding.id, finding.severity, finding.status) == (
+        "DATA-190",
+        Severity.P2,
+        "unavailable",
+    )
+
+
 def test_offline_contracts_exclude_network_marked_tests(monkeypatch):
     captured = {}
 

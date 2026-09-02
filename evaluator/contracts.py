@@ -27,6 +27,18 @@ _OFFLINE_NODE_IDS = (
 _LIVE_MARKER = "network"
 _NO_TESTS_COLLECTED_RETURN_CODE = 5
 _FAILED_NODE_ID = re.compile(r"^FAILED\s+([^\s]+)", re.MULTILINE)
+_LIVE_PROVIDER_UNAVAILABLE_MARKERS = (
+    "connectionerror",
+    "connecttimeout",
+    "readtimeout",
+    "proxyerror",
+    "network is unreachable",
+    "connection refused",
+    "temporary failure in name resolution",
+    "certificate verify failed",
+    "sslerror",
+    "too many requests",
+)
 
 
 def run_offline_contracts(root: Path) -> list[Finding]:
@@ -106,12 +118,17 @@ def _contract_failure(
         "stderr": _bounded_text(stderr),
         "failed_node_ids": _failed_node_ids(stdout, stderr),
     }
-    if profile == "live" and timed_out:
+    if profile == "live" and (timed_out or _provider_unavailable(stdout, stderr)):
+        detail = (
+            "The bounded live provider contract exceeded its total deadline."
+            if timed_out
+            else "The live provider was unavailable during the bounded contract."
+        )
         return Finding(
             "DATA-190",
             Severity.P2,
             "Live provider contract unavailable",
-            "The bounded live provider contract exceeded its total deadline.",
+            detail,
             evidence=evidence,
             status="unavailable",
             remediation="Check provider availability and rerun the live evaluator profile.",
@@ -129,6 +146,14 @@ def _contract_failure(
         evidence=evidence,
         remediation="Fix the failing contract before accepting this evaluator run.",
     )
+
+
+def _provider_unavailable(
+    stdout: str | bytes | None, stderr: str | bytes | None
+) -> bool:
+    """Classify only captured provider/network failures as temporarily unavailable."""
+    output = (_coerce_text(stdout) + "\n" + _coerce_text(stderr)).lower()
+    return any(marker in output for marker in _LIVE_PROVIDER_UNAVAILABLE_MARKERS)
 
 
 def _missing_live_contracts(
