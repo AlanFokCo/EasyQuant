@@ -43,3 +43,5 @@ Python 3.10 的四目标哈希锁及其已检查的 resolver 证据位于 `requi
 ## CI 行为
 
 `.github/workflows/eqlib-evaluator.yml` 在 Ubuntu 的 Python 3.10 与 3.12 上运行严格离线审查并上传报告；定时/手动 live job 上传在线报告。普通测试工作流以 `-m "not network"` 排除真实提供方调用，避免网络波动影响可重复测试。
+
+离线报告还会检查打包交易日历是否至少覆盖未来 120 天；接近到期时产生 `DATA-192`（P2），提醒在下一次发布前刷新 `eqlib/static/ashare_trading_days.json`。
