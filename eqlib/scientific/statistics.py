@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 """Statistical confidence tools for evaluating backtest robustness.
 
 This module quantifies how reliable a backtest appears under resampling,
 Monte-Carlo permutation, hypothesis testing, and basic sample-size checks.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
@@ -14,6 +14,7 @@ import pandas as pd
 from scipy import stats
 
 from eqlib.constants import TRADING_DAYS_PER_YEAR
+
 DEFAULT_BOOTSTRAP_METRICS = [
     "sharpe_ratio",
     "annual_return",
@@ -108,22 +109,35 @@ class ConfidenceReport:
         if self.confidence_level:
             return self.confidence_level
 
-        if self.sample_size_result and self.sample_size_result.assessment == "INSUFFICIENT":
+        if (
+            self.sample_size_result
+            and self.sample_size_result.assessment == "INSUFFICIENT"
+        ):
             return ConfidenceLevel.INSUFFICIENT_DATA
 
         positive_signals = 0
         if self.significance_result and self.significance_result.is_significant:
             positive_signals += 1
-        if self.monte_carlo_result and self.monte_carlo_result.p_value_vs_random <= 0.05:
+        if (
+            self.monte_carlo_result
+            and self.monte_carlo_result.p_value_vs_random <= 0.05
+        ):
             positive_signals += 1
 
         sharpe_ci = None
         if self.bootstrap_result is not None:
             sharpe_ci = self.bootstrap_result.metrics.get("sharpe_ratio")
-        if sharpe_ci is not None and np.isfinite(sharpe_ci.ci_lower) and sharpe_ci.ci_lower > 0:
+        if (
+            sharpe_ci is not None
+            and np.isfinite(sharpe_ci.ci_lower)
+            and sharpe_ci.ci_lower > 0
+        ):
             positive_signals += 1
 
-        if self.sample_size_result and self.sample_size_result.assessment == "SUFFICIENT":
+        if (
+            self.sample_size_result
+            and self.sample_size_result.assessment == "SUFFICIENT"
+        ):
             if positive_signals >= 3:
                 return ConfidenceLevel.HIGH_CONFIDENCE
             if positive_signals >= 1:
@@ -140,19 +154,25 @@ class ConfidenceReport:
         parts = [f"Overall confidence: {level}"]
 
         if self.sample_size_result is not None:
-            parts.append(f"sample size assessment: {self.sample_size_result.assessment}")
+            parts.append(
+                f"sample size assessment: {self.sample_size_result.assessment}"
+            )
         if self.significance_result is not None:
             parts.append(
                 f"p-value={self.significance_result.p_value:.4f} ({'significant' if self.significance_result.is_significant else 'not significant'})"
             )
         if self.monte_carlo_result is not None:
-            parts.append(f"Monte Carlo p-value={self.monte_carlo_result.p_value_vs_random:.4f}")
+            parts.append(
+                f"Monte Carlo p-value={self.monte_carlo_result.p_value_vs_random:.4f}"
+            )
 
         sharpe_ci = None
         if self.bootstrap_result is not None:
             sharpe_ci = self.bootstrap_result.metrics.get("sharpe_ratio")
         if sharpe_ci is not None:
-            parts.append(f"Sharpe CI=[{sharpe_ci.ci_lower:.3f}, {sharpe_ci.ci_upper:.3f}]")
+            parts.append(
+                f"Sharpe CI=[{sharpe_ci.ci_lower:.3f}, {sharpe_ci.ci_upper:.3f}]"
+            )
 
         if self.notes:
             parts.append("notes=" + "; ".join(self.notes))
@@ -238,7 +258,9 @@ def _bootstrap_sample(returns: pd.Series, rng: np.random.Generator) -> pd.Series
     return pd.Series(sample, dtype=float)
 
 
-def _distribution_summary(values: Iterable[float]) -> tuple[float, float, float, float, float]:
+def _distribution_summary(
+    values: Iterable[float],
+) -> tuple[float, float, float, float, float]:
     data = np.asarray(list(values), dtype=float)
     if data.size == 0:
         nan = float("nan")
@@ -257,6 +279,7 @@ def bootstrap_metrics(
     n_bootstrap: int = 1000,
     metrics: Optional[Sequence[str]] = None,
     confidence_level: float = 0.95,
+    random_state: Optional[int] = 42,
 ) -> BootstrapResult:
     """Estimate confidence intervals for core backtest metrics via bootstrap.
 
@@ -271,11 +294,14 @@ def bootstrap_metrics(
         max drawdown, and Sortino ratio.
     confidence_level:
         Central confidence level for percentile intervals.
+    random_state:
+        Seed for the local random generator. Set to ``None`` to opt into
+        non-deterministic resampling.
     """
     returns = _extract_daily_returns(backtest_result)
     metric_names = list(metrics or DEFAULT_BOOTSTRAP_METRICS)
     alpha = (1.0 - confidence_level) / 2.0
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(random_state)
 
     results: Dict[str, MetricCI] = {}
     for metric_name in metric_names:
@@ -283,7 +309,9 @@ def bootstrap_metrics(
         samples: list[float] = []
         if not returns.empty:
             for _ in range(max(int(n_bootstrap), 0)):
-                samples.append(_compute_metric(metric_name, _bootstrap_sample(returns, rng)))
+                samples.append(
+                    _compute_metric(metric_name, _bootstrap_sample(returns, rng))
+                )
 
         sample_array = np.asarray(samples, dtype=float)
         if sample_array.size == 0:
@@ -291,9 +319,13 @@ def bootstrap_metrics(
         else:
             ci_lower = float(np.quantile(sample_array, alpha))
             ci_upper = float(np.quantile(sample_array, 1.0 - alpha))
-            std_error = float(np.std(sample_array, ddof=1)) if sample_array.size > 1 else 0.0
+            std_error = (
+                float(np.std(sample_array, ddof=1)) if sample_array.size > 1 else 0.0
+            )
             if np.isfinite(point_estimate) and not np.isclose(point_estimate, 0.0):
-                ci_width_pct = float(abs(ci_upper - ci_lower) / abs(point_estimate) * 100.0)
+                ci_width_pct = float(
+                    abs(ci_upper - ci_lower) / abs(point_estimate) * 100.0
+                )
             else:
                 ci_width_pct = float("nan")
 
@@ -339,11 +371,16 @@ def monte_carlo_simulation(
     random_start_dates: bool = False,
     random_params: bool = False,
     param_ranges: Optional[Mapping[str, Sequence[float]]] = None,
+    random_state: Optional[int] = 42,
 ) -> MonteCarloResult:
-    """Generate synthetic return paths and compare observed Sharpe to random outcomes."""
+    """Generate synthetic return paths and compare observed Sharpe to random outcomes.
+
+    ``random_state`` seeds the local generator; pass ``None`` for a fresh
+    non-deterministic simulation.
+    """
     returns = _extract_daily_returns(backtest_result)
     observed_sharpe = _metric_sharpe_ratio(returns)
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(random_state)
 
     sharpe_distribution: list[float] = []
     return_distribution: list[float] = []
@@ -362,10 +399,14 @@ def monte_carlo_simulation(
 
         sim_returns = pd.Series(simulated, dtype=float)
         sharpe_distribution.append(_metric_sharpe_ratio(sim_returns))
-        return_distribution.append(float((1.0 + sim_returns).prod() - 1.0) if not sim_returns.empty else float("nan"))
+        return_distribution.append(
+            float((1.0 + sim_returns).prod() - 1.0)
+            if not sim_returns.empty
+            else float("nan")
+        )
 
-    mean_sharpe, std_sharpe, median_sharpe, percentile_5, percentile_95 = _distribution_summary(
-        sharpe_distribution
+    mean_sharpe, std_sharpe, median_sharpe, percentile_5, percentile_95 = (
+        _distribution_summary(sharpe_distribution)
     )
 
     sharpe_array = np.asarray(sharpe_distribution, dtype=float)
@@ -397,11 +438,17 @@ def significance_test(
     benchmark = _as_returns_series(benchmark_returns)
 
     if benchmark_returns is not None:
-        aligned = pd.concat([strategy.rename("strategy"), benchmark.rename("benchmark")], axis=1).dropna()
+        aligned = pd.concat(
+            [strategy.rename("strategy"), benchmark.rename("benchmark")], axis=1
+        ).dropna()
         observed = aligned["strategy"] - aligned["benchmark"]
-        mean_benchmark = float(aligned["benchmark"].mean()) if not aligned.empty else float("nan")
+        mean_benchmark = (
+            float(aligned["benchmark"].mean()) if not aligned.empty else float("nan")
+        )
         subject = "Excess returns versus benchmark"
-        mean_return = float(aligned["strategy"].mean()) if not aligned.empty else float("nan")
+        mean_return = (
+            float(aligned["strategy"].mean()) if not aligned.empty else float("nan")
+        )
     else:
         observed = strategy
         mean_benchmark = None
@@ -429,8 +476,14 @@ def significance_test(
 
     is_significant = bool(np.isfinite(p_value) and p_value < 0.05)
     if np.isfinite(p_value):
-        significance_text = "statistically significant" if is_significant else "not statistically significant"
-        conclusion = f"{subject} are {significance_text} under {test_type} (p={p_value:.4f})."
+        significance_text = (
+            "statistically significant"
+            if is_significant
+            else "not statistically significant"
+        )
+        conclusion = (
+            f"{subject} are {significance_text} under {test_type} (p={p_value:.4f})."
+        )
     else:
         conclusion = f"{subject} could not be evaluated under {test_type} because the sample is empty."
 
@@ -469,7 +522,11 @@ def sample_size_assessment(
     backtest_result: Optional[Mapping[str, Any]] = None,
 ) -> SampleSizeResult:
     """Assess whether a backtest has enough observations for robust conclusions."""
-    returns = _extract_daily_returns(backtest_result or {}) if backtest_result is not None else pd.Series(dtype=float)
+    returns = (
+        _extract_daily_returns(backtest_result or {})
+        if backtest_result is not None
+        else pd.Series(dtype=float)
+    )
     daily_observations = int(len(returns))
 
     if backtest_result is not None:
@@ -486,14 +543,18 @@ def sample_size_assessment(
     recommended_daily_observations = TRADING_DAYS_PER_YEAR * 2
 
     if trade_count is None:
-        warnings.append("Trade count is unavailable; win-rate reliability cannot be assessed.")
+        warnings.append(
+            "Trade count is unavailable; win-rate reliability cannot be assessed."
+        )
     elif trade_count < recommended_min_trades:
         warnings.append(
             f"Only {trade_count} trades observed; at least {recommended_min_trades} trades are recommended for a meaningful win-rate estimate."
         )
 
     if time_span_years is None:
-        warnings.append("Backtest time span is unavailable; Sharpe reliability cannot be assessed.")
+        warnings.append(
+            "Backtest time span is unavailable; Sharpe reliability cannot be assessed."
+        )
     elif time_span_years < recommended_min_years:
         warnings.append(
             f"Time span is {time_span_years:.2f} years; at least {recommended_min_years:.1f} years are recommended for Sharpe reliability around a target Sharpe of {target_sharpe:.2f}."
