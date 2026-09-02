@@ -18,3 +18,11 @@ def test_workflow_hygiene_script_passes():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_python310_workflows_install_the_hash_locked_dependency_closure():
+    for workflow_name in ("test.yml", "eqlib-evaluator.yml"):
+        workflow = (ROOT / ".github" / "workflows" / workflow_name).read_text()
+
+        assert "pip install --require-hashes -r requirements/constraints-py310.txt" in workflow
+        assert 'pip install --no-deps -e ".[dev]"' in workflow
