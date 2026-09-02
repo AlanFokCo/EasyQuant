@@ -25,7 +25,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install eqlib
-        run: python -m pip install -e ".[dev]"
+        run: |
+          if [[ "${{ matrix.python-version }}" == "3.10" ]]; then
+            python -m pip install --require-hashes -r requirements/constraints-py310.txt
+            python -m pip install --no-deps -e ".[dev]"
+          else
+            python -m pip install -e ".[dev]"
+          fi
       - name: Run offline evaluator
         run: python scripts/evaluate_eqlib_dependencies.py --profile offline --strict --output artifacts/eqlib-evaluator
       - uses: actions/upload-artifact@v4
