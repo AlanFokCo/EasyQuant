@@ -8,7 +8,7 @@ override any default when calling :func:`eqlib.scientific.validate_backtest`.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional
 
 
 @dataclasses.dataclass
@@ -35,6 +35,9 @@ class ValidationConfig:
         Number of bootstrap resamples.
     n_monte_carlo : int
         Number of Monte-Carlo simulations.
+    random_state : int | None
+        Seed used by bootstrap and Monte-Carlo statistical checks. Set to
+        ``None`` to opt into non-deterministic resampling.
     significance_level : float
         p-value threshold for significance tests.
 
@@ -73,6 +76,7 @@ class ValidationConfig:
     statistics: bool = True
     n_bootstrap: int = 1000
     n_monte_carlo: int = 500
+    random_state: Optional[int] = 42
     significance_level: float = 0.05
 
     # ── Bias ─────────────────────────────────────────────────────────────

@@ -165,7 +165,9 @@ class ValidationResult:
             fmt = _REPORT_SUFFIXES[target_suffix]
             report = generate_validation_report(
                 self,
-                config=ReportConfig(format=[fmt], output_dir=str(target.parent or Path("."))),
+                config=ReportConfig(
+                    format=[fmt], output_dir=str(target.parent or Path("."))
+                ),
             )
             target.parent.mkdir(parents=True, exist_ok=True)
             if fmt == "markdown":
@@ -205,7 +207,9 @@ def validate_backtest(
         try:
             bias_report = _run_bias_checks(backtest_result, config, strategy_file)
             if bias_report.has_critical:
-                LOGGER.warning("Critical bias detected; continuing remaining validation stages.")
+                LOGGER.warning(
+                    "Critical bias detected; continuing remaining validation stages."
+                )
         except Exception as exc:  # pragma: no cover - defensive orchestration path
             LOGGER.warning("Bias detection failed: %s", exc, exc_info=True)
             bias_report = None
@@ -233,7 +237,9 @@ def validate_backtest(
 
     if config.comparison and platform_result is not None:
         try:
-            comparison_report = _run_platform_comparison(backtest_result, platform_result)
+            comparison_report = _run_platform_comparison(
+                backtest_result, platform_result
+            )
         except Exception as exc:  # pragma: no cover - defensive orchestration path
             LOGGER.warning("Platform comparison failed: %s", exc, exc_info=True)
             comparison_report = None
@@ -312,9 +318,15 @@ def _run_bias_check(name: str, func: Any, *args: Any, **kwargs: Any) -> Any:
         return None
 
 
-def _run_risk_checks(backtest_result: Mapping[str, Any], config: ValidationConfig) -> RiskReport:
+def _run_risk_checks(
+    backtest_result: Mapping[str, Any], config: ValidationConfig
+) -> RiskReport:
     returns = _extract_daily_returns(backtest_result)
-    scenarios = None if config.stress_test_scenarios == "default" else config.stress_test_scenarios
+    scenarios = (
+        None
+        if config.stress_test_scenarios == "default"
+        else config.stress_test_scenarios
+    )
     return RiskReport(
         extended_metrics=extended_risk_metrics(backtest_result),
         var_95=value_at_risk(returns, confidence_level=0.95),
@@ -336,16 +348,23 @@ def _run_statistical_checks(
 
     strategy_returns = _extract_daily_returns(backtest_result)
     benchmark_returns = _extract_benchmark_returns(backtest_result)
-    monte_carlo_runs = int(getattr(config, "n_monte_carlo", 0) or getattr(config, "n_simulations", 0) or 0)
+    monte_carlo_runs = int(
+        getattr(config, "n_monte_carlo", 0) or getattr(config, "n_simulations", 0) or 0
+    )
 
     report = ConfidenceReport(
         bootstrap_result=bootstrap_metrics(
             backtest_result,
             n_bootstrap=int(config.n_bootstrap),
             confidence_level=confidence_level,
+            random_state=config.random_state,
         ),
         monte_carlo_result=(
-            monte_carlo_simulation(backtest_result, n_simulations=monte_carlo_runs)
+            monte_carlo_simulation(
+                backtest_result,
+                n_simulations=monte_carlo_runs,
+                random_state=config.random_state,
+            )
             if monte_carlo_runs > 0
             else None
         ),
@@ -419,12 +438,16 @@ def _determine_trust_rating(
 
     if (
         overfitting_report is not None
-        and overfitting_report.out_of_sample.overfitting_warning == OverfittingWarning.HIGH_OVERFITTING
+        and overfitting_report.out_of_sample.overfitting_warning
+        == OverfittingWarning.HIGH_OVERFITTING
     ):
         return TrustRating.LOW_TRUST
 
     confidence_level = _get_confidence_level(confidence_report)
-    if confidence_level in {ConfidenceLevel.LOW_CONFIDENCE, ConfidenceLevel.INSUFFICIENT_DATA}:
+    if confidence_level in {
+        ConfidenceLevel.LOW_CONFIDENCE,
+        ConfidenceLevel.INSUFFICIENT_DATA,
+    }:
         return TrustRating.INSUFFICIENT_DATA
 
     if _has_warnings(
@@ -462,11 +485,17 @@ def _has_warnings(
             return True
         if tail_rating and tail_rating.upper() != "LOW":
             return True
-        if any(str(item.get("stress_rating", "")) != RiskRating.RESILIENT for item in stress_scenarios):
+        if any(
+            str(item.get("stress_rating", "")) != RiskRating.RESILIENT
+            for item in stress_scenarios
+        ):
             return True
 
     if overfitting_report is not None:
-        if overfitting_report.out_of_sample.overfitting_warning != OverfittingWarning.STABLE:
+        if (
+            overfitting_report.out_of_sample.overfitting_warning
+            != OverfittingWarning.STABLE
+        ):
             return True
         if overfitting_report.walk_forward.is_sharpe_decay:
             return True
@@ -492,13 +521,17 @@ def _comparison_is_clean(comparison_report: ComparisonReport) -> bool:
 
     for attr_name in ("judgment", "comparison_judgment", "result"):
         value = getattr(comparison_report, attr_name, None)
-        if isinstance(value, str) and any(token in value.lower() for token in ("suspicious", "mismatch")):
+        if isinstance(value, str) and any(
+            token in value.lower() for token in ("suspicious", "mismatch")
+        ):
             return False
 
     return True
 
 
-def _get_confidence_level(confidence_report: Optional[ConfidenceReport]) -> Optional[str]:
+def _get_confidence_level(
+    confidence_report: Optional[ConfidenceReport],
+) -> Optional[str]:
     if confidence_report is None:
         return None
     if confidence_report.confidence_level:

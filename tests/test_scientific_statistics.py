@@ -69,8 +69,16 @@ def test_bootstrap_metrics_returns_confidence_intervals():
     assert isinstance(bootstrap, BootstrapResult)
     assert bootstrap.n_bootstrap == 100
     assert bootstrap.confidence_level == 0.90
-    assert set(bootstrap.metrics) == {"sharpe_ratio", "annual_return", "max_drawdown", "sortino_ratio"}
-    assert bootstrap.metrics["sharpe_ratio"].ci_upper >= bootstrap.metrics["sharpe_ratio"].ci_lower
+    assert set(bootstrap.metrics) == {
+        "sharpe_ratio",
+        "annual_return",
+        "max_drawdown",
+        "sortino_ratio",
+    }
+    assert (
+        bootstrap.metrics["sharpe_ratio"].ci_upper
+        >= bootstrap.metrics["sharpe_ratio"].ci_lower
+    )
 
 
 def test_monte_carlo_simulation_returns_distribution_summary():
@@ -81,7 +89,10 @@ def test_monte_carlo_simulation_returns_distribution_summary():
         n_simulations=50,
         random_start_dates=True,
         random_params=True,
-        param_ranges={"drift_multiplier": (0.9, 1.1), "volatility_multiplier": (0.9, 1.1)},
+        param_ranges={
+            "drift_multiplier": (0.9, 1.1),
+            "volatility_multiplier": (0.9, 1.1),
+        },
     )
 
     assert isinstance(simulation, MonteCarloResult)
@@ -91,12 +102,36 @@ def test_monte_carlo_simulation_returns_distribution_summary():
     assert simulation.percentile_95 >= simulation.percentile_5
 
 
+def test_bootstrap_metrics_is_reproducible_with_random_state():
+    result = _make_backtest_result()
+
+    first = bootstrap_metrics(result, n_bootstrap=50, random_state=7)
+    second = bootstrap_metrics(result, n_bootstrap=50, random_state=7)
+
+    assert first == second
+
+
+def test_monte_carlo_simulation_is_reproducible_with_random_state():
+    result = _make_backtest_result()
+
+    first = monte_carlo_simulation(
+        result, n_simulations=50, random_start_dates=True, random_state=7
+    )
+    second = monte_carlo_simulation(
+        result, n_simulations=50, random_start_dates=True, random_state=7
+    )
+
+    assert first == second
+
+
 def test_significance_test_supports_ttest_and_wilcoxon():
     rng = np.random.default_rng(42)
     strategy = pd.Series(rng.normal(0.002, 0.004, size=120))
     benchmark = pd.Series(rng.normal(0.0005, 0.004, size=120))
 
-    t_test_result = significance_test(strategy, benchmark_returns=benchmark, test_type="t-test")
+    t_test_result = significance_test(
+        strategy, benchmark_returns=benchmark, test_type="t-test"
+    )
     wilcoxon_result = significance_test(strategy, test_type="wilcoxon")
 
     assert t_test_result.test_type == "t-test"
@@ -124,7 +159,9 @@ def test_confidence_report_summary_uses_inferred_level():
     report = ConfidenceReport(
         bootstrap_result=bootstrap_metrics(result, n_bootstrap=50),
         monte_carlo_result=monte_carlo_simulation(result, n_simulations=30),
-        significance_result=significance_test(_extract_daily_returns(result), test_type="t-test"),
+        significance_result=significance_test(
+            _extract_daily_returns(result), test_type="t-test"
+        ),
         sample_size_result=sample_size_assessment(backtest_result=result),
     )
 
