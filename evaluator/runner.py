@@ -9,6 +9,7 @@ import sys
 import tempfile
 
 from .benchmarks import evaluate_benchmarks
+from .calendar import evaluate_calendar_coverage
 from .contracts import run_live_contracts, run_offline_contracts
 from .inventory import evaluate_inventory
 from .models import EvaluationReport, Finding, Severity
@@ -44,6 +45,7 @@ def collect_findings(root: Path, profile: str) -> list[Finding]:
         _, wheel_findings = build_and_audit_wheel(root, Path(work_dir))
     findings.extend(wheel_findings)
     findings.extend(evaluate_benchmarks(root, _benchmark_baseline(root)))
+    findings.extend(evaluate_calendar_coverage(root))
     findings.extend(run_offline_contracts(root))
     if profile == "live":
         findings.extend(run_live_contracts(root))

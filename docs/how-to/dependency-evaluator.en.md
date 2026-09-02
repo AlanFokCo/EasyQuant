@@ -43,3 +43,5 @@ The Python 3.10 four-target hash lock and checked resolver evidence are under `r
 ## CI behavior
 
 `.github/workflows/eqlib-evaluator.yml` runs the strict offline audit on Ubuntu with Python 3.10 and 3.12, then uploads reports. Its scheduled/manual live job uploads the online report. The normal test workflow uses `-m "not network"` to exclude real provider calls so network fluctuation cannot affect reproducible tests.
+
+The offline report also checks that the packaged trading calendar covers at least the next 120 days. Near expiry it emits `DATA-192` (P2), prompting a refresh of `eqlib/static/ashare_trading_days.json` before the next release.
