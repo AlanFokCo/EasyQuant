@@ -46,6 +46,15 @@ def _normalize_security(security: str) -> str:
     return security + _infer_exchange_suffix(security)
 
 
+def _resolve_security(security, portfolio):
+    """Use one position key, including positions restored with legacy bare codes."""
+    normalized = _normalize_security(security)
+    for key in portfolio.positions:
+        if _normalize_security(key) == normalized:
+            return key
+    return security
+
+
 def _get_pending_price(security):
     """Return a reference price for validation purposes only.
 
@@ -98,7 +107,7 @@ def _buffer_order(action: str, **kwargs) -> Order:
         log.warn(f"_buffer_order: no active context (order ignored)")
         return None
 
-    security = kwargs.pop("security")
+    security = _resolve_security(kwargs.pop("security"), sess._context.portfolio)
     amount = kwargs.get("amount", kwargs.get("target_amount", 0))
     style = kwargs.get("style")
 
@@ -124,6 +133,7 @@ def _buffer_order(action: str, **kwargs) -> Order:
     # computes the actual delta. Set side=None; engine will assign at fill time.
     if action in _TARGET_ACTIONS:
         order_obj = Order(security, amount, style=style, side=None)
+        order_obj._quantity_resolved = False
     else:
         order_obj = Order(security, amount, style=style)
 
@@ -132,7 +142,7 @@ def _buffer_order(action: str, **kwargs) -> Order:
     # In backtest mode, orders fill on T+1, so wall-clock timeout is wrong.
     ctx = getattr(sess, '_context', None)
     current_dt = getattr(ctx, 'current_dt', None) if ctx else None
-    if current_dt is not None:
+    if not sess._options.get("_is_paper_trading", False) and current_dt is not None:
         # Backtest: store just the date for trading-day counting
         sess._order_timestamps[order_obj.order_id] = current_dt.date() if hasattr(current_dt, 'date') else current_dt
     else:
@@ -263,8 +273,9 @@ def cancel_order(order_obj):
         req for req in sess._pending_orders
         if req.get("order_obj") is not order_obj
     ]
-    if order_obj.status in (Order.STATUS_PENDING, Order.STATUS_SUBMITTED):
+    if order_obj.status in (Order.STATUS_PENDING, Order.STATUS_SUBMITTED, Order.STATUS_PARTIAL_FILL):
         order_obj.transition_to(Order.STATUS_CANCELLED, reason="user cancelled")
+    sess._order_timestamps.pop(order_obj.order_id, None)
     return order_obj
 
 
@@ -313,7 +324,7 @@ def order_pct(security, pct, style=None) -> Order:
         log.warn("order_pct: no active context (order ignored)")
         return None
 
-    security = _normalize_security(security)
+    security = _resolve_security(security, ctx.portfolio)
 
     if pct == 0:
         return None
@@ -327,6 +338,6 @@ def order_pct(security, pct, style=None) -> Order:
         if position is None or position.amount <= 0:
             log.warn("order_pct: no position to sell for %s", security)
             return None
-        value = position.total_value * pct  # pct is negative, so value is negative
+        return order(security, -int(position.amount * min(abs(pct), 1.0)), style=style)
 
     return order_value(security, value, style=style)

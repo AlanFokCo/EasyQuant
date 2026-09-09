@@ -78,10 +78,10 @@ def _slice_by_date(df: pd.DataFrame, start, end) -> pd.DataFrame:
     filtering logic in each caller.
     """
     if df.empty:
-        return df
+        return df.copy()
     start_ts = pd.Timestamp(start)
     end_ts = pd.Timestamp(end)
-    return df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
+    return df.loc[(df.index >= start_ts) & (df.index <= end_ts)].copy()
 
 
 def _get_cache_dir() -> Path:
@@ -778,7 +778,7 @@ class PreloadedData:
         else:
             result = ind_df
 
-        return result.tail(count)
+        return result.tail(count).copy()
 
     def get_history(self, security, count, fields, current_dt):
         """Fast attribute_history from preloaded data.
@@ -807,7 +807,7 @@ class PreloadedData:
                         ts = pd.Timestamp(current_dt)
                         cutoff = ts.normalize()
                         result = result[result.index < cutoff]
-                    return result.tail(count)
+                    return result.tail(count).copy()
                 except Exception:
                     return None
             return None
@@ -828,7 +828,7 @@ class PreloadedData:
             result = pd.DataFrame(
                 {f: sec_data[f] for f in available}
             )
-        return result.tail(count)
+        return result.tail(count).copy()
 
     def get_close(self, date, security) -> Optional[float]:
         """Get closing price for a given date and security."""
@@ -875,7 +875,7 @@ class PreloadedData:
         if self._close_matrix is not None:
             for sec in [security, security.replace(".XSHG", "").replace(".XSHE", "")]:
                 if sec in self._close_matrix.columns:
-                    return self._close_matrix[sec].dropna()
+                    return self._close_matrix[sec].dropna().copy()
         return None
 
     def get_bar(self, date, security) -> Optional[dict]:
@@ -939,7 +939,7 @@ class PreloadedData:
 
     @property
     def dates(self) -> pd.DatetimeIndex:
-        return self._dates
+        return self._dates.copy(deep=True)
 
     def get_prev_trading_day(self, day) -> Optional[datetime.date]:
         """Return the latest trading day strictly before *day* using binary search.

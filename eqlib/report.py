@@ -216,17 +216,19 @@ def _build_daily_pnl(recorded, initial):
 def _build_drawdown_from_cumulative_pct(cum_points):
     """From cumulative total return % series [{time, value}, ...], build drawdown % from running peak.
 
-    Same definition as strategy drawdown: current cumulative % minus max cumulative % seen so far.
+    Divide the decline by peak wealth (100 + peak cumulative return),
+    including initial wealth of 100 before the first observation.
     """
     if not cum_points:
         return []
     out = []
-    peak = cum_points[0]["value"]
+    peak = 0.0
     for d in cum_points:
         v = d["value"]
         if v > peak:
             peak = v
-        out.append({"time": d["time"], "value": round(v - peak, 3)})
+        drawdown_pct = (v - peak) / (100.0 + peak) * 100.0
+        out.append({"time": d["time"], "value": round(drawdown_pct, 3)})
     return out
 
 
@@ -835,12 +837,7 @@ def _compute_chart_data(result):
         ret_sse = _fetch_index_returns("sh000001", start, end, recorded)
 
     # Drawdown series
-    drawdown_data = []
-    if cum_return_data:
-        peak = cum_return_data[0]["value"]
-        for d in cum_return_data:
-            if d["value"] > peak: peak = d["value"]
-            drawdown_data.append({"time": d["time"], "value": round(d["value"] - peak, 3)})
+    drawdown_data = _build_drawdown_from_cumulative_pct(cum_return_data)
 
     return {
         "symbol": symbol,

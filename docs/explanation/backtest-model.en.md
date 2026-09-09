@@ -79,3 +79,5 @@ def market_open(context):
 !!! warning "Do not use Python global variables"
 
     Use `g` instead of Python `global` variables. `g` is managed by the framework, ensuring consistent behavior across backtests and paper trading.
+
+See the [data API](../reference/api-data.en.md#historical-price-and-adjustment-contracts) for visibility and adjustment requirements, and the [trading API](../reference/api-trading.en.md#execution-status-and-security-keys) for partial fills, limits and stale marks.

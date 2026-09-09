@@ -15,6 +15,7 @@ import pandas as pd
 from scipy.stats import jarque_bera, kurtosis as scipy_kurtosis, norm, skew as scipy_skew
 
 from eqlib.constants import TRADING_DAYS_PER_YEAR
+from eqlib.utils.stats import _drawdown_from_returns
 ReturnInput = Optional[Union[Sequence[float], pd.Series, np.ndarray]]
 
 
@@ -99,9 +100,7 @@ def _annualized_return(returns: pd.Series, trading_days: int = TRADING_DAYS_PER_
 def _max_drawdown(returns: pd.Series) -> float:
     if returns.empty:
         return 0.0
-    wealth = (1.0 + returns).cumprod()
-    drawdown = wealth / wealth.cummax() - 1.0
-    return float(drawdown.min()) if not drawdown.empty else 0.0
+    return float(_drawdown_from_returns(returns).min())
 
 
 def _downside_deviation(returns: pd.Series, target_return: float = 0.0, trading_days: int = TRADING_DAYS_PER_YEAR) -> float:

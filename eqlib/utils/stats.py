@@ -188,8 +188,6 @@ def conditional_var(returns: pd.Series, confidence: float = 0.05) -> float:
     _validate_confidence(confidence)
     values = _validated_returns(returns)
     loss_quantile = _quantile_by_method(values, confidence, "historical")
-    if loss_quantile >= 0:
-        return 0.0
     tail = values[values <= loss_quantile]
     return float(max(0.0, -tail.mean())) if len(tail) > 0 else 0.0
 
@@ -237,6 +235,18 @@ def _quantile_by_method(values: pd.Series, confidence: float, method: str) -> fl
 # ============================================================
 # Drawdown Analysis
 # ============================================================
+
+
+def _drawdown_from_returns(returns: pd.Series) -> pd.Series:
+    """Signed drawdowns, including unit wealth before the first return.
+
+    Keep the observation index intact while including the initial investment
+    in the running peak. This also handles an immediate total loss without
+    dividing by a zero post-return peak.
+    """
+    wealth = (1.0 + returns).cumprod()
+    peak = wealth.cummax().clip(lower=1.0)
+    return wealth / peak - 1.0
 
 
 def drawdown(equity: pd.Series) -> pd.Series:

@@ -50,7 +50,7 @@ def initialize(context):
     g.selector = MLSelector(
         model='random_forest',
         features=['rsi', 'macd_hist', 'atr', 'momentum', 'volatility'],
-        target='forward_return_5d',
+        target='past_return_5d',
         top_n=3,
     )
 
@@ -92,7 +92,7 @@ result = run_strategy(
 MLSelector(
     model='random_forest',           # 模型类型
     features=['rsi', 'macd_hist'],  # 使用的特征
-    target='forward_return_5d',      # 预测目标
+    target='past_return_5d',      # 预测目标
     top_n=5,                         # 选出股票数量
     train_start=None,                # 训练开始日期（可选）
     train_end=None,                  # 训练结束日期（可选）
@@ -129,8 +129,8 @@ MLSelector(
 
 | 目标 | 说明 |
 |------|------|
-| `forward_return_5d` | 未来 5 日收益率（分类或回归） |
-| `forward_return_10d` | 未来 10 日收益率 |
+| `past_return_5d` | 过去 5 日收益率（回归） |
+| `past_return_10d` | 过去 10 日收益率 |
 | `will_rise_5d` | 未来 5 日是否上涨（0/1 分类） |
 
 ---
@@ -175,7 +175,7 @@ def price_to_ma_ratio(close, high, low, volume):
 # 创建带有自定义特征的 Pipeline
 g.selector = MLSelector(
     features=['rsi', 'momentum', 'price_ma_ratio'],
-    target='forward_return_5d',
+    target='past_return_5d',
     top_n=3,
 )
 g.selector.pipeline = FeaturePipeline(
@@ -243,3 +243,9 @@ def before_trading_start(context):
 `examples/22_feature_pipeline.py`（独立特征计算）、
 `examples/23_model_comparison.py`（模型对比）、
 `examples/24_custom_features.py`（自定义特征）。
+
+### 标签的时间边界
+
+`date` 是历史特征日期（只使用该日之前的日线），`available_at` 是整个标签实际可观测的时刻，必须包含预测窗口结束及发布延迟。仅有日期或午夜时间的 `available_at` 保守地从次日可用。缺少此列会抛出 `ValueError`。训练只接受特征日期早于当前日、标签可用时刻严格早于决策时刻的样本，并按 `train_start` / `train_end`（含首尾日期）筛选；同一日期和证券不可重复。
+
+框架按每个历史样本日期计算特征，不会把当前特征配给历史标签。使用没有标签面板的 `past_return_*` 仍属于过去收益拟合，不是未来收益预测。重用 selector 回到更早日期时，会重新训练，防止沿用未来模型。

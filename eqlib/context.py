@@ -1,6 +1,7 @@
 """Context, Portfolio, and Position objects (mirrors EasyQuant's context paradigm)."""
 
 import datetime
+import math
 
 
 class Position:
@@ -13,6 +14,7 @@ class Position:
         self.total_value = 0.0
         self.closeable_amount = 0
         self._current_price = 0.0
+        self.price_stale = True
 
     @property
     def value(self):
@@ -35,6 +37,9 @@ class Position:
         return self._current_price
 
     def update(self, price):
+        self.price_stale = price is None or not math.isfinite(price) or price <= 0
+        if self.price_stale:
+            price = self._current_price if self._current_price > 0 else self.avg_cost
         self._current_price = price
         self.total_value = round(self.amount * price, 2)
 
@@ -72,7 +77,7 @@ class Portfolio:
     def _sync_total_value(self, prices):
         total = self.available_cash
         for sec, pos in self.positions.items():
-            p = prices.get(sec, pos.avg_cost)
+            p = prices.get(sec)
             pos.update(p)
             total += pos.total_value
         self.total_value = round(total, 2)
