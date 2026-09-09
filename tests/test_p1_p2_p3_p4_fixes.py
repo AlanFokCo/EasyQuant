@@ -144,8 +144,9 @@ class TestH5AttributeHistoryFqValidation:
             with pytest.raises(ValueError, match="fq='post'"):
                 attribute_history("601390", 10, fields=["close"], fq="post")
 
-    def test_fq_none_is_allowed_in_backtest(self):
-        """fq=None (no adjustment) is permitted in backtest mode and returns data."""
+    def test_fq_none_rejected_for_adjusted_preload(self):
+        """Raw prices must never be supplied from a qfq preload."""
+        import pytest
         import datetime as dt
         from eqlib.data import attribute_history
         from eqlib._state import BacktestSession, _set_session
@@ -161,9 +162,8 @@ class TestH5AttributeHistoryFqValidation:
         session._context = ctx
 
         with patch("eqlib.engine._get_preloaded", return_value=preloaded):
-            # fq=None means "no adjustment" — should not raise, uses qfq preloaded data
-            result = attribute_history("601390", 10, fields=["close"], fq=None)
-            assert not result.empty
+            with pytest.raises(ValueError, match="does not match preloaded"):
+                attribute_history("601390", 10, fields=["close"], fq=None)
 
     def test_fq_pre_works_in_backtest(self):
         """fq='pre' (default) should work fine in backtest mode."""

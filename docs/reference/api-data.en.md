@@ -17,7 +17,7 @@ get_price(security, start_date=None, end_date=None, frequency='daily', fields=No
 | `security` | `str` or `list` | Yes | Stock code |
 | `start_date` | `str`/`date` | No | Start date |
 | `end_date` | `str`/`date` | No | End date |
-| `frequency` | `str` | No | Only `'daily'` is supported |
+| `frequency` | `str` | No | `'daily'` / `'1d'`; use `get_price_minute` for minutes |
 | `fields` | `list` | No | Specify returned fields |
 | `count` | `int` | No | Return the most recent N bars |
 
@@ -300,3 +300,11 @@ get_universe()                 # Get the current universe
 | `list_local_stocks()` | List all local files |
 | `remove_local_data(security)` | Delete a single local file |
 | `clear_all_local_data()` | Delete all local files |
+
+## Historical price and adjustment contracts
+
+`count` must be a positive integer (not a boolean). Results contain the last N rows in the window, or fewer when data is unavailable. String, date and datetime inputs are supported. With an active backtest context, `get_price` follows `attribute_history`: only daily bars before the current date are visible, and explicit future end dates are clamped. Research queries without a backtest context use the requested range. `frequency="1m"` raises `NotImplementedError` rather than silently returning daily bars.
+
+Preloaded prices must match `fq`: default qfq preload supports `fq="pre"`; requesting `fq=None` (raw prices) raises `ValueError` unless the preload explicitly contains unadjusted data. Use genuine raw prices rather than treating adjusted prices as raw. Mutating returned data does not mutate the shared cache.
+
+`get_price_minute` also enforces simulation visibility: only bar timestamps strictly before `current_dt` are returned, conservatively excluding the current bar. Supported periods are 1m, 5m, 15m, 30m and 60m; rows are sorted before taking the last `count` bars.

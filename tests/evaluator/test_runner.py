@@ -55,6 +55,9 @@ def test_runner_rejects_unknown_profile(tmp_path):
 
 def test_live_profile_adds_live_contract_findings_only_for_live(monkeypatch):
     calls: list[str] = []
+    # Profile routing must not depend on the wall-clock calendar horizon;
+    # calendar warning behavior has its own explicit-date contract tests.
+    monkeypatch.setattr("evaluator.runner.evaluate_calendar_coverage", lambda root: [])
     monkeypatch.setattr("evaluator.runner.evaluate_inventory", lambda root: [])
     monkeypatch.setattr(
         "evaluator.runner.build_and_audit_wheel", lambda root, work_dir: ({}, [])

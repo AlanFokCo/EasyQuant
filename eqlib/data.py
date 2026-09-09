@@ -7,6 +7,7 @@ import requests
 from collections import OrderedDict
 from functools import lru_cache
 from importlib import resources
+from numbers import Integral
 from typing import Optional, Union
 
 import akshare as ak
@@ -90,11 +91,11 @@ def _get_spot_data():
     with _spot_lock:
         _invalidate_spot_cache()
         if _spot_cache is not None:
-            return _spot_cache
+            return _spot_cache.copy()
 
         try:
             df = ak.stock_zh_a_spot_em()
-            _spot_cache = df
+            _spot_cache = df.copy()
             _spot_fetch_time = time.time()
             return df
         except Exception as e:
@@ -661,7 +662,7 @@ def fetch_stock_data(
         if df_cached is not None:
             if is_idx and start_date and end_date:
                 return _slice_by_date(df_cached, start_date, end_date)
-            return df_cached
+            return df_cached.copy()
 
     start_str = _normalize_date(start_date)
     end_str = _normalize_date(end_date)
@@ -689,7 +690,7 @@ def fetch_stock_data(
                     df["日期"] = pd.to_datetime(df["日期"])
                     df.set_index("日期", inplace=True)
             with _cache_lock:
-                _cache[cache_key] = df
+                _cache[cache_key] = df.copy()
                 _cache.move_to_end(cache_key)
                 while len(_cache) > _MAX_CACHE_ENTRIES:
                     _cache.popitem(last=False)
@@ -739,7 +740,7 @@ def fetch_stock_data(
                 ]
                 df = df[[c for c in cols if c in df.columns]]
                 with _cache_lock:
-                    _cache[cache_key] = df
+                    _cache[cache_key] = df.copy()
                     _cache.move_to_end(cache_key)
                     while len(_cache) > _MAX_CACHE_ENTRIES:
                         _cache.popitem(last=False)
@@ -848,46 +849,73 @@ def get_price(
     fields=None,
     count=None,
 ):
-    """Get historical price data.
+    """Get daily historical prices, with an inclusive research date range.
 
-    Parameters:
-        security: stock code (str or list)
-        start_date / end_date: date range
-        frequency: 'daily' or '1m'
-        fields: list of fields to return
-        count: number of bars (alternative to date range)
+    During an active simulation only bars strictly before its current day
+    are visible, including when an explicit future end date is supplied.
+    ``count`` must be a positive integer and limits the most recent bars
+    within the requested range. Dates accept strings, dates and datetimes.
+    Only ``daily`` and ``1d`` are supported; use ``get_price_minute`` for
+    minute data. Outside a simulation the requested research range is kept.
     """
+    if frequency not in ("daily", "1d"):
+        raise NotImplementedError(
+            "get_price supports daily/1d only; use get_price_minute for minute data"
+        )
+    if count is not None:
+        if isinstance(count, bool) or not isinstance(count, Integral) or count <= 0:
+            raise ValueError("count must be a positive integer")
+        count = int(count)
     if isinstance(security, (list, tuple)):
         return {
-            sec: f
+            sec: frame
             for sec in security
             if not (
-                f := get_price(sec, start_date, end_date, frequency, fields, count)
+                frame := get_price(sec, start_date, end_date, frequency, fields, count)
             ).empty
         }
 
-    if count is not None and start_date is None:
-        # B2: In backtest mode, default to simulated time instead of real time
-        if end_date is None:
-            from eqlib._state import _context
+    from eqlib._state import _context
 
-            end_date = getattr(_context, "current_dt", None) or datetime.datetime.now()
-        lookback = end_date if isinstance(end_date, datetime.date) else end_date.date()
-        start_date = datetime.datetime.combine(lookback, datetime.time())
-        start_date = _compute_lookback(count, start_date)
-
+    current = getattr(_context, "current_dt", None)
     if end_date is None:
-        # B2: In backtest mode, default to simulated time instead of real time
-        from eqlib._state import _context
+        end_date = current if current is not None else _get_china_today()
+    end_ts = pd.Timestamp(end_date)
+    start_ts = pd.Timestamp(start_date) if start_date is not None else None
+    if pd.isna(end_ts) or (start_ts is not None and pd.isna(start_ts)):
+        raise ValueError("start_date and end_date must be valid dates")
 
-        end_date = getattr(_context, "current_dt", None) or datetime.datetime.now()
-    if start_date is None:
-        start_date = end_date - datetime.timedelta(days=count * 2 if count else 365)
+    # The daily providers use exchange-local dates, even for aware timestamps.
+    def exchange_day(ts):
+        if ts.tzinfo is not None:
+            ts = ts.tz_convert("Asia/Shanghai").tz_localize(None)
+        return ts.normalize()
 
-    df = fetch_stock_data(security, start_date, end_date)
-    if not df.empty and fields:
-        df = df[[f for f in fields if f in df.columns]]
-    return df
+    end_ts = exchange_day(end_ts)
+    if start_ts is not None:
+        start_ts = exchange_day(start_ts)
+        if start_ts > end_ts:
+            raise ValueError("start_date must not be after end_date")
+    if current is not None:
+        cutoff = exchange_day(pd.Timestamp(current))
+        end_ts = min(end_ts, cutoff - pd.Timedelta(days=1))
+    if start_ts is None:
+        start_ts = (
+            _compute_lookback(count, end_ts)
+            if count is not None
+            else end_ts - pd.Timedelta(days=365)
+        )
+    if start_ts > end_ts:
+        return pd.DataFrame(columns=list(fields) if fields else None)
+
+    result = fetch_stock_data(security, start_ts, end_ts)
+    # Apply the boundary again even if a provider/cache returns extra rows.
+    result = _slice_by_date(result, start_ts, end_ts).sort_index()
+    if count is not None:
+        result = result.tail(count)
+    if fields:
+        result = result[[f for f in fields if f in result.columns]]
+    return result.copy()
 
 
 def history(
@@ -941,12 +969,10 @@ def attribute_history(
         fields: tuple of field names to fetch (default ``('close',)``)
         df: if True return a DataFrame, else a Series / dict
         skip_paused: reserved for future use
-        fq: adjustment mode.  In backtest mode (preloaded panel), only
-            ``'pre'`` (前复权 / qfq) and ``None`` (no adjustment) are supported
-            because the preloaded data is always stored with ``adjust='qfq'``.
-            Requesting ``'post'`` in backtest mode will raise a
-            ``ValueError`` to prevent silent incorrect data.  In live
-            mode all three modes are supported via the fallback path.
+        fq: ``'pre'`` (qfq), ``'post'`` (hfq), or ``None`` (raw).
+            Preloaded data must match the requested adjustment mode; a
+            mismatch raises ValueError instead of relabeling adjusted prices.
+            Without preload the requested mode is passed to the data source.
 
     Returns:
         DataFrame with columns for each requested field, indexed by date.
@@ -954,18 +980,24 @@ def attribute_history(
     from eqlib._state import _context
     from eqlib.engine import _get_preloaded
 
+    adjust_map = {"pre": "qfq", "post": "hfq", None: ""}
+    if fq not in adjust_map:
+        raise ValueError("fq must be 'pre', 'post', or None")
     # Fast path: use prebuilt Series dicts from PreloadedData
     preloaded = _get_preloaded()
+    if preloaded is not None and (preloaded._field_series or preloaded.panel is not None):
+        stats = getattr(preloaded, "load_stats", {})
+        loaded_adjust = stats.get("adjust") if isinstance(stats, dict) else None
+        if loaded_adjust is None:
+            loaded_adjust = "qfq"  # Legacy panels use forward-adjusted prices.
+        if adjust_map[fq] != loaded_adjust:
+            raise ValueError(
+                f"attribute_history: fq='{fq}' does not match preloaded "
+                f"adjust='{loaded_adjust}'. Load data with adjust='{adjust_map[fq]}'."
+            )
     if preloaded is not None and preloaded._field_series:
         sec_data = preloaded._field_series.get(security)
         if sec_data is not None:
-            if fq not in ("pre", None):
-                raise ValueError(
-                    f"attribute_history: fq='{fq}' is not supported in backtest mode. "
-                    "The preloaded OHLCV panel is stored with adjust='qfq' (前复权). "
-                    "Use fq='pre' (the default), or switch to the network fallback by "
-                    "not preloading data."
-                )
             available = [f for f in fields if f in sec_data]
             if not available:
                 return pd.DataFrame()
@@ -980,7 +1012,7 @@ def attribute_history(
                 )
             else:
                 result = pd.DataFrame({f: sec_data[f] for f in available})
-            return result.tail(count)
+            return result.tail(count).copy()
         if preloaded.panel is None:
             return pd.DataFrame()
 
@@ -988,11 +1020,6 @@ def attribute_history(
     if preloaded is not None and preloaded.panel is not None:
         sec_df = preloaded.panel.get(security)
         if sec_df is not None and not sec_df.empty:
-            if fq not in ("pre", None):
-                raise ValueError(
-                    f"attribute_history: fq='{fq}' is not supported in backtest mode. "
-                    "The preloaded panel is stored with adjust='qfq'. Use fq='pre'."
-                )
             available = [f for f in fields if f in sec_df.columns]
             if not available:
                 return pd.DataFrame()
@@ -1002,16 +1029,15 @@ def attribute_history(
                 cutoff = pd.Timestamp(current).normalize()
                 sec_df = sec_df[sec_df.index < cutoff]
             result = sec_df[available].tail(count)
-            return result
+            return result.copy()
         return pd.DataFrame()
 
     # Fallback: fetch from disk/network
     end_date = _context.current_dt
     start_date = _compute_lookback(count, end_date)
 
-    adjust_map = {"pre": "qfq", "post": "hfq", None: ""}
     df_data = fetch_stock_data(
-        security, start_date, end_date, adjust=adjust_map.get(fq, "qfq")
+        security, start_date, end_date, adjust=adjust_map[fq]
     )
     if df_data.empty:
         return pd.DataFrame()
@@ -1768,7 +1794,17 @@ def fetch_minute_data(
 def get_price_minute(
     security, count=None, period: str = "5m", fields=None, adjust: str = "qfq"
 ):
-    """Get minute-level price data."""
+    """Get completed minute bars strictly before active simulation time.
+
+    Outside an active context this is an unrestricted research query. Provider
+    timestamps are exchange-local bar timestamps; the current bar is excluded
+    conservatively, so its final close cannot enter an in-progress decision.
+    """
+    if period not in ("1m", "5m", "15m", "30m", "60m"):
+        raise ValueError("unsupported minute period")
+    if count is not None:
+        if isinstance(count, bool) or not isinstance(count, Integral) or count <= 0:
+            raise ValueError("count must be a positive integer")
     if isinstance(security, (list, tuple)):
         return {
             sec: f
@@ -1779,6 +1815,20 @@ def get_price_minute(
     df = fetch_minute_data(security, period=period, adjust=adjust)
     if df.empty:
         return df
+    from eqlib._state import _context
+
+    current = getattr(_context, "current_dt", None)
+    df = df.copy()
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise ValueError("minute data requires a DatetimeIndex")
+    if df.index.tz is not None:
+        df.index = df.index.tz_convert("Asia/Shanghai").tz_localize(None)
+    df = df.sort_index()
+    if current is not None:
+        cutoff = pd.Timestamp(current)
+        if cutoff.tzinfo is not None:
+            cutoff = cutoff.tz_convert("Asia/Shanghai").tz_localize(None)
+        df = df.loc[df.index < cutoff]
     if count is not None:
         df = df.tail(count)
     if fields:

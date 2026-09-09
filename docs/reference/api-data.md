@@ -17,7 +17,7 @@ get_price(security, start_date=None, end_date=None, frequency='daily', fields=No
 | `security` | `str` 或 `list` | 是 | 股票代码 |
 | `start_date` | `str`/`date` | 否 | 开始日期 |
 | `end_date` | `str`/`date` | 否 | 结束日期 |
-| `frequency` | `str` | 否 | 仅支持 `'daily'` |
+| `frequency` | `str` | 否 | 支持 `'daily'` / `'1d'`；分钟请用 `get_price_minute` |
 | `fields` | `list` | 否 | 指定返回字段 |
 | `count` | `int` | 否 | 返回最近 N 根 bar |
 
@@ -300,3 +300,11 @@ get_universe()                 # 获取当前股票池
 | `list_local_stocks()` | 列出所有本地文件 |
 | `remove_local_data(security)` | 删除单个文件 |
 | `clear_all_local_data()` | 清空所有本地文件 |
+
+## 历史价格契约与复权
+
+`count` 必须是正整数（不能是布尔值），结果取窗口内最后 N 行，数据不足时返回实际可用条数。字符串、date 和 datetime 日期均支持。存在活动回测上下文时，`get_price` 与 `attribute_history` 一样，只返回当前日期之前的日线；显式未来结束日期会被截断。没有回测上下文的研究查询按请求范围读取。`frequency="1m"` 会明确抛出 `NotImplementedError`，不会静默返回日线。
+
+预载数据必须与 `fq` 的复权口径相符：默认 qfq 预载只支持 `fq="pre"`；请求 `fq=None`（不复权）会抛出 `ValueError`，除非预载数据本身明确标为不复权。请使用真实原始价格数据，不要将前复权数据冒充原始价格。缓存返回值可以由调用方处理，不会修改共享缓存。
+
+`get_price_minute` 也限制模拟时间，只返回时间戳严格早于 `current_dt` 的分钟 bar；当前 bar 被保守排除。支持 1m、5m、15m、30m、60m，按时间排序后再取最后 `count` 行。

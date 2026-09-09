@@ -78,3 +78,5 @@ def market_open(context):
 !!! warning "不要使用 Python 全局变量"
 
     使用 `g` 而非 Python `global` 变量。`g` 由框架管理，确保在回测和模拟盘中行为一致。
+
+历史价格的可见范围和复权要求见[数据 API](../reference/api-data.md#历史价格契约与复权)，部分成交、限价与缺报价估值规则见[交易 API](../reference/api-trading.md#成交状态和代码规则)。

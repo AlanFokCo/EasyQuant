@@ -4,6 +4,7 @@ Replaces hand-tuned factor weights with a learned model.
 """
 
 import logging
+from copy import copy
 from typing import Optional
 
 import numpy as np
@@ -14,6 +15,7 @@ from eqlib.selection import StockSelector
 
 from .features import FeaturePipeline
 from .models import BaseMLModel
+from ._history import history_at, market_timestamp
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +75,13 @@ class MLSelector(StockSelector):
         Number of historical bars to fetch for computing features.
     label_data : pd.DataFrame or None
         Optional pre-computed labels. If provided, must be a DataFrame
-        with columns ``['security', 'date', 'label']``.
+        with columns ``['security', 'date', 'label', 'available_at']``.
+        ``date`` is the historical feature date; features use earlier daily
+        bars. ``available_at`` is when the entire label actually became
+        observable, including its forward horizon and publication delay.
+        Date-only availability is conservatively usable from the next day.
+        Only historical rows whose labels were available before the current
+        decision are used, within ``train_start`` / ``train_end``.
         When ``None``, labels are computed from historical data using
         the selected ``target`` (past returns by default).
     custom_features : dict or None
@@ -117,9 +125,13 @@ class MLSelector(StockSelector):
         self.top_n = top_n
         self.train_start = train_start
         self.train_end = train_end
+        if train_start is not None and train_end is not None:
+            if market_timestamp(train_start).normalize() > market_timestamp(train_end).normalize():
+                raise ValueError("train_start must not be after train_end")
         self.lookback = lookback
         self.label_data = label_data
         self._is_trained = False
+        self._trained_at = None
 
     def train(self, securities: list[str], context) -> None:
         """Train the model on historical data.
@@ -131,12 +143,12 @@ class MLSelector(StockSelector):
         context : Context
             The current backtest context.
         """
-        import datetime
-
         current_dt = getattr(context, "current_dt", None)
         if current_dt is None:
             log.warning("context.current_dt is not available, cannot train model.")
             return
+
+        self._is_trained = False
 
         log.debug("Training ML model on %d securities", len(securities))
 
@@ -163,6 +175,7 @@ class MLSelector(StockSelector):
         try:
             self._model.fit(X, y)
             self._is_trained = True
+            self._trained_at = market_timestamp(current_dt)
             log.debug("ML model trained on %d samples", len(common))
         except Exception as exc:
             log.error("Failed to train ML model: %s", exc)
@@ -177,8 +190,15 @@ class MLSelector(StockSelector):
         For more robust training, use ``label_data`` to provide pre-computed
         panel data with historical features and labels.
         """
-        X = self.pipeline.compute(securities, context, lookback=self.lookback)
-        y = self._compute_target(securities, context, self.target)
+        sample_context = copy(context)
+        sample_day = market_timestamp(context.current_dt).normalize()
+        if self.train_end is not None:
+            sample_day = min(sample_day, market_timestamp(self.train_end).normalize())
+        if self.train_start is not None and sample_day < market_timestamp(self.train_start).normalize():
+            return None, None
+        sample_context.current_dt = sample_day
+        X = self.pipeline.compute(securities, sample_context, lookback=self.lookback)
+        y = self._compute_target(securities, sample_context, self.target)
         return X, y
 
     def _build_training_set_from_labels(
@@ -186,8 +206,8 @@ class MLSelector(StockSelector):
     ) -> tuple[Optional[pd.DataFrame], Optional[pd.Series]]:
         """Build training set from pre-computed label_data.
 
-        label_data must be a DataFrame with columns:
-        ['security', 'date', 'label'].
+        Features and labels are joined by (sample date, security), never by
+        security alone. Labels without availability metadata are rejected.
         """
         if self.label_data is None:
             return None, None
@@ -196,20 +216,46 @@ class MLSelector(StockSelector):
         if current_dt is None:
             return None, None
 
-        # Filter labels for current date
-        labels = self.label_data
-        if "date" in labels.columns:
-            labels = labels[labels["date"] == current_dt]
-
-        # Compute features
-        X = self.pipeline.compute(securities, context, lookback=self.lookback)
-
-        # Build y from labels
-        y = pd.Series(dtype=float)
-        if "security" in labels.columns and "label" in labels.columns:
-            y = labels.set_index("security")["label"]
-
-        return X, y
+        required = {"security", "date", "label", "available_at"}
+        if not isinstance(self.label_data, pd.DataFrame) or not required.issubset(self.label_data.columns):
+            raise ValueError("label_data requires security, date, label, available_at columns")
+        labels = self.label_data.copy()
+        labels["date"] = labels["date"].map(market_timestamp).dt.normalize()
+        labels["available_at"] = labels["available_at"].map(market_timestamp)
+        # Daily labels typically realize at the close, not midnight. A date
+        # with no intraday timestamp is safe only from the following day.
+        midnight = labels["available_at"] == labels["available_at"].dt.normalize()
+        labels.loc[midnight, "available_at"] += pd.Timedelta(days=1)
+        if (labels["available_at"] < labels["date"]).any():
+            raise ValueError("label available_at cannot precede its feature date")
+        now = market_timestamp(current_dt)
+        eligible = labels["security"].isin(securities) & (labels["date"] < now.normalize()) & (labels["available_at"] < now)
+        if self.train_start is not None:
+            eligible &= labels["date"] >= market_timestamp(self.train_start).normalize()
+        if self.train_end is not None:
+            eligible &= labels["date"] <= market_timestamp(self.train_end).normalize()
+        labels = labels.loc[eligible]
+        if labels.duplicated(["date", "security"]).any():
+            raise ValueError("label_data has duplicate date/security samples")
+        features, targets = [], []
+        for sample_day, sample in labels.groupby("date", sort=True):
+            sample_context = copy(context)
+            sample_context.current_dt = sample_day
+            codes = sample["security"].tolist()
+            X = self.pipeline.compute(codes, sample_context, lookback=self.lookback)
+            if X.empty:
+                continue
+            y = sample.set_index("security")["label"].reindex(X.index)
+            y = pd.to_numeric(y, errors="raise")
+            valid = np.isfinite(y.to_numpy(dtype=float)) & ~X.isna().all(axis=1).to_numpy()
+            X, y = X.loc[valid].copy(), y.loc[valid].copy()
+            index = pd.MultiIndex.from_arrays([[sample_day] * len(X), X.index], names=["date", "security"])
+            X.index = y.index = index
+            features.append(X)
+            targets.append(y)
+        if not features:
+            return None, None
+        return pd.concat(features), pd.concat(targets)
 
     def rank(self, securities: list[str], context) -> list[str]:
         """Return top-N stocks ranked by model prediction.
@@ -226,6 +272,12 @@ class MLSelector(StockSelector):
         list[str]
             Selected security codes (best first).
         """
+        current_dt = getattr(context, "current_dt", None)
+        if self._trained_at is not None and current_dt is not None:
+            if market_timestamp(current_dt) < self._trained_at:
+                # A selector reused in an earlier fold/run must not retain a
+                # model trained with information from its future.
+                self._is_trained = False
         if not self._is_trained:
             log.warning("ML model not trained. Training now...")
             self.train(securities, context)
@@ -270,8 +322,8 @@ class MLSelector(StockSelector):
         for sec in securities:
             try:
                 if target_name == "past_return_5d":
-                    hist = attribute_history(
-                        sec, self.lookback + 10, "1d", fields=["close"]
+                    hist = history_at(
+                        attribute_history, sec, self.lookback + 10, context, fields=["close"]
                     )
                     if hist is None or hist.empty or len(hist) < 25:
                         continue
@@ -285,8 +337,8 @@ class MLSelector(StockSelector):
                     results[sec] = ret_5d
 
                 elif target_name == "past_return_10d":
-                    hist = attribute_history(
-                        sec, self.lookback + 15, "1d", fields=["close"]
+                    hist = history_at(
+                        attribute_history, sec, self.lookback + 15, context, fields=["close"]
                     )
                     if hist is None or hist.empty or len(hist) < 15:
                         continue
@@ -299,8 +351,8 @@ class MLSelector(StockSelector):
                     results[sec] = ret_10d
 
                 elif target_name == "will_rise_5d":
-                    hist = attribute_history(
-                        sec, self.lookback + 10, "1d", fields=["close"]
+                    hist = history_at(
+                        attribute_history, sec, self.lookback + 10, context, fields=["close"]
                     )
                     if hist is None or hist.empty or len(hist) < 10:
                         continue

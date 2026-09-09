@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from eqlib.data import attribute_history
+from ._history import history_at
 
 log = logging.getLogger(__name__)
 
@@ -156,8 +157,8 @@ class FeaturePipeline:
         # Add a safety buffer
         min_history = max(lookback, 60)
 
-        hist = attribute_history(
-            sec, min_history, "1d",
+        hist = history_at(
+            attribute_history, sec, min_history, context,
             fields=["close", "high", "low", "volume"],
         )
         if hist is None or hist.empty or len(hist) < 20:
