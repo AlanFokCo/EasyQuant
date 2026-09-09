@@ -44,7 +44,7 @@ def initialize(context):
 
     # ML Selector — learns from historical data to pick top stocks.
     # target='past_return_5d' uses historical 5-day returns as labels.
-    # For true forward-return prediction, provide label_data (panel).
+    # For true forward-return prediction, provide label_data with security/date/label/available_at columns.
     g.selector = MLSelector(
         model='random_forest',
         features=['rsi', 'macd_hist', 'atr', 'momentum', 'volatility', 'volume_ratio'],

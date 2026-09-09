@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from eqlib.constants import TRADING_DAYS_PER_YEAR
+from eqlib.utils.stats import _drawdown_from_returns
 
 __all__ = [
     "OverfittingWarning",
@@ -111,10 +112,7 @@ def _compute_sharpe(returns, risk_free_rate=0.0):
 
 
 def _compute_max_drawdown(returns):
-    cumulative = (1 + returns).cumprod()
-    running_max = cumulative.cummax()
-    drawdown = (cumulative - running_max) / running_max
-    return float(drawdown.min())
+    return float(_drawdown_from_returns(returns).min())
 
 
 def _compute_annual_return(returns):

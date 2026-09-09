@@ -143,7 +143,7 @@ MLSelector(
 | `train_start` | `str` | Training start date (`YYYY-MM-DD`) |
 | `train_end` | `str` | Training end date (`YYYY-MM-DD`) |
 | `lookback` | `int` | Historical lookback in days |
-| `label_data` | `pd.DataFrame \| None` | Pre-computed label panel DataFrame. Must contain columns `['security', 'date', 'label']`. When provided, the training stage uses this panel instead of computing labels from `target` — this is the recommended path for true forward-return prediction. |
+| `label_data` | `pd.DataFrame \| None` | Pre-computed label panel DataFrame. Must contain columns `['security', 'date', 'label', 'available_at']`. When provided, the training stage uses this panel instead of computing labels from `target` — this is the recommended path for true forward-return prediction. |
 | `custom_features` | `dict[str, Callable] \| None` | Custom feature functions: `{name: func(close, high, low, volume) -> float}`. Function names must also appear in `features` to be invoked. |
 | `**model_kwargs` | | Extra model parameters |
 
@@ -302,3 +302,9 @@ best_params = auto_tune_selector(
 | `momentum` | 20-day momentum |
 | `volatility` | 20-day return std |
 | `roc` | 12-period rate of change |
+
+### Label availability
+
+`date` is the historical feature date (daily bars strictly before that day). `available_at` is when the entire label actually became observable, including the prediction horizon and publication delay. Date-only or midnight availability is conservatively usable from the following day. Missing availability raises `ValueError`. Training includes only feature dates before the current day and labels available strictly before the decision, within inclusive `train_start` / `train_end` dates. Duplicate date/security pairs are rejected.
+
+Features are recomputed at each historical sample date rather than pairing current features with past labels. Without a label panel, `past_return_*` remains past-return fitting rather than forward prediction. Reusing a selector at an earlier date triggers retraining rather than retaining a future-trained model.
