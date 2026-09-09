@@ -566,7 +566,50 @@ def _cache_price_limit_st(session, security, ratio, context_dt):
         cache[security] = {"ratio": ratio, "date": context_dt or datetime.date.today()}
 
 
-def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
+def _fill_pending_orders(sess, day, exec_prices=None, max_daily_volume_pct=0.10):
+    """Match a snapshot of the queue; retain unprocessed requests on failure.
+
+    The volume budget is shared by buys and sells for each security/day,
+    including repeated calls to this function during paper trading.
+    """
+    from eqlib.objects import Order
+    pending = list(sess._pending_orders)
+    sess._pending_orders.clear()
+    retained = []
+    terminal = {Order.STATUS_FILLED, Order.STATUS_CANCELLED,
+                Order.STATUS_EXPIRED, Order.STATUS_REJECTED}
+    try:
+        for index, req in enumerate(pending):
+            obj = req.get("order_obj")
+            if obj and obj.status in terminal:
+                continue
+            sess._pending_orders = [req]
+            try:
+                _fill_order_batch(sess, day, exec_prices, max_daily_volume_pct)
+            except Exception:
+                if not obj or obj.status not in terminal:
+                    retained.append(req)
+                retained.extend(pending[index + 1:])
+                raise
+            finally:
+                retained.extend(sess._pending_orders)
+                sess._pending_orders = []
+    finally:
+        # Cancellation callbacks may remove a partially filled remainder.
+        seen = set()
+        for req in retained:
+            obj = req.get("order_obj")
+            identity = obj.order_id if obj else id(req)
+            if identity not in seen and (not obj or obj.status not in terminal):
+                sess._pending_orders.append(req)
+                seen.add(identity)
+        for req in pending:
+            obj = req.get("order_obj")
+            if obj and obj.status in terminal:
+                sess._order_timestamps.pop(obj.order_id, None)
+
+
+def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                          exec_prices: Optional[dict] = None,
                          max_daily_volume_pct: float = 0.10):
     """Fill all pending orders at today's open price.
@@ -610,7 +653,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
     still_pending = []
 
     for order_req in pending:
-        security = order_req["security"]
+        from eqlib.trade import _resolve_security, _normalize_security
+        security = _resolve_security(order_req["security"], portfolio)
+        order_req["security"] = security
         action = order_req["action"]
         order_obj: Order = order_req.get("order_obj")
 
@@ -665,6 +710,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
                 timeout_seconds = sess._order_timeout_seconds
                 if timeout_seconds is None:
                     timeout_seconds = 3600  # 1 hour default for live
+                if not isinstance(submit_stamp, datetime.datetime):
+                    # Legacy persisted requests recorded only a date.
+                    submit_stamp = datetime.datetime.combine(submit_stamp, datetime.time())
                 elapsed_seconds = (current_time - submit_stamp).total_seconds()
                 elapsed_display = f"{elapsed_seconds:.0f}s"
                 timed_out = elapsed_seconds > timeout_seconds
@@ -692,7 +740,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             current = portfolio.positions[security].amount if security in portfolio.positions else 0
             delta = order_req["target_amount"] - current
         elif action == "ORDER_VALUE":
-            open_px = _get_open_fast(security, day)
+            open_px = ((exec_prices or {}).get(security) or
+                       (exec_prices or {}).get(_bare_code(security)) or
+                       _get_open_fast(security, day))
             if not open_px or (isinstance(open_px, float) and math.isnan(open_px)):
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_VALUE skipped)")
                 if order_obj:
@@ -707,7 +757,9 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             if order_req["value"] < 0:
                 delta = -delta
         elif action == "ORDER_TARGET_VALUE":
-            open_px = _get_open_fast(security, day)
+            open_px = ((exec_prices or {}).get(security) or
+                       (exec_prices or {}).get(_bare_code(security)) or
+                       _get_open_fast(security, day))
             if not open_px or (isinstance(open_px, float) and math.isnan(open_px)):
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_TARGET_VALUE skipped)")
                 if order_obj:
@@ -723,6 +775,10 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             if order_obj:
                 order_obj.transition_to(Order.STATUS_CANCELLED, reason="unknown action")
             continue
+
+        if order_obj:
+            order_obj.amount = order_obj.filled_amount + abs(int(delta))
+            order_obj._quantity_resolved = True
 
         # A-REG2: Cancel (not fill) when no position change is needed.
         # PENDING → FILLED is not a valid transition.
@@ -885,12 +941,25 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         else:
             exec_price = base_price
 
+        if order_style and getattr(order_style, "limit_price", None) is not None:
+            if ((is_buy and exec_price > order_style.limit_price) or
+                    (not is_buy and exec_price < order_style.limit_price)):
+                still_pending.append(order_req)
+                continue
+
         # ── Phase 2.2: Check daily volume limit for partial fill ───────────────
         # Large orders exceeding max_daily_volume_pct of daily volume are
         # partially filled; remaining amount stays in pending queue.
         # This is more realistic for live trading where large orders can
         # significantly impact market prices.
-        max_fill_by_volume = int(vol * max_daily_volume_pct) if vol and vol > 0 else requested_amount
+        budget_state = sess._options.setdefault("_fill_volume_budget", {})
+        if budget_state.get("day") != day:
+            budget_state.clear()
+            budget_state.update(day=day, used={})
+        volume_key = _normalize_security(security)
+        used_volume = budget_state["used"].get(volume_key, 0)
+        daily_cap = int(vol * max_daily_volume_pct) if vol and vol > 0 else requested_amount
+        max_fill_by_volume = max(0, daily_cap - used_volume)
         # Round to 100-share lots
         max_fill_by_volume = _round_lot(max_fill_by_volume)
         # For sells, also consider closeable_amount
@@ -903,6 +972,7 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
         fill_amount = min(requested_amount, max_fill_by_volume)
         if fill_amount <= 0:
             log.warn(f"fill_pending {is_buy and 'BUY' or 'SELL'} {security}: volume limit or closeable_amount=0")
+            still_pending.append(order_req)
             continue
 
         # Check if this is a partial fill
@@ -975,6 +1045,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             pos.closeable_amount = pos.amount - locked
 
             pos.avg_cost = round(total_cb / pos.amount, 4) if pos.amount > 0 else 0
+            pos.update(exec_price)
+            budget_state["used"][volume_key] = used_volume + rounded
 
             # ── Update Order status for partial/full fill ───────────────────────
             if order_obj:
@@ -1018,6 +1090,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             # Sell
             sell_amount = fill_amount
             if security not in portfolio.positions:
+                if order_obj:
+                    order_obj.transition_to(Order.STATUS_CANCELLED, reason="no position")
                 continue
             pos = portfolio.positions[security]
             # A-share rule: allow selling odd lots (零股) when closing position.
@@ -1048,6 +1122,8 @@ def _fill_pending_orders(sess: BacktestSession, day: datetime.date,
             portfolio.available_cash = round(portfolio.available_cash + net, 2)
             pos.amount -= sell_amount
             pos.closeable_amount = max(0, pos.closeable_amount - sell_amount)
+            pos.update(exec_price)
+            budget_state["used"][volume_key] = used_volume + sell_amount
 
             if pos.amount <= 0:
                 del portfolio.positions[security]
@@ -1290,7 +1366,7 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
         open_prices = {}
         for sec in context.portfolio.positions:
             op = _get_open_fast(sec, day)
-            open_prices[sec] = op if op is not None else context.portfolio.positions[sec].avg_cost
+            open_prices[sec] = op
         context.portfolio._sync_total_value(open_prices)
 
         data = _LazyData(context)
@@ -1337,8 +1413,7 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
         close_prices = {}
         for sec in context.portfolio.positions:
             price = _get_price_fast(sec, day)
-            close_prices[sec] = (price if price is not None
-                                 else context.portfolio.positions[sec].avg_cost)
+            close_prices[sec] = price
         context.portfolio._sync_total_value(close_prices)
 
         # ── Record daily snapshot ──────────────────────────────────────────
@@ -1633,7 +1708,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                 session._after_trading_end_done = False
                 prev_day = today
 
-            prices = {sec: _resolve_live_price(spot_cache, sec, pos.avg_cost)
+            prices = {sec: _resolve_live_price(spot_cache, sec, None)
                       for sec, pos in context.portfolio.positions.items()}
 
             # Run scheduled functions with precise time check
@@ -1691,7 +1766,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     }
 
 
-def _resolve_live_price(spot_cache: dict, security: str, default: float) -> float:
+def _resolve_live_price(spot_cache: dict, security: str, default: Optional[float]) -> Optional[float]:
     """Look up a live spot price from spot_cache for a security.
 
     akshare returns bare codes (e.g. "601390").  Securities in the portfolio

@@ -141,7 +141,7 @@ MLSelector(
 | `train_start` | `str` | 训练开始日期（`YYYY-MM-DD`） |
 | `train_end` | `str` | 训练结束日期（`YYYY-MM-DD`） |
 | `lookback` | `int` | 历史数据回看天数 |
-| `label_data` | `pd.DataFrame \| None` | 预计算标签 panel DataFrame，必须包含 `['security', 'date', 'label']` 三列。传入后训练阶段将使用此 panel 而非按 `target` 现算——这是实现真正 forward-return 预测的推荐路径 |
+| `label_data` | `pd.DataFrame \| None` | 预计算标签 panel DataFrame，必须包含 `['security', 'date', 'label', 'available_at']` 四列。传入后训练阶段将使用此 panel 而非按 `target` 现算——这是实现真正 forward-return 预测的推荐路径 |
 | `custom_features` | `dict[str, Callable] \| None` | 自定义特征函数映射，格式 `{name: func(close, high, low, volume) -> float}`。函数名必须同时出现在 `features` 列表中才会被调用 |
 | `**model_kwargs` | | 模型额外参数 |
 
@@ -304,3 +304,9 @@ best_params = auto_tune_selector(
 | `momentum` | 20日动量 |
 | `volatility` | 20日收益率标准差 |
 | `roc` | 12期变动率 |
+
+### 标签的时间边界
+
+`date` 是历史特征日期（只使用该日之前的日线），`available_at` 是整个标签实际可观测的时刻，必须包含预测窗口结束及发布延迟。仅有日期或午夜时间的 `available_at` 保守地从次日可用。缺少此列会抛出 `ValueError`。训练只接受特征日期早于当前日、标签可用时刻严格早于决策时刻的样本，并按 `train_start` / `train_end`（含首尾日期）筛选；同一日期和证券不可重复。
+
+框架按每个历史样本日期计算特征，不会把当前特征配给历史标签。使用没有标签面板的 `past_return_*` 仍属于过去收益拟合，不是未来收益预测。重用 selector 回到更早日期时，会重新训练，防止沿用未来模型。

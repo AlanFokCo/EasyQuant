@@ -14,6 +14,7 @@ import pandas as pd
 from scipy import stats
 
 from eqlib.constants import TRADING_DAYS_PER_YEAR
+from eqlib.utils.stats import _drawdown_from_returns
 
 DEFAULT_BOOTSTRAP_METRICS = [
     "sharpe_ratio",
@@ -222,9 +223,7 @@ def _metric_annual_return(returns: pd.Series) -> float:
 def _metric_max_drawdown(returns: pd.Series) -> float:
     if returns.empty:
         return float("nan")
-    cumulative = (1.0 + returns).cumprod()
-    drawdowns = cumulative / cumulative.cummax() - 1.0
-    return float(abs(drawdowns.min()))
+    return float(abs(_drawdown_from_returns(returns).min()))
 
 
 def _metric_sortino_ratio(returns: pd.Series) -> float:

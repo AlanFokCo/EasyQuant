@@ -144,7 +144,7 @@ MLSelector(
     cross-section cannot construct true forward-return labels. For
     true forward-return prediction, pass pre-computed labels via the
     `label_data` parameter (a panel DataFrame with columns
-    `['security', 'date', 'label']`).
+    `['security', 'date', 'label', 'available_at']`).
 
 ---
 
@@ -260,3 +260,9 @@ See:
 - `examples/22_feature_pipeline.py` — standalone feature computation
 - `examples/23_model_comparison.py` — model comparison
 - `examples/24_custom_features.py` — custom features
+
+### Label availability
+
+`date` is the historical feature date (daily bars strictly before that day). `available_at` is when the entire label actually became observable, including the prediction horizon and publication delay. Date-only or midnight availability is conservatively usable from the following day. Missing availability raises `ValueError`. Training includes only feature dates before the current day and labels available strictly before the decision, within inclusive `train_start` / `train_end` dates. Duplicate date/security pairs are rejected.
+
+Features are recomputed at each historical sample date rather than pairing current features with past labels. Without a label panel, `past_return_*` remains past-return fitting rather than forward prediction. Reusing a selector at an earlier date triggers retraining rather than retaining a future-trained model.

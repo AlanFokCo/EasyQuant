@@ -102,6 +102,7 @@ class Order:
         self.order_id = order_id or f"ORD_{security}_{uuid.uuid4().hex[:12]}"
         self.security = security
         self.amount = abs(amount)  # requested amount (always positive)
+        self._quantity_resolved = True
         self.style = style or MarketOrder()
         if side is Order._SIDE_AUTO:
             self.side = "buy" if amount > 0 else "sell"
@@ -149,10 +150,16 @@ class Order:
 
     def is_complete(self) -> bool:
         """Check if order is fully filled."""
-        return self.filled_amount >= self.amount
+        return self.status == self.STATUS_FILLED
 
-    def remaining_amount(self) -> int:
-        """Get unfilled amount."""
+    def remaining_amount(self) -> int | None:
+        """Unfilled shares, or None until a value/target delta is priced.
+
+        Dynamic orders report the latest resolved quantity; a subsequent fill
+        may resolve a different target delta if price or holdings changed.
+        """
+        if not self._quantity_resolved:
+            return None
         return max(0, self.amount - self.filled_amount)
 
     def __repr__(self):

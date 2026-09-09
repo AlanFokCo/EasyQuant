@@ -83,13 +83,18 @@ class TestOrderTargetPartialFill:
         }
         preloaded._dates = [pd.Timestamp(day)]
 
-        with patch.object(engine, '_get_preloaded', return_value=preloaded):
+        with patch.object(engine, '_get_preloaded', return_value=preloaded), \
+             patch.object(engine, '_get_open_fast', return_value=10.0), \
+             patch.object(engine, '_get_volume_fast', return_value=300):
             engine._fill_pending_orders(
                 sess, day,
                 max_daily_volume_pct=1.0,
             )
 
-        # Check: if partial fill happened, the remaining order should keep target=1000
+        assert order_obj.filled_amount == 300
+        assert len(sess._trade_log) == 1
+        assert len(sess._pending_orders) == 1
+        # The remaining order must keep target=1000
         for pending_order in sess._pending_orders:
             if pending_order["action"] == "ORDER_TARGET":
                 assert pending_order["target_amount"] == 1000, \

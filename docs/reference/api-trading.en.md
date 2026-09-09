@@ -16,7 +16,7 @@ order(security, amount, style=None)
 |-----------|------|----------|-------------|
 | `security` | `str` | Yes | Stock code, e.g. `'601390'` |
 | `amount` | `int` | Yes | Number of shares; positive = buy, negative = sell |
-| `style` | — | No | Order type (reserved parameter) |
+| `style` | — | No | `MarketOrder` or `LimitOrder` |
 
 Returns the pending order ID (`str`), or `None` on failure. Buy orders are automatically rounded to the nearest multiple of 100.
 
@@ -112,3 +112,11 @@ order_pct('601390', -0.3)    # Sell 30% of current position
 ## Commission Fees
 
 Configure via [`set_order_cost()`](api-config.md#set_order_cost) (see [Configuration API](api-config.md)). Defaults: buy stamp duty 0%, sell stamp duty 0.05% (halved since Aug 2023), buy/sell commission 0.025%, minimum commission 5 yuan.
+
+## Execution, status and security keys
+
+Limits apply to the final execution price including slippage; an order waits if that price violates its limit. Buys and sells share a per-security, per-day volume budget across split orders and repeated matching calls. Temporarily unfillable requests remain queued. The first fill preserves the submitted symbol format for compatibility with existing position dictionary access. Later orders using bare or suffixed symbols resolve to the same existing position.
+
+`cancel_order(order_obj)` cancels the unfilled remainder of a partial fill while preserving executions and setting `cancelled`. `is_complete()` is True only for `filled`. Value and target orders return None from `remaining_amount()` until matching first resolves their quantity; afterwards it reports the latest resolved remaining shares. Target-value quantities may change with prices. Negative `order_pct` uses current position shares; `order_pct(code, -1)` requests a full exit.
+
+Missing or invalid quotes retain the last valid mark and set `Position.price_stale=True`; a fresh quote clears it. Missing data alone never resets the position to cost.
