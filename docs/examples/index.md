@@ -92,7 +92,7 @@ python examples/<file>.py
 |---|------|------|----------|
 | 25 | `25_sr_risk_budget.py` | 支撑反弹/突破回踩、按风险分配仓位、逐年评估及成本压力测试 | `python examples/25_sr_risk_budget.py --download` |
 
-详见[规则、运行方法与验证边界](../explanation/sr-risk-budget.md)。本策略尚未证明持续盈利。
+下载时会将股票成交量从手转换为股，已有 CSV 需使用股。详见[规则、运行方法与验证边界](../explanation/sr-risk-budget.md)。本策略尚未证明持续盈利。
 
 ---
 

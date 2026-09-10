@@ -58,7 +58,7 @@ python examples/25_sr_risk_budget.py --stress --start 2021-01-01 --end 2025-12-3
 python examples/25_sr_risk_budget.py --data-dir /path/to/snapshots --stress
 ```
 
-文件名为 `<code>_daily_qfq.csv`，包括 `000300.XSHG_daily_qfq.csv`。首列为日期索引，至少包含 `open,high,low,close,volume`，价格为同一口径的前复权人民币价格，成交量为股。文件必须覆盖测试末日，并在开始日前提供至少 160 根有效日线。重复、乱序、非有限数值、错误 OHLC、基准缺交易日或时间覆盖不足都会报错，不会悄悄缩短测试区间。股票缺失交易日会记录在清单中，不会凭空补成交。
+文件名为 `<code>_daily_qfq.csv`，包括 `000300.XSHG_daily_qfq.csv`。首列为日期索引，至少包含 `open,high,low,close,volume`，价格为同一口径的前复权人民币价格，股票成交量为股。`--download` 将 eqlib 主板股票接口的成交量从手乘以 100 转为股；已提供的 CSV 不会再转换。指数成交量保留源单位，不参与策略的流动性计算。文件必须覆盖测试末日，并在开始日前提供至少 160 根有效日线。重复、乱序、非有限数值、错误 OHLC、基准缺交易日或时间覆盖不足都会报错，不会悄悄缩短测试区间。股票缺失交易日会记录在清单中，不会凭空补成交。
 
 离线运行使用打包交易日历，并把引擎和报告的读取绑定到同一份 CSV，避免回测结束时又下载另一版指数数据。这一示例适配器作用于当前 Python 进程；不要在同一个进程中并发运行它。
 
