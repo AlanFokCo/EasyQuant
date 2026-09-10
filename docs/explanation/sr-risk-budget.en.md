@@ -58,7 +58,7 @@ To supply existing CSVs:
 python examples/25_sr_risk_budget.py --data-dir /path/to/snapshots --stress
 ```
 
-Files are named `<code>_daily_qfq.csv`, including `000300.XSHG_daily_qfq.csv`. The first column is a date index. Required columns are `open,high,low,close,volume`, with consistently forward-adjusted CNY prices and volume in shares. Cover the final test session and provide at least 160 valid warm-up bars before the start. Duplicate/unordered dates, nonfinite values, invalid OHLC, missing benchmark sessions or truncated coverage cause errors instead of silently shortening the evaluation. Missing stock sessions are recorded in the manifest, without inventing fills.
+Files are named `<code>_daily_qfq.csv`, including `000300.XSHG_daily_qfq.csv`. The first column is a date index. Required columns are `open,high,low,close,volume`, with consistently forward-adjusted CNY prices and stock volume in shares. `--download` multiplies eqlib main-board stock volumes by 100 to convert lots to shares; supplied CSVs are already in shares and are not converted again. Index volume retains its source units and is not used for liquidity calculations. Cover the final test session and provide at least 160 valid warm-up bars before the start. Duplicate/unordered dates, nonfinite values, invalid OHLC, missing benchmark sessions or truncated coverage cause errors instead of silently shortening the evaluation. Missing stock sessions are recorded in the manifest, without inventing fills.
 
 Offline runs use the packaged calendar and bind engine/report reads to the same immutable CSV frames, preventing a later download of different benchmark data. This example adapter is scoped to the Python process; do not run it concurrently in multiple threads.
 

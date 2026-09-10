@@ -244,6 +244,13 @@ def main(argv=None):
             frame = fetch_stock_data(code, warmup, args.end, adjust="qfq")
             if frame.empty:
                 raise ValueError(f"data download failed: {code}")
+            # eqlib's main-board stock providers return lots (100 shares).
+            # This strategy and the engine fill budget consume share counts.
+            # Copy first: do not mutate the provider's cached frame. Index
+            # volume is unused by this strategy and keeps its source units.
+            if code != INDEX_HS300:
+                frame = frame.copy()
+                frame["volume"] = pd.to_numeric(frame["volume"]) * 100.0
             frame.to_csv(args.data_dir / f"{code}_daily_qfq.csv")
     frames, manifest = read_inputs(
         args.data_dir, all_codes, args.start, args.end, config

@@ -85,7 +85,7 @@ python examples/25_sr_risk_budget.py --download
 python examples/25_sr_risk_budget.py --stress
 ```
 
-See [strategy rules and limitations](../docs/explanation/sr-risk-budget.md). Profitability has not been established.
+Downloads convert stock volume from lots to shares; supplied CSVs must use shares. See [strategy rules and limitations](../docs/explanation/sr-risk-budget.md). Profitability has not been established.
 
 ## Shared Infrastructure
 
