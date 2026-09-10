@@ -7,7 +7,7 @@
     | **Goal** | Quickly locate each script under `examples/` by number and find the recommended way to run it |
     | **Prerequisite** | Run `pip install -e .` from the repository root |
 
-20 examples across a three-tier progressive learning path: Foundations (01–07) → Intermediate (08–14) → Real-World Projects (15–20), plus an ML extension (21–24).
+25 examples: Foundations (01–07), Intermediate (08–14), Practical (15–20), ML (21–24), and risk-budgeted research (25).
 
 ## Quick Start
 
@@ -23,7 +23,7 @@ Run an example:
 python examples/<file>.py
 ```
 
-All examples use relative dates and a unified trading cost configuration (`examples/_defaults.py`).
+Examples share trading costs (`examples/_defaults.py`); example 25 uses explicit fixed dates and CSV snapshots.
 
 ---
 
@@ -84,6 +84,16 @@ All examples use relative dates and a unified trading cost configuration (`examp
     the model to learn meaningful patterns. For robust training, pass
     panel data via `label_data`. See the
     [ML selection tutorial](../tutorials/11-ml-selection.en.md).
+
+---
+
+## Risk-Budgeted Research (25)
+
+| # | File | Content | Command |
+|---|------|---------|---------|
+| 25 | `25_sr_risk_budget.py` | Support bounces/retests, risk sizing, yearly evaluation and cost stress | `python examples/25_sr_risk_budget.py --download` |
+
+See [rules, usage and validation boundaries](../explanation/sr-risk-budget.md). Sustained profitability has not been established.
 
 ---
 

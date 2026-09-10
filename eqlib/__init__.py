@@ -453,3 +453,9 @@ def run_strategy(initialize_func, start_date=None, end_date=None,
     print(f"Data:   {report_json_path}")
 
     return result
+
+
+# Fixed-parameter support/resistance research strategy [EXPERIMENTAL]
+from eqlib.strategies.sr_risk_budget import SRRiskConfig, make_sr_risk_budget_strategy
+
+__all__ += ["SRRiskConfig", "make_sr_risk_budget_strategy"]
