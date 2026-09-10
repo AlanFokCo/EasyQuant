@@ -157,3 +157,17 @@ curl http://localhost:8081/api/v1/runs/<run_id>/report/data
 `eqlib` 的 API 可与任意 Python 流程配合（脚本、Notebook、定时任务）。典型调用链：`run_backtest()` → `analyze_returns()` → `brinson_attribution()` → 分析结果 → 修改参数 → 再回测。
 
 策略文件定义 `PARAMS`（当前值）与 `PARAM_RANGES`（搜索空间），由优化脚本读取与更新。每次变更后建议核对：新参数落在范围内、满足交叉约束、未引入前视偏差。
+
+
+## 支撑压力风险预算策略 [EXPERIMENTAL]
+
+```python
+from eqlib.strategies import SRRiskConfig, make_sr_risk_budget_strategy
+
+initialize = make_sr_risk_budget_strategy(
+    universe=["601398", "601318"], config=SRRiskConfig(),
+    benchmark="000300.XSHG", order_cost=None, eligible=None,
+)
+```
+
+`SRRiskConfig` 定义计划风险和交易条件；工厂返回日线 `initialize` 回调。`eligible(code, date)` 可提供历史时点的成员/ST 过滤。不传时使用静态自选池。详见[完整规则和限制](../explanation/sr-risk-budget.md)。

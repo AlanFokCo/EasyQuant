@@ -157,3 +157,17 @@ The response structure matches the JSON output of `generate_report_json()` and i
 The `eqlib` API works with any Python workflow (scripts, notebooks, scheduled tasks). A typical call chain: `run_backtest()` → `analyze_returns()` → `brinson_attribution()` → analyze results → modify parameters → re-run backtest.
 
 Strategy files define `PARAMS` (current values) and `PARAM_RANGES` (search space), which are read and updated by the optimization script. After each change, verify that: new parameters fall within range, cross-parameter constraints are satisfied, and no look-ahead bias is introduced.
+
+
+## Support/resistance risk-budget strategy [EXPERIMENTAL]
+
+```python
+from eqlib.strategies import SRRiskConfig, make_sr_risk_budget_strategy
+
+initialize = make_sr_risk_budget_strategy(
+    universe=["601398", "601318"], config=SRRiskConfig(),
+    benchmark="000300.XSHG", order_cost=None, eligible=None,
+)
+```
+
+`SRRiskConfig` defines planned risk and signal conditions. The factory returns a daily initialize callback. Supply `eligible(code, date)` for point-in-time membership/ST eligibility; otherwise the watchlist is static. See [full rules and limitations](../explanation/sr-risk-budget.md).
