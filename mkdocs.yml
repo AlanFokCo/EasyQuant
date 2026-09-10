@@ -170,6 +170,7 @@ nav:
       - explanation/backtest-model.md
       - explanation/ashare-market.md
       - explanation/ashare-sr-leader-strategy.md
+      - explanation/sr-risk-budget.md
       - explanation/glossary.md
 
   - 示例: examples/index.md

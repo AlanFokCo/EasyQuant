@@ -425,3 +425,8 @@ You've learned how to write and run your first strategy. What's next:
 2. Add a stop-loss to the strategy (e.g., force sell at -8%)
 3. Backtest with a different stock
 4. Try changing `order_value(..., available_cash)` to `order_value(..., available_cash * 0.5)` for half-position trading
+
+
+## Complete support/resistance example
+
+For stop-distance sizing, fill tracking and portfolio halts, see the [support/resistance risk-budget strategy](../explanation/sr-risk-budget.md) and `examples/25_sr_risk_budget.py`. Signals form after the close and fill no earlier than the next open. Engineering tests are not evidence of profitability.
