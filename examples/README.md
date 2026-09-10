@@ -1,7 +1,7 @@
 # EasyQuant Examples
 
-24 examples organized in a progressive learning path: Foundation (01-07),
-Intermediate (08-14), Practical (15-20), and ML (21-24).
+25 examples organized in a progressive learning path: Foundation (01-07),
+Intermediate (08-14), Practical (15-20), ML (21-24), and risk-budgeted S/R research (25).
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ Intermediate (08-14), Practical (15-20), and ML (21-24).
 pip install -e .
 ```
 
-All examples use relative dates and shared configuration from `_defaults.py`.
+Examples share configuration from `_defaults.py`. Example 25 uses explicit fixed dates and immutable CSV inputs.
 
 ## Foundation (01-07): Learn the Basics
 
@@ -73,6 +73,19 @@ python examples/22_feature_pipeline.py
 python examples/23_model_comparison.py
 python examples/24_custom_features.py
 ```
+
+## Risk-Budgeted Research (25)
+
+| # | File | What You'll Learn |
+|---|------|-------------------|
+| 25 | `25_sr_risk_budget.py` | Completed-bar support/retest entries, risk sizing, halt/retry lifecycle, CSV validation and cost stress |
+
+```bash
+python examples/25_sr_risk_budget.py --download
+python examples/25_sr_risk_budget.py --stress
+```
+
+See [strategy rules and limitations](../docs/explanation/sr-risk-budget.md). Profitability has not been established.
 
 ## Shared Infrastructure
 

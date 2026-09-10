@@ -425,3 +425,8 @@ def market_open(context):
 2. 给策略加上止损（如 -8% 强制卖出）
 3. 换成另一只股票回测
 4. 尝试把 `order_value(..., available_cash)` 改为 `order_value(..., available_cash * 0.5)`，只半仓操作
+
+
+## 支撑压力位的完整示例
+
+需要带止损风险预算、成交跟踪和组合熔断的版本，可从[支撑压力风险预算策略](../explanation/sr-risk-budget.md)与 `examples/25_sr_risk_budget.py` 开始。其信号在收盘回调产生，最早次日开盘撮合；工程测试不构成盈利证据。

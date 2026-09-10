@@ -7,7 +7,7 @@
     | **目标** | 按编号快速定位 `examples/` 下脚本用途与推荐运行方式 |
     | **前置** | 在仓库根目录执行 `pip install -e .` |
 
-20 个示例，三层递进式学习路径：基础（01-07）→ 进阶（08-14）→ 实战（15-20），并扩展 ML 层（21-24）。
+25 个示例：基础（01-07）→ 进阶（08-14）→ 实战（15-20），以及 ML（21-24）和风险预算策略（25）。
 
 ## 快速开始
 
@@ -23,7 +23,7 @@ pip install -e .
 python examples/<file>.py
 ```
 
-所有示例使用相对日期和统一的交易成本配置（`examples/_defaults.py`）。
+示例使用统一交易成本（`examples/_defaults.py`）；示例 25 使用明确的固定日期和 CSV 快照。
 
 ---
 
@@ -83,6 +83,16 @@ python examples/<file>.py
     （<50 只）时样本量不足，模型无法学到有意义的模式。如需稳健训练，
     请通过 `label_data` 传入 panel DataFrame。详见
     [ML 选股教程](../tutorials/11-ml-selection.md)。
+
+---
+
+## 风险预算研究（25）
+
+| # | 文件 | 内容 | 运行命令 |
+|---|------|------|----------|
+| 25 | `25_sr_risk_budget.py` | 支撑反弹/突破回踩、按风险分配仓位、逐年评估及成本压力测试 | `python examples/25_sr_risk_budget.py --download` |
+
+详见[规则、运行方法与验证边界](../explanation/sr-risk-budget.md)。本策略尚未证明持续盈利。
 
 ---
 
