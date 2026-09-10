@@ -320,21 +320,36 @@ def test_only_main_board_universe_is_accepted():
             make_sr_risk_budget_strategy(codes)
 
 
+@pytest.mark.parametrize("download", [False, True])
 def test_cli_writes_complete_synthetic_and_cost_stress_reports(
-    tmp_path, frames, monkeypatch
+    tmp_path, frames, monkeypatch, download
 ):
     from examples._defaults import STOCKS
 
     dates = frames[CODE].index
+    source_frames = {}
+    expected_volumes = {}
     for code in [*STOCKS.values(), INDEX_HS300]:
         frame = frames[INDEX_HS300 if code == INDEX_HS300 else CODE].copy()
         extra = frame.iloc[:1].copy()
         extra.index = pd.DatetimeIndex([pd.Timestamp("2022-12-30")])
-        pd.concat([extra, frame]).to_csv(tmp_path / f"{code}_daily_qfq.csv")
+        frame = pd.concat([extra, frame])
+        expected_volumes[code] = frame.volume.copy()
+        if download:
+            if code != INDEX_HS300:
+                frame["volume"] /= 100.0
+            source_frames[code] = frame
+        else:
+            frame.to_csv(tmp_path / f"{code}_daily_qfq.csv")
+    if download:
+        monkeypatch.setattr(
+            runner, "fetch_stock_data", lambda code, *args, **kwargs: source_frames[code]
+        )
     output = tmp_path / "out"
     assert (
         runner.main(
             [
+                *(["--download"] if download else []),
                 "--data-dir",
                 str(tmp_path),
                 "--output",
@@ -350,6 +365,16 @@ def test_cli_writes_complete_synthetic_and_cost_stress_reports(
         == 0
     )
     payload = json.loads((output / "summary.json").read_text())
+    for code, expected in expected_volumes.items():
+        saved = pd.read_csv(
+            tmp_path / f"{code}_daily_qfq.csv", index_col=0, parse_dates=True
+        )
+        pd.testing.assert_series_equal(saved.volume, expected, check_names=False)
+        if download:
+            multiplier = 1 if code == INDEX_HS300 else 100
+            pd.testing.assert_series_equal(
+                source_frames[code].volume * multiplier, expected
+            )
     assert payload["evidence"] == "synthetic_execution_test"
     assert payload["profitability_proven"] is False
     assert payload["full_period"]["fill_count"] > 0
