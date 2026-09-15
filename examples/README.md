@@ -78,7 +78,7 @@ python examples/24_custom_features.py
 
 | # | File | What You'll Learn |
 |---|------|-------------------|
-| 25 | `25_sr_risk_budget.py` | Completed-bar support/retest entries, risk sizing, halt/retry lifecycle, CSV validation and cost stress |
+| 25 | `25_sr_risk_budget.py` | Completed-bar support/retests and optional breakouts, risk sizing, chronological research and cost stress |
 
 ```bash
 python examples/25_sr_risk_budget.py --download
@@ -111,3 +111,9 @@ All examples use consistent 2024 rates:
 | Stamp duty | 0.05% | Sell only, halved since Aug 2023 |
 | Commission | 0.025% | Buy + sell, includes regulatory fees |
 | Minimum | 5 CNY | Per trade |
+
+Example 25 accepts `--allow-breakout` as an experimental opt-in.
+Three rounds and 11 configurations did not pass the development/validation gate.
+`scripts/research_sr_risk_budget.py` replays declared candidates and intervals
+on supplied frozen CSVs. See the bilingual
+[research record](../docs/explanation/sr-risk-budget.md).

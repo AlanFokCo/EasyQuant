@@ -1,0 +1,3074 @@
+{
+  "title": "SR risk-budget optimization on frozen 2020-2026 inputs",
+  "base_commit": "e9e6f691a1193988b2e07fcead4d20d45e5f8ab6",
+  "decision": {
+    "validated_selection": null,
+    "provisional_comparison": "channel60",
+    "promotion_gate_passed": false,
+    "default_changed": false,
+    "reason": "All 11 candidates failed positive development AND validation returns. The provisional channel60 later check also lost; no retuning after inspection."
+  },
+  "periods": {
+    "development": [
+      "2020-01-01",
+      "2022-12-31"
+    ],
+    "validation": [
+      "2023-01-01",
+      "2024-12-31"
+    ],
+    "later_check": [
+      "2025-01-01",
+      "2026-09-10"
+    ],
+    "full": [
+      "2020-01-01",
+      "2026-09-10"
+    ]
+  },
+  "starting_cash": 1000000,
+  "candidate_configs": {
+    "baseline": {
+      "level_window": 60,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": false,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    },
+    "short_levels": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": false,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    },
+    "breakout": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    },
+    "trend_exit": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 2.5,
+      "trailing_atr": 4.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 6.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.12,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 120,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    },
+    "early_market": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": false,
+      "exit_on_market_filter": true
+    },
+    "long_trend": {
+      "level_window": 20,
+      "trend_window": 120,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": false,
+      "exit_on_market_filter": true
+    },
+    "early_trend_exit": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 2.5,
+      "trailing_atr": 4.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 6.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.12,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 120,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": false,
+      "exit_on_market_filter": true
+    },
+    "channel60": {
+      "level_window": 60,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    },
+    "stock_exits": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": false
+    },
+    "channel60_stock_exits": {
+      "level_window": 60,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": false
+    },
+    "patient_exits": {
+      "level_window": 20,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 6.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 120,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    }
+  },
+  "rounds": [
+    {
+      "declared_at_utc": "2026-09-13T15:28:22.050359+00:00",
+      "candidates": {
+        "baseline": {
+          "level_window": 60,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": false
+        },
+        "short_levels": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": false
+        },
+        "breakout": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true
+        },
+        "trend_exit": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 2.5,
+          "trailing_atr": 4.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 6.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.12,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 120,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true
+        }
+      },
+      "periods": {
+        "development": [
+          "2020-01-01",
+          "2022-12-31"
+        ],
+        "validation": [
+          "2023-01-01",
+          "2024-12-31"
+        ],
+        "later_check": [
+          "2025-01-01",
+          "2026-09-10"
+        ],
+        "full": [
+          "2020-01-01",
+          "2026-09-10"
+        ]
+      },
+      "selection_rule": "Select using development and validation only. Prefer positive net returns in both, drawdown under 12%, more trades than baseline, unchanged risk budgets; later_check evaluated once after selection. Reject adverse cost stress. Report all tested variants.",
+      "limitations": "The full baseline results were already seen. Later_check is not a certified untouched holdout. Fixed current watchlist and rebased execution-price limitations persist."
+    },
+    {
+      "declared_at_utc": "2026-09-13T15:33:31.390202+00:00",
+      "reason": "All initial candidates lost in 2023-2024 validation. Test lag in the broad-market slope filter and stricter stock trend quality. No later_check results have been generated for any candidate.",
+      "candidates": {
+        "early_market": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": false
+        },
+        "long_trend": {
+          "level_window": 20,
+          "trend_window": 120,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": false
+        },
+        "early_trend_exit": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 2.5,
+          "trailing_atr": 4.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 6.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.12,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 120,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": false
+        }
+      },
+      "selection_rule": "Same positive development AND validation return, drawdown under 12%, unchanged risk budgets. Do not inspect later_check before selection."
+    },
+    {
+      "declared_at_utc": "2026-09-15T14:50:39.003989+00:00",
+      "reason": "Market slope removal increased false entries. Separately test applying the unchanged broad-market gate only to entries; use stock stops/targets/time/portfolio halt for exits. Compare a 60-day breakout channel against 20-day levels. Separately test longer targets/holding without widening initial/trailing stops.",
+      "candidates": {
+        "channel60": {
+          "level_window": 60,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": true,
+          "exit_on_market_filter": true
+        },
+        "stock_exits": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": true,
+          "exit_on_market_filter": false
+        },
+        "channel60_stock_exits": {
+          "level_window": 60,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 3.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 40,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": true,
+          "exit_on_market_filter": false
+        },
+        "patient_exits": {
+          "level_window": 20,
+          "trend_window": 60,
+          "market_window": 120,
+          "atr_period": 20,
+          "retest_bars": 5,
+          "support_tolerance_atr": 0.75,
+          "stop_buffer_atr": 0.5,
+          "stop_atr": 1.5,
+          "trailing_atr": 3.0,
+          "min_reward_risk": 1.8,
+          "breakout_target_r": 6.0,
+          "entry_gap": 0.005,
+          "min_stop_pct": 0.015,
+          "max_stop_pct": 0.08,
+          "min_price": 3.0,
+          "min_avg_turnover": 50000000.0,
+          "max_atr_pct": 0.06,
+          "risk_per_trade": 0.005,
+          "max_open_risk": 0.02,
+          "max_stock_weight": 0.15,
+          "max_exposure": 0.6,
+          "max_positions": 5,
+          "volume_participation": 0.005,
+          "max_holding_days": 120,
+          "cooldown_days": 5,
+          "halt_drawdown": 0.1,
+          "halt_days": 20,
+          "slippage": 0.001,
+          "allow_breakout": true,
+          "require_market_slope": true,
+          "exit_on_market_filter": true
+        }
+      },
+      "selection_rule": "Positive development AND validation net return, each max drawdown under 12%, more fills than baseline. Cost stress must remain positive in both periods before later_check. If none qualifies, report no validated selection; do not relax criteria.",
+      "total_candidates_including_baseline": 11,
+      "later_check_not_yet_inspected": true
+    }
+  ],
+  "selection_before_later_check": {
+    "frozen_at_utc": "2026-09-15T14:52:04.576726+00:00",
+    "candidate_count_including_baseline": 11,
+    "qualified_candidates": [],
+    "validated_selection": null,
+    "diagnostic_candidate": "channel60",
+    "config": {
+      "level_window": 60,
+      "trend_window": 60,
+      "market_window": 120,
+      "atr_period": 20,
+      "retest_bars": 5,
+      "support_tolerance_atr": 0.75,
+      "stop_buffer_atr": 0.5,
+      "stop_atr": 1.5,
+      "trailing_atr": 3.0,
+      "min_reward_risk": 1.8,
+      "breakout_target_r": 3.0,
+      "entry_gap": 0.005,
+      "min_stop_pct": 0.015,
+      "max_stop_pct": 0.08,
+      "min_price": 3.0,
+      "min_avg_turnover": 50000000.0,
+      "max_atr_pct": 0.06,
+      "risk_per_trade": 0.005,
+      "max_open_risk": 0.02,
+      "max_stock_weight": 0.15,
+      "max_exposure": 0.6,
+      "max_positions": 5,
+      "volume_participation": 0.005,
+      "max_holding_days": 40,
+      "cooldown_days": 5,
+      "halt_drawdown": 0.1,
+      "halt_days": 20,
+      "slippage": 0.001,
+      "allow_breakout": true,
+      "require_market_slope": true,
+      "exit_on_market_filter": true
+    },
+    "reason": "No candidate met the declared positive-return gate in both development and validation. Channel60 is a provisional comparison only: one signal flag change, higher development return and lower validation loss/drawdown than baseline and breakout. It is NOT an accepted profitable strategy. No retuning after later_check.",
+    "next_runs": [
+      "channel60 development stress",
+      "channel60 validation stress",
+      "baseline later_check",
+      "channel60 later_check",
+      "channel60 later_check stress",
+      "baseline full",
+      "channel60 full",
+      "channel60 full stress"
+    ],
+    "limitations": [
+      "Baseline full history already inspected before optimization; later_check is not certified untouched OOS.",
+      "Validation was reused across three rounds; 11 candidates including baseline.",
+      "Fixed watchlist and terminal-rebased hfq execution approximation."
+    ]
+  },
+  "diagnosis": {
+    "funnel": {
+      "stock_sessions": 12974,
+      "market_pass": 5046,
+      "liquidity_and_volatility_pass": 4964,
+      "stock_trend_pass": 2514,
+      "candle_pass": 1134,
+      "signal_breakout_retest": 38
+    },
+    "yearly_signals": {
+      "2023": {
+        "breakout_retest": 3
+      },
+      "2024": {
+        "breakout_retest": 6
+      },
+      "2025": {
+        "breakout_retest": 16
+      },
+      "2020": {
+        "breakout_retest": 10
+      },
+      "2026": {
+        "breakout_retest": 3
+      }
+    },
+    "market_days": 632,
+    "total_market_days": 1623,
+    "closed_trades": 26,
+    "winners": 6,
+    "net_pnl": -1109.01,
+    "mean_win": 13725.488333333333,
+    "mean_loss": -4173.097,
+    "exit_reasons": {
+      "market_filter": {
+        "trades": 3,
+        "pnl": -3882.23
+      },
+      "resistance_or_r_target": {
+        "trades": 5,
+        "pnl": 82339.08
+      },
+      "support_or_trailing_stop": {
+        "trades": 18,
+        "pnl": -79565.86
+      }
+    },
+    "cash_rounding": "Round each buy/sell cash movement to cents, as the engine does."
+  },
+  "data": {
+    "601398": {
+      "sha256": "0966c779d92482c2da7d2e53a2b90840bcb31cb3245181b147e5891cd5b28924",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "601318": {
+      "sha256": "5ec99361e55dd87d2b71d7ece7897c2ecb7da3597345f6da5f8e4d4077d6f68d",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "600519": {
+      "sha256": "1373a122dcf51f9183c6da728b98df60d511532faec3f86ddf72988be9edf87f",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "002594": {
+      "sha256": "ec17225459492f4290ae6b998dc033ab0c99536606480d40d0c8a00dee4d10d8",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "000725": {
+      "sha256": "5904db26f42db766c5c9d4cc38df1b5ee6a97ed58d187c99b1b83867edf26d18",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "600276": {
+      "sha256": "2ee2e7f42c56c857b0a042e532fa6411e6fa75d099510cae844ef6bfd9baeb37",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "600585": {
+      "sha256": "a537b59e2c986f6e0860bed46ac02dfd0e8269025f3d3d02666d23f11f152bba",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    },
+    "601088": {
+      "sha256": "85a3b2431c328e807262d61e2b9f277d4f7d1cbc870fd96ae3057f68f6d44660",
+      "rows": 1857,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 10
+    },
+    "000300.XSHG": {
+      "sha256": "4409325f7839a988573fafd2ba4bcfadcf1870a5e73f7f491b30678701c581ca",
+      "rows": 1867,
+      "first": "2019-01-02",
+      "last": "2026-09-10",
+      "missing_test_days": 0
+    }
+  },
+  "input_sources": {
+    "downloaded_at_utc": "2026-09-13T13:10:31.543030+00:00",
+    "test_start": "2020-01-01",
+    "test_end": "2026-09-10",
+    "files": {
+      "601318": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.34706507470150655,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 55.52,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.0206291716212248,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "5ec99361e55dd87d2b71d7ece7897c2ecb7da3597345f6da5f8e4d4077d6f68d"
+      },
+      "600276": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.016362326629086293,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 42.93,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.003603198865922,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "2ee2e7f42c56c857b0a042e532fa6411e6fa75d099510cae844ef6bfd9baeb37"
+      },
+      "600519": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.1422275787346457,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 1285.13,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.0025145346195452,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "1373a122dcf51f9183c6da728b98df60d511532faec3f86ddf72988be9edf87f"
+      },
+      "000725": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.1927966101694915,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 5.46,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.0083790906858914,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "5904db26f42db766c5c9d4cc38df1b5ee6a97ed58d187c99b1b83867edf26d18"
+      },
+      "002594": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.31987744159325926,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 83.52,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.003957340493733,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "ec17225459492f4290ae6b998dc033ab0c99536606480d40d0c8a00dee4d10d8"
+      },
+      "601398": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.6159695817490494,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 8.1,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 0.9999119060677158,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "0966c779d92482c2da7d2e53a2b90840bcb31cb3245181b147e5891cd5b28924"
+      },
+      "600585": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.16980950548393303,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 17.65,
+        "anchor_source": "2026-09-10 terminal qfq bar from snapshot collected on that date",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.0043949827015557,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1867,
+        "sha256": "a537b59e2c986f6e0860bed46ac02dfd0e8269025f3d3d02666d23f11f152bba"
+      },
+      "601088": {
+        "provider": "Tencent Finance",
+        "adjustment": "hfq scaled to terminal qfq close; not native Tencent qfq",
+        "normalization_formula": "input OHLC[t] = hfq OHLC[t] * anchor_close / hfq_close[2026-09-10]",
+        "normalization_factor": 0.652317880794702,
+        "anchor_date": "2026-09-10",
+        "anchor_close": 47.28,
+        "anchor_source": "Tencent qfq terminal close, retrieved 2026-09-13",
+        "source_volume_unit": "lots",
+        "stored_volume_unit": "shares",
+        "volume_multiplier": 100,
+        "recent_cash_share_volume_close_ratio": 1.0001227892131777,
+        "overlapping_bars_verified": 63,
+        "windows": [
+          [
+            "20190101",
+            "20201231"
+          ],
+          [
+            "20201201",
+            "20221130"
+          ],
+          [
+            "20221101",
+            "20241031"
+          ],
+          [
+            "20241001",
+            "20260910"
+          ]
+        ],
+        "rows": 1857,
+        "sha256": "85a3b2431c328e807262d61e2b9f277d4f7d1cbc870fd96ae3057f68f6d44660"
+      },
+      "000300.XSHG": {
+        "provider": "eqlib.fetch_stock_data index fallback chain",
+        "source_resolution": "provider not attached to index frame by eqlib",
+        "adjustment": "index",
+        "volume_multiplier": 1,
+        "sha256": "4409325f7839a988573fafd2ba4bcfadcf1870a5e73f7f491b30678701c581ca"
+      }
+    },
+    "errors": [],
+    "reason": "Native Tencent Shenhua qfq contains nonpositive OHLC on 2020-03-19/23. Uniform hfq rebasing is used for all eight stocks, with original parameters unchanged.",
+    "limitations": [
+      "Execution in rebased adjusted prices remains approximate; no corporate-action ledger.",
+      "Terminal-date scaling affects absolute price filters and lot sizes; this is not a point-in-time raw-price backtest."
+    ]
+  },
+  "results": [
+    {
+      "candidate": "baseline",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": -0.007634379999999608,
+        "annual_return": -0.0025652970329562708,
+        "max_drawdown": -0.039601505050791075,
+        "sharpe": -2.199798996809805,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 18,
+        "completed_exits": 9,
+        "paid_costs": 1144.47,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": -0.007634380000000005,
+        "average_exposure": 0.01286464466084705,
+        "maximum_exposure": 0.1975756771761115,
+        "invested_sessions": 85,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": -0.022429059999999668,
+          "annual_return": -0.02252031346373229,
+          "max_drawdown": -0.039601505050791075,
+          "sharpe": -2.2483584761585633,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.015134124179264186,
+          "annual_return": 0.015196875384716035,
+          "max_drawdown": -0.0005956188298665843,
+          "sharpe": -1.445043551119264,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "breakout",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.07339796000000098,
+        "annual_return": 0.024023508672468274,
+        "max_drawdown": -0.03173343000000017,
+        "sharpe": -0.21370091717895462,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 52,
+        "completed_exits": 26,
+        "paid_costs": 4021.84,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.07339795999999996,
+        "average_exposure": 0.05279458319419506,
+        "maximum_exposure": 0.5167133214254797,
+        "invested_sessions": 165,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.06175665000000108,
+          "annual_return": 0.062018515643026406,
+          "max_drawdown": -0.03173343000000017,
+          "sharpe": 0.7049305345971085,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.010964197869634207,
+          "annual_return": 0.011009565497467788,
+          "max_drawdown": -0.01626061732925066,
+          "sharpe": -1.0666205431808926,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.07970509999999909,
+        "annual_return": 0.026036276718673923,
+        "max_drawdown": -0.03716432000000025,
+        "sharpe": -0.16644627641930185,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 40,
+        "completed_exits": 20,
+        "paid_costs": 2947.42,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.0797051000000001,
+        "average_exposure": 0.025705992735187554,
+        "maximum_exposure": 0.33966465880213775,
+        "invested_sessions": 116,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.054762069999999774,
+          "annual_return": 0.05499351459473112,
+          "max_drawdown": -0.03716432000000025,
+          "sharpe": 0.6436790649972712,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.02364801570841424,
+          "annual_return": 0.023746479092290773,
+          "max_drawdown": -0.01646966351783008,
+          "sharpe": -0.35890250738621166,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "channel60_stock_exits",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.08795851999999882,
+        "annual_return": 0.028658379181854876,
+        "max_drawdown": -0.03716432000000025,
+        "sharpe": -0.057907254693549,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 40,
+        "completed_exits": 20,
+        "paid_costs": 2957.75,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.08795852000000001,
+        "average_exposure": 0.02667937279420331,
+        "maximum_exposure": 0.33966465880213775,
+        "invested_sessions": 126,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.054762069999999774,
+          "annual_return": 0.05499351459473112,
+          "max_drawdown": -0.03716432000000025,
+          "sharpe": 0.6436790649972712,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.03147292734938745,
+          "annual_return": 0.03160447106284292,
+          "max_drawdown": -0.01646966351783008,
+          "sharpe": 0.06460023901601841,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "development",
+      "stress": true,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.07333842999999973,
+        "annual_return": 0.024004473733107767,
+        "max_drawdown": -0.03339914436831182,
+        "sharpe": -0.2688349680289048,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 36,
+        "completed_exits": 18,
+        "paid_costs": 3406.66,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.07333842999999994,
+        "average_exposure": 0.021284412907599175,
+        "maximum_exposure": 0.32364377618618484,
+        "invested_sessions": 103,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.04244307999999952,
+          "annual_return": 0.042621413393441276,
+          "max_drawdown": -0.03339914436831182,
+          "sharpe": 0.3670819116250316,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.029637445528440942,
+          "annual_return": 0.02976120752960898,
+          "max_drawdown": -0.014900439302856894,
+          "sharpe": -0.024586132531525976,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "early_market",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.0727279900000013,
+        "annual_return": 0.023809242755213678,
+        "max_drawdown": -0.03628983000000008,
+        "sharpe": -0.21656133436531586,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 58,
+        "completed_exits": 29,
+        "paid_costs": 4401.97,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.07272798999999999,
+        "average_exposure": 0.05454722128617395,
+        "maximum_exposure": 0.5168393461928487,
+        "invested_sessions": 178,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.05704489000000046,
+          "annual_return": 0.057286242095101025,
+          "max_drawdown": -0.03628983000000008,
+          "sharpe": 0.6003296368121899,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.01099627850242002,
+          "annual_return": 0.011041779596984158,
+          "max_drawdown": -0.016211552866514656,
+          "sharpe": -1.0702277923382721,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0037986898555861792,
+          "annual_return": 0.0038301440323478264,
+          "max_drawdown": -0.008171430741788499,
+          "sharpe": -3.127936920164869,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "early_trend_exit",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.0028119000000004224,
+        "annual_return": 0.0009415704405038028,
+        "max_drawdown": -0.029819795083533163,
+        "sharpe": -1.3430737208395578,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 36,
+        "completed_exits": 18,
+        "paid_costs": 1801.68,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.0028119000000000234,
+        "average_exposure": 0.03370597805301914,
+        "maximum_exposure": 0.25118308318131044,
+        "invested_sessions": 201,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.00920638000000018,
+          "annual_return": 0.009244440920408215,
+          "max_drawdown": -0.025194150000000137,
+          "sharpe": -0.7223356509973248,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": -0.003795606206928981,
+          "annual_return": -0.003811196182729959,
+          "max_drawdown": -0.029819795083533496,
+          "sharpe": -1.4165686520984617,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": -0.0025502204484065816,
+          "annual_return": -0.00257126953100284,
+          "max_drawdown": -0.005929010828756631,
+          "sharpe": -6.438171739473881,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "long_trend",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.06836368000000115,
+        "annual_return": 0.022411292398850646,
+        "max_drawdown": -0.04265104000000042,
+        "sharpe": -0.2926318745150902,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 54,
+        "completed_exits": 27,
+        "paid_costs": 4118.68,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.06836367999999994,
+        "average_exposure": 0.04523489152569318,
+        "maximum_exposure": 0.3856490682826432,
+        "invested_sessions": 179,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.05667235000000126,
+          "annual_return": 0.05691208386898583,
+          "max_drawdown": -0.04265104000000042,
+          "sharpe": 0.6403453150096607,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.0036637279285292035,
+          "annual_return": 0.003678832697326051,
+          "max_drawdown": -0.017865705761558992,
+          "sharpe": -1.573980736099678,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0073735480454641955,
+          "annual_return": 0.007434712431829027,
+          "max_drawdown": 0.0,
+          "sharpe": -5.0217460741116335,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "patient_exits",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.08020251999999939,
+        "annual_return": 0.026194683130091434,
+        "max_drawdown": -0.03173343000000017,
+        "sharpe": -0.13081669157126724,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 42,
+        "completed_exits": 21,
+        "paid_costs": 3470.91,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.08020252000000001,
+        "average_exposure": 0.05829858311601326,
+        "maximum_exposure": 0.5597216443784243,
+        "invested_sessions": 164,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.07023746999999925,
+          "annual_return": 0.07053647602877011,
+          "max_drawdown": -0.03173343000000017,
+          "sharpe": 0.8411037969400313,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.009311064393961122,
+          "annual_return": 0.009349560101064025,
+          "max_drawdown": -0.016094144592091575,
+          "sharpe": -1.2784287338369886,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "short_levels",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.01319895000000093,
+        "annual_return": 0.004404555027493817,
+        "max_drawdown": -0.026187228644601435,
+        "sharpe": -1.2027609858527175,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 32,
+        "completed_exits": 16,
+        "paid_costs": 2263.08,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.013198949999999954,
+        "average_exposure": 0.04001162528124484,
+        "maximum_exposure": 0.4931962788405872,
+        "invested_sessions": 145,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.009756880000000967,
+          "annual_return": 0.00979722781967074,
+          "max_drawdown": -0.026187228644601435,
+          "sharpe": -0.6209341979596162,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.0034088106436080956,
+          "annual_return": 0.00342286265166436,
+          "max_drawdown": -0.016110269099460672,
+          "sharpe": -1.4623938219228618,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "stock_exits",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.0816513800000016,
+        "annual_return": 0.02665580519835964,
+        "max_drawdown": -0.03173343000000017,
+        "sharpe": -0.11700346434803292,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 52,
+        "completed_exits": 26,
+        "paid_costs": 4032.17,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.08165137999999988,
+        "average_exposure": 0.05377366876676603,
+        "maximum_exposure": 0.5167133214254797,
+        "invested_sessions": 175,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.06175665000000108,
+          "annual_return": 0.062018515643026406,
+          "max_drawdown": -0.03173343000000017,
+          "sharpe": 0.7049305345971085,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.018737561003267622,
+          "annual_return": 0.018815391230542655,
+          "max_drawdown": -0.01626061732925066,
+          "sharpe": -0.5422528638246642,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "trend_exit",
+      "period": "development",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "trading_days": 728,
+        "total_return": 0.00842204000000013,
+        "annual_return": 0.002814905649934696,
+        "max_drawdown": -0.029731795287766594,
+        "sharpe": -1.271899444265545,
+        "benchmark_return": -0.054911142996770135,
+        "fill_count": 32,
+        "completed_exits": 16,
+        "paid_costs": 1607.25,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.008422040000000037,
+        "average_exposure": 0.0325312117406452,
+        "maximum_exposure": 0.25091231944286574,
+        "invested_sessions": 188,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.012252590000000563,
+          "annual_return": 0.012303321099489617,
+          "max_drawdown": -0.022309930000000144,
+          "sharpe": -0.6173002306394259,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": -0.003784183945630293,
+          "annual_return": -0.0037997270954569506,
+          "max_drawdown": -0.029731795287766816,
+          "sharpe": -1.4203935373254364,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        }
+      }
+    },
+    {
+      "candidate": "baseline",
+      "period": "full",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2026-09-10",
+        "trading_days": 1623,
+        "total_return": -0.0011090100000000769,
+        "annual_return": -0.00016680592566464814,
+        "max_drawdown": -0.039601505050791075,
+        "sharpe": -1.8898913055331183,
+        "benchmark_return": 0.11028901655087275,
+        "fill_count": 52,
+        "completed_exits": 26,
+        "paid_costs": 3561.51,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": -0.0011090100000000092,
+        "average_exposure": 0.02341807038206621,
+        "maximum_exposure": 0.5650027005322801,
+        "invested_sessions": 246,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": -0.022429059999999668,
+          "annual_return": -0.02252031346373229,
+          "max_drawdown": -0.039601505050791075,
+          "sharpe": -2.2483584761585633,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.015134124179264186,
+          "annual_return": 0.015196875384716035,
+          "max_drawdown": -0.0005956188298665843,
+          "sharpe": -1.445043551119264,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        },
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.007568218657151515,
+          "annual_return": -0.007630526677708915,
+          "max_drawdown": -0.010566392006547853,
+          "sharpe": -4.340374198448464,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.005532366697812763,
+          "annual_return": -0.005577960981977714,
+          "max_drawdown": -0.007336936583915099,
+          "sharpe": -5.038300864252345,
+          "benchmark_return": 0.1468332405548045
+        },
+        "2025": {
+          "start": "2025-01-02",
+          "end": "2025-12-31",
+          "trading_days": 243,
+          "total_return": -0.004198256372787368,
+          "annual_return": -0.004215496681717501,
+          "max_drawdown": -0.015648629991176888,
+          "sharpe": -1.336247753732999,
+          "benchmark_return": 0.1766314409652452
+        },
+        "2026": {
+          "start": "2026-01-05",
+          "end": "2026-09-10",
+          "trading_days": 168,
+          "total_return": 0.024193905268437454,
+          "annual_return": 0.035330220266350576,
+          "max_drawdown": -0.011268860205534748,
+          "sharpe": 0.24979106945589055,
+          "benchmark_return": -0.01761361918297133
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "full",
+      "stress": false,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2026-09-10",
+        "trading_days": 1623,
+        "total_return": 0.050664679999996354,
+        "annual_return": 0.0074578696752878315,
+        "max_drawdown": -0.03716432000000025,
+        "sharpe": -1.0420741641438394,
+        "benchmark_return": 0.11028901655087275,
+        "fill_count": 98,
+        "completed_exits": 49,
+        "paid_costs": 7473.12,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.050664679999999934,
+        "average_exposure": 0.03662210806961292,
+        "maximum_exposure": 0.5678438202907237,
+        "invested_sessions": 318,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.054762069999999774,
+          "annual_return": 0.05499351459473112,
+          "max_drawdown": -0.03716432000000025,
+          "sharpe": 0.6436790649972712,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.02364801570841424,
+          "annual_return": 0.023746479092290773,
+          "max_drawdown": -0.01646966351783008,
+          "sharpe": -0.35890250738621166,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        },
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -8.678295583042228e-06,
+          "annual_return": -8.750016720404652e-06,
+          "max_drawdown": -0.011623721068743875,
+          "sharpe": -2.4396972120204103,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.004882106924698482,
+          "annual_return": -0.004922355449566096,
+          "max_drawdown": -0.007646385709055625,
+          "sharpe": -4.403616724098906,
+          "benchmark_return": 0.1468332405548045
+        },
+        "2025": {
+          "start": "2025-01-02",
+          "end": "2025-12-31",
+          "trading_days": 243,
+          "total_return": 0.0033379822095278566,
+          "annual_return": 0.003351741756894233,
+          "max_drawdown": -0.023804593586104206,
+          "sharpe": -0.9226925257097256,
+          "benchmark_return": 0.1766314409652452
+        },
+        "2026": {
+          "start": "2026-01-05",
+          "end": "2026-09-10",
+          "trading_days": 168,
+          "total_return": -0.0253673397287848,
+          "annual_return": -0.03663065253707076,
+          "max_drawdown": -0.0253673397287848,
+          "sharpe": -3.17964031474894,
+          "benchmark_return": -0.01761361918297133
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "full",
+      "stress": true,
+      "metrics": {
+        "start": "2020-01-02",
+        "end": "2026-09-10",
+        "trading_days": 1623,
+        "total_return": 0.04092982000000189,
+        "annual_return": 0.006048971196906727,
+        "max_drawdown": -0.03610530880744367,
+        "sharpe": -1.2046617870292118,
+        "benchmark_return": 0.11028901655087275,
+        "fill_count": 90,
+        "completed_exits": 45,
+        "paid_costs": 9217.28,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.04092981999999995,
+        "average_exposure": 0.032670229736289975,
+        "maximum_exposure": 0.5314700685532671,
+        "invested_sessions": 304,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2020": {
+          "start": "2020-01-02",
+          "end": "2020-12-31",
+          "trading_days": 243,
+          "total_return": 0.04244307999999952,
+          "annual_return": 0.042621413393441276,
+          "max_drawdown": -0.03339914436831182,
+          "sharpe": 0.3670819116250316,
+          "benchmark_return": 0.2721066000875858
+        },
+        "2021": {
+          "start": "2021-01-04",
+          "end": "2021-12-31",
+          "trading_days": 243,
+          "total_return": 0.029637445528440942,
+          "annual_return": 0.02976120752960898,
+          "max_drawdown": -0.014900439302856894,
+          "sharpe": -0.024586132531525976,
+          "benchmark_return": -0.05198637035865683
+        },
+        "2022": {
+          "start": "2022-01-04",
+          "end": "2022-12-30",
+          "trading_days": 242,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "sharpe": null,
+          "benchmark_return": -0.21632759307849914
+        },
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": 0.00031497987079376344,
+          "annual_return": 0.00031758342353516156,
+          "max_drawdown": -0.008451359208718978,
+          "sharpe": -3.0582202760595014,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.007205587463210428,
+          "annual_return": -0.007264920935086683,
+          "max_drawdown": -0.009629185237553517,
+          "sharpe": -4.9122532619528485,
+          "benchmark_return": 0.1468332405548045
+        },
+        "2025": {
+          "start": "2025-01-02",
+          "end": "2025-12-31",
+          "trading_days": 243,
+          "total_return": 0.004785250397386198,
+          "annual_return": 0.004804990021278099,
+          "max_drawdown": -0.020826010843444154,
+          "sharpe": -0.9514958939452635,
+          "benchmark_return": 0.1766314409652452
+        },
+        "2026": {
+          "start": "2026-01-05",
+          "end": "2026-09-10",
+          "trading_days": 168,
+          "total_return": -0.02811378348666671,
+          "annual_return": -0.04057092335776369,
+          "max_drawdown": -0.02811378348666671,
+          "sharpe": -3.7010636688314174,
+          "benchmark_return": -0.01761361918297133
+        }
+      }
+    },
+    {
+      "candidate": "baseline",
+      "period": "later_check",
+      "stress": false,
+      "metrics": {
+        "start": "2025-01-02",
+        "end": "2026-09-10",
+        "trading_days": 411,
+        "total_return": 0.02366396000000104,
+        "annual_return": 0.013981874721195275,
+        "max_drawdown": -0.015727634768789245,
+        "sharpe": -0.6933168573704187,
+        "benchmark_return": 0.155906702845374,
+        "fill_count": 22,
+        "completed_exits": 11,
+        "paid_costs": 1524.93,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": 0.023663959999999963,
+        "average_exposure": 0.05260762321115339,
+        "maximum_exposure": 0.5644849470300012,
+        "invested_sessions": 112,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2025": {
+          "start": "2025-01-02",
+          "end": "2025-12-31",
+          "trading_days": 243,
+          "total_return": -0.00038870999999918165,
+          "annual_return": -0.0003903093174131289,
+          "max_drawdown": -0.015727634768789245,
+          "sharpe": -1.2111172378503055,
+          "benchmark_return": 0.1766314409652452
+        },
+        "2026": {
+          "start": "2026-01-05",
+          "end": "2026-09-10",
+          "trading_days": 168,
+          "total_return": 0.02406202314901784,
+          "annual_return": 0.035136600132269935,
+          "max_drawdown": -0.011327127819224625,
+          "sharpe": 0.24040270061022453,
+          "benchmark_return": -0.01761361918297133
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "later_check",
+      "stress": false,
+      "metrics": {
+        "start": "2025-01-02",
+        "end": "2026-09-10",
+        "trading_days": 411,
+        "total_return": -0.02391018999999983,
+        "annual_return": -0.014264595375521938,
+        "max_drawdown": -0.033251551562776704,
+        "sharpe": -1.7896379401829332,
+        "benchmark_return": 0.155906702845374,
+        "fill_count": 40,
+        "completed_exits": 20,
+        "paid_costs": 2700.88,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": -0.023910189999999946,
+        "average_exposure": 0.06350415321799745,
+        "maximum_exposure": 0.5656890781553983,
+        "invested_sessions": 130,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2025": {
+          "start": "2025-01-02",
+          "end": "2025-12-31",
+          "trading_days": 243,
+          "total_return": -0.0015908399999994272,
+          "annual_return": -0.0015973814351235571,
+          "max_drawdown": -0.02393103256883844,
+          "sharpe": -1.1573994295096488,
+          "benchmark_return": 0.1766314409652452
+        },
+        "2026": {
+          "start": "2026-01-05",
+          "end": "2026-09-10",
+          "trading_days": 168,
+          "total_return": -0.022354913089939976,
+          "annual_return": -0.032303001511524876,
+          "max_drawdown": -0.022354913089939976,
+          "sharpe": -3.018057029556159,
+          "benchmark_return": -0.01761361918297133
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "later_check",
+      "stress": true,
+      "metrics": {
+        "start": "2025-01-02",
+        "end": "2026-09-10",
+        "trading_days": 411,
+        "total_return": -0.024445279999999125,
+        "annual_return": -0.014585439281095236,
+        "max_drawdown": -0.031999372973197104,
+        "sharpe": -1.9614357161836014,
+        "benchmark_return": 0.155906702845374,
+        "fill_count": 36,
+        "completed_exits": 18,
+        "paid_costs": 3410.42,
+        "end_positions": 0,
+        "pending_orders": 0,
+        "core_total_return": -0.024445280000000028,
+        "average_exposure": 0.05836659949766323,
+        "maximum_exposure": 0.5365940709937294,
+        "invested_sessions": 130,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2025": {
+          "start": "2025-01-02",
+          "end": "2025-12-31",
+          "trading_days": 243,
+          "total_return": -0.00012020999999873272,
+          "annual_return": -0.0001207046614998264,
+          "max_drawdown": -0.020328996374799346,
+          "sharpe": -1.1928447990687225,
+          "benchmark_return": 0.1766314409652452
+        },
+        "2026": {
+          "start": "2026-01-05",
+          "end": "2026-09-10",
+          "trading_days": 168,
+          "total_return": -0.024327994468214875,
+          "annual_return": -0.03513821222764535,
+          "max_drawdown": -0.024327994468214875,
+          "sharpe": -3.4963964919893327,
+          "benchmark_return": -0.01761361918297133
+        }
+      }
+    },
+    {
+      "candidate": "baseline",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.01301077000000006,
+        "annual_return": -0.006580445474204888,
+        "max_drawdown": -0.017771453811764926,
+        "sharpe": -4.639569347868872,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 11,
+        "completed_exits": 5,
+        "paid_costs": 822.21,
+        "end_positions": 1,
+        "pending_orders": 0,
+        "core_total_return": -0.013010770000000019,
+        "average_exposure": 0.009498676612963403,
+        "maximum_exposure": 0.15085686765972509,
+        "invested_sessions": 34,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.007578949999999751,
+          "annual_return": -0.007641346029541585,
+          "max_drawdown": -0.010581290692842749,
+          "sharpe": -4.335548310259717,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.005473301881293247,
+          "annual_return": -0.0055184107422435735,
+          "max_drawdown": -0.007281002352781729,
+          "sharpe": -5.063974133301939,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "breakout",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.007825439999998962,
+        "annual_return": -0.003952740707737656,
+        "max_drawdown": -0.021945822752483024,
+        "sharpe": -2.021901079161658,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 25,
+        "completed_exits": 11,
+        "paid_costs": 1761.47,
+        "end_positions": 3,
+        "pending_orders": 0,
+        "core_total_return": -0.007825439999999944,
+        "average_exposure": 0.0514117117893521,
+        "maximum_exposure": 0.5310994241511015,
+        "invested_sessions": 88,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.00016031999999976954,
+          "annual_return": -0.0001616448515853186,
+          "max_drawdown": -0.01147290053682637,
+          "sharpe": -2.4743205408169957,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.0076663490690813685,
+          "annual_return": -0.007729461832497564,
+          "max_drawdown": -0.015419061984016214,
+          "sharpe": -1.8483858451182067,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.0049122100000003055,
+        "annual_return": -0.0024794268182782853,
+        "max_drawdown": -0.014374063471838006,
+        "sharpe": -3.1364439871363565,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 17,
+        "completed_exits": 8,
+        "paid_costs": 1398.71,
+        "end_positions": 1,
+        "pending_orders": 0,
+        "core_total_return": -0.004912209999999963,
+        "average_exposure": 0.019770960639186683,
+        "maximum_exposure": 0.4205381283610578,
+        "invested_sessions": 47,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -3.2600000000604368e-06,
+          "annual_return": -3.2869421044967595e-06,
+          "max_drawdown": -0.011657972883055145,
+          "sharpe": -2.4351074803215047,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.004908966003229431,
+          "annual_return": -0.0049494354056124346,
+          "max_drawdown": -0.007664944987720745,
+          "sharpe": -4.395529499892001,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "channel60_stock_exits",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.014569780000000199,
+        "annual_return": -0.007371823229188834,
+        "max_drawdown": -0.03208717392310456,
+        "sharpe": -2.2380070815451885,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 17,
+        "completed_exits": 8,
+        "paid_costs": 1391.15,
+        "end_positions": 1,
+        "pending_orders": 0,
+        "core_total_return": -0.014569780000000029,
+        "average_exposure": 0.042813908911857025,
+        "maximum_exposure": 0.4329978993154553,
+        "invested_sessions": 97,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": 4.9140000000225115e-05,
+          "annual_return": 4.9546125763244575e-05,
+          "max_drawdown": -0.015472250277783428,
+          "sharpe": -1.4551968385652512,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.014618201661570795,
+          "annual_return": -0.0147381185897415,
+          "max_drawdown": -0.017348647487462565,
+          "sharpe": -3.8212492400762925,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "channel60",
+      "period": "validation",
+      "stress": true,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.006957239999999976,
+        "annual_return": -0.003513439990099343,
+        "max_drawdown": -0.013897100584467914,
+        "sharpe": -3.859410438185351,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 17,
+        "completed_exits": 8,
+        "paid_costs": 1885.16,
+        "end_positions": 1,
+        "pending_orders": 0,
+        "core_total_return": -0.00695723999999999,
+        "average_exposure": 0.017843385283271843,
+        "maximum_exposure": 0.3857082731729813,
+        "invested_sessions": 46,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": 0.000267329999999788,
+          "annual_return": 0.0002695396365683944,
+          "max_drawdown": -0.00840516392894708,
+          "sharpe": -3.0838417743980027,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.007222639171870271,
+          "annual_return": -0.007282112538236185,
+          "max_drawdown": -0.00964545148145557,
+          "sharpe": -4.892365121882121,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "early_market",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.05193962000000041,
+        "annual_return": -0.026530655422935978,
+        "max_drawdown": -0.06042445744827951,
+        "sharpe": -2.248655219202594,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 56,
+        "completed_exits": 27,
+        "paid_costs": 3928.08,
+        "end_positions": 2,
+        "pending_orders": 0,
+        "core_total_return": -0.05193961999999999,
+        "average_exposure": 0.08736608447831845,
+        "maximum_exposure": 0.4777490678393995,
+        "invested_sessions": 178,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.007259849999999735,
+          "annual_return": -0.007319628640483855,
+          "max_drawdown": -0.021958075294111756,
+          "sharpe": -1.635110398524181,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.04500651051536597,
+          "annual_return": -0.04536989732811658,
+          "max_drawdown": -0.05396332517464386,
+          "sharpe": -2.7755802040649225,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "early_trend_exit",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.015572439999999577,
+        "annual_return": -0.007881117132616744,
+        "max_drawdown": -0.027396998829788632,
+        "sharpe": -2.035620752826931,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 37,
+        "completed_exits": 17,
+        "paid_costs": 1916.5,
+        "end_positions": 3,
+        "pending_orders": 0,
+        "core_total_return": -0.015572439999999944,
+        "average_exposure": 0.09023373012444824,
+        "maximum_exposure": 0.5399002323196669,
+        "invested_sessions": 198,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.007917280000000249,
+          "annual_return": -0.00798245021720001,
+          "max_drawdown": -0.013764810819998918,
+          "sharpe": -2.4767315811415602,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.007716251725460643,
+          "annual_return": -0.007779773697013326,
+          "max_drawdown": -0.022604073812947267,
+          "sharpe": -1.7624072229655354,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "long_trend",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.04902400999999934,
+        "annual_return": -0.02502255793202479,
+        "max_drawdown": -0.059832085199281515,
+        "sharpe": -2.1749101265516484,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 59,
+        "completed_exits": 28,
+        "paid_costs": 4045.35,
+        "end_positions": 3,
+        "pending_orders": 0,
+        "core_total_return": -0.04902401000000001,
+        "average_exposure": 0.08892294020891409,
+        "maximum_exposure": 0.597516405580735,
+        "invested_sessions": 169,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.0001659499999989711,
+          "annual_return": -0.00016732137285635496,
+          "max_drawdown": -0.01747821999999921,
+          "sharpe": -1.263500357122599,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.04886616934080268,
+          "annual_return": -0.04925990832121918,
+          "max_drawdown": -0.05522541642530143,
+          "sharpe": -2.9916160479983978,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "patient_exits",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.006697489999998973,
+        "annual_return": -0.0033820460442588463,
+        "max_drawdown": -0.021945822752483024,
+        "sharpe": -1.9965628105894841,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 24,
+        "completed_exits": 10,
+        "paid_costs": 1683.48,
+        "end_positions": 4,
+        "pending_orders": 0,
+        "core_total_return": -0.006697489999999991,
+        "average_exposure": 0.05162920203543458,
+        "maximum_exposure": 0.5310994241511015,
+        "invested_sessions": 88,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.00016031999999976954,
+          "annual_return": -0.0001616448515853186,
+          "max_drawdown": -0.01147290053682637,
+          "sharpe": -2.4743205408169957,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.006538218207141622,
+          "annual_return": -0.006592074576402873,
+          "max_drawdown": -0.015419061984016214,
+          "sharpe": -1.8028924401582558,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "short_levels",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.013023910000000805,
+        "annual_return": -0.0065871129516343885,
+        "max_drawdown": -0.021011049067837795,
+        "sharpe": -2.4427976061512844,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 16,
+        "completed_exits": 7,
+        "paid_costs": 1023.6899999999999,
+        "end_positions": 2,
+        "pending_orders": 0,
+        "core_total_return": -0.013023910000000033,
+        "average_exposure": 0.03737885525105252,
+        "maximum_exposure": 0.4447347239079413,
+        "invested_sessions": 70,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.007578949999999751,
+          "annual_return": -0.007641346029541585,
+          "max_drawdown": -0.010581290692842749,
+          "sharpe": -4.335548310259717,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.005486542229229063,
+          "annual_return": -0.005531759908301015,
+          "max_drawdown": -0.012753336361391865,
+          "sharpe": -1.8333466716014768,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "stock_exits",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.010537000000000463,
+        "annual_return": -0.005325992316167594,
+        "max_drawdown": -0.03281877039377057,
+        "sharpe": -1.644576453866315,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 25,
+        "completed_exits": 11,
+        "paid_costs": 1758.1,
+        "end_positions": 3,
+        "pending_orders": 0,
+        "core_total_return": -0.010537,
+        "average_exposure": 0.07868907416648668,
+        "maximum_exposure": 0.52678604954775,
+        "invested_sessions": 138,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": 0.00010439000000039833,
+          "annual_return": 0.00010525277267370292,
+          "max_drawdown": -0.015132110026935486,
+          "sharpe": -1.4779750202415096,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.010640279261248664,
+          "annual_return": -0.01072774208625793,
+          "max_drawdown": -0.020293455842440467,
+          "sharpe": -1.7952922936571971,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    },
+    {
+      "candidate": "trend_exit",
+      "period": "validation",
+      "stress": false,
+      "metrics": {
+        "start": "2023-01-03",
+        "end": "2024-12-31",
+        "trading_days": 484,
+        "total_return": -0.002952810000000361,
+        "annual_return": -0.0014896981131693465,
+        "max_drawdown": -0.017953408316275676,
+        "sharpe": -3.4292523133221784,
+        "benchmark_return": 0.01634374530237226,
+        "fill_count": 17,
+        "completed_exits": 7,
+        "paid_costs": 904.28,
+        "end_positions": 3,
+        "pending_orders": 0,
+        "core_total_return": -0.0029528100000000557,
+        "average_exposure": 0.02902997767017014,
+        "maximum_exposure": 0.32436463720044295,
+        "invested_sessions": 87,
+        "halted_sessions": 0
+      },
+      "years": {
+        "2023": {
+          "start": "2023-01-03",
+          "end": "2023-12-29",
+          "trading_days": 242,
+          "total_return": -0.0012979499999998811,
+          "annual_return": -0.0013086698374940031,
+          "max_drawdown": -0.007605598889513954,
+          "sharpe": -4.045744225533944,
+          "benchmark_return": -0.11378244947740246
+        },
+        "2024": {
+          "start": "2024-01-02",
+          "end": "2024-12-31",
+          "trading_days": 242,
+          "total_return": -0.001657010717060925,
+          "annual_return": -0.0016706935746655383,
+          "max_drawdown": -0.010427113872450988,
+          "sharpe": -3.0315381767683505,
+          "benchmark_return": 0.1468332405548045
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Baseline full history already inspected; later_check is not certified untouched OOS.",
+    "Three adaptive rounds reuse validation; 11 configurations including baseline.",
+    "Fixed eight-stock watchlist creates membership/survivorship bias.",
+    "All stocks use hfq scaled by terminal qfq reference, not native qfq.",
+    "Terminal scaling affects price filters and 100-share sizing; no raw-price/corporate-action ledger.",
+    "CSI 300 is a price index; no common explicit dividend-reinvestment ledger.",
+    "No interest credited on cash. Sharpe subtracts 3% per year, using 244 sessions/year.",
+    "Periods restart from cash; full-period yearly metrics slice a continuous path.",
+    "Stress changes fill eligibility and quantities; trade paths can differ.",
+    "No candidate is approved for live trading or guaranteed profitability."
+  ],
+  "trade_attribution": {
+    "full/baseline": {
+      "round_trips": 26,
+      "winners": 6,
+      "win_rate": 0.23076923076923078,
+      "net_pnl": -1109.01,
+      "by_kind": {
+        "breakout_retest": {
+          "trades": 26,
+          "pnl": -1109.0099999999948
+        }
+      },
+      "by_exit": {
+        "market_filter": {
+          "trades": 3,
+          "pnl": -3882.23
+        },
+        "resistance_or_r_target": {
+          "trades": 5,
+          "pnl": 82339.08
+        },
+        "support_or_trailing_stop": {
+          "trades": 18,
+          "pnl": -79565.86
+        }
+      }
+    },
+    "full/channel60": {
+      "round_trips": 49,
+      "winners": 17,
+      "win_rate": 0.3469387755102041,
+      "net_pnl": 50664.68,
+      "by_kind": {
+        "breakout_retest": {
+          "trades": 13,
+          "pnl": -3818.010000000002
+        },
+        "resistance_breakout": {
+          "trades": 36,
+          "pnl": 54482.689999999995
+        }
+      },
+      "by_exit": {
+        "market_filter": {
+          "trades": 9,
+          "pnl": 11731.57
+        },
+        "resistance_or_r_target": {
+          "trades": 10,
+          "pnl": 148704.93
+        },
+        "support_or_trailing_stop": {
+          "trades": 29,
+          "pnl": -114349.53
+        },
+        "time_exit": {
+          "trades": 1,
+          "pnl": 4577.71
+        }
+      }
+    },
+    "later_check/baseline": {
+      "round_trips": 11,
+      "winners": 3,
+      "win_rate": 0.2727272727272727,
+      "net_pnl": 23663.96,
+      "by_kind": {
+        "breakout_retest": {
+          "trades": 11,
+          "pnl": 23663.960000000003
+        }
+      },
+      "by_exit": {
+        "resistance_or_r_target": {
+          "trades": 3,
+          "pnl": 49150.05
+        },
+        "support_or_trailing_stop": {
+          "trades": 8,
+          "pnl": -25486.09
+        }
+      }
+    },
+    "later_check/channel60": {
+      "round_trips": 20,
+      "winners": 4,
+      "win_rate": 0.2,
+      "net_pnl": -23910.19,
+      "by_kind": {
+        "breakout_retest": {
+          "trades": 7,
+          "pnl": -5571.2699999999995
+        },
+        "resistance_breakout": {
+          "trades": 13,
+          "pnl": -18338.92
+        }
+      },
+      "by_exit": {
+        "market_filter": {
+          "trades": 2,
+          "pnl": -1337.05
+        },
+        "resistance_or_r_target": {
+          "trades": 2,
+          "pnl": 25301.11
+        },
+        "support_or_trailing_stop": {
+          "trades": 16,
+          "pnl": -47874.25
+        }
+      }
+    }
+  },
+  "replay_validation": [
+    {
+      "candidate": "channel60",
+      "metrics_equal": true,
+      "years_equal": true,
+      "differences": []
+    },
+    {
+      "candidate": "channel60_stress",
+      "metrics_equal": true,
+      "years_equal": true,
+      "differences": []
+    }
+  ]
+}

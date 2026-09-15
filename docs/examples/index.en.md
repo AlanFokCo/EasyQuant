@@ -91,7 +91,7 @@ Examples share trading costs (`examples/_defaults.py`); example 25 uses explicit
 
 | # | File | Content | Command |
 |---|------|---------|---------|
-| 25 | `25_sr_risk_budget.py` | Support bounces/retests, risk sizing, yearly evaluation and cost stress | `python examples/25_sr_risk_budget.py --download` |
+| 25 | `25_sr_risk_budget.py` | Support/retests and optional direct breakouts, risk sizing, chronological research and cost stress | `python examples/25_sr_risk_budget.py --download` |
 
 Downloads convert stock volume from lots to shares; supplied CSVs must use shares. See [rules, usage and validation boundaries](../explanation/sr-risk-budget.md). Sustained profitability has not been established.
 

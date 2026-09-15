@@ -430,3 +430,5 @@ def market_open(context):
 ## 支撑压力位的完整示例
 
 需要带止损风险预算、成交跟踪和组合熔断的版本，可从[支撑压力风险预算策略](../explanation/sr-risk-budget.md)与 `examples/25_sr_risk_budget.py` 开始。其信号在收盘回调产生，最早次日开盘撮合；工程测试不构成盈利证据。
+
+可用 `--allow-breakout` 比较直接突破，或用 `scripts/research_sr_risk_budget.py` 重放固定候选与分段。此次完整区间收益改善，但验证期和后段未通过；不应只凭累计收益选择策略。

@@ -171,3 +171,5 @@ initialize = make_sr_risk_budget_strategy(
 ```
 
 `SRRiskConfig` 定义计划风险和交易条件；工厂返回日线 `initialize` 回调。`eligible(code, date)` 可提供历史时点的成员/ST 过滤。不传时使用静态自选池。详见[完整规则和限制](../explanation/sr-risk-budget.md)。
+
+新增严格布尔参数 `allow_breakout=False`、`require_market_slope=True`、`exit_on_market_filter=True`，分别控制直接突破、大盘均线斜率确认及大盘失效清仓；默认行为保持原样。11 个历史配置未选出通过验证的策略，详见[研究记录](../explanation/sr-risk-budget.md)。
