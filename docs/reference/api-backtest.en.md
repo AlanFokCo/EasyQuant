@@ -171,3 +171,5 @@ initialize = make_sr_risk_budget_strategy(
 ```
 
 `SRRiskConfig` defines planned risk and signal conditions. The factory returns a daily initialize callback. Supply `eligible(code, date)` for point-in-time membership/ST eligibility; otherwise the watchlist is static. See [full rules and limitations](../explanation/sr-risk-budget.md).
+
+New strictly boolean switches `allow_breakout=False`, `require_market_slope=True` and `exit_on_market_filter=True` control direct breakouts, benchmark slope confirmation and failed-filter exits. Defaults are preserved. None of 11 configurations passed validation; see the [research record](../explanation/sr-risk-budget.md).

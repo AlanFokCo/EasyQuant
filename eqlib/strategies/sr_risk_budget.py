@@ -54,6 +54,9 @@ class SRRiskConfig:
     halt_drawdown: float = 0.10
     halt_days: int = 20
     slippage: float = 0.001
+    allow_breakout: bool = False
+    require_market_slope: bool = True
+    exit_on_market_filter: bool = True
 
     def __post_init__(self):
         integer_fields = (
@@ -68,7 +71,14 @@ class SRRiskConfig:
             "halt_days",
         )
         for name, value in vars(self).items():
-            if name in integer_fields:
+            if name in {
+                "allow_breakout",
+                "require_market_slope",
+                "exit_on_market_filter",
+            }:
+                if type(value) is not bool:
+                    raise ValueError(f"{name} must be boolean")
+            elif name in integer_fields:
                 if type(value) is not int or value <= 0:
                     raise ValueError(f"{name} must be a positive integer")
             elif isinstance(value, bool) or not math.isfinite(value) or value <= 0:
@@ -149,15 +159,18 @@ def valid_bars(frame: pd.DataFrame, count: int) -> bool:
 
 
 def market_allows_entry(frame: pd.DataFrame, config: SRRiskConfig) -> bool:
-    """Require the benchmark above a rising long moving average."""
+    """Require price above its average, optionally confirming a rising average."""
     if not valid_bars(frame, config.market_window + 20):
         return False
     ma = frame.close.rolling(config.market_window).mean()
-    return bool(frame.close.iloc[-1] > ma.iloc[-1] > ma.iloc[-21])
+    return bool(
+        frame.close.iloc[-1] > ma.iloc[-1]
+        and (not config.require_market_slope or ma.iloc[-1] > ma.iloc[-21])
+    )
 
 
 def plan_entry(frame: pd.DataFrame, config: SRRiskConfig) -> EntryPlan | None:
-    """Find support bounces or volume-confirmed breakout retests.
+    """Find support bounces, breakout retests or optional direct breakouts.
 
     Levels exclude the signal bar. Retest resistance is frozen before the
     entire breakout window; no centered/future pivot confirmation is used.
@@ -211,9 +224,20 @@ def plan_entry(frame: pd.DataFrame, config: SRRiskConfig) -> EntryPlan | None:
             <= support + config.support_tolerance_atr * atr
             and support < row.close <= support + 2 * config.support_tolerance_atr * atr
         )
-        if not near:
+        if near:
+            kind = "breakout_retest"
+        elif (
+            config.allow_breakout
+            and resistance + 0.1 * atr < row.close <= resistance + 1.5 * atr
+            and row.volume >= avg_volume
+        ):
+            # A completed close can confirm a breakout without a later retest.
+            # The prior channel excludes today; reject extended moves instead
+            # of lifting the buy limit to chase them at the next open.
+            kind = "resistance_breakout"
+            support = resistance
+        else:
             return None
-        kind = "breakout_retest"
 
     # A buy limit prevents chasing gaps up. Gap-down/T+1 losses remain possible.
     limit = math.floor(float(row.close) * (1 + config.entry_gap) * 100) / 100
@@ -222,11 +246,15 @@ def plan_entry(frame: pd.DataFrame, config: SRRiskConfig) -> EntryPlan | None:
     if stop <= 0 or not config.min_stop_pct <= distance / limit <= config.max_stop_pct:
         return None
     target = resistance - 0.3 * atr
-    if kind == "breakout_retest":
+    if kind != "support_bounce":
         # At new highs there is no observed overhead resistance: use an explicitly
         # projected R-multiple target, not a fabricated historical price level.
         target = limit + config.breakout_target_r * distance
-        overhead = frame.high.iloc[: -(config.retest_bars + 1)]
+        overhead = (
+            frame.high.iloc[: -(config.retest_bars + 1)]
+            if kind == "breakout_retest"
+            else frame.high.iloc[:-1]
+        )
         overhead = overhead[overhead > limit]
         if not overhead.empty:
             target = min(target, float(overhead.max()) - 0.3 * atr)
@@ -449,7 +477,7 @@ def make_sr_risk_budget_strategy(
                 reason = "portfolio_halt"
             elif eligible is not None and not eligible(code, ctx.current_dt.date()):
                 reason = reason or "universe_exit"
-            elif not market_ok:
+            elif config.exit_on_market_filter and not market_ok:
                 reason = reason or "market_filter"
             if reason:
                 if holding:

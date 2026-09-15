@@ -58,7 +58,7 @@ To supply existing CSVs:
 python examples/25_sr_risk_budget.py --data-dir /path/to/snapshots --stress
 ```
 
-Files are named `<code>_daily_qfq.csv`, including `000300.XSHG_daily_qfq.csv`. The first column is a date index. Required columns are `open,high,low,close,volume`, with consistently forward-adjusted CNY prices and stock volume in shares. `--download` multiplies eqlib main-board stock volumes by 100 to convert lots to shares; supplied CSVs are already in shares and are not converted again. Index volume retains its source units and is not used for liquidity calculations. Cover the final test session and provide at least 160 valid warm-up bars before the start. Duplicate/unordered dates, nonfinite values, invalid OHLC, missing benchmark sessions or truncated coverage cause errors instead of silently shortening the evaluation. Missing stock sessions are recorded in the manifest, without inventing fills.
+Files are named `<code>_daily_qfq.csv`, including `000300.XSHG_daily_qfq.csv`. The first column is a date index. Required columns are `open,high,low,close,volume`, with consistently forward-adjusted CNY prices and stock volume in shares. `--download` multiplies eqlib main-board stock volumes by 100 to convert lots to shares; supplied CSVs are already in shares and are not converted again. Index volume retains its source units and is not used for liquidity calculations. Cover the final test session and provide at least `config.history_bars` valid warm-up bars (140 by default) before the start. Duplicate/unordered dates, nonfinite values, invalid OHLC, missing benchmark sessions or truncated coverage cause errors instead of silently shortening the evaluation. Missing stock sessions are recorded in the manifest, without inventing fills.
 
 Offline runs use the packaged calendar and bind engine/report reads to the same immutable CSV frames, preventing a later download of different benchmark data. This example adapter is scoped to the Python process; do not run it concurrently in multiple threads.
 
@@ -73,7 +73,7 @@ Outputs under `reports/sr_risk_budget/`:
 | `trades.csv` | Actual engine fills and fees |
 | `events.csv` | Buy limits, support, stops, targets, exit reasons, halt/resume events |
 
-Calendar-year metrics slice one continuous position path and retain the prior equity observation at each boundary. They do not restart from cash each year and are not independent or certified untouched out-of-sample tests. There is no parameter search. Do not select only winning years to claim stable profits.
+Calendar-year metrics slice one continuous position path and retain the prior equity observation at each boundary. They do not restart from cash each year and are not independent or certified untouched out-of-sample tests. A single example run does not perform a parameter search. Do not select only winning years to claim stable profits.
 
 Use `--synthetic` when validating artificial data; reports are labeled execution tests, not historical return evidence.
 
@@ -101,3 +101,74 @@ Inherited research approximations remain: execution at forward-adjusted prices, 
 Before making performance claims, freeze parameters and point-in-time membership, evaluate new data not used in design, report net returns, drawdowns, completed trades, market regimes and friction stress, and then paper trade. Preserve failed evaluations whenever a target is missed.
 
 Trading-rule references: [current SSE trading rules](https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20260424_10816492.shtml), [SSE round/odd-lot guidance](https://www.sse.com.cn/lawandrules/guide/stock/jyglywznylc/tz/c/c_20230209_5716007.shtml), and [HKEX Stock Connect FAQ](https://www.hkex.com.hk/-/media/HKEX-Market/Mutual-Market/Stock-Connect/Getting-Started/Information-Booklet-and-FAQ/FAQ/FAQ_Cn.pdf).
+
+## Optional breakout rules and September 2026 research record
+
+`SRRiskConfig()` preserves the original behavior. Three strictly boolean experimental switches are available:
+
+| Parameter | Default | Behavior |
+|---|---|---|
+| `allow_breakout` | `False` | If neither a support bounce nor retest triggers, permit a direct breakout above prior `level_window` highs |
+| `require_market_slope` | `True` | `False` removes only benchmark slope confirmation; price must still close above its average |
+| `exit_on_market_filter` | `True` | `False` removes forced market-filter exits; entry filtering, stock stops, time/eligibility exits and portfolio halts remain active |
+
+Direct breakouts use a historical high **excluding the signal bar**. The close must exceed it by 0.1 ATR but no more than 1.5 ATR, with volume at least the prior 20-session average. Existing stops, reward/risk checks, friction reservations and next-open limits apply. Overhead uses only prior data; absent overhead, the 3R target is projected. The feature stays off by default because validation failed.
+
+```bash
+python examples/25_sr_risk_budget.py --allow-breakout --stress \
+  --start 2020-01-01 --end 2026-09-10 \
+  --data-dir /path/to/frozen-inputs --output reports/sr_breakout
+```
+
+On the fixed eight-stock history, baseline averaged **2.34%** exposure and completed 26 round trips with six winners. No support bounce satisfied the combined prior-60-day-low proximity and non-declining 60-day-average conditions. Only 38 breakout-retest candidates remained. This explains sparse trading and idle cash; more signals alone do not establish an edge.
+
+Three rounds tested **11 configurations including baseline**, declaring each round first. Development covers 2020–2022, validation 2023–2024. Each starts independently with CNY 1 million and prior warm-up data. Later rounds used validation feedback, introducing repeated-selection bias. All results are retained:
+
+| Candidate | Development net return | Validation net return | Validation max drawdown |
+|---|---:|---:|---:|
+| `baseline` | -0.76% | -1.30% | 1.78% |
+| `short_levels` | +1.32% | -1.30% | 2.10% |
+| `breakout` | +7.34% | -0.78% | 2.19% |
+| `trend_exit` | +0.84% | -0.30% | 1.80% |
+| `early_market` | +7.27% | -5.19% | 6.04% |
+| `long_trend` | +6.84% | -4.90% | 5.98% |
+| `early_trend_exit` | +0.28% | -1.56% | 2.74% |
+| `channel60` | +7.97% | -0.49% | 1.44% |
+| `stock_exits` | +8.17% | -1.05% | 3.28% |
+| `channel60_stock_exits` | +8.80% | -1.46% | 3.21% |
+| `patient_exits` | +8.02% | -0.67% | 2.19% |
+
+The declared gate required positive returns and drawdown below 12% in both periods, more fills than baseline, then doubled commissions and 0.3% slippage. **No configuration passed the return gates; none was selected for promotion.** `channel60`, equivalent to `SRRiskConfig(allow_breakout=True)`, was frozen before the later check only as a minimal-change comparison. Positive full-period returns did not change the gate.
+
+| Check | Baseline | `channel60` |
+|---|---:|---:|
+| Continuous return, 2020-01-02–2026-09-10 | -0.11% | +5.07% |
+| Annual return, 244 sessions/year | -0.02% | +0.75% |
+| Maximum drawdown | 3.96% | 3.72% |
+| Actual fills / completed round trips | 52 / 26 | 98 / 49 |
+| Mean exposure | 2.34% | 3.66% |
+| Independent later return, 2025-01-02–2026-09-10 | +2.37% | **-2.39%** |
+| Candidate full-period cost stress | — | +4.09% |
+
+The CSI 300 price index gained 11.03% over the full interval. Candidate annualized Sharpe was -1.04 with a 3% risk-free reference and no interest on cash. Candidate validation stress returned -0.70%, later stress -2.45%. Full-period performance improved but later performance deteriorated: gains mainly came from earlier conditions. Defaults remain unchanged; neither version establishes sustained profitability.
+
+Baseline full history had already been inspected, so the later check is **not certified untouched out-of-sample data**. Independently restarted periods cannot simply be compounded to reconstruct the continuous path. Stress changes limit-fill eligibility and quantities, so trade paths may differ.
+
+### Data treatment and reproduction
+
+All candidates share 2019-01-02–2026-09-10 snapshots, identical stock membership, risk budgets and commissions. No stocks were replaced based on observed winners. China Shenhua has ten suspended sessions from 2025-08-04 through 2025-08-15 without fabricated fills; see its [resumption announcement](https://file.finance.qq.com/finance/hs/pdf/2025/08/16/1224500923.PDF).
+
+Archived stocks are not native Tencent qfq. Native Shenhua qfq had nonpositive early observations, so **all eight stocks consistently use Tencent hfq scaled by a fixed terminal reference ratio**. The `_daily_qfq.csv` suffix is only for adapter compatibility. Volumes are shares. The formula is `input_OHLC[t] = hfq_OHLC[t] × qfq_close[2026-09-10] / hfq_close[2026-09-10]`. Terminal scaling affects price filters and round-lot sizing. Raw-price execution, corporate-action cash/share accounting, historical ST flags and point-in-time membership are missing. Results are approximations, not investable net returns. The benchmark is a price index, without a common explicit dividend-reinvestment ledger.
+
+Repository file `research/sr_risk_budget_2026_09/results.json` records declarations, all configurations, failed gates, period/year metrics and input SHA-256. Market CSVs are not shipped with the code. Reproduction requires archived snapshots; new downloads or normalization conventions are different experiments.
+
+```bash
+python scripts/research_sr_risk_budget.py --candidate channel60 --period full \
+  --data-dir /path/to/frozen-inputs --output reports/replay
+python scripts/research_sr_risk_budget.py --candidate channel60 --period full --stress \
+  --data-dir /path/to/frozen-inputs --output reports/replay
+```
+
+`--candidate` accepts the 11 table names; `--period` accepts `development`, `validation`, `later_check`, or `full`. Each invocation runs one configuration and period, without automatic selection or overwriting evidence. Auxiliary online index charts are omitted; benchmark metrics still use snapshots. Outputs contain fills, equity, events, parameters, costs and source hashes.
+
+Further work should first obtain point-in-time membership and raw-price/corporate-action data, then declare new hypotheses and gates before new-data or paper-trading checks. Retuning inspected years creates no independent evidence. Multiple trials amplify selection bias; see [Bailey et al. on backtest overfitting](https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf). No PBO estimate or statistical-significance claim was produced here.
