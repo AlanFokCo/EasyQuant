@@ -98,6 +98,58 @@ def test_retest_uses_pre_breakout_resistance(frames):
     assert plan.stop < plan.support < plan.limit < plan.target
 
 
+def test_optional_breakout_uses_prior_channel_and_keeps_retest_default(frames):
+    frame = frame_from_closes(np.linspace(8, 10, 160), frames[CODE].index[:160])
+    frame.iloc[-1] = [10.5, 10.9, 10.4, 10.7, 1e7]
+    config = replace(SRRiskConfig(), level_window=20)
+    assert plan_entry(frame, config) is None
+    plan = plan_entry(frame, replace(config, allow_breakout=True))
+    assert plan.kind == "resistance_breakout"
+    assert plan.support == pytest.approx(frame.high.iloc[-21:-1].max())
+    assert plan.support < frame.high.iloc[-1]
+    assert plan.reward_risk >= config.min_reward_risk
+
+
+@pytest.mark.parametrize("damage", ["extended", "thin_volume"])
+def test_breakout_rejects_chasing_and_unconfirmed_volume(frames, damage):
+    frame = frame_from_closes(np.linspace(8, 10, 160), frames[CODE].index[:160])
+    frame.iloc[-1] = [10.5, 10.9, 10.4, 10.7, 1e7]
+    if damage == "extended":
+        frame.iloc[-1] = [11.2, 11.6, 11.1, 11.4, 1e7]
+    else:
+        frame.iloc[-1, frame.columns.get_loc("volume")] = 5e6
+    assert (
+        plan_entry(frame, replace(SRRiskConfig(), level_window=20, allow_breakout=True))
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "flag", ["allow_breakout", "require_market_slope", "exit_on_market_filter"]
+)
+def test_signal_flags_reject_truthy_non_boolean_values(flag):
+    for value in (1, "yes", None):
+        with pytest.raises(ValueError, match=flag):
+            SRRiskConfig(**{flag: value})
+
+
+def test_new_breakout_executes_at_next_open(frames):
+    signal_frame = frame_from_closes(np.linspace(8, 10, 160), frames[CODE].index[:160])
+    signal_frame.iloc[-1] = [10.5, 10.9, 10.4, 10.7, 1e7]
+    frames[CODE].iloc[:160] = signal_frame.to_numpy()
+    result = run(
+        frames,
+        end_idx=164,
+        config=replace(SRRiskConfig(), level_window=20, allow_breakout=True),
+    )
+    event = result["context"].sr_risk_budget.events[0]
+    assert event["kind"] == "resistance_breakout"
+    fill = result["trade_log"][0]
+    assert pd.Timestamp(fill["date"]) == frames[CODE].index[160]
+    assert fill["amount"] % 100 == 0
+    assert fill["price"] <= event["limit"]
+
+
 def test_support_bounce_and_nearby_resistance_rejection(frames):
     frame = frame_from_closes(
         np.r_[np.linspace(8, 10, 139), np.full(20, 10), 10.2], frames[CODE].index[:160]
@@ -158,6 +210,45 @@ def test_missing_or_weak_market_blocks_new_entries(frames):
     assert not run(frames)["trade_log"]
 
 
+def test_optional_market_slope_still_requires_price_above_average(frames):
+    frame = frame_from_closes(
+        np.r_[np.linspace(1500, 1000, 159), 1300], frames[CODE].index[:160]
+    )
+    relaxed = replace(SRRiskConfig(), require_market_slope=False)
+    assert market_allows_entry(frame, relaxed)
+    assert not market_allows_entry(frame, SRRiskConfig())
+    set_bar(frame, 159, 999, 1000)
+    assert not market_allows_entry(frame, relaxed)
+
+
+@pytest.mark.parametrize("exit_on_filter", [True, False])
+def test_market_exit_switch_keeps_entry_gate_and_stock_stops(frames, exit_on_filter):
+    for i in range(160, 166):
+        set_bar(frames[INDEX_HS300], i, 900, 900)
+    config = replace(SRRiskConfig(), exit_on_market_filter=exit_on_filter)
+    result = run(frames, end_idx=165, config=config)
+    exits = [
+        e
+        for e in result["context"].sr_risk_budget.events
+        if e["action"] == "exit_order"
+    ]
+    assert bool(exits) is exit_on_filter
+    if exits:
+        assert exits[0]["reason"] == "market_filter"
+    else:
+        assert len(result["trade_log"]) == 1
+        # Disabling a broad-market exit must not disable the position stop.
+        set_bar(frames[CODE], 163, 9.5, 9.5)
+        stopped = run(frames, end_idx=165, config=config)
+        assert any(
+            e.get("reason") == "support_or_trailing_stop"
+            for e in stopped["context"].sr_risk_budget.events
+        )
+    # A weak market still prevents initiating a position with either setting.
+    set_bar(frames[INDEX_HS300], 159, 900, 900)
+    assert not run(frames, end_idx=165, config=config)["trade_log"]
+
+
 def test_fee_inclusive_lot_sizing_and_portfolio_capacity(frames):
     cfg = SRRiskConfig()
     plan = plan_entry(frames[CODE].iloc[:160], cfg)
@@ -185,12 +276,27 @@ def test_real_engine_uses_next_open_and_later_day_sales(frames):
     assert all(trade["commission"] >= 5 for trade in trades)
 
 
-def test_future_mutation_cannot_change_earlier_signals_or_fills(frames):
-    first = run(frames, end_idx=168)
+def test_snapshot_run_does_not_fetch_auxiliary_online_indices(frames, monkeypatch):
+    calls = []
+
+    def observe(*args, **kwargs):
+        calls.append((args, kwargs))
+        return pd.DataFrame()
+
+    monkeypatch.setattr("akshare.stock_zh_index_daily_em", observe)
+    result = run(frames, end_idx=161)
+    assert result["trade_log"]
+    assert calls == []
+
+
+@pytest.mark.parametrize("allow_breakout", [False, True])
+def test_future_mutation_cannot_change_earlier_signals_or_fills(frames, allow_breakout):
+    config = replace(SRRiskConfig(), allow_breakout=allow_breakout)
+    first = run(frames, end_idx=168, config=config)
     modified = {code: frame.copy() for code, frame in frames.items()}
     for frame in modified.values():
         frame.iloc[169:, :4] *= 0.5
-    second = run(modified)
+    second = run(modified, config=config)
     cutoff = frames[CODE].index[168].date()
 
     def past_trades(result):
@@ -320,9 +426,9 @@ def test_only_main_board_universe_is_accepted():
             make_sr_risk_budget_strategy(codes)
 
 
-@pytest.mark.parametrize("download", [False, True])
+@pytest.mark.parametrize("download,allow_breakout", [(False, False), (True, True)])
 def test_cli_writes_complete_synthetic_and_cost_stress_reports(
-    tmp_path, frames, monkeypatch, download
+    tmp_path, frames, monkeypatch, download, allow_breakout
 ):
     from examples._defaults import STOCKS
 
@@ -343,13 +449,16 @@ def test_cli_writes_complete_synthetic_and_cost_stress_reports(
             frame.to_csv(tmp_path / f"{code}_daily_qfq.csv")
     if download:
         monkeypatch.setattr(
-            runner, "fetch_stock_data", lambda code, *args, **kwargs: source_frames[code]
+            runner,
+            "fetch_stock_data",
+            lambda code, *args, **kwargs: source_frames[code],
         )
     output = tmp_path / "out"
     assert (
         runner.main(
             [
                 *(["--download"] if download else []),
+                *(["--allow-breakout"] if allow_breakout else []),
                 "--data-dir",
                 str(tmp_path),
                 "--output",
@@ -377,6 +486,7 @@ def test_cli_writes_complete_synthetic_and_cost_stress_reports(
             )
     assert payload["evidence"] == "synthetic_execution_test"
     assert payload["profitability_proven"] is False
+    assert payload["config"]["allow_breakout"] is allow_breakout
     assert payload["full_period"]["fill_count"] > 0
     assert payload["cost_stress"]["paid_costs"] > payload["full_period"]["paid_costs"]
     assert (
