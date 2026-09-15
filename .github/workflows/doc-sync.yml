@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The revision-date plugin needs history during the strict build.
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v6

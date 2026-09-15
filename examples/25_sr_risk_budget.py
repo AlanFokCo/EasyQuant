@@ -211,7 +211,8 @@ def run_snapshot(frames, codes, start, end, cash, config, cost):
     )
     # Core metrics are also exercised, but period returns use one consistent
     # prior-close baseline for both the strategy and the benchmark.
-    analysis = analyze_returns(result)
+    with local_prices(frames):
+        analysis = analyze_returns(result)
     metrics["core_total_return"] = float(analysis["total_return"])
     return result, metrics
 
