@@ -7,6 +7,7 @@ Run from the repository root after ``pip install -e .``::
 
     python examples/25_sr_risk_budget.py --download
     python examples/25_sr_risk_budget.py --stress
+    python examples/25_sr_risk_budget.py --allow-breakout --stress
 
 No parameter search or live broker orders are performed. Backtest returns do
 not establish reliable future profits; see docs/explanation/sr-risk-budget.md.
@@ -18,11 +19,15 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, replace
 from importlib import resources
 from pathlib import Path
 from unittest.mock import patch
+
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 
@@ -124,6 +129,9 @@ def local_prices(frames):
             "eqlib.data_cache.load_stock_local",
         ):
             stack.enter_context(patch(name, side_effect=fetch))
+        # This ancillary chart helper calls akshare directly, bypassing fetch.
+        # Omit those charts; benchmark metrics still use the supplied snapshot.
+        stack.enter_context(patch("eqlib.report._fetch_index_returns", return_value=[]))
         yield
 
 
@@ -216,6 +224,11 @@ def main(argv=None):
     parser.add_argument("--data-dir", type=Path, default=Path("data/sr_risk_budget"))
     parser.add_argument("--output", type=Path, default=Path("reports/sr_risk_budget"))
     parser.add_argument(
+        "--allow-breakout",
+        action="store_true",
+        help="research direct pressure-level breakouts; validation has NOT passed",
+    )
+    parser.add_argument(
         "--download", action="store_true", help="fetch and overwrite input snapshots"
     )
     parser.add_argument(
@@ -229,7 +242,7 @@ def main(argv=None):
         help="label supplied synthetic data as an execution test",
     )
     args = parser.parse_args(argv)
-    config = SRRiskConfig()
+    config = SRRiskConfig(allow_breakout=args.allow_breakout)
     start, end = pd.Timestamp(args.start), pd.Timestamp(args.end)
     if pd.isna(start) or pd.isna(end) or start >= end:
         parser.error("start must precede end")
