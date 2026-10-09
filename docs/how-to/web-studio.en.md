@@ -40,21 +40,21 @@ Configure in `web_strategy_studio/backend/users.yaml`:
 
 ```yaml
 preset_users:
-  - username: demo
-    password: ***REMOVED***
-  - username: analyst
-    password: ***REMOVED***
-  - username: quant
-    password: ***REMOVED***
+  - username: <username1>
+    password: <strong-unique-password>
+  - username: <username2>
+    password: <another-strong-password>
 ```
 
 The backend reads and creates these users automatically on startup. Restart the backend after modifying the configuration.
+
+> **Security note**: never commit real passwords to git. In production, prefer the environment variable method and keep passwords in a controlled file local to the server.
 
 #### Environment Variable Method
 
 ```bash
 # Format: comma-separated list of username:password
-export EQ_PRESET_USERS="demo:***REMOVED***,analyst:***REMOVED***"
+export EQ_PRESET_USERS="user1:<strong-password>,user2:<strong-password>"
 ```
 
 #### Using Both Methods Together

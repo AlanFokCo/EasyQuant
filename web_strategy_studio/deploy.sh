@@ -191,8 +191,11 @@ nginx -t && systemctl reload nginx
 # 6. 创建 systemd 服务
 echo "[6/6] 创建 systemd 服务..."
 
-# Generate JWT secret before writing service file (systemd Environment= doesn't support shell expansion)
+# Generate JWT secret and admin password before writing service file
+# (systemd Environment= doesn't support shell expansion).
+# Never commit real credentials to git — they are generated fresh per deploy.
 JWT_SECRET=$(openssl rand -hex 32)
+ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
 cat > /etc/systemd/system/easyquant-backend.service << SERVICEEOF
 [Unit]
 Description=EasyQuant Studio Backend
@@ -206,7 +209,7 @@ Environment="EQ_STUDIO_REPO_ROOT=/opt/easyquant-studio"
 Environment="EQ_STUDIO_DATABASE_URL=sqlite+aiosqlite:////opt/easyquant-studio/data/studio.sqlite3"
 Environment="EQ_STUDIO_ARTIFACT_DIR=/opt/easyquant-studio/artifacts"
 Environment="EQ_STUDIO_PUBLIC_BASE_URL=http://39.106.214.78"
-Environment="EQ_ADMIN_PASSWORD=***REMOVED***"
+Environment="EQ_ADMIN_PASSWORD=${ADMIN_PASSWORD}"
 Environment="EQ_JWT_SECRET=${JWT_SECRET}"
 ExecStart=/usr/local/bin/uvicorn studio_api.app:app --host 0.0.0.0 --port 8080
 Restart=always
@@ -215,6 +218,8 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 SERVICEEOF
+
+chmod 640 /etc/systemd/system/easyquant-backend.service
 
 systemctl daemon-reload
 systemctl enable easyquant-backend
@@ -228,13 +233,11 @@ echo ""
 echo "访问地址: http://39.106.214.78"
 echo "API 地址: http://39.106.214.78/api/v1"
 echo ""
-echo "默认管理员账号:"
+echo "默认管理员账号（仅此一次显示，请立即保存并尽快登录修改）:"
 echo "  用户名: admin"
-echo "  密码: ***REMOVED***"
+echo "  密码: ${ADMIN_PASSWORD}"
 echo ""
-echo "预设用户:"
-echo "  用户名: demo"
-echo "  密码: ***REMOVED***"
+echo "预设用户: 无（请通过 EQ_PRESET_USERS 或管理后台创建）"
 echo ""
 echo "查看服务状态:"
 echo "  systemctl status easyquant-backend"

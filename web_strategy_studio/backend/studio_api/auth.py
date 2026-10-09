@@ -342,10 +342,8 @@ async def ensure_preset_users(session: AsyncSession) -> list[User]:
 
     Config file format (users.yaml):
         preset_users:
-          - username: demo
-            password: ***REMOVED***
-          - username: analyst
-            password: ***REMOVED***
+          - username: <username1>
+            password: <strong-unique-password>
 
     Env format:
         EQ_PRESET_USERS="user1:pass1,user2:pass2"

@@ -40,21 +40,21 @@ export EQ_ADMIN_PASSWORD="your-secure-password"
 
 ```yaml
 preset_users:
-  - username: demo
-    password: ***REMOVED***
-  - username: analyst
-    password: ***REMOVED***
-  - username: quant
-    password: ***REMOVED***
+  - username: <username1>
+    password: <strong-unique-password>
+  - username: <username2>
+    password: <another-strong-password>
 ```
 
 后端启动时会自动读取并创建这些用户。修改配置后需重启后端生效。
+
+> **安全提示**：切勿把真实密码提交进 git 仓库。生产环境请改用环境变量方式，并将密码保存在服务器本地的受控文件中。
 
 #### 环境变量方式
 
 ```bash
 # 格式：逗号分隔的 username:password 列表
-export EQ_PRESET_USERS="demo:***REMOVED***,analyst:***REMOVED***"
+export EQ_PRESET_USERS="user1:<strong-password>,user2:<strong-password>"
 ```
 
 #### 同时使用两种方式
