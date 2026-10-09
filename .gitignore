@@ -103,3 +103,6 @@ tools/
 
 # Internal planning documents (not for public repo)
 docs/ROADMAP-LLMQUANT-INTEGRATION.md
+
+# Superpowers planning/spec docs (internal only, never commit)
+docs/superpowers/
