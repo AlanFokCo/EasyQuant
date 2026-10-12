@@ -29,7 +29,13 @@ from .inventory import (
 from .models import Finding, Severity
 
 
-_COMMAND_TIMEOUT_SECONDS = 180
+# Bounded per-command deadline.  The audit installs the wheel's full
+# dependency set with --no-cache-dir, so runtime is dominated by network
+# throughput (numpy/pandas/scikit-learn re-download every run); 3 minutes is
+# too tight even for normal broadband on a loaded host.  Bandwidth-constrained
+# hosts (e.g. small cloud instances whose PyPI throughput is ~300 kB/s) should
+# set the env override even higher.
+_COMMAND_TIMEOUT_SECONDS = int(os.environ.get("EQ_WHEEL_COMMAND_TIMEOUT", "600"))
 _MAX_EVIDENCE_CHARS = 4_000
 _STREAM_CHUNK_SIZE = 64 * 1024
 _TERMINATION_GRACE_SECONDS = 1.0
@@ -734,7 +740,14 @@ def _venv_python(venv_dir: Path) -> Path:
 
 
 def _copy_source_for_build(root: Path, destination: Path) -> None:
-    """Copy a clean build input outside the repository before invoking build."""
+    """Copy a clean build input outside the repository before invoking build.
+
+    A copy timeout is impractical with ``shutil.copytree`` (no per-file
+    progress callback to abort cleanly), so the copied tree is kept minimal
+    instead: bulky non-package directories (virtualenvs, node_modules, local
+    data stores, caches, reports, built docs) are excluded, which bounds the
+    copy time and keeps the wheel build hermetic.
+    """
     shutil.copytree(
         root,
         destination,
@@ -745,6 +758,14 @@ def _copy_source_for_build(root: Path, destination: Path) -> None:
             "__pycache__",
             "*.egg-info",
             "build",
+            ".mypy_cache",
+            "reports",
+            "data",
+            ".venv",
+            "venv",
+            "node_modules",
+            ".eqlib_cache",
+            "site",
         ),
     )
 

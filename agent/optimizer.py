@@ -41,6 +41,8 @@ import argparse
 import copy
 import datetime
 import importlib.util
+import math
+import numbers
 import os
 import sys
 import types
@@ -298,7 +300,12 @@ class StrategyOptimizer:
         periods_results: list[dict],
         aggregate: dict,
     ) -> tuple[bool, list[str]]:
-        """Return (all_met, list_of_failing_descriptions)."""
+        """Return (all_met, list_of_failing_descriptions).
+
+        Non-finite metrics (NaN/inf) always count as failing: a bare ``<``
+        comparison is False for NaN, which would otherwise let degenerate
+        backtests report ``requirements_met``.
+        """
         failing: list[str] = []
         req = self.requirements
 
@@ -312,19 +319,29 @@ class StrategyOptimizer:
             drawdown = p.get("max_drawdown", -1.0)
             ann_ret = p.get("annual_return", -1.0)
             wr = p.get("win_rate_trade", 0.0)
-            if sharpe < req["min_sharpe"]:
+            for name, value in (
+                ("sharpe_ratio", sharpe),
+                ("max_drawdown", drawdown),
+                ("annual_return", ann_ret),
+                ("win_rate_trade", wr),
+            ):
+                if not _is_finite_number(value):
+                    failing.append(
+                        f"{period_label}: {name} is not finite ({value})"
+                    )
+            if _is_finite_number(sharpe) and sharpe < req["min_sharpe"]:
                 failing.append(f"{period_label}: sharpe {sharpe:.2f} < {req['min_sharpe']}")
-            if abs(drawdown) > req["max_drawdown"]:
+            if _is_finite_number(drawdown) and abs(drawdown) > req["max_drawdown"]:
                 failing.append(
                     f"{period_label}: max_drawdown {drawdown*100:.1f}% worse than "
                     f"-{req['max_drawdown']*100:.0f}%"
                 )
-            if ann_ret < req["min_annual_return"]:
+            if _is_finite_number(ann_ret) and ann_ret < req["min_annual_return"]:
                 failing.append(
                     f"{period_label}: annual_return {ann_ret*100:.1f}% < "
                     f"{req['min_annual_return']*100:.0f}%"
                 )
-            if wr < req["min_win_rate"]:
+            if _is_finite_number(wr) and wr < req["min_win_rate"]:
                 failing.append(
                     f"{period_label}: win_rate {wr*100:.1f}% < "
                     f"{req['min_win_rate']*100:.0f}%"
@@ -332,7 +349,10 @@ class StrategyOptimizer:
 
         # Aggregate check
         avg_sharpe = aggregate.get("avg_sharpe", 0.0)
-        if avg_sharpe < req["min_sharpe"] and not any("sharpe" in f for f in failing):
+        if not _is_finite_number(avg_sharpe):
+            if not any("sharpe" in f for f in failing):
+                failing.append(f"avg_sharpe is not finite ({avg_sharpe})")
+        elif avg_sharpe < req["min_sharpe"] and not any("sharpe" in f for f in failing):
             failing.append(f"avg_sharpe {avg_sharpe:.2f} < {req['min_sharpe']}")
 
         return len(failing) == 0, failing
@@ -650,19 +670,43 @@ def _load_strategy_module(strategy_path: str) -> types.ModuleType:
 # Metric aggregation
 # ===========================================================================
 
+def _is_finite_number(value: Any) -> bool:
+    """Return True only for real numbers that are not NaN/inf.
+
+    Accepts numpy scalars (np.float64/np.int64 are ``numbers.Real``); rejects
+    bools, which are integers by type but never a legitimate metric value.
+    """
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, numbers.Real) and math.isfinite(value)
+
+
 def _compute_aggregate(periods_results: list[dict]) -> dict:
-    """Compute aggregate metrics across all periods."""
+    """Compute aggregate metrics across all periods.
+
+    Non-finite period metrics (NaN/inf) propagate as NaN into the aggregate
+    so that ``_evaluate_requirements`` always treats them as failing instead
+    of silently averaging or minimizing them away.
+    """
     valid = [p for p in periods_results if "error" not in p]
     if not valid:
         return {}
 
     def _avg(key: str) -> float:
         vals = [p[key] for p in valid if key in p]
-        return sum(vals) / len(vals) if vals else 0.0
+        if not vals:
+            return 0.0
+        if not all(_is_finite_number(v) for v in vals):
+            return float("nan")
+        return sum(vals) / len(vals)
 
     def _min(key: str) -> float:
         vals = [p[key] for p in valid if key in p]
-        return min(vals) if vals else 0.0
+        if not vals:
+            return 0.0
+        if not all(_is_finite_number(v) for v in vals):
+            return float("nan")
+        return min(vals)
 
     avg_annual_ret = _avg("annual_return")
     consistency = sum(1 for p in valid if p.get("annual_return", 0) > 0) / len(valid) if valid else 0.0

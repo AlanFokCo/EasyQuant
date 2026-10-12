@@ -30,7 +30,7 @@ jobs:
           python-version: "3.12"
 
       - name: Check doc sync
-        run: python scripts/check_doc_sync.py
+        run: python scripts/check_doc_sync.py --scope all
 
       - name: Run example smoke tests
         run: |

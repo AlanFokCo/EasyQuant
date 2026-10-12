@@ -27,6 +27,9 @@ _OFFLINE_NODE_IDS = (
 _LIVE_MARKER = "network"
 _NO_TESTS_COLLECTED_RETURN_CODE = 5
 _FAILED_NODE_ID = re.compile(r"^FAILED\s+([^\s]+)", re.MULTILINE)
+_PYTEST_EXCEPTION_LINE = re.compile(r"^E\s")
+_SHORT_SUMMARY_HEADER = re.compile(r"^=+\s*short test summary info\s*=+$")
+_SHORT_SUMMARY_ENTRY = re.compile(r"^(?:FAILED|ERROR)\s+\S+\s+-\s+(.*)$")
 _LIVE_PROVIDER_UNAVAILABLE_MARKERS = (
     "connectionerror",
     "connecttimeout",
@@ -118,17 +121,12 @@ def _contract_failure(
         "stderr": _bounded_text(stderr),
         "failed_node_ids": _failed_node_ids(stdout, stderr),
     }
-    if profile == "live" and (timed_out or _provider_unavailable(stdout, stderr)):
-        detail = (
-            "The bounded live provider contract exceeded its total deadline."
-            if timed_out
-            else "The live provider was unavailable during the bounded contract."
-        )
+    if profile == "live" and not timed_out and _provider_unavailable(stdout, stderr):
         return Finding(
             "DATA-190",
             Severity.P2,
             "Live provider contract unavailable",
-            detail,
+            "The live provider was unavailable during the bounded contract.",
             evidence=evidence,
             status="unavailable",
             remediation="Check provider availability and rerun the live evaluator profile.",
@@ -151,9 +149,38 @@ def _contract_failure(
 def _provider_unavailable(
     stdout: str | bytes | None, stderr: str | bytes | None
 ) -> bool:
-    """Classify only captured provider/network failures as temporarily unavailable."""
-    output = (_coerce_text(stdout) + "\n" + _coerce_text(stderr)).lower()
-    return any(marker in output for marker in _LIVE_PROVIDER_UNAVAILABLE_MARKERS)
+    """Classify only captured provider/network failures as temporarily unavailable.
+
+    Markers are matched exclusively on pytest exception lines (``E ``-prefixed)
+    and short-summary entries. Traceback source lines never qualify, so a real
+    assertion failure whose echoed source mentions e.g. ``ConnectionError``
+    stays a blocking CON-001 instead of being downgraded.
+    """
+    output = _coerce_text(stdout) + "\n" + _coerce_text(stderr)
+    return any(
+        marker in line.lower()
+        for line in _exception_evidence_lines(output)
+        for marker in _LIVE_PROVIDER_UNAVAILABLE_MARKERS
+    )
+
+
+def _exception_evidence_lines(output: str) -> list[str]:
+    """Extract pytest exception lines and short-summary details from output."""
+    lines: list[str] = []
+    in_summary = False
+    for raw_line in output.splitlines():
+        if _PYTEST_EXCEPTION_LINE.match(raw_line):
+            lines.append(raw_line)
+            continue
+        stripped = raw_line.strip()
+        if _SHORT_SUMMARY_HEADER.match(stripped):
+            in_summary = True
+            continue
+        if in_summary:
+            entry = _SHORT_SUMMARY_ENTRY.match(stripped)
+            if entry:
+                lines.append(entry.group(1))
+    return lines
 
 
 def _missing_live_contracts(

@@ -15,7 +15,7 @@ _CALENDAR_RESOURCE = Path("eqlib/static/ashare_trading_days.json")
 def evaluate_calendar_coverage(
     root: Path, *, today: date | None = None, warning_days: int = 120
 ) -> list[Finding]:
-    """Report invalid or soon-to-expire bundled exchange-calendar coverage."""
+    """Report invalid, expired, or soon-to-expire bundled calendar coverage."""
     reference_date = today or date.today()
     path = Path(root) / _CALENDAR_RESOURCE
     try:
@@ -34,6 +34,22 @@ def evaluate_calendar_coverage(
         ]
 
     required_end = reference_date + timedelta(days=warning_days)
+    if coverage_end < reference_date:
+        return [
+            Finding(
+                "DATA-192",
+                Severity.P1,
+                "Bundled exchange calendar has expired",
+                f"Coverage expired on {coverage_end.isoformat()}, before today "
+                f"({reference_date.isoformat()}); offline trading-day lookups "
+                "past the coverage window are unreliable.",
+                evidence={
+                    "coverage_end": coverage_end.isoformat(),
+                    "today": reference_date.isoformat(),
+                },
+                remediation="Refresh the bundled A-share trading calendar immediately; expired coverage blocks release.",
+            )
+        ]
     if coverage_end < required_end:
         return [
             Finding(

@@ -15,6 +15,7 @@ import pytest
 
 from evaluator.wheel import (
     _CommandResult,
+    _copy_source_for_build,
     _installation_findings,
     _metadata_findings,
     _read_wheel_metadata,
@@ -429,3 +430,31 @@ dependencies = []
 
     assert any(command[1:4] == ("-m", "pip", "install") for command in calls)
     assert [finding.id for finding in findings] == ["DEP-004"]
+
+
+def test_copy_source_for_build_skips_bulky_non_package_directories(tmp_path):
+    """The build input copy must exclude trees that bound copy time/space."""
+    source = tmp_path / "repo"
+    (source / "eqlib").mkdir(parents=True)
+    (source / "eqlib" / "__init__.py").write_text("", encoding="utf-8")
+    skipped_dirs = (
+        ".mypy_cache",
+        "reports",
+        "data",
+        ".venv",
+        "venv",
+        "node_modules",
+        ".eqlib_cache",
+        "site",
+    )
+    for name in skipped_dirs:
+        skipped = source / name
+        skipped.mkdir()
+        (skipped / "blob.txt").write_text("x", encoding="utf-8")
+    destination = tmp_path / "copy"
+
+    _copy_source_for_build(source, destination)
+
+    assert (destination / "eqlib" / "__init__.py").is_file()
+    for name in skipped_dirs:
+        assert not (destination / name).exists(), f"{name} was copied"

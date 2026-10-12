@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 
-from evaluator.contracts import run_live_contracts, run_offline_contracts
+from evaluator.contracts import (
+    _OFFLINE_NODE_IDS,
+    run_live_contracts,
+    run_offline_contracts,
+)
 from evaluator.models import Severity
 
 
@@ -48,7 +52,8 @@ def test_contract_failure_keeps_failed_node_ids_when_stdout_is_truncated(monkeyp
     assert "FAILED " + failure_node in finding.evidence["stdout"]
 
 
-def test_live_timeout_is_unavailable_and_sets_live_environment(monkeypatch):
+def test_live_timeout_stays_blocking_and_sets_live_environment(monkeypatch):
+    """A timed-out contract never validated anything: it must not downgrade."""
     captured = {}
 
     def expire(*args, **kwargs):
@@ -59,7 +64,8 @@ def test_live_timeout_is_unavailable_and_sets_live_environment(monkeypatch):
 
     finding = run_live_contracts(ROOT)[0]
 
-    assert (finding.id, finding.status) == ("DATA-190", "unavailable")
+    assert (finding.id, finding.severity) == ("CON-001", Severity.P1)
+    assert finding.evidence["timed_out"] is True
     assert captured["timeout"] == 90
     assert captured["env"]["EQLIB_EVALUATOR_LIVE"] == "1"
 
@@ -70,7 +76,18 @@ def test_live_provider_connection_failure_is_unavailable(monkeypatch):
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args=args[0],
             returncode=1,
-            stdout="requests.exceptions.ConnectionError: network is unreachable",
+            stdout=(
+                "________________________ test_fetch_daily ________________________\n"
+                "\n"
+                "    def test_fetch_daily():\n"
+                ">       df = fetch_stock_data(\"601398\", \"2026-01-01\", \"2026-02-01\")\n"
+                "E       requests.exceptions.ConnectionError: network is unreachable\n"
+                "\n"
+                "tests/test_data_source_contracts.py:42: ConnectionError\n"
+                "=========================== short test summary info ============================\n"
+                "FAILED tests/test_data_source_contracts.py::test_fetch_daily - "
+                "requests.exceptions.ConnectionError: network is unreachable\n"
+            ),
             stderr="",
         ),
     )
@@ -81,6 +98,40 @@ def test_live_provider_connection_failure_is_unavailable(monkeypatch):
         "DATA-190",
         Severity.P2,
         "unavailable",
+    )
+
+
+def test_live_assertion_failure_with_marker_in_source_stays_blocking(monkeypatch):
+    """Traceback source lines mentioning network markers must not downgrade."""
+    monkeypatch.setattr(
+        "evaluator.contracts.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0],
+            returncode=1,
+            stdout=(
+                "_______________________ test_contract_budget _______________________\n"
+                "\n"
+                "    def test_contract_budget():\n"
+                "        with pytest.raises(ConnectionError):\n"
+                "            fetch_stock_data(\"601398\")\n"
+                ">       assert remaining_budget() > 0\n"
+                "E       AssertionError: assert 0 > 0\n"
+                "\n"
+                "tests/test_data_source_contracts.py:88: AssertionError\n"
+                "=========================== short test summary info ============================\n"
+                "FAILED tests/test_data_source_contracts.py::test_contract_budget - "
+                "AssertionError: assert 0 > 0\n"
+            ),
+            stderr="",
+        ),
+    )
+
+    finding = run_live_contracts(ROOT)[0]
+
+    assert (finding.id, finding.severity, finding.status) == (
+        "CON-001",
+        Severity.P1,
+        "open",
     )
 
 
@@ -97,3 +148,20 @@ def test_offline_contracts_exclude_network_marked_tests(monkeypatch):
 
     assert run_offline_contracts(ROOT) == []
     assert "not network" in captured["command"]
+
+
+def test_offline_whitelist_registers_every_contract_style_test_file():
+    """A new tests/test_*contract*.py must be registered or the gate stagnates."""
+    registered = set(_OFFLINE_NODE_IDS)
+    contract_files = sorted((ROOT / "tests").glob("test_*contract*.py"))
+    unregistered = [
+        f"tests/{path.name}"
+        for path in contract_files
+        if f"tests/{path.name}" not in registered
+    ]
+
+    assert contract_files, "guard vacuous: no contract-style test files found"
+    assert unregistered == [], (
+        "register contract-style test files in "
+        "evaluator.contracts._OFFLINE_NODE_IDS: " + ", ".join(unregistered)
+    )

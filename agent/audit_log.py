@@ -22,7 +22,9 @@ Usage:
 
 import datetime
 import json
+import math
 import os
+import uuid
 from typing import Any
 
 
@@ -31,7 +33,12 @@ class AuditLog:
 
     def __init__(self, output_dir: str = "audit_log"):
         os.makedirs(output_dir, exist_ok=True)
-        self.session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Microseconds + short uuid prevent same-second session collisions.
+        self.session_id = (
+            datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            + "_"
+            + uuid.uuid4().hex[:8]
+        )
         self._jsonl_path = os.path.join(output_dir, f"session_{self.session_id}.jsonl")
         self._md_path = os.path.join(output_dir, f"session_{self.session_id}.md")
         self._entries: list[dict] = []
@@ -216,10 +223,21 @@ class AuditLog:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _write_jsonl(self, entry: dict) -> None:
-        """Append one JSON entry to the JSONL file (atomic line write)."""
+        """Append one JSON entry to the JSONL file (atomic line write).
+
+        Non-finite floats (NaN/inf) are not valid JSON; they are sanitized to
+        null before serialization, and ``allow_nan=False`` turns any value
+        that still slips through into a loud error instead of invalid JSON.
+        """
         self._entries.append(entry)
+        line = json.dumps(
+            _sanitize_json_value(entry),
+            ensure_ascii=False,
+            default=_json_default,
+            allow_nan=False,
+        )
         with open(self._jsonl_path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False, default=_json_default))
+            fh.write(line)
             fh.write("\n")
 
     def _append_md_iteration(self, entry: dict) -> None:
@@ -324,10 +342,24 @@ def _now_iso() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _sanitize_json_value(value: Any) -> Any:
+    """Replace non-finite floats with None so the audit trail stays valid JSON."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _sanitize_json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json_value(item) for item in value]
+    return value
+
+
 def _json_default(obj: Any) -> Any:
     """JSON serializer for types not handled by default."""
     if hasattr(obj, "isoformat"):
         return obj.isoformat()
     if hasattr(obj, "item"):
-        return obj.item()  # numpy scalar → Python scalar
+        scalar = obj.item()  # numpy scalar → Python scalar
+        if isinstance(scalar, float) and not math.isfinite(scalar):
+            return None
+        return scalar
     return str(obj)

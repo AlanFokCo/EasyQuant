@@ -22,8 +22,17 @@ def main() -> int:
         "--output", type=Path, default=Path("artifacts/eqlib-evaluator")
     )
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=_REPOSITORY_ROOT,
+        help=(
+            "Repository to audit; defaults to the repository containing this "
+            "script so the audited tree never depends on the caller's cwd."
+        ),
+    )
     args = parser.parse_args()
-    _, exit_code = run_evaluation(Path.cwd(), args.profile, args.output, args.strict)
+    _, exit_code = run_evaluation(args.root, args.profile, args.output, args.strict)
     return exit_code
 
 
