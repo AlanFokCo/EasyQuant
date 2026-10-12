@@ -124,6 +124,8 @@ def compute_all_indicators(close: pd.Series, high: pd.Series, low: pd.Series,
     avg_loss = loss.ewm(alpha=1 / rsi_period, min_periods=rsi_period, adjust=False).mean()
     rs = avg_gain / avg_loss.replace(0, np.nan)
     rsi_vals = 100 - (100 / (1 + rs))
+    rsi_vals = rsi_vals.mask(avg_loss.eq(0) & avg_gain.gt(0), 100.0)
+    rsi_vals = rsi_vals.mask(avg_loss.eq(0) & avg_gain.eq(0), 50.0)
 
     # Bollinger Bands
     bb_mid = close.rolling(boll_period).mean()
@@ -197,7 +199,12 @@ def rsi(close: pd.Series, period: int = 14) -> pd.Series:
     avg_loss = loss.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
     rs = avg_gain / avg_loss.replace(0, np.nan)
-    return 100 - (100 / (1 + rs))
+    result = 100 - (100 / (1 + rs))
+    # Convention: a window with no down moves has RSI 100; a completely flat
+    # window (no up or down moves) is neutral at 50.
+    result = result.mask(avg_loss.eq(0) & avg_gain.gt(0), 100.0)
+    result = result.mask(avg_loss.eq(0) & avg_gain.eq(0), 50.0)
+    return result
 
 
 # ============================================================

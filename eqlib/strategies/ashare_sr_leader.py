@@ -115,7 +115,9 @@ class StrategyParams:
     neutral_market_exposure: float = 0.65
     weak_market_exposure: float = 0.35
     min_price: float = 0.10
-    min_avg_volume: float = 100_000.0
+    # Volume is measured in shares (股) — the engine's canonical unit since
+    # the 2026-10 volume-unit fix.  10M shares/day ≈ 100k lots.
+    min_avg_volume: float = 10_000_000.0
     min_relative_strength: float = -0.03
     max_support_distance: float = 0.12
     max_position_drawdown: float = 0.0

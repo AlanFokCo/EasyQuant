@@ -273,6 +273,23 @@ def _is_index(code: str) -> bool:
 # Daily OHLCV — Multi-source fallback
 # ============================================================
 
+def _security_variants(security):
+    """Candidate keys for preloaded-data lookups: as-given, bare, suffixed.
+
+    Preloaded structures may be keyed by bare codes (``601398``) or
+    exchange-suffixed codes (``601398.XSHG``) depending on the loader, so
+    lookups must try both forms — matching the behaviour of
+    ``PreloadedData.get_bar``.
+    """
+    from eqlib.trade import _bare_code, _normalize_security
+    variants = [security]
+    if isinstance(security, str):
+        for candidate in (_bare_code(security), _normalize_security(security)):
+            if candidate not in variants:
+                variants.append(candidate)
+    return variants
+
+
 
 def _fetch_from_em(
     symbol: str, start_date: str, end_date: str, adjust: str
@@ -370,8 +387,10 @@ def _fetch_from_tencent(
         "turnover",
     ]
     df = df[[c for c in cols if c in df.columns]]
-    canonical = _canonicalize_ohlcv(df, "tencent", start_date, end_date)
-    return canonical if canonical is not None else pd.DataFrame()
+    # Return the standardized raw frame: canonicalization (including the
+    # lots→shares volume conversion) happens exactly once in fetch_stock_data
+    # for every source.  Canonicalizing here as well would double the volume.
+    return df
 
 
 def _fetch_from_sina(
@@ -582,6 +601,12 @@ def _canonicalize_ohlcv(df, source_name, start_date=None, end_date=None):
         result = result.loc[result.index <= pd.Timestamp(end_date).normalize()]
     if not _validate_ohlcv(result, source_name):
         return None
+    # Canonical volume unit is SHARES (股).  Every provider integration above
+    # delivers volume in lots (手, 1 lot = 100 shares): EM/Sina keep the raw
+    # 手 figure, Sina/BaoStock divide their raw share counts by 100 to match.
+    # The engine, slippage models and strategies all consume share counts, so
+    # convert once at this boundary.
+    result["volume"] = result["volume"] * 100.0
     result.attrs["eqlib_source"] = source_name
     result.attrs["eqlib_quality"] = "valid"
     return result
@@ -908,6 +933,34 @@ def get_price(
     if start_ts > end_ts:
         return pd.DataFrame(columns=list(fields) if fields else None)
 
+    # Fast path: inside a simulation, serve from preloaded data when its
+    # adjustment mode matches (get_price always implies qfq).  This avoids a
+    # live network fetch per security per day, keeps the backtest
+    # deterministic/offline-capable, and uses the same adjusted snapshot the
+    # engine trades on.  Outside a simulation (or when the preload adjust
+    # mismatches) fall through to the provider fetch below.
+    if current is not None:
+        from eqlib.engine import _get_preloaded
+        preloaded = _get_preloaded()
+        if preloaded is not None and (
+            preloaded._field_series or getattr(preloaded, "panel", None) is not None
+        ):
+            stats = getattr(preloaded, "load_stats", None)
+            loaded_adjust = (
+                stats.get("adjust") if isinstance(stats, dict) else None
+            ) or "qfq"
+            if loaded_adjust == "qfq":
+                frame = preloaded.get_history(
+                    security, count=None, fields=None, current_dt=None
+                )
+                if frame is not None and not frame.empty:
+                    frame = _slice_by_date(frame, start_ts, end_ts).sort_index()
+                    if count is not None:
+                        frame = frame.tail(count)
+                    if fields:
+                        frame = frame[[f for f in fields if f in frame.columns]]
+                    return frame.copy()
+
     result = fetch_stock_data(security, start_ts, end_ts)
     # Apply the boundary again even if a provider/cache returns extra rows.
     result = _slice_by_date(result, start_ts, end_ts).sort_index()
@@ -923,6 +976,10 @@ def history(
 ):
     """Get the most recent `count` bars ending at current_dt."""
     from eqlib._state import _context
+
+    if isinstance(count, bool) or not isinstance(count, Integral) or count <= 0:
+        raise ValueError("count must be a positive integer")
+    count = int(count)
 
     if security is None:
         security = _context.universe
@@ -980,6 +1037,10 @@ def attribute_history(
     from eqlib._state import _context
     from eqlib.engine import _get_preloaded
 
+    if isinstance(count, bool) or not isinstance(count, Integral) or count <= 0:
+        raise ValueError("count must be a positive integer")
+    count = int(count)
+
     adjust_map = {"pre": "qfq", "post": "hfq", None: ""}
     if fq not in adjust_map:
         raise ValueError("fq must be 'pre', 'post', or None")
@@ -996,7 +1057,11 @@ def attribute_history(
                 f"adjust='{loaded_adjust}'. Load data with adjust='{adjust_map[fq]}'."
             )
     if preloaded is not None and preloaded._field_series:
-        sec_data = preloaded._field_series.get(security)
+        sec_data = None
+        for variant in _security_variants(security):
+            sec_data = preloaded._field_series.get(variant)
+            if sec_data is not None:
+                break
         if sec_data is not None:
             available = [f for f in fields if f in sec_data]
             if not available:
@@ -1018,7 +1083,11 @@ def attribute_history(
 
     # Fallback: slice from preloaded panel (legacy path)
     if preloaded is not None and preloaded.panel is not None:
-        sec_df = preloaded.panel.get(security)
+        sec_df = None
+        for variant in _security_variants(security):
+            sec_df = preloaded.panel.get(variant)
+            if sec_df is not None and not sec_df.empty:
+                break
         if sec_df is not None and not sec_df.empty:
             available = [f for f in fields if f in sec_df.columns]
             if not available:
@@ -1090,16 +1159,15 @@ def get_trade_days(
         dates = pd.to_datetime(df[col]).dt.date.unique()
         dates = sorted(dates.tolist())
 
-        if count is not None:
-            return dates[-count:]
-
         if start_date:
             sd = pd.Timestamp(start_date).date()
             dates = [d for d in dates if d >= sd]
         if end_date:
             ed = pd.Timestamp(end_date).date()
             dates = [d for d in dates if d <= ed]
-        return dates
+        # ``count`` applies to the filtered window, matching the bundled
+        # calendar path below (tail of the requested range).
+        return dates[-count:] if count is not None else dates
     except Exception as e:
         log.debug("get_trade_days: %s", e)
         try:
@@ -1249,6 +1317,7 @@ def _build_holiday_set() -> frozenset:
         "2023-10-06",
         # 2024
         "2024-01-01",
+        "2024-02-09",  # CNY eve
         "2024-02-12",
         "2024-02-13",
         "2024-02-14",
@@ -1260,6 +1329,7 @@ def _build_holiday_set() -> frozenset:
         "2024-05-02",
         "2024-05-03",
         "2024-06-10",
+        "2024-09-16",  # Mid-Autumn
         "2024-09-17",
         "2024-10-01",
         "2024-10-02",
@@ -1273,24 +1343,34 @@ def _build_holiday_set() -> frozenset:
         "2025-01-30",
         "2025-01-31",
         "2025-02-03",
+        "2025-02-04",
         "2025-04-04",
         "2025-05-01",
         "2025-05-02",
+        "2025-05-05",  # Labour Day observed
         "2025-05-31",
+        "2025-06-02",  # Dragon Boat
         "2025-10-01",
         "2025-10-02",
         "2025-10-03",
         "2025-10-06",
         "2025-10-07",
+        "2025-10-08",  # National Day
         # 2026
         "2026-01-01",
+        "2026-01-02",  # New Year extra
+        "2026-02-16",  # CNY
         "2026-02-17",
         "2026-02-18",
         "2026-02-19",
         "2026-02-20",
+        "2026-02-23",  # CNY
         "2026-04-06",
         "2026-05-01",
+        "2026-05-04",  # Labour Day
+        "2026-05-05",
         "2026-06-19",
+        "2026-09-25",  # Mid-Autumn
         "2026-10-01",
         "2026-10-02",
         "2026-10-05",
@@ -1780,10 +1860,21 @@ def fetch_minute_data(
             df["datetime"] = pd.to_datetime(df["datetime"])
             df.set_index("datetime", inplace=True)
 
+        # EM minute volume is in lots (手); the canonical unit is shares (股),
+        # consistent with _canonicalize_ohlcv for daily bars.
+        if "volume" in df.columns:
+            df["volume"] = pd.to_numeric(df["volume"], errors="coerce") * 100.0
+
         if start_date is not None:
             df = df[df.index >= pd.Timestamp(start_date)]
         if end_date is not None:
-            df = df[df.index <= pd.Timestamp(end_date)]
+            end_ts = pd.Timestamp(end_date)
+            # A bare date (midnight timestamp, no time component) means "the
+            # whole day": extend the inclusive bound to end-of-day so intraday
+            # bars are kept.  An explicit time component is honored as-is.
+            if end_ts == end_ts.normalize():
+                end_ts = end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+            df = df[df.index <= end_ts]
 
         return df
     except Exception as e:

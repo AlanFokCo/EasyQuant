@@ -27,7 +27,7 @@ set_order_cost(OrderCost(open_tax=0, close_tax=0.0005,
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `open_tax` | `0` | 买入印花税 |
-| `close_tax` | `0.0005` | 卖出印花税 |
+| `close_tax` | `None` | 卖出印花税；`None` 时按法定税率（2023-08-28 起 0.05%，此前 0.1%），显式设置优先 |
 | `open_commission` | `0.00025` | 买入佣金 |
 | `close_commission` | `0.00025` | 卖出佣金 |
 | `close_today_commission` | `0` | 今日卖出佣金 |

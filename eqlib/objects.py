@@ -18,13 +18,19 @@ class OrderCost:
     def __init__(
         self,
         open_tax=0,
-        close_tax=0.0005,
+        close_tax=None,
         open_commission=0.00025,
         close_commission=0.00025,
         close_today_commission=0,
         min_commission=5,
     ):
         self.open_tax = open_tax
+        # close_tax=None means "not explicitly configured": calc_close_cost
+        # then applies the statutory date-dependent A-share stamp duty
+        # (0.05% on/after 2023-08-28, 0.1% before).  An explicitly supplied
+        # value always wins.  Keeping the unset state as None (rather than a
+        # materialised default plus a flag attribute) ensures
+        # ``OrderCost(**vars(cost))`` round-trips cleanly.
         self.close_tax = close_tax
         self.open_commission = open_commission
         self.close_commission = close_commission
@@ -49,20 +55,25 @@ class OrderCost:
             trade_date: the trade date (datetime.date or None). When provided,
                 applies the date-dependent A-share stamp duty rate:
                 0.05% (万五) for trades on or after 2023-08-28 (MoF Announcement
-                2023 No. 33), and 0.1% (千一) for earlier dates.  When None,
-                falls back to the configured ``close_tax`` rate.
+                2023 No. 33), and 0.1% (千一) for earlier dates — unless the
+                user explicitly configured ``close_tax`` on this OrderCost,
+                which always takes precedence.  When None, falls back to the
+                configured ``close_tax`` rate.
         """
         value = price * amount
         # Determine effective stamp duty rate
         if is_etf:
             tax = 0.0
-        elif trade_date is not None:
-            _cutoff = datetime.date(2023, 8, 28)
-            _date = trade_date if isinstance(trade_date, datetime.date) else trade_date.date()
-            effective_tax_rate = 0.0005 if _date >= _cutoff else 0.001
-            tax = value * effective_tax_rate
         else:
-            tax = value * self.close_tax
+            close_tax = self.close_tax
+            if close_tax is None:
+                if trade_date is not None:
+                    _cutoff = datetime.date(2023, 8, 28)
+                    _date = trade_date if isinstance(trade_date, datetime.date) else trade_date.date()
+                    close_tax = 0.0005 if _date >= _cutoff else 0.001
+                else:
+                    close_tax = 0.0005
+            tax = value * close_tax
         comm_rate = self.close_today_commission if is_today else self.close_commission
         commission = max(value * comm_rate, self.min_commission)
         return tax + commission

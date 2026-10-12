@@ -33,6 +33,7 @@ Usage in paper trading:
 """
 
 import datetime
+import urllib.parse
 import requests
 from typing import Optional, Dict, Any, Tuple, TYPE_CHECKING
 
@@ -89,7 +90,12 @@ class DingTalkSender(NotificationSender):
         if self.secret:
             sign = self._compute_sign(timestamp)
             # F1: DingTalk API requires timestamp and sign as URL query parameters
-            url = f"{self.webhook_url}&timestamp={timestamp}&sign={sign}"
+            # The HMAC signature is base64 and frequently contains '+' or '/';
+            # it MUST be URL-encoded or DingTalk verification fails (errcode 310000).
+            url = (
+                f"{self.webhook_url}&timestamp={timestamp}"
+                f"&sign={urllib.parse.quote_plus(sign)}"
+            )
         else:
             url = self.webhook_url
 

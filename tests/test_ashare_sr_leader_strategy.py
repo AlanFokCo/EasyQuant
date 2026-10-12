@@ -1601,13 +1601,13 @@ def test_default_liquidity_threshold_keeps_high_price_leaders():
     )
     stock = _ohlcv_from_close(
         list(np.linspace(100, 115, 50)) + [116],
-        volume_start=150_000,
-        volume_end=180_000,
+        volume_start=15_000_000,
+        volume_end=18_000_000,
     )
     benchmark = _ohlcv_from_close(
         list(np.linspace(100, 105, 51)),
-        volume_start=200_000,
-        volume_end=220_000,
+        volume_start=20_000_000,
+        volume_end=22_000_000,
     )
     assert build_signal_snapshot(stock, benchmark, params) is not None
 
@@ -1622,8 +1622,8 @@ def test_default_price_filter_accepts_qfq_scaled_leader_prices():
     )
     stock = _ohlcv_from_close(
         list(np.linspace(0.6, 0.8, 50)) + [0.82],
-        volume_start=200_000,
-        volume_end=250_000,
+        volume_start=20_000_000,
+        volume_end=25_000_000,
     )
     benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
     assert build_signal_snapshot(stock, benchmark, params) is not None
@@ -1639,8 +1639,8 @@ def test_default_price_filter_rejects_extreme_qfq_execution_artifacts():
     )
     stock = _ohlcv_from_close(
         list(np.linspace(0.02, 0.03, 50)) + [0.031],
-        volume_start=2_000_000,
-        volume_end=2_500_000,
+        volume_start=200_000_000,
+        volume_end=250_000_000,
     )
     benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
     assert build_signal_snapshot(stock, benchmark, params) is None
@@ -2408,18 +2408,18 @@ def test_liquidity_capped_target_value_limits_new_order_size():
     )
     stock = _ohlcv_from_close(
         list(np.linspace(0.3, 0.4, 50)) + [0.42],
-        volume_start=2_000_000,
-        volume_end=2_500_000,
+        volume_start=20_000_000,
+        volume_end=25_000_000,
     )
     benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
     snapshot = build_signal_snapshot(stock, benchmark, params)
     assert snapshot is not None
     capped = liquidity_capped_target_value(
-        requested_target_value=120_000,
+        requested_target_value=1_000_000,
         snapshot=snapshot,
         params=params,
     )
-    assert capped < 120_000
+    assert capped < 1_000_000
     assert capped == snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
 
 
@@ -2434,21 +2434,21 @@ def test_liquidity_capped_rebalance_target_value_limits_additional_buys():
     )
     stock = _ohlcv_from_close(
         list(np.linspace(0.3, 0.4, 50)) + [0.42],
-        volume_start=2_000_000,
-        volume_end=2_500_000,
+        volume_start=20_000_000,
+        volume_end=25_000_000,
     )
     benchmark = _ohlcv_from_close(list(np.linspace(100, 105, 51)))
     snapshot = build_signal_snapshot(stock, benchmark, params)
     assert snapshot is not None
 
     capped = liquidity_capped_rebalance_target_value(
-        requested_target_value=120_000,
+        requested_target_value=1_000_000,
         current_value=20_000,
         snapshot=snapshot,
         params=params,
     )
 
-    assert capped < 120_000
+    assert capped < 1_000_000
     assert capped == 20_000 + snapshot.close * snapshot.avg_volume * params.liquidity_volume_pct
 
 

@@ -209,12 +209,18 @@ def walk_forward(
             except Exception:
                 pass
 
-            # Collect OOS equity curve
-            recorded = oos_result.get("recorded_values", {})
-            if recorded:
-                dates = sorted(recorded.keys())
-                values = [recorded[d].get("total_value", starting_cash) for d in dates]
-                s = pd.Series(values, index=pd.DatetimeIndex([pd.Timestamp(d) for d in dates]))
+            # Collect OOS equity curve.  run_backtest returns recorded_values
+            # as a list of per-day dicts sorted by date (each has a "date"
+            # key); tolerate the legacy mapping form as well.
+            recorded = oos_result.get("recorded_values") or []
+            if isinstance(recorded, dict):
+                entries = [recorded[d] for d in sorted(recorded)]
+            else:
+                entries = sorted(recorded, key=lambda e: e["date"])
+            if entries:
+                dates = [pd.Timestamp(e["date"]) for e in entries]
+                values = [e.get("total_value", starting_cash) for e in entries]
+                s = pd.Series(values, index=pd.DatetimeIndex(dates))
                 # Normalize to 1.0 at start of each OOS window so curves stitch
                 if len(s) > 0 and s.iloc[0] > 0:
                     s = s / s.iloc[0]

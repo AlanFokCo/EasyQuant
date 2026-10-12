@@ -40,7 +40,9 @@ class TestOrderCost:
     def test_order_cost_defaults(self):
         cost = OrderCost()
         assert cost.open_tax == 0
-        assert cost.close_tax == 0.0005
+        # None = unset: calc_close_cost applies the statutory date-dependent
+        # stamp duty (0.05% on/after 2023-08-28, 0.1% before).
+        assert cost.close_tax is None
         assert cost.open_commission == 0.00025
         assert cost.close_commission == 0.00025
         assert cost.min_commission == 5

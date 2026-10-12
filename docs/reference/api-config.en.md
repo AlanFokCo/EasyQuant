@@ -27,7 +27,7 @@ set_order_cost(OrderCost(open_tax=0, close_tax=0.0005,
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `open_tax` | `0` | Buy-side stamp duty |
-| `close_tax` | `0.0005` | Sell-side stamp duty |
+| `close_tax` | `None` | Sell-side stamp duty; `None` applies the statutory rate (0.05% on/after 2023-08-28, 0.1% before); an explicit value takes precedence |
 | `open_commission` | `0.00025` | Buy-side commission |
 | `close_commission` | `0.00025` | Sell-side commission |
 | `close_today_commission` | `0` | Intraday sell commission |

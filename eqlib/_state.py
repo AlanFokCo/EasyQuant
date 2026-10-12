@@ -55,6 +55,8 @@ class BacktestSession:
         '_notification_events',
         # Paper-trading: after_trading_end one-shot flag
         '_after_trading_end_done',
+        # Scheduled-func dedup: {(func_id, time_str): last run datetime.date}
+        '_sched_last_run',
     )
 
     def __init__(self):
@@ -96,6 +98,7 @@ class BacktestSession:
         self._notification_events: list = []  # Enabled events, e.g., ["queued", "filled"]
         # Paper-trading: after_trading_end one-shot flag
         self._after_trading_end_done = False
+        self._sched_last_run = {}
 
 
 # ── Thread-local session management ───────────────────────────────────────────

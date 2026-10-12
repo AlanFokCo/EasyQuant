@@ -232,8 +232,13 @@ class BaseMLModel:
         if hasattr(self._model, "feature_importances_"):
             importances = self._model.feature_importances_
         elif hasattr(self._model, "coef_"):
-            # Logistic regression / Linear regression: use absolute coefficient values
-            importances = np.abs(self._model.coef_[0])
+            # Logistic regression / Linear regression: use absolute coefficient
+            # values.  Classifier coef_ has shape (1, n_features) while
+            # single-target LinearRegression coef_ is (n_features,) — indexing
+            # [0] on the latter yields a scalar that would broadcast to every
+            # feature.
+            coef = np.asarray(self._model.coef_)
+            importances = np.abs(coef[0] if coef.ndim > 1 else coef)
 
         if importances is not None and self._feature_names:
             return pd.Series(importances, index=self._feature_names).sort_values(

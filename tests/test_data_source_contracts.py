@@ -40,8 +40,15 @@ def test_tencent_adapter_keeps_yuan_prices_and_strictly_slices_requested_range(
     monkeypatch.setattr(
         data_mod.requests, "get", lambda *args, **kwargs: _FakeResponse()
     )
+    # The adapter returns a standardized raw frame; canonicalisation (range
+    # slicing, validation, lots→shares volume) happens exactly once in
+    # fetch_stock_data, so exercise the contract through the full chain.
+    monkeypatch.setattr(
+        data_mod, "_DATA_FETCHERS", [("tencent", data_mod._fetch_from_tencent)]
+    )
+    data_mod._cache.clear()
 
-    frame = data_mod._fetch_from_tencent("000001", "20240102", "20240110", "qfq")
+    frame = data_mod.fetch_stock_data("000001", "20240102", "20240110", "qfq")
 
     assert frame.index.min() >= pd.Timestamp("2024-01-02")
     assert frame.index.max() <= pd.Timestamp("2024-01-10")
@@ -49,6 +56,8 @@ def test_tencent_adapter_keeps_yuan_prices_and_strictly_slices_requested_range(
     assert frame.loc[pd.Timestamp("2024-01-10"), "money"] == pytest.approx(
         783_771_200.0
     )
+    # 1234 lots → 123,400 shares, converted exactly once.
+    assert frame.loc[pd.Timestamp("2024-01-10"), "volume"] == pytest.approx(123_400.0)
 
 
 @pytest.mark.parametrize(

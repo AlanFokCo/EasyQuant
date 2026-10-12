@@ -235,6 +235,11 @@ def _load_from_disk(security: str, start: str, end: str, adjust: str) -> Optiona
             age_seconds = time.time() - path.stat().st_mtime
             if age_seconds > 7 * 86400:
                 continue
+            # Refuse legacy caches written before the volume unit fix
+            # (they store lots/手; the canonical unit is now shares/股).
+            _meta = _read_cache_metadata(security, adjust)
+            if _meta.get("version", 1) < 2 or _meta.get("volume_unit") != "shares":
+                continue
             if not _cache_covers_request(security, start, end, adjust):
                 continue
             df = _read_cache_file(path)
@@ -294,6 +299,36 @@ def _cache_starts_after_request_end(security: str, end: str, adjust: str) -> boo
     return listing_date > requested_end
 
 
+def _adjustment_anchor_drifted(existing: pd.DataFrame, new_df: pd.DataFrame) -> bool:
+    """Detect adjustment-anchor drift between a cached frame and a fresh fetch.
+
+    Forward-adjusted (qfq) prices are anchored at download time: a dividend or
+    split shifts the whole history.  Merging two differently-anchored frames
+    creates a fake price seam at the join date.  Compare the close-price ratio
+    on overlapping dates; a median deviation beyond 0.5% means the anchors
+    differ and the frames must not be merged.
+    """
+    if existing is None or existing.empty or new_df.empty:
+        return False
+    overlap = existing.index.intersection(new_df.index)
+    if len(overlap) < 2:
+        return False
+    try:
+        ratio = (new_df.loc[overlap, "close"] / existing.loc[overlap, "close"]).dropna()
+    except Exception:
+        return False
+    if len(ratio) < 2:
+        return False
+    median = float(ratio.median())
+    if median <= 0 or abs(median - 1.0) <= 0.005:
+        return False
+    # The deviation must be consistent across overlapping dates: a corporate
+    # action reprices every prior bar by the same factor, whereas a lone
+    # outlier is just a corrected/refreshed bar and must not nuke the cache.
+    spread = float(((ratio / median) - 1.0).abs().max())
+    return spread < 0.005
+
+
 def _save_to_disk(
     df: pd.DataFrame,
     security: str,
@@ -333,13 +368,43 @@ def _save_to_disk(
         path = parquet_path if _parquet_engine() is not None else pickle_path
         with _get_file_lock(path):
             existing = _existing_cache_frame(path, parquet_path, pickle_path)
+            replace_existing = False
             if existing is not None:
-                df = pd.concat([existing, df])
-                df = df[~df.index.duplicated(keep='last')].sort_index()
+                existing_meta = _read_cache_metadata(security, adjust)
+                if (
+                    existing_meta.get("version", 1) < 2
+                    or existing_meta.get("volume_unit") != "shares"
+                ):
+                    # Legacy cache predates the volume-unit fix: merging would
+                    # mix lots (old rows) with shares (new rows), and the fresh
+                    # metadata would then legitimize the poisoned frame.
+                    _log.warning(
+                        "cache merge skipped for %s (%s): legacy cache predates "
+                        "the shares-unit canonicalisation; replacing with the "
+                        "freshly fetched frame",
+                        security, adjust,
+                    )
+                    existing = None
+                    replace_existing = True
+                elif adjust in ("qfq", "hfq") and _adjustment_anchor_drifted(existing, df):
+                    # Corporate action between fetches moved the qfq anchor:
+                    # merging would create a fake price seam.  Keep only the
+                    # freshly fetched frame and reset coverage metadata.
+                    _log.warning(
+                        "cache merge skipped for %s (%s): adjustment anchor drifted; "
+                        "replacing with freshly fetched frame",
+                        security, adjust,
+                    )
+                    existing = None
+                    replace_existing = True
+                else:
+                    df = pd.concat([existing, df])
+                    df = df[~df.index.duplicated(keep='last')].sort_index()
             _write_cache_file(df, path)
 
-            metadata = _read_cache_metadata(security, adjust)
-            metadata["version"] = 1
+            metadata = {} if replace_existing else _read_cache_metadata(security, adjust)
+            metadata["version"] = 2
+            metadata["volume_unit"] = "shares"
             requested_ranges = list(metadata.get("requested_ranges", []))
             if requested_start is not None and requested_end is not None:
                 requested_ranges.append(
@@ -793,13 +858,29 @@ class PreloadedData:
             fields: list of field names
             current_dt: datetime (may be None, in which case no date filter)
         """
-        sec_data = self._field_series.get(security)
+        from eqlib.data import _security_variants
+        variants = _security_variants(security)
+        sec_data = None
+        for variant in variants:
+            sec_data = self._field_series.get(variant)
+            if sec_data is not None:
+                security = variant
+                break
         if sec_data is None:
             # D2: Panel-based fallback when _field_series is empty (memory limit exceeded)
-            if self.panel is not None and security in self.panel.columns.get_level_values(0):
+            panel_key = next(
+                (v for v in variants
+                 if self.panel is not None and v in self.panel.columns.get_level_values(0)),
+                None,
+            )
+            if panel_key is not None:
                 try:
-                    sec_panel = self.panel[security]
-                    available = [f for f in fields if f in sec_panel.columns]
+                    sec_panel = self.panel[panel_key]
+                    available = (
+                        [f for f in fields if f in sec_panel.columns]
+                        if fields is not None
+                        else list(sec_panel.columns)
+                    )
                     if not available:
                         return pd.DataFrame()
                     result = sec_panel[available]
@@ -807,12 +888,16 @@ class PreloadedData:
                         ts = pd.Timestamp(current_dt)
                         cutoff = ts.normalize()
                         result = result[result.index < cutoff]
-                    return result.tail(count).copy()
+                    return result.tail(count).copy() if count else result.copy()
                 except Exception:
                     return None
             return None
 
-        available = [f for f in fields if f in sec_data]
+        available = (
+            [f for f in fields if f in sec_data]
+            if fields is not None
+            else list(sec_data.keys())
+        )
         if not available:
             return pd.DataFrame()
 
@@ -828,7 +913,7 @@ class PreloadedData:
             result = pd.DataFrame(
                 {f: sec_data[f] for f in available}
             )
-        return result.tail(count).copy()
+        return result.tail(count).copy() if count else result.copy()
 
     def get_close(self, date, security) -> Optional[float]:
         """Get closing price for a given date and security."""
@@ -1022,6 +1107,17 @@ def _local_csv_path(security: str, adjust: str = "qfq") -> Path:
         )
     return resolved
 
+def _read_local_csv_metadata(path: Path) -> Optional[dict]:
+    """Read the .meta.json sidecar for a local CSV, or None if absent/invalid."""
+    meta_path = path.with_suffix(".meta.json")
+    if not meta_path.exists():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return meta if isinstance(meta, dict) else None
+
 
 def save_stock_local(security: str, start_date=None, end_date=None,
                      adjust: str = "qfq") -> Optional[str]:
@@ -1047,12 +1143,25 @@ def save_stock_local(security: str, start_date=None, end_date=None,
     # Try to read existing data
     existing = None
     if path.exists():
-        try:
-            existing = pd.read_csv(path, index_col=0, parse_dates=True)
-        except Exception:
-            existing = None
+        # Refuse to merge into a legacy file that predates the volume-unit
+        # fix (no sidecar or unit != shares): its volume is in lots (手) and
+        # merging shares-unit rows into it would silently mix units.
+        existing_meta = _read_local_csv_metadata(path)
+        if existing_meta is None or existing_meta.get("volume_unit") != "shares":
+            _log.warning(
+                "save_stock_local: %s lacks shares-unit metadata (legacy lots "
+                "file); replacing instead of merging",
+                path.name,
+            )
+        else:
+            try:
+                existing = pd.read_csv(path, index_col=0, parse_dates=True)
+            except Exception:
+                existing = None
 
     # Download new data (full history if no date range specified)
+    requested_start = start_date or "20000101"
+    requested_end = end_date or datetime.date.today()
     new_df = fetch_stock_data(security, start_date or "20000101",
                               end_date or datetime.date.today(), adjust)
     if new_df.empty:
@@ -1060,12 +1169,38 @@ def save_stock_local(security: str, start_date=None, end_date=None,
 
     # Merge with existing data
     if existing is not None and not existing.empty:
-        df = pd.concat([existing, new_df])
-        df = df[~df.index.duplicated(keep='last')].sort_index()
+        if adjust in ("qfq", "hfq") and _adjustment_anchor_drifted(existing, new_df):
+            _log.warning(
+                "save_stock_local: %s adjustment anchor drifted (corporate action); "
+                "replacing legacy file with freshly fetched frame",
+                path.name,
+            )
+            df = new_df
+        else:
+            df = pd.concat([existing, new_df])
+            df = df[~df.index.duplicated(keep='last')].sort_index()
     else:
         df = new_df
 
     df.to_csv(path)
+    # Sidecar metadata: marks the canonical volume unit and the range this
+    # file was requested to cover, so load_stock_local can refuse legacy
+    # lot-based files and silently truncated coverage.
+    try:
+        meta_path = path.with_suffix(".meta.json")
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "volume_unit": "shares",
+                    "covered_start": _normalise_cache_date(requested_start),
+                    "covered_end": _normalise_cache_date(requested_end),
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
     return str(path)
 
 
@@ -1087,6 +1222,36 @@ def load_stock_local(security: str, start_date, end_date,
         return None
 
     try:
+        # Refuse legacy files written before the volume-unit fix (no sidecar
+        # or unit != shares) — their volume is in lots (手).
+        meta = _read_local_csv_metadata(path)
+        if meta is None or meta.get("volume_unit") != "shares":
+            _log.warning(
+                "load_stock_local: %s lacks shares-unit metadata (legacy lots "
+                "file); ignoring — re-download with download_stock_data()",
+                path.name,
+            )
+            return None
+
+        # Coverage validation: the file must cover the requested range.
+        # Otherwise warmup bars are silently missing and early indicators are
+        # wrong.  Compare against the *requested-at-save* range (not the first
+        # data row) so young IPO stocks still work.
+        tolerance = pd.Timedelta(days=14)
+        covered_start = pd.Timestamp(meta.get("covered_start", "99991231"))
+        covered_end = pd.Timestamp(meta.get("covered_end", "19000101"))
+        if (
+            covered_start - tolerance > pd.Timestamp(start_date)
+            or covered_end + tolerance < pd.Timestamp(end_date)
+        ):
+            _log.warning(
+                "load_stock_local: %s covers %s..%s, request is %s..%s — "
+                "refusing truncated data",
+                path.name, meta.get("covered_start"), meta.get("covered_end"),
+                start_date, end_date,
+            )
+            return None
+
         df = pd.read_csv(path, index_col=0, parse_dates=True)
         if df.empty:
             return None

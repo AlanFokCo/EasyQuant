@@ -1334,7 +1334,7 @@ h1 .sym {{ color: var(--accent); }}
 .grade-B {{ background: rgba(250,173,20,.15); color: #faad14; border-color: #faad14; }}
 .grade-C {{ background: rgba(255,152,0,.15); color: #ff9800; border-color: #ff9800; }}
 .grade-D {{ background: rgba(239,83,80,.15); color: #ef5350; border-color: #ef5350; }}
-.grade-N\/A {{ background: rgba(74,85,104,.15); color: #4a5568; border-color: #4a5568; }}
+.grade-N\\/A {{ background: rgba(74,85,104,.15); color: #4a5568; border-color: #4a5568; }}
 .hero-info {{ flex: 1; min-width: 0; }}
 .hero-score {{ font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }}
 .hero-score span {{ font-size: 14px; color: var(--text-dim); font-weight: 400; }}

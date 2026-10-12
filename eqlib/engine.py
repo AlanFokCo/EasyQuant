@@ -451,12 +451,43 @@ class _LazyData(dict):
 
     def __missing__(self, key):
         day = self._context.current_dt.date()
-        bar = _get_preloaded().get_bar(day, key)
+        preloaded = _get_preloaded()
+        if preloaded is None:
+            return None
+        bar = preloaded.get_bar(day, key)
         if bar is not None:
             result = SecurityBar(bar)
             self[key] = result
             return result
         return None
+
+    def current(self, security, fields=None):
+        """Return the current bar value(s) for *security*.
+
+        ``fields`` may be a single field name (``'close'``) or an iterable of
+        field names.  Returns ``None`` when no bar is available for today.
+        """
+        bar = self[security]
+        if bar is None:
+            return None
+        if fields is None:
+            return bar
+        if isinstance(fields, str):
+            return getattr(bar, fields, None)
+        return {f: getattr(bar, f, None) for f in fields}
+
+    def attribute_history(self, security, count, unit="1d", fields=("close",),
+                          df=True, skip_paused=True, fq="pre"):
+        """Delegate to the module-level :func:`eqlib.attribute_history`.
+
+        Point-in-time safety is enforced there (bars for the current day are
+        excluded).
+        """
+        from eqlib.data import attribute_history
+        return attribute_history(
+            security, count, unit=unit, fields=fields, df=df,
+            skip_paused=skip_paused, fq=fq,
+        )
 
 
 # ── Pending-order fill logic (look-ahead bias fix) ─────────────────────────────
@@ -889,12 +920,17 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                 try:
                     bare = _bare_code(security)
                     from eqlib.data import fetch_stock_data
-                    prev_df = fetch_stock_data(bare, end_date=str(day - datetime.timedelta(days=7)), count=10)
+                    prev_df = fetch_stock_data(
+                        bare,
+                        start_date=str(day - datetime.timedelta(days=37)),
+                        end_date=str(day - datetime.timedelta(days=1)),
+                    )
                     if prev_df is not None and len(prev_df) > 0:
                         prev_close = float(prev_df['close'].iloc[-1])
                     else:
                         prev_close = None
-                except Exception:
+                except Exception as exc:
+                    log.warn(f"fill_pending: prev_close fetch failed for {security}: {exc}")
                     prev_close = None
             elif prev_day_date is not None:
                 prev_close = _get_price_fast(security, prev_day_date)
@@ -1270,7 +1306,7 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
     object.__setattr__(session, '_preloaded', preloaded)
 
     session._order_cost = OrderCost(
-        open_tax=0, close_tax=0.0005,
+        open_tax=0,
         open_commission=0.00025, close_commission=0.00025,
         close_today_commission=0, min_commission=5,
     )
@@ -1630,6 +1666,23 @@ def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datet
 
 # ── Paper trading ──────────────────────────────────────────────────────────────
 
+def _paper_is_trading_day(day: datetime.date) -> bool:
+    """Best-effort trading-day check for paper trading.
+
+    Uses the akshare exchange calendar with the bundled calendar as offline
+    fallback.  If neither can answer (e.g. bundled coverage expired), fail
+    open with a loud warning — blocking trading on a stale calendar is worse
+    than processing a non-trading day.
+    """
+    from eqlib.data import get_trade_days
+    try:
+        days = get_trade_days(start_date=day, end_date=day, strict=True)
+    except Exception:
+        log.warn(f"paper: trading-day check unavailable for {day}; assuming trading day")
+        return True
+    return day in days
+
+
 def run_paper_trade(initialize_func, starting_cash=100000.0,
                     benchmark: str = "000300.XSHG", interval: int = 60):
     """Run a strategy in paper trading mode with live market data."""
@@ -1640,7 +1693,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     object.__setattr__(session, '_preloaded', _preloaded_fallback)
 
     session._order_cost = OrderCost(
-        open_tax=0, close_tax=0.0005,
+        open_tax=0,
         open_commission=0.00025, close_commission=0.00025,
         close_today_commission=0, min_commission=5,
     )
@@ -1664,9 +1717,23 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     spot_cache: dict = {}
     prev_day: Optional[datetime.date] = None
     _warmup_done: bool = False  # True after the first iteration is complete
+    _paper_day_checked: Optional[datetime.date] = None
+    _paper_day_is_trading: bool = True
     try:
         while True:
             context.current_dt = datetime.datetime.now()
+
+            # Non-trading days (weekends/holidays): no fills, no scheduled
+            # funcs, no handle_data, no price fetch — just idle.
+            today = context.current_dt.date()
+            if today != _paper_day_checked:
+                _paper_day_is_trading = _paper_is_trading_day(today)
+                _paper_day_checked = today
+                if not _paper_day_is_trading:
+                    log.info(f"paper: {today} is not a trading day — idling")
+            if not _paper_day_is_trading:
+                time.sleep(max(interval, 300))
+                continue
 
             # Restrict live price fetch to only the securities in the user's
             # universe and current positions — avoids downloading all 5000+
@@ -1719,12 +1786,18 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                     if t == "every_bar":
                         func(context)
                     else:
-                        # Parse scheduled time and check if within ±60 seconds
+                        # Parse scheduled time and check if within ±60 seconds.
+                        # Run at most once per (func, time) per day: the
+                        # polling loop can hit the ±60s window 2-3 times.
+                        sched_key = (id(func), t)
+                        if session._sched_last_run.get(sched_key) == today:
+                            continue
                         try:
                             hour, minute = map(int, t.split(":"))
                             scheduled_dt = datetime.datetime.combine(today, datetime.time(hour, minute))
                             current_dt = context.current_dt
                             if abs((current_dt - scheduled_dt).total_seconds()) <= 60:
+                                session._sched_last_run[sched_key] = today
                                 func(context)
                         except Exception:
                             # Fallback: run on every iteration if time parse fails
