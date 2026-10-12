@@ -23,6 +23,13 @@ Run:
     python examples/04_stock_screener.py
     python examples/04_stock_screener.py --pe-max 20 --min-price 10
 """
+import sys
+from pathlib import Path
+
+# Allow running as a script: python examples/NN_xxx.py
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import argparse
 from datetime import datetime, timedelta
@@ -134,7 +141,7 @@ def demo_query_api():
     Pattern:
         q = query(valuation.pe, valuation.market_cap) \\
             .filter(valuation.pe < 20) \\
-            .filter(valuation.market_cap > 50e9) \\
+            .filter(valuation.market_cap > 500) \\
             .order_by(valuation.pe.asc()) \\
             .limit(10)
         result = get_fundamentals(q)
@@ -144,11 +151,12 @@ def demo_query_api():
     try:
         from eqlib import query, valuation, get_fundamentals
 
-        # Screen for value stocks: low PE, large market cap
+        # Screen for value stocks: low PE, large market cap.
+        # Note: valuation.market_cap is in 亿元 (100M CNY), so 500 = 50B CNY.
         q = (query(valuation.pe, valuation.market_cap, valuation.price)
              .filter(valuation.pe.lt(25))
              .filter(valuation.pe.gt(0))
-             .filter(valuation.market_cap.gt(50e9))
+             .filter(valuation.market_cap.gt(500))
              .order_by(valuation.pe.asc())
              .limit(10))
 

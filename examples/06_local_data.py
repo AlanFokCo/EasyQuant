@@ -23,6 +23,13 @@ Run:
     python examples/06_local_data.py --list          # list cached stocks
     python examples/06_local_data.py --download 601398  # download specific
 """
+import sys
+from pathlib import Path
+
+# Allow running as a script: python examples/NN_xxx.py
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import argparse
 import os

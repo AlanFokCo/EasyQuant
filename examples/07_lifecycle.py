@@ -26,6 +26,13 @@ Expected Output:
 Run:
     python examples/07_lifecycle.py
 """
+import sys
+from pathlib import Path
+
+# Allow running as a script: python examples/NN_xxx.py
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import os
 from datetime import datetime, timedelta
@@ -68,7 +75,18 @@ def pre_market_check(context, data=None):
     Checks for ST stocks in the universe and removes them.
     ST (Special Treatment) stocks have abnormal financial
     conditions and carry higher risk of delisting.
+
+    Note: ``get_extras("is_st")`` reads a live spot snapshot, so it is
+    throttled to the first trading day of each month.  A daily call would
+    hit the network on every simulated bar (spot cache TTL is 60s of wall
+    time) and, in backtests, would apply today's ST flags to historical
+    dates anyway.
     """
+    current_month = context.current_dt.strftime("%Y-%m")
+    if getattr(g, "st_last_check_month", None) == current_month:
+        return
+    g.st_last_check_month = current_month
+
     universe = get_universe()
 
     # Check ST status for all stocks in universe

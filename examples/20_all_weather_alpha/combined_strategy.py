@@ -65,6 +65,7 @@ Run:
     python examples/20_all_weather_alpha/run_paper_trade.py
 """
 
+import datetime
 import statistics
 
 from eqlib import (
@@ -656,7 +657,17 @@ def _before_market_open(context, data=None):
         len(held), str(held),
     ))
 
+    # The checks below call live data APIs; in a backtest that would mean a
+    # network round-trip on every simulated bar (the spot cache TTL is 60s
+    # of wall time).  Throttle them to the first trading day of each month.
+    current_month = context.current_dt.strftime("%Y-%m")
+    if getattr(g, "premarket_last_check_month", None) == current_month:
+        return
+    g.premarket_last_check_month = current_month
+
     # ST-flag check (if API is available; silently skip if not)
+    # Note: is_st comes from a live spot snapshot — it reflects today's
+    # flags, not the simulated date's; treated here as a coarse demo screen.
     try:
         universe = get_universe()
         if universe:
@@ -669,8 +680,12 @@ def _before_market_open(context, data=None):
 
     # North-capital regime signal (A-share specific)
     # 5-day rolling net buy -> bull / bear / neutral
+    # end_date is pinned to the simulated date so the backtest stays
+    # point-in-time (no look-ahead from real-time data).
     try:
-        north_df = get_north_money_flow()
+        end_dt = context.current_dt.date()
+        start_dt = end_dt - datetime.timedelta(days=45)
+        north_df = get_north_money_flow(start_date=start_dt, end_date=end_dt)
         if not north_df.empty and "net_buy" in north_df.columns:
             recent_5d = north_df.tail(5)
             net_5d = recent_5d["net_buy"].sum()

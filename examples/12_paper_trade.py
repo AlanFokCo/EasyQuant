@@ -21,6 +21,13 @@ Expected Output:
 Run:
     python examples/12_paper_trade.py --cash 100000 --interval 60
 """
+import sys
+from pathlib import Path
+
+# Allow running as a script: python examples/NN_xxx.py
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import argparse
 

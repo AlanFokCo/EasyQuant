@@ -33,8 +33,10 @@ import sys
 # Make the local package importable (same pattern as other examples)
 # ---------------------------------------------------------------------------
 _here = os.path.dirname(os.path.abspath(__file__))
-if _here not in sys.path:
-    sys.path.insert(0, _here)
+_project_root = os.path.dirname(os.path.dirname(_here))
+for _p in (_project_root, _here):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from combined_strategy import initialize, STOCK_POOL  # noqa: E402
 from eqlib import run_strategy  # noqa: E402
