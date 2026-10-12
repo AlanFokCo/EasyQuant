@@ -138,20 +138,6 @@ log.error(msg)
 
 ---
 
-## Web Studio API Endpoints
-
-### `GET /api/v1/runs/{run_id}/report/data`
-
-Returns the complete backtest report as JSON (including all chart data arrays), used for native Lightweight Charts rendering in the Web Studio.
-
-```bash
-curl http://localhost:8081/api/v1/runs/<run_id>/report/data
-```
-
-The response structure matches the JSON output of `generate_report_json()` and includes all fields: `summary`, `risk_metrics`, `cumulative_returns`, `candlestick_data`, `volume_data`, `ma5/20/60_data`, `rsi_data`, `macd_data`, `bb_upper/middle/lower_data`, `drawdown_data`, `pnl_bar_data`, `daily_returns_data`, etc.
-
----
-
 ## Parameterization & Optimization Conventions
 
 The `eqlib` API works with any Python workflow (scripts, notebooks, scheduled tasks). A typical call chain: `run_backtest()` → `analyze_returns()` → `brinson_attribution()` → analyze results → modify parameters → re-run backtest.

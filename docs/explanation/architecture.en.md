@@ -1,47 +1,45 @@
 # System Architecture
 
-EasyQuant consists of the core library `eqlib` and the Web Strategy Studio. This page explains how they relate and what each module does.
+EasyQuant is built around the event-driven backtesting library `eqlib`. This page explains its overall architecture and what each module does.
 
 ---
 
 ## Overall Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                        User Layer                                │
-│  Python Scripts / Jupyter Notebook / Web Strategy Studio         │
-└─────────────┬───────────────────────────┬───────────────────────┘
-              │                           │
-              ▼                           ▼
-┌─────────────────────────┐  ┌─────────────────────────────────┐
-│  Strategy API            │  │  Web Studio                      │
-│  initialize(context)     │  │  FastAPI Backend (studio_api/)   │
-│  handle_data(ctx, data)  │  │  ┌───────────────────────────┐  │
-│  run_daily(func)         │  │  │ isolated_runner.py         │  │
-│  order*()                │  │  │ (runs backtests in          │  │
-└─────────────┬───────────┘  │  │  isolated subprocesses)     │  │
-              │               │  └───────────┬───────────────┘  │
-              ▼               └──────────────┼───────────────────┘
-┌─────────────────────────────────────────────┼───────────────────┐
-│  Backtest Engine (eqlib/engine.py)          │                   │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  │                   │
-│  │ Scheduler │  │  Order   │  │ Portfolio│  │                   │
-│  │run_daily  │  │ Matching │  │ Manager  │  │                   │
-│  │run_weekly │  │ T+1 check│  │ Pos/Cash │  │                   │
-│  └──────────┘  │ 100-lot  │  │ Fees     │  │                   │
-│                └──────────┘  └──────────┘  │                   │
-└─────────────┬───────────────┬───────────────┘                   │
-              │               │                                    │
-              ▼               ▼                                    │
-┌──────────────────┐ ┌─────────────────────────────────────────────┤
-│  Data Layer       │ │  Analysis & Reporting Layer                 │
-│  eqlib/data.py   │ │  eqlib/attribution.py  (Brinson / Factor)   │
-│  ┌────────────┐  │ │  eqlib/report.py       (HTML/PNG/MD/JSON)  │
-│  │ AKShare API │  │ │  eqlib/scientific/     (overfitting /      │
-│  │ Local CSV   │  │ │                         bias detection)    │
-│  │ Cache Mgmt  │  │ └─────────────────────────────────────────────┤
-│  └────────────┘  │
-└──────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                                 User Layer                                 │
+│  Python Scripts / Jupyter Notebook                                         │
+└──────────────────────────────────────┬─────────────────────────────────────┘
+                                       │
+                                       ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  Strategy API                                                              │
+│  initialize(context) / handle_data(ctx, data)                              │
+│  run_daily(func) / order*()                                                │
+└──────────────────────────────────────┬─────────────────────────────────────┘
+                                       │
+                                       ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  Backtest Engine (eqlib/engine.py)                                         │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐                            │
+│  │ Scheduler  │  │   Order    │  │ Portfolio  │                            │
+│  │ run_daily  │  │  Matching  │  │  Manager   │                            │
+│  │ run_weekly │  │ T+1 check  │  │ Pos / Cash │                            │
+│  │            │  │ 100-lot    │  │   Fees     │                            │
+│  └────────────┘  └────────────┘  └────────────┘                            │
+└──────────────┬──────────────────────────────────────────────┬──────────────┘
+               │                                              │
+               ▼                                              ▼
+┌────────────────────────┐  ┌────────────────────────────────────────────────┐
+│  Data Layer            │  │  Analysis & Reporting Layer                    │
+│  eqlib/data.py         │  │  eqlib/attribution.py  (Brinson / Factor)      │
+│  ┌─────────────┐       │  │  eqlib/report.py       (HTML / PNG / MD / JSON)│
+│  │ AKShare API │       │  │  eqlib/scientific/     (overfitting / bias)    │
+│  │ Local CSV   │       │  └────────────────────────────────────────────────┘
+│  │ Cache Mgmt  │       │
+│  └─────────────┘       │
+└────────────────────────┘
 ```
 
 ## Module Responsibilities
@@ -76,12 +74,3 @@ Each trading day: before_trading_start → handle_data / market_open → after_t
                                               ▼
 Backtest complete → analyze_returns() → generate_report()
 ```
-
-## Web Studio Architecture
-
-The Web Strategy Studio adds a web interface layer on top of `eqlib`:
-
-- **Frontend**: React + Vite + TypeScript, using Monaco Editor and Lightweight Charts
-- **Backend**: FastAPI, running backtests in **isolated subprocesses** via `isolated_runner.py` to prevent strategy code from affecting the server
-- **Communication**: SSE (Server-Sent Events) for real-time backtest log streaming
-- **Storage**: SQLite (strategy code and backtest results) + filesystem (report artifacts)

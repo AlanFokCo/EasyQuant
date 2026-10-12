@@ -10,7 +10,6 @@ EasyQuant is an event-driven quantitative backtesting framework for the **China 
 
 - **Core library**: `eqlib` (Python package under `eqlib/`)
 - **Data source**: `akshare` (free China stock market data)
-- **Web Studio**: FastAPI backend + React frontend at `web_strategy_studio/`
 
 ---
 
@@ -38,33 +37,10 @@ python -c "from eqlib import *; print('eqlib OK')"
 mkdocs serve
 ```
 
-### Web Strategy Studio
-
-```bash
-cd web_strategy_studio
-
-# Install all dependencies + build symbol manifest
-npm run install:all
-
-# Run backend + frontend in dev mode
-npm run dev:all        # API on :8080, frontend on :5173
-
-# Or with Docker
-docker compose up --build
-
-# Backend tests only
-cd backend && pip install -e ".[dev]" && pytest tests/ -v
-```
-
 ### Linting & Pre-commit
 
-Pre-commit hooks run automatically on `git commit`. They include:
-
-- **General**: trailing-whitespace, end-of-file-fixer, check-yaml/toml, mixed-line-ending (LF)
-- **Backend (`web_strategy_studio/backend/`)**: ruff (lint + import sort), black (format), mypy (type check)
-- **Frontend (`web_strategy_studio/frontend/src/`)**: ESLint + Prettier
-
-Note: pre-commit hooks do NOT cover `eqlib/` core — use `ruff` manually if needed.
+Pre-commit hooks run automatically on `git commit`. They cover general hygiene:
+trailing-whitespace, end-of-file-fixer, check-yaml/toml, mixed-line-ending (LF).
 
 ---
 
@@ -95,7 +71,7 @@ Event-driven backtest engine with JoinQuant/Zipline-compatible API.
 - `eqlib/scientific/` — Scientific validation layer (overfitting detection, statistical confidence, bias detection, extended risk metrics, platform comparison, unified `validate_backtest()` orchestration)
 - `eqlib/utils/` — Four submodules: `indicators` (MA, MACD, RSI, KDJ, Bollinger, ATR, etc.), `stats` (rolling metrics, regression, VaR, drawdown), `money` (Kelly, ATR sizing, risk parity, volatility normalize), `levels` (pivot points, support/resistance, Fibonacci, trailing stop)
 - `eqlib/ml/` — Machine-learning stock selection (`[EXPERIMENTAL]`): `FeaturePipeline` (point-in-time feature engineering via `attribute_history` — no look-ahead), `BaseMLModel` (random forest / logistic regression wrappers), `MLSelector` (drop-in replacement for `MultiFactorSelector`), `optimize_hyperparams` / `auto_tune_selector` (hyperparameter search), `validate_ml_strategy` / `check_feature_drift` (out-of-sample validation and drift detection)
-- `eqlib/strategies/` — Built-in strategy templates (`momentum_rotation_strategy`, `ma_crossover_strategy`, `grid_trading_strategy`) designed to be copy-pasted into Web Strategy Studio
+- `eqlib/strategies/` — Built-in strategy templates (`momentum_rotation_strategy`, `ma_crossover_strategy`, `grid_trading_strategy`)
 - `eqlib/examples/` — Bundled reference strategies importable via `from eqlib import *` (currently `multi_factor_momentum.py`)
 
 **Strategy lifecycle:**
@@ -139,26 +115,6 @@ A critical convention used throughout the codebase:
 | Trading APIs (`order`, `order_target`, `order_value`) | Suffixed code | `"601398.XSHG"` |
 
 The suffixes are `.XSHG` (Shanghai) and `.XSHE` (Shenzhen). See `examples/_defaults.py` for both forms (`STOCKS` dict = bare, `STOCKS_TRADE` dict = suffixed). Mixing them up causes silent data misses or trade failures.
-
-### Web Strategy Studio (`web_strategy_studio/`)
-
-FastAPI + React web interface for browser-based strategy development.
-
-**Backend (`studio_api/`):**
-- `app.py` — ASGI app with CORS, auth, lifespan
-- `config.py` — Pydantic settings (env-vars)
-- `db.py` — Async SQLAlchemy engine + session factory
-- `models.py` — ORM models: Strategy, Run, User
-- `routers/` — Domain routes: strategies, runs, auth, data_mgmt, lint, symbols
-- `backtest_executor.py` — Subprocess driver for isolated backtest execution
-- `run_queue.py` — Asyncio run queue with progress streaming
-
-**Frontend (`frontend/src/`):**
-- React + Vite + TypeScript
-- Zustand for global state
-- SSE for real-time run progress
-
-**Key pattern:** Backtests run in isolated subprocesses (`isolated_runner.py`) to prevent strategy code from affecting the server process.
 
 ### Agent Utilities (`agent/`)
 
@@ -321,7 +277,6 @@ The test suite in `tests/` has several organizational patterns:
 - **`test_lookahead.py`** — Look-ahead bias regression tests
 - **`test_concurrent_sessions.py`** — Thread-safety of the `g` proxy across concurrent `BacktestSession`s
 - **`test_ashare_data.py`, `test_attribution_grading.py`, `test_portfolio_risk.py`, `test_ptrade_adapter.py`** — Feature-specific coverage
-- **`conftest.py`** — Adds `web_strategy_studio/backend` to `sys.path` so `studio_api` is importable
 
 Run specific dimensions or tiers:
 ```bash

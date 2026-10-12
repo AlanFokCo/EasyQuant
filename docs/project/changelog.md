@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **移除 Web 策略工作室**（2026-10-10）— `web_strategy_studio/`（FastAPI 后端 + React 前端）已从仓库中移除，项目重新聚焦于核心回测库 `eqlib`。相关文档（使用指南、部署指南、FAQ 条目、首页入口与导航）已同步删除。
+
 ### eqlib Core — Correctness (P0)
 
 #### Fixed

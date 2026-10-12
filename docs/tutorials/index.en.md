@@ -79,11 +79,6 @@ If you lack a foundation in any of the following areas, we recommend reading the
    python -m pytest tests/
    ```
 
-> **Alternative: Web Strategy Studio**
-> If you prefer a browser-based interface, try the [Web Strategy Studio](https://github.com/AlanFokCo/EasyQuant/tree/main/web_strategy_studio/).
-> No Python environment or repo clone needed — write strategies, run backtests, and view reports directly in your browser.
-> Ideal for users who want to skip environment setup. See [Web Studio Documentation](../how-to/web-studio.md).
-
 After completing these steps, continue with [Tutorial 01](01-first-strategy.md) and [Tutorial 02](02-backtesting.md).
 
 ---

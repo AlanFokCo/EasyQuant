@@ -40,12 +40,6 @@ pip install easyquant-eqlib
 <p><code>eqlib</code> 全部公开 API 的参数、返回值与示例。</p>
 <span class="card-link">查阅 →</span>
 </a>
-<a class="hero-card" href="how-to/web-studio/">
-<span class="hero-card-icon">🌐</span>
-<h3>Web 工作室</h3>
-<p>浏览器中编写策略、运行回测、查看报告。</p>
-<span class="card-link">体验 →</span>
-</a>
 </div>
 
 ## 核心能力

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **Removed Web Strategy Studio** (2026-10-10) — `web_strategy_studio/` (FastAPI backend + React frontend) has been removed from the repository; the project refocuses on the core backtesting library `eqlib`. Related documentation (user guide, deployment guide, FAQ entries, homepage card, and navigation) has been removed as well.
+
 ### eqlib Core — Correctness (P0)
 
 #### Fixed

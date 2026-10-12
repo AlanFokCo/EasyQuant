@@ -69,7 +69,6 @@ plugins:
             更新日志: Changelog
             贡献指南: Contributing
             安全政策: Security
-            Web 策略工作室: Web Studio
             Home: Home
             GitHub: GitHub
   - search:
@@ -143,9 +142,6 @@ nav:
       - how-to/portfolio-risk.md
       - how-to/param-optimization.md
       - how-to/dependency-evaluator.md
-      - Web 策略工作室:
-          - how-to/web-studio.md
-          - how-to/deploy-web-studio.md
       - how-to/export-ptrade.md
 
   - API 参考:

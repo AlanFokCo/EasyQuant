@@ -138,20 +138,6 @@ log.error(msg)
 
 ---
 
-## Web Studio API 端点
-
-### `GET /api/v1/runs/{run_id}/report/data`
-
-返回完整的回测报告 JSON 数据（包含所有图表数据数组），用于 Web 控制台中的原生 Lightweight Charts 渲染。
-
-```bash
-curl http://localhost:8081/api/v1/runs/<run_id>/report/data
-```
-
-返回结构与 `generate_report_json()` 输出的 JSON 一致，包含 `summary`、`risk_metrics`、`cumulative_returns`、`candlestick_data`、`volume_data`、`ma5/20/60_data`、`rsi_data`、`macd_data`、`bb_upper/middle/lower_data`、`drawdown_data`、`pnl_bar_data`、`daily_returns_data` 等全部字段。
-
----
-
 ## 参数化与优化约定
 
 `eqlib` 的 API 可与任意 Python 流程配合（脚本、Notebook、定时任务）。典型调用链：`run_backtest()` → `analyze_returns()` → `brinson_attribution()` → 分析结果 → 修改参数 → 再回测。

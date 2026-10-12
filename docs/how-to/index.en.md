@@ -22,6 +22,4 @@ Find the right guide for your task. Each guide focuses on a specific task and pr
 | Monitor portfolio risk (VaR, concentration) | [Portfolio Risk Control](portfolio-risk.md) | 15 min |
 | Parameterize a strategy and keep audit records | [Parameter Optimization & Auditing](param-optimization.md) | 20 min |
 | Run an adversarial audit of dependencies, wheels, and runtime contracts | [Run the eqlib Adversarial Dependency Evaluator](dependency-evaluator.md) | 10 min |
-| Write strategies in the browser | [Web Strategy Studio](web-studio.md) | 10 min |
-| Deploy the Web Studio | [Deploying Web Studio](deploy-web-studio.md) | 30 min |
 | Export strategies to PTrade/QMT | [PTrade/QMT Adapter](export-ptrade.md) | 20 min |

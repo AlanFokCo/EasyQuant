@@ -199,32 +199,6 @@ See [Export to PTrade/QMT](../how-to/export-ptrade.md) and the example `examples
 
 ---
 
-## Web Strategy Studio
-
-### Q: Why am I automatically logged out after login?
-
-**Cause:** When the JWT Token expires or becomes invalid, the frontend automatically clears authentication state and redirects to the login page.
-
-**Solution:**
-- Check if the backend is running normally
-- In production, configure a stable JWT secret (environment variable `EQ_JWT_SECRET`); otherwise, key changes after restart will invalidate all tokens
-- If the backend restarts, you need to log in again
-
-### Q: Backtest always shows positions=0, no trades?
-
-**Cause:** The strategy code may not have properly set `context.universe = [...]`. The Web Studio's data preloading relies on this configuration to determine which stocks' historical data to load.
-
-**Solution:** Explicitly set the stock universe in `initialize(context)`:
-
-```python
-def initialize(context):
-    context.universe = ['601390', '600519']
-```
-
-For more Web Studio issues, see [Web Strategy Studio](../how-to/web-studio.md).
-
----
-
 ## Development & Testing { #developmenttesting }
 
 ### Q: How to verify changes after modifying `eqlib` source code?

@@ -79,11 +79,6 @@ docs/tutorials/
    python -m pytest tests/
    ```
 
-> **替代方案：Web 策略工作室**
-> 如果你更喜欢浏览器界面，可以使用 [Web 策略工作室](https://github.com/AlanFokCo/EasyQuant/tree/main/web_strategy_studio/)。
-> 无需安装 Python 环境或克隆仓库，打开浏览器即可编写策略、运行回测、查看报告。
-> 适合不想折腾环境配置的用户。详见 [Web 工作室文档](../how-to/web-studio.md)。
-
 完成后继续阅读 [Tutorial 01](01-first-strategy.md) 与 [Tutorial 02](02-backtesting.md)。
 
 ---

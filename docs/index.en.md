@@ -40,12 +40,6 @@ pip install easyquant-eqlib
 <p>Parameters, return values, and examples for every public API in <code>eqlib</code>.</p>
 <span class="card-link">Reference →</span>
 </a>
-<a class="hero-card" href="how-to/web-studio/">
-<span class="hero-card-icon">🌐</span>
-<h3>Web Studio</h3>
-<p>Write strategies, run backtests, and view reports — all in your browser.</p>
-<span class="card-link">Try it →</span>
-</a>
 </div>
 
 ## Core Capabilities

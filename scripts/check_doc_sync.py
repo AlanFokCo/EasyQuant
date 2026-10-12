@@ -2,12 +2,14 @@
 """Doc sync validator — checks documentation consistency.
 
 Validates:
-1. Every docs/*.md has a corresponding .en.md translation
+1. Every docs/*.md has a corresponding .en.md translation (and vice versa)
 2. No stale example file references in docs
-3. Trading cost rates in docs match examples/_defaults.py
+3. Trading cost rates in docs match examples/_defaults.py (parsed at runtime,
+   so changing _defaults.py changes what docs must say); code files are
+   scanned for known-stale literal cost values
 4. No outdated stamp duty (0.001) or commission (0.0003) values
 5. With ``--scope all`` (or ``--scope code``), also scans ``eqlib/``,
-   ``examples/``, ``web_strategy_studio/``, and ``agent/`` for stale cost
+   ``examples/``, and ``agent/`` for stale cost
    values so regressions in code are caught alongside docs.
 
 Usage:
@@ -21,6 +23,7 @@ Exit code 0 = all checks pass, non-zero = issues found.
 """
 
 import argparse
+import ast
 import os
 import re
 import sys
@@ -29,13 +32,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = ROOT / "docs"
 EXAMPLES_DIR = ROOT / "examples"
+DEFAULTS_FILE = EXAMPLES_DIR / "_defaults.py"
 
 # Skip these directories
 SKIP_DIRS = {"superpowers", "__pycache__", "node_modules", ".git", "site",
              ".venv", "venv", "node_modules", "dist", "build"}
 
 # Directories scanned when --scope includes code
-CODE_DIRS = [ROOT / "eqlib", ROOT / "examples", ROOT / "web_strategy_studio", ROOT / "agent"]
+CODE_DIRS = [ROOT / "eqlib", ROOT / "examples", ROOT / "agent"]
 CODE_SUFFIXES = {".py", ".json", ".ts", ".tsx", ".js", ".jsx"}
 
 # Example file reference pattern: examples/XX_something.py or examples/XX_dir/
@@ -75,6 +79,14 @@ STALE_COSTS = {
     "close_commission=0.0003": "close_commission=0.00025",
 }
 
+# OrderCost fields whose doc-quoted literals must match examples/_defaults.py
+COST_FIELDS = ("close_tax", "open_commission", "close_commission")
+
+# Matches e.g. "close_tax=0.0005" (with optional whitespace) in prose/code blocks
+COST_LITERAL_PATTERN = re.compile(
+    r"(close_tax|open_commission|close_commission)\s*=\s*([0-9]+(?:\.[0-9]+)?)"
+)
+
 # Files exempt from stale-cost scanning (historical date-aware logic, tests
 # of the old rate, or documentation *about* the old rate).
 # Pattern: the file path must contain one of these substrings to be skipped.
@@ -99,7 +111,7 @@ def get_doc_files():
 
 
 def check_translations(doc_files, verbose=False):
-    """Check that every Chinese doc has an English counterpart."""
+    """Check that every doc has both a Chinese .md and an English .en.md."""
     issues = []
     for path in doc_files:
         en_path = path.with_suffix(".en.md")
@@ -108,7 +120,53 @@ def check_translations(doc_files, verbose=False):
             issues.append(f"  Missing translation: {rel}")
         elif verbose:
             print(f"  OK: {path.relative_to(ROOT)}")
+
+    # Reverse direction: an .en.md without its Chinese source is also orphaned
+    for en_path in sorted(DOCS_DIR.rglob("*.en.md")):
+        if any(skip in en_path.parts for skip in SKIP_DIRS):
+            continue
+        zh_path = en_path.with_name(
+            en_path.name[: -len(".en.md")] + ".md"
+        )
+        if not zh_path.exists():
+            rel = en_path.relative_to(ROOT)
+            issues.append(f"  Orphan translation (missing Chinese source): {rel}")
+        elif verbose:
+            print(f"  OK: {en_path.relative_to(ROOT)}")
     return issues
+
+
+def load_default_costs():
+    """Parse DEFAULT_ORDER_COST rates from examples/_defaults.py via AST.
+
+    Parsed rather than imported so the check runs without eqlib's
+    dependencies installed (CI runs it before package installation).
+    """
+    tree = ast.parse(
+        DEFAULTS_FILE.read_text(encoding="utf-8"), filename=str(DEFAULTS_FILE)
+    )
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == "DEFAULT_ORDER_COST"
+            for target in node.targets
+        ):
+            continue
+        call = node.value
+        if not isinstance(call, ast.Call):
+            break
+        costs = {}
+        for keyword in call.keywords:
+            value = keyword.value
+            if (
+                keyword.arg in COST_FIELDS
+                and isinstance(value, ast.Constant)
+                and isinstance(value.value, (int, float))
+            ):
+                costs[keyword.arg] = float(value.value)
+        return costs
+    return {}
 
 
 def check_stale_refs(verbose=False):
@@ -160,14 +218,63 @@ def _is_cost_exempt(path: Path) -> bool:
 
 
 def check_stale_costs(verbose=False, scope="docs"):
-    """Check for outdated trading cost values in docs and (optionally) code."""
+    """Check trading cost values in docs and (optionally) code.
+
+    Docs must quote the authoritative rates parsed from
+    ``examples/_defaults.py`` (any cost literal that disagrees is flagged,
+    so editing _defaults.py changes what docs must say). Code files are
+    scanned for the known-stale literal values in STALE_COSTS.
+    """
     issues = []
 
-    paths = list(DOCS_DIR.rglob("*.md")) if scope in ("docs", "all") else []
+    if scope in ("docs", "all"):
+        issues.extend(_check_doc_costs_against_defaults(verbose=verbose))
     if scope in ("code", "all"):
-        paths.extend(_iter_code_files())
+        issues.extend(_check_code_for_stale_cost_literals(verbose=verbose))
 
-    for path in paths:
+    return issues
+
+
+def _check_doc_costs_against_defaults(verbose=False):
+    """Flag doc cost literals that disagree with examples/_defaults.py."""
+    expected = load_default_costs()
+    missing = [field for field in COST_FIELDS if field not in expected]
+    if missing:
+        return [
+            f"  {DEFAULTS_FILE.relative_to(ROOT)}: could not parse "
+            f"DEFAULT_ORDER_COST fields: {', '.join(missing)}"
+        ]
+
+    issues = []
+    for path in sorted(DOCS_DIR.rglob("*.md")):
+        if any(skip in path.parts for skip in SKIP_DIRS):
+            continue
+        if "changelog" in path.name:
+            continue
+
+        try:
+            content = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        rel = path.relative_to(ROOT)
+
+        for match in COST_LITERAL_PATTERN.finditer(content):
+            field, literal = match.group(1), match.group(2)
+            if abs(float(literal) - expected[field]) > 1e-12:
+                issues.append(
+                    f"  {rel}: '{match.group(0)}' does not match "
+                    f"examples/_defaults.py ({field}={expected[field]:g})"
+                )
+
+    return issues
+
+
+def _check_code_for_stale_cost_literals(verbose=False):
+    """Scan code files for the known-stale literal cost values."""
+    issues = []
+
+    for path in _iter_code_files():
         if any(skip in path.parts for skip in SKIP_DIRS):
             continue
         if "changelog" in path.name:

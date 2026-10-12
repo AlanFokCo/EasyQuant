@@ -228,32 +228,6 @@ def initialize(context):
 
 ---
 
-## Web 策略工作室
-
-### Q: 登录后自动退出是什么原因？
-
-**原因：** JWT Token 过期或失效时，前端会自动清除认证状态并返回登录页面。
-
-**处理：**
-- 检查后端是否正常运行
-- 生产环境需配置稳定的 JWT 密钥（环境变量 `EQ_JWT_SECRET`），否则重启后密钥变化导致所有 Token 失效
-- 若后端重启，需重新登录
-
-### Q: 回测一直显示 positions=0，没有交易？
-
-**原因：** 策略代码中可能未正确设置 `context.universe = [...]`。Web 工作室的数据预加载依赖这个配置来确定需要加载哪些股票的历史数据。
-
-**处理：** 在 `initialize(context)` 中明确设置股票池：
-
-```python
-def initialize(context):
-    context.universe = ['601390', '600519']
-```
-
-更多 Web 工作室问题请查看 [Web 策略工作室](../how-to/web-studio.md)。
-
----
-
 ## 开发与测试
 
 ### Q: 修改了 `eqlib` 源码如何验证？

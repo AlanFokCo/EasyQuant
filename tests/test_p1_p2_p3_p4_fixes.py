@@ -15,7 +15,6 @@ Coverage:
 
 from __future__ import annotations
 
-import asyncio
 import threading
 import warnings
 from datetime import date
@@ -351,101 +350,6 @@ class TestM8StrategyConfigUseLocal:
         assert captured_kwargs.get("use_local") is True
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# S1: CORS configuration
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestS1CORSConfig:
-    """S1: CORS should use configurable origins, not ['*'] + allow_credentials."""
-
-    def test_settings_has_cors_allowed_origins(self):
-        from studio_api.config import settings
-        assert hasattr(settings, "cors_allowed_origins")
-        assert isinstance(settings.cors_allowed_origins, list)
-
-    def test_default_cors_does_not_contain_wildcard(self):
-        from studio_api.config import settings
-        assert "*" not in settings.cors_allowed_origins
-
-    def test_default_cors_contains_localhost(self):
-        from studio_api.config import settings
-        origins = settings.cors_allowed_origins
-        has_localhost = any("localhost" in o or "127.0.0.1" in o for o in origins)
-        assert has_localhost
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# S4: StreamHub cleanup
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestS4StreamHubCleanup:
-    """S4: StreamHub should clean up empty run_id entries after terminal events."""
-
-    def test_unsubscribe_removes_empty_entry(self):
-        from studio_api.stream_hub import StreamHub
-
-        hub = StreamHub()
-        q = hub.subscribe("run_abc")
-        assert "run_abc" in hub._queues
-
-        hub.unsubscribe("run_abc", q)
-        # After unsubscribe and list becomes empty, the key should be removed
-        assert "run_abc" not in hub._queues
-
-    def test_done_event_cleans_up_run_id(self):
-        """Publishing 'done' should remove the run_id from _queues."""
-        from studio_api.stream_hub import StreamHub
-
-        async def _run():
-            hub = StreamHub()
-            hub.subscribe("run_xyz")
-            assert "run_xyz" in hub._queues
-            await hub.publish("run_xyz", "done", {"status": "succeeded"})
-            assert "run_xyz" not in hub._queues
-
-        asyncio.get_event_loop().run_until_complete(_run())
-
-    def test_error_event_cleans_up_run_id(self):
-        """Publishing 'error' should also remove the run_id."""
-        from studio_api.stream_hub import StreamHub
-
-        async def _run():
-            hub = StreamHub()
-            hub.subscribe("run_err")
-            await hub.publish("run_err", "error", {"message": "something failed"})
-            assert "run_err" not in hub._queues
-
-        asyncio.get_event_loop().run_until_complete(_run())
-
-    def test_non_terminal_events_do_not_clean_up(self):
-        """Progress and log events should NOT remove the run_id."""
-        from studio_api.stream_hub import StreamHub
-
-        async def _run():
-            hub = StreamHub()
-            hub.subscribe("run_prog")
-            await hub.publish("run_prog", "progress", {"progress": 0.5})
-            assert "run_prog" in hub._queues
-
-        asyncio.get_event_loop().run_until_complete(_run())
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# S6: Idempotency TTL
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestS6IdempotencyTTL:
-    """S6: idempotency_ttl_sec should be a Settings field."""
-
-    def test_settings_has_idempotency_ttl(self):
-        from studio_api.config import settings
-        assert hasattr(settings, "idempotency_ttl_sec")
-        assert settings.idempotency_ttl_sec > 0
-
-    def test_default_ttl_is_24_hours(self):
-        from studio_api.config import settings
-        assert settings.idempotency_ttl_sec == 86400
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # E7: API stability markers
@@ -513,24 +417,3 @@ class TestH7TradingDays:
             mock_sina.assert_called_once()
 
         assert len(result) > 0
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Security scanner documentation
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestS2SecurityScannerDocumented:
-    """S2: security_scanner.py should document its limitations."""
-
-    def test_module_docstring_warns_about_limitations(self):
-        from studio_api import security_scanner
-        doc = security_scanner.__doc__ or ""
-        assert "NOT a security sandbox" in doc or "friendly lint" in doc
-
-    def test_scanner_still_catches_banned_imports(self):
-        """The scanner should still catch obvious banned imports."""
-        from studio_api.security_scanner import SecurityScanner
-        scanner = SecurityScanner()
-        notes = scanner.scan("import os\nprint('hello')")
-        codes = [n.code for n in notes]
-        assert "EQ-BANNED-IMPORT" in codes

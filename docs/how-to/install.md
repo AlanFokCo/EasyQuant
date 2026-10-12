@@ -37,11 +37,6 @@ pip install -e ".[dev]"
 python -m pytest tests/
 ```
 
-> **替代方案：Web 策略工作室**
-> 如果你更喜欢浏览器界面，可以使用 [Web 策略工作室](https://github.com/AlanFokCo/EasyQuant/tree/main/web_strategy_studio/)。
-> 无需安装 Python 环境，打开浏览器即可编写策略、运行回测、查看报告和对比指标。
-> 详见 [Web 工作室文档](web-studio.md)。
-
 ---
 
 ## 2. 简介与适用范围
@@ -81,4 +76,3 @@ print("eqlib OK")
 更多排错见 [常见问题 FAQ](../project/faq.md)。
 
 ---
-

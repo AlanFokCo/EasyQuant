@@ -37,11 +37,6 @@ pip install -e ".[dev]"
 python -m pytest tests/
 ```
 
-> **Alternative: Web Strategy Studio**
-> If you prefer a browser-based interface, try the [Web Strategy Studio](https://github.com/AlanFokCo/EasyQuant/tree/main/web_strategy_studio/).
-> No Python environment needed — open your browser to write strategies, run backtests, view reports, and compare metrics.
-> See the [Web Studio documentation](web-studio.md) for details.
-
 ---
 
 ## 2. Introduction & Scope
@@ -81,4 +76,3 @@ print("eqlib OK")
 For more troubleshooting, see the [FAQ](../project/faq.md).
 
 ---
-

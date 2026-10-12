@@ -8,7 +8,6 @@ This guide helps contributors work effectively with the EasyQuant codebase.
 - **Tests**: `tests/` — pytest suite with smoke tests for examples
 - **Examples**: `examples/` — Numbered tutorials (01-20) demonstrating library features
 - **Documentation**: `docs/` — MkDocs site with bilingual support (Chinese + `.en.md` English)
-- **Web Studio**: `web_strategy_studio/` — FastAPI backend + React frontend
 - **Scripts**: `scripts/` — Validation utilities like `check_doc_sync.py`
 
 ## Build & Test Commands
@@ -34,7 +33,6 @@ mkdocs serve
 
 - **Python**: Use type hints, keep imports explicit (avoid `from eqlib import *` in examples)
 - **Linting**: Pre-commit hooks enforce trailing whitespace, EOF fixes, YAML/TOML validation
-- **Backend code**: ruff (lint + import sort), black (format), mypy (type check)
 - **API stability**: Mark exports in `eqlib/__init__.py` as `STABLE`, `EXPERIMENTAL`, or `DEPRECATED`
 - **Constants**: Use `eqlib/constants.py` for `RISK_FREE_RATE` (0.03) and `TRADING_DAYS_PER_YEAR` (244)
 
@@ -42,7 +40,7 @@ mkdocs serve
 
 - **Framework**: pytest 7.0+ with coverage via pytest-cov
 - **Naming**: Files as `test_*.py`, functions as `test_*()`
-- **Smoke tests**: `tests/test_examples_smoke.py` validates all examples run without error
+- **Smoke tests**: `tests/test_examples_smoke.py` checks that all examples compile, import, and follow style standards (it does not execute backtests); `tests/test_examples_runtime.py` executes one minimal example end-to-end with a stubbed, deterministic data layer
 - **Coverage**: Focus on `eqlib/` core logic; examples serve as integration tests
 
 ## Commit & Pull Request Guidelines
