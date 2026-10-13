@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+<script>document.documentElement.classList.add('eq-landing');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+{{ page.content }}
+{% endblock %}

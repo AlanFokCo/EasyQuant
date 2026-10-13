@@ -46,6 +46,10 @@ extra:
       name: GitHub
 extra_css:
   - assets/stylesheets/extra.css
+  - assets/stylesheets/home.css
+extra_javascript:
+  - assets/js/lightweight-charts.standalone.production.js
+  - assets/js/home.js
 plugins:
   - i18n:
       docs_structure: suffix
