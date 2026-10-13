@@ -1,5 +1,12 @@
 # Run the eqlib Adversarial Dependency Evaluator
 
+!!! abstract "Overview"
+
+    | Item | Description |
+    |------|-------------|
+    | **Goal** | Run the offline/live dependency audit and read the report |
+    | **Prerequisite** | Repository root, Python 3.10+ |
+
 The built-in `eqlib` evaluator checks release quality across dependencies, wheel metadata, offline contracts, performance baselines, and bounded live-data contracts. It writes both human-readable Markdown and CI-consumable JSON evidence.
 
 ## Run the offline audit

@@ -67,8 +67,11 @@ from eqlib import (
     # 配置
     set_benchmark, set_option, set_order_cost, set_slippage,
     OrderCost, SlippageModel, FixedSlippage, VolumeSlippage,
+    # 通知
+    set_notification_webhook, enable_notification, notify_signal,
     # 交易
     order, order_target, order_value, order_target_value,
+    cancel_order, order_lots, order_pct,
     # 数据
     get_price, history, attribute_history, get_all_securities,
     fetch_stock_data, download_stock_data, load_csv, clear_cache,
@@ -96,6 +99,7 @@ from eqlib import (
     portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
     # 分析
     analyze_returns, brinson_attribution, simple_factor_analysis,
+    grade_strategy, diagnose_bottleneck, recommend_params,
     # 组合风控（实验性）
     PortfolioRiskMonitor, RiskThresholds, RiskReport, AlertLevel,
     check_kill_switch,
@@ -108,6 +112,14 @@ from eqlib import (
     filter_st_stocks, filter_paused_stocks,
     filter_low_price_stocks, filter_high_pe_stocks,
     fetch_factor_data,
+    # 机器学习（实验性）
+    FeaturePipeline, BaseMLModel, MLSelector,
+    optimize_hyperparams, auto_tune_selector,
+    validate_ml_strategy, check_feature_drift,
+    # 工具模块
+    utils,
+    # 内置策略模板
+    SRRiskConfig, make_sr_risk_budget_strategy,
     # 缓存
     set_cache_dir, set_local_data_dir, fetch_cached, estimate_memory_mb,
     save_stock_local, load_stock_local, has_local_data,

@@ -51,6 +51,7 @@ ML 模型封装，统一 sklearn 模型接口。
 ```python
 BaseMLModel(
     model_type: str = 'random_forest',
+    is_classifier: bool = True,
     **kwargs,
 )
 ```
@@ -58,6 +59,7 @@ BaseMLModel(
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `model_type` | `str` | 模型类型：`random_forest`, `logistic_regression`, `gradient_boosting`, `xgboost` |
+| `is_classifier` | `bool` | `True` 为分类器（默认，向后兼容）；目标为连续值（如收益率）时设 `False` 走回归 |
 | `**kwargs` | | 传递给底层模型的参数 |
 
 ### 方法
@@ -65,10 +67,10 @@ BaseMLModel(
 #### fit
 
 ```python
-fit(X: pd.DataFrame, y: pd.Series) -> None
+fit(X: pd.DataFrame, y: pd.Series) -> BaseMLModel
 ```
 
-训练模型。
+训练模型，返回 `self`（可链式调用）。
 
 #### predict
 

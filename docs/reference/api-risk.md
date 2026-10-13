@@ -126,6 +126,7 @@ RiskThresholds(
     correlation_kill=0.85,      # 熔断相关性
     single_stock_max=0.10,      # 单股票最大占比
     single_sector_max=0.30,     # 单板块最大占比
+    small_cap_max=0.20,         # 微盘股最大占比（<50亿）
     var_confidence=0.95,        # VaR 置信水平
 )
 ```

@@ -10,7 +10,7 @@
 
 > The A-share market has its own unique microstructure — north-bound capital (north-capital), margin trading, limit up/down boards, restricted share unlocks — signals that either don't exist or take very different forms in overseas markets. This tutorial walks through how to use the four A-share specific APIs provided by `eqlib` to capture these signals, and how to use `PortfolioRiskMonitor` to build a portfolio-level risk control system.
 
-**Documentation index:** [How-To Overview](../how-to/index.md) | **Related example:** [Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)
+**Documentation index:** [How-To Overview](../how-to/index.md) | **Related example:** [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)
 
 ---
 
@@ -204,6 +204,8 @@ from eqlib import get_limit_up_down_stats
 | `limit_down_count` | Number of limit-down stocks |
 
 > **Important limitation**: This API **only supports the most recent 30 trading days**. Beyond that range, a warning is printed and results may be incomplete. Cache validity is 30 minutes (data changes during trading hours).
+
+> **Relationship to the backtest engine**: This section covers limit up/down *statistics*; the backtest engine separately enforces price limits **by default** — buy orders whose open touches limit-up and sell orders touching limit-down cannot fill and are cancelled with a `cancel_reason`. The limit depends on board and date (main board ±10%, ST ±5%, ChiNext ±20% since 2020-08-24, STAR ±20%, BSE ±30%); disable with `set_option('check_price_limit', False)`.
 
 ### 4.2 Systemic Risk Warning
 
@@ -585,7 +587,7 @@ Strategy logic:
 """
 
 from eqlib import (
-    run_backtest, analyze_returns, order_target, order_value,
+    run_backtest, analyze_returns, order_target_value,
     get_north_money_flow, get_limit_up_down_stats,
     before_trading_start, g, log, set_benchmark, attribute_history,
 )
@@ -678,10 +680,10 @@ def handle_data(context, data):
 
     if ma5 > ma20:
         # Short-term MA above -> buy to target position
-        order_target(g.security, value=target_value)
+        order_target_value(g.security, target_value)
     elif ma5 < ma20 * 0.98:
         # Short-term MA significantly below -> liquidate
-        order_target(g.security, value=0)
+        order_target_value(g.security, 0)
 
 
 # -- Run backtest --------------------------------------------------
@@ -691,6 +693,7 @@ if __name__ == "__main__":
         start_date="2024-01-01",
         end_date="2024-12-31",
         starting_cash=100000,
+        handle_data=handle_data,   # without handle_data= or any run_daily/run_weekly, the backtest makes zero trades
     )
 
     metrics = analyze_returns(result, risk_free_rate=0.03)
@@ -702,9 +705,16 @@ if __name__ == "__main__":
 ### Key Points
 
 1. **`before_trading_start` registration**: Called in `initialize` to ensure risk checks run before each day's open; callback signature is `(context, data)`
-2. **Signal layering**: North-bound capital provides "big picture" signals (add/reduce position), moving averages provide "entry/exit" timing
-3. **Risk circuit breaker**: The `g.can_trade` flag is set in `before_market_check` and checked in `handle_data`
-4. **Dynamic position adjustment**: `g.position_pct` floats between 30% and 80% based on market conditions
+2. **`handle_data` registration**: Passed via `run_backtest(..., handle_data=handle_data)` (or call `set_handle_data(handle_data)` inside `initialize`). Defining `handle_data` in the module without registering it means the backtest executes zero trades
+3. **Order semantics**: `order_target_value(security, value)` targets a **market value**; `order_target(security, amount)` targets a **share count** — do not mix them up
+4. **Signal layering**: North-bound capital provides "big picture" signals (add/reduce position), moving averages provide "entry/exit" timing
+5. **Risk circuit breaker**: The `g.can_trade` flag is set in `before_market_check` and checked in `handle_data`
+
+!!! note "How engine defaults affect this case"
+
+    - Buy orders touching limit-up at the open and sell orders touching limit-down are cancelled with a recorded `cancel_reason` (on by default; disable with `set_option('check_price_limit', False)`). Orders for suspended securities are cancelled the same day
+    - A position with no price bars for 30 trading days is force-liquidated and logged as `DELIST_LIQUIDATE` in the trade log
+    - Reported win rate is FIFO-matched and net of both-side fees; without a benchmark, `alpha` / `beta` are `NaN` and render as N/A in reports
 
 ---
 
@@ -723,7 +733,7 @@ if __name__ == "__main__":
 
 ### Related Examples
 
-- **[Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)**: A-share market sentiment indicators — complete demonstration of all four data APIs
+- **[Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)**: A-share market sentiment indicators — complete demonstration of all four data APIs
 - **[Example 07](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)**: Lifecycle callbacks — detailed usage of `before_trading_start` and `after_trading_end`
 
 ### Next Steps

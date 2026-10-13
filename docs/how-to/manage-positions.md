@@ -61,7 +61,11 @@ def market_open(context):
 
 ## 2. 交易 API
 
-> 重要：`order` / `order_value` / `order_target` / `order_target_value` 在回测中是**先入队**，统一按**下一交易日开盘价**成交。
+> 重要：`order` / `order_value` / `order_target` / `order_target_value` 在回测中是**先入队**，统一按**下一交易日开盘价**成交。撮合时按 2026-10 起默认生效的市场规则检查：
+>
+> - **涨跌停拦截**（`check_price_limit=True`）：开盘价触及涨停的买单、触及跌停的卖单当日取消。
+> - **停牌处理**：当日无行情的标的无法成交，订单当日取消、不顺延。
+> - 被取消的订单在返回对象的 `cancel_reason` 中记录原因：`"limit-up"` / `"limit-down"` / `"no price data"` / `"suspended"` 等。
 
 ### 2.1 `order(security, amount)`
 
@@ -114,6 +118,22 @@ order_lots('601390', -2)   # 卖出 2 手（200 股）
 order_pct('601390', 0.5)    # 用 50% 可用资金买入
 order_pct('601390', -0.3)   # 卖出当前持仓的 30%
 ```
+
+### 2.7 返回值与撤单
+
+每个 `order*` 函数返回一个 `Order` 对象（请求无效时返回 `None`，例如数量为 0）。用它确认成交结果：
+
+```python
+od = order_value('601390', 50000)
+
+# 下一交易日撮合完成后：
+od.status          # 'filled' / 'partial_fill' / 'cancelled' / ...
+od.filled_amount   # 实际成交股数
+od.avg_cost        # 成交均价
+od.cancel_reason   # 未成交原因，如 'limit-up'、'suspended'、'no price data'
+```
+
+订单仍在队列中（未撮合）时，可调用 `cancel_order(od)` 撤单；已成交或已取消的订单不受影响。
 
 ---
 

@@ -65,7 +65,7 @@ The script will download (or update) data and run the backtest. When finished, t
 
 Open the **`.html` file** in your browser and scroll from top to bottom: metric cards → charts → fills and positions. Field descriptions can be found in [**Report & Metrics Reference**](../reference/reports-format.md).
 
-To compare with the saved example outputs in **`reports/`**, see **[`reports/README.md`](../how-to/read-reports.md)** (recommended to read alongside [`example_report_html_19_localdata.png`](../assets/tutorials/example_report_html_19_localdata.png) and the Tutorial 02 illustrations).
+For how to read each report section, see [Reading Backtest Reports](../how-to/read-reports.md) — read it alongside [`example_report_html_19_localdata.png`](../assets/tutorials/example_report_html_19_localdata.png) and the Tutorial 02 illustrations.
 
 ---
 
@@ -90,7 +90,7 @@ python - <<'PY'
 from eqlib import set_local_data_dir, save_stock_local, list_local_stocks
 
 set_local_data_dir('/home/user/eqlib_data')  # Absolute path recommended for reuse across projects
-targets = ['601390', '600519', '000858', '000300.XSHG']  # Including benchmark
+targets = ['601398', '600519', '000858', '000300.XSHG']  # Including benchmark
 
 for sec in targets:
     path = save_stock_local(sec, start_date='2020-01-01', end_date='2024-12-31')
@@ -107,7 +107,7 @@ result = run_strategy(
     initialize,
     start_date='2024-01-01',
     end_date='2024-12-31',
-    securities=['601390'],
+    securities=['601398'],
     use_local=True,
 )
 ```
@@ -165,7 +165,7 @@ Discretionary trading idea:
 > "ICBC has been going up lately and the moving averages look like they're about to cross — let me buy some and see."
 
 Quantitative trading idea:
-> "When the 5-day MA of 601390 crosses above the 20-day MA, and the day's closing price is more than 2% above the 5-day MA, buy with all available cash. When the 5-day MA crosses below the 20-day MA, sell everything."
+> "When the 5-day MA of 601398 (ICBC) crosses above the 20-day MA, and the day's closing price is more than 2% above the 5-day MA, buy with all available cash. When the 5-day MA crosses below the 20-day MA, sell everything."
 
 The key difference: **verifiable, reproducible, auditable**.
 
@@ -193,7 +193,7 @@ Every runnable quantitative strategy consists of these five elements:
 ### 2.1 Universe
 
 Decide which stocks you will trade. Common approaches:
-- **Fixed list**: preselect a handful of stocks (e.g., `'601390', '600519', '000858'`)
+- **Fixed list**: preselect a handful of stocks (e.g., `'601398', '600519', '000858'`)
 - **Index constituents**: CSI 300, CSI 500 constituents
 - **Sector**: stocks in a given industry (e.g., baijiu, new energy)
 - **Dynamic screening**: real-time filtering by fundamentals (PE/PB/ROE), technicals (MA alignment), money flow, etc.
@@ -324,19 +324,22 @@ set_order_cost(OrderCost(
 ### 4.2 Look-ahead Bias
 
 ```python
+# Pseudo-code — get_today_close does not exist in eqlib; at open you simply cannot have it
 # Wrong: using today's closing price to make a decision that is executed at open
 def market_open(context):
     # Getting today's close at open — impossible!
-    today_close = get_today_close('601390')
+    today_close = get_today_close('601398')
     if today_close > ma20:
         order(...)
 
 # Correct: only use historical data
 def market_open(context):
     # Use yesterday's data and earlier
-    hist = attribute_history('601390', 20, '1d', ['close'])
+    hist = attribute_history('601398', 20, '1d', ['close'])
     # hist contains only the 20 days up to and including yesterday
 ```
+
+> **Snapshot APIs also leak future data**: `get_fundamentals`, `get_index_stocks`, `get_industry_stocks`, `get_valuation`, etc. return the provider's **current snapshot** — the `date` parameter is not point-in-time filtered. Calling them inside a backtest session emits a `FutureWarning`; `set_option('avoid_future_data', True)` upgrades that to a `ValueError`. Keep those APIs for research/live use; inside a backtest, use date-aligned APIs such as `attribute_history` or `history`.
 
 ### 4.3 Survivorship Bias
 

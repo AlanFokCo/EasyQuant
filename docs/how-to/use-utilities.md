@@ -12,6 +12,26 @@
 
 `eqlib.utils` 提供了技术指标、统计分析、资金管理和支撑阻力位计算工具。
 
+### 1.0 一个可运行的闭环示例
+
+取数 → 计算指标 → 打印，直接运行（需联网取数）：
+
+```python
+from eqlib import fetch_stock_data, utils
+
+df = fetch_stock_data('601398', '2024-01-01', '2024-06-30')
+close = df['close']
+
+daily_returns = close.pct_change().dropna()
+
+print("MA20 最新值: %.2f" % utils.ma(close, 20).iloc[-1])
+print("RSI(14)    : %.1f" % utils.rsi(close, 14).iloc[-1])
+print("年化夏普    : %.2f" % utils.rolling_sharpe(daily_returns, window=20).iloc[-1])
+print("VaR(5%%)    : %.2f%%" % (utils.value_at_risk(daily_returns, confidence=0.05) * 100))
+```
+
+`value_at_risk` 支持三种口径：`historical`（经验分位，默认）、`parametric`（正态假设）、`cornish_fisher`（按偏度/峰度修正，更贴合 A 股收益的肥尾特征）。
+
 ### 1.1 技术指标
 
 ```python
@@ -51,7 +71,3 @@ fib = utils.fibonacci_retracement(high, low, close)
 ```
 
 详细说明见 [工具库参考](../reference/utils.md)。
-
----
-
-完整函数参数与数学定义见 [工具库参考](../reference/utils.md)。

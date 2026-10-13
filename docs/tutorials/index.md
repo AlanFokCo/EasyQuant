@@ -33,7 +33,8 @@ docs/tutorials/
 ├── 07-multi-factor.md      ← 多因子选股
 ├── 08-combined-strategy.md ← 综合策略（全天候 Alpha）
 ├── 09-param-optimization.md  ← 策略参数优化与审计
-└── 10-ashare-data-risk.md  ← A 股特色数据与风控
+├── 10-ashare-data-risk.md  ← A 股特色数据与风控
+└── 11-ml-selection.md      ← 机器学习选股（MLSelector、特征管道）
 ```
 
 ---
@@ -111,7 +112,7 @@ docs/tutorials/
 | 06 | [行业轮动策略](06-sector-rotation.md) | 行业轮动 | 动量打分、等权调仓、行业 API | 20 min |
 | 07 | [多因子选股](07-multi-factor.md) | 因子选股 | Z-Score 标准化、因子合成、IC 检验 | 25 min |
 | 08 | [全天候 Alpha 综合策略](08-combined-strategy.md) | 综合策略 | 多因子+行业轮动+RSI/布林/MACD+ATR止损 | 30 min |
-| 09 | [策略参数优化与审计](09-param-optimization.md) | 参数化与工具 | PARAMS、`optimizer.py`、审计日志、审查清单 | 20 min |
+| 09 | [策略参数优化与审计](09-param-optimization.md) | 参数化与工具 | PARAMS、`optimizer.py`、滚动样本外验证、科学验证、审计日志 | 60 min |
 | 10 | [A 股数据与风控](10-ashare-data-risk.md) | A 股特色数据 | 北向资金、融资融券、涨跌停、限售股解禁、组合风控 | 25 min |
 | 11 | [机器学习选股](11-ml-selection.md) | ML 选股 | FeaturePipeline、MLSelector、模型对比、自定义特征 | 25 min |
 
@@ -191,11 +192,12 @@ docs/tutorials/
 | **多因子选股** | [Tutorial 07](07-multi-factor.md) | [Example 17](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)、[Example 09](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution.py) |
 | **综合策略（全天候 Alpha）** | [Tutorial 08](08-combined-strategy.md) | [Example 20](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md) |
 | **网格交易** | — | [Example 18](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_grid_trading.py) |
-| **支撑阻力位** | — | [Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py)、[Example 19](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) |
+| **支撑阻力位** | — | [Example 19](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) |
 | **组合回测** | [Tutorial 02 第 8 节](02-backtesting.md#8-组合回测) | [Example 11](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/11_portfolio_backtest.py) |
 | **参数优化与审计** | [Tutorial 09](09-param-optimization.md) | [agent/optimizer.py](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/optimizer.py)、[agent/strategy_template.py](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/strategy_template.py) |
 | **模拟盘 / 实盘** | [Tutorial 04](04-live-trading.md) | [Example 12](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py) |
-| **A 股特色数据与风控** | [Tutorial 10](10-ashare-data-risk.md) | — |
+| **A 股特色数据与风控** | [Tutorial 10](10-ashare-data-risk.md) | [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py) |
+| **机器学习选股** | [Tutorial 11](11-ml-selection.md) | [Example 21](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/21_ml_selector.py)、[Example 24](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/24_custom_features.py) |
 
 ---
 

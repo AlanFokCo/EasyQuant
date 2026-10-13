@@ -16,7 +16,7 @@
 from eqlib import *
 
 def initialize(context):
-    g.security = '601390'          # 工商银行
+    g.security = '601390'          # 中国中铁
     set_benchmark('000300.XSHG')   # 沪深300 作为基准
     set_option('use_real_price', True)
     run_daily(market_open, time='every_bar')
@@ -65,6 +65,13 @@ handle_data(context, data)   ← 每个交易日调用一次
     v
 after_trading_end(ctx, data) ← 每个交易日收盘后调用（可选注册）
 ```
+
+!!! note "2026-10 起默认生效的市场规则"
+    以下三项默认开启，无需配置：
+
+    - **涨跌停拦截**：开盘价触及涨停的买单、触及跌停的卖单，当日取消（`set_option('check_price_limit', False)` 可关闭）。
+    - **停牌取消**：当日无行情的标的无法成交，订单当日取消、不再顺延，原因记入订单的 `cancel_reason`。
+    - **退市清算**：持仓标的连续 30 个交易日无行情视为退市，按最后收盘价强制清算，交易记录类型为 `DELIST_LIQUIDATE`。
 
 ### 2.1 `initialize(context)`
 
@@ -131,4 +138,3 @@ def market_open(context):
     - 对于模块级别的配置（如常量、参数），使用普通 Python 变量而非 `g`。
 
 ---
-

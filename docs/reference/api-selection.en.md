@@ -55,6 +55,8 @@ result = run_strategy(initialize, selection_func=my_selection, selection_rebalan
 | `TopNSelector(factor, top_n, ascending)` | Single-factor Top-N selector |
 | `MultiFactorSelector(factors, top_n)` | Multi-factor weighted selector |
 
+Note: `filter_high_pe_stocks` **returns the input list unchanged** in backtest mode (historical PE is unavailable, and using the live snapshot would introduce look-ahead bias); in live/research mode it filters on real-time PE.
+
 ### TopNSelector
 
 Single-factor Top-N selector — ranks by a single factor and selects the top N stocks.

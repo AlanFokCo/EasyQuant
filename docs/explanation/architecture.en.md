@@ -24,9 +24,11 @@ EasyQuant is built around the event-driven backtesting library `eqlib`. This pag
 │  Backtest Engine (eqlib/engine.py)                                         │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐                            │
 │  │ Scheduler  │  │   Order    │  │ Portfolio  │                            │
-│  │ run_daily  │  │  Matching  │  │  Manager   │                            │
-│  │ run_weekly │  │ T+1 check  │  │ Pos / Cash │                            │
-│  │            │  │ 100-lot    │  │   Fees     │                            │
+│  │ run_daily  │  │ T+1 check  │  │ Pos / Cash │                            │
+│  │ run_weekly │  │ 100-lot    │  │   Fees     │                            │
+│  │            │  │ Price-limit│  │            │                            │
+│  │            │  │ Suspension │  │            │                            │
+│  │            │  │  Delisting │  │            │                            │
 │  └────────────┘  └────────────┘  └────────────┘                            │
 └──────────────┬──────────────────────────────────────────────┬──────────────┘
                │                                              │
@@ -46,7 +48,7 @@ EasyQuant is built around the event-driven backtesting library `eqlib`. This pag
 
 | Module | File | Responsibility |
 |--------|------|----------------|
-| **Backtest Engine** | `eqlib/engine.py` | Event loop, scheduling, order matching, portfolio management |
+| **Backtest Engine** | `eqlib/engine.py` | Event loop, scheduling, order matching (incl. price-limit / suspension / delisting rules), portfolio management |
 | **Data API** | `eqlib/data.py` | Historical quotes, real-time snapshots, fundamentals, A-share specific data |
 | **Trade Execution** | `eqlib/trade.py` | Order placement, T+1 checks, 100-lot rounding, commission calculation |
 | **Performance Analysis** | `eqlib/attribution.py` | Sharpe, Alpha/Beta, Brinson attribution, factor analysis |
@@ -70,6 +72,9 @@ Each trading day: before_trading_start → handle_data / market_open → after_t
                                               │
                                               ▼
                               Next trading day open: orders matched (avoids look-ahead bias)
+                              ├─ Price-limit interception: orders touching the limit are cancelled same-day
+                              ├─ Suspension: orders for a security with no bar are cancelled same-day (recorded in cancel_reason)
+                              └─ Delisting: no quote for 30 trading days → forced liquidation (DELIST_LIQUIDATE)
                                               │
                                               ▼
 Backtest complete → analyze_returns() → generate_report()

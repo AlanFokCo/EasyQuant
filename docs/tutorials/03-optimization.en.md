@@ -49,14 +49,14 @@ After passing the backtest, there is usually room for improvement:
 from eqlib import *
 import datetime
 
-SECURITIES = ['601390']
+SECURITIES = ['601398']   # Module-level constant: the engine clears g before initialize
 
 def test_ma_combo(fast_period, slow_period):
     """Test a set of moving average parameters."""
     results_log = []
 
     def initialize(context):
-        g.security = '601390'
+        g.security = SECURITIES[0]
         g.fast = fast_period
         g.slow = slow_period
         set_benchmark('000300.XSHG')
@@ -72,12 +72,12 @@ def test_ma_combo(fast_period, slow_period):
         if hist.empty or len(hist) < g.slow:
             return
         ma_fast = hist['close'].tail(g.fast).mean()
-        ma_slow = hist['close'].mean()
+        ma_slow = hist['close'].tail(g.slow).mean()
         price = hist['close'].iloc[-1]
 
         if price > ma_fast > ma_slow:
             if g.security not in context.portfolio.positions:
-                order_value(g.security, context.portfolio.available_cash)
+                order_value(g.security, context.portfolio.available_cash * 0.95)  # keep a 5% fee buffer
         elif price < ma_fast < ma_slow:
             if g.security in context.portfolio.positions:
                 order_target(g.security, 0)
@@ -122,6 +122,8 @@ for fast, slow in combos:
             r['max_dd'] * 100, r['trades']))
 ```
 
+> Scan results already include the engine's default behaviors: price-limit interception (`check_price_limit=True`), same-day cancellation on suspension days, and forced liquidation 30 trading days after a delisted stock stops trading (`DELIST_LIQUIDATE`). These bring the backtest closer to live trading — don't turn them off to make the curve look better.
+
 ### 2.2 Stability Testing
 
 ```python
@@ -155,7 +157,7 @@ def market_open(context):
 
     price = hist['close'].iloc[-1]
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
 
     # === Stop-loss takes priority ===
     if security in context.portfolio.positions:
@@ -170,7 +172,7 @@ def market_open(context):
     # === Original signal logic ===
     if price > ma5 > ma20:
         if security not in context.portfolio.positions:
-            order_value(security, context.portfolio.available_cash)
+            order_value(security, context.portfolio.available_cash * 0.95)
     elif price < ma5 < ma20:
         if security in context.portfolio.positions:
             order_target(security, 0)
@@ -205,7 +207,7 @@ close_prices = hist['close']
 volume = hist['volume']
 
 ma5 = close_prices.tail(5).mean()
-ma20 = close_prices.mean()
+ma20 = close_prices.tail(20).mean()
 price = close_prices.iloc[-1]
 
 avg_vol_20 = volume.tail(20).mean()
@@ -214,7 +216,7 @@ current_vol = volume.iloc[-1]
 # Volume confirmation: today's volume > 1.5x the 20-day average volume
 if price > ma5 > ma20 and current_vol > avg_vol_20 * 1.5:
     if security not in context.portfolio.positions:
-        order_value(security, context.portfolio.available_cash)
+        order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 3.4 MACD Confirmation
@@ -226,7 +228,7 @@ hist = attribute_history(security, 40, '1d', ['close'])
 close_prices = hist['close']
 
 ma5 = close_prices.tail(5).mean()
-ma20 = close_prices.mean()
+ma20 = close_prices.tail(20).mean()
 price = close_prices.iloc[-1]
 
 # MACD golden cross
@@ -236,7 +238,7 @@ macd_golden_cross = dif.iloc[-1] > dea.iloc[-1] and dif.iloc[-2] <= dea.iloc[-2]
 # Dual confirmation: MA golden cross + MACD golden cross
 if price > ma5 > ma20 and macd_golden_cross:
     if security not in context.portfolio.positions:
-        order_value(security, context.portfolio.available_cash)
+        order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 3.5 ATR Trailing Stop-Loss
@@ -254,7 +256,7 @@ close = hist['close']
 price = close.iloc[-1]
 
 # Calculate 14-day ATR
-atr14 = utils.atr(high, low, close, 14)[-1]
+atr14 = utils.atr(high, low, close, 14).iloc[-1]
 
 if security in context.portfolio.positions:
     pos = context.portfolio.positions[security]
@@ -269,24 +271,47 @@ if security in context.portfolio.positions:
 
 ## 4. Portfolio Optimization
 
-When you have multiple stocks, you can use `eqlib`'s built-in portfolio optimizer to allocate weights.
+With multiple stocks, use `portfolio_optimizer` to allocate weights. Function signature:
+
+```python
+portfolio_optimizer(securities, prices, target=None, constraints=None,
+                    bounds=None, default_range=(0.0, 1.0), ftol=1e-9,
+                    return_none_if_fail=True)
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `securities` | List of stock codes |
+| `prices` | **Price** DataFrame (index=dates, columns=stock codes) — returns are computed internally via `pct_change`; do not pass a returns matrix |
+| `target` | Objective: `MinVariance()` (default), `MaxSharpe(risk_free_rate=0.03)`, or `RiskParity()` |
+| `bounds` | One `Bound(lower, upper)` per stock; defaults to `default_range` for all |
+| `constraints` | dict supporting `max_weight`, `min_weight` |
+| `return_none_if_fail` | Default True: return `None` on solver failure instead of raising |
+
+The return value is a `pd.Series` (stock code → weight, summing to 1), or `None` on failure. Requirements: at least 2 securities and at least 20 valid daily returns, otherwise it returns `None`. The covariance matrix uses Ledoit-Wolf shrinkage, which is more stable than the sample covariance on small samples.
 
 ### 4.1 Minimum Variance Portfolio
 
 ```python
-from eqlib import portfolio_optimizer, MinVariance
+import pandas as pd
+from eqlib import get_price, portfolio_optimizer, MinVariance, Bound
 
-# Get historical returns
-returns_df = ...  # Daily returns DataFrame for each stock, columns = stock codes
+SECURITIES = ['601398', '600519', '000858']
 
-optimizer = portfolio_optimizer(returns_df)
-result = optimizer.optimize(
-    method=MinVariance(),
-    bounds=[Bound(0.05, 0.40)] * len(returns_df.columns),  # Each stock 5%-40%
+# get_price with a list returns a {code: DataFrame} dict
+frames = get_price(SECURITIES, start_date='2023-01-01', end_date='2024-12-31')
+prices = pd.DataFrame({sec: df['close'] for sec, df in frames.items()}).dropna()
+
+weights = portfolio_optimizer(
+    SECURITIES, prices,
+    target=MinVariance(),
+    bounds=[Bound(0.05, 0.40)] * len(SECURITIES),  # 5%–40% per stock
 )
 
-print("Optimal weights:", result['weights'])
-# Example output: [0.25, 0.35, 0.20, 0.20]
+if weights is None:
+    print("Optimization failed: insufficient data or no convergence")
+else:
+    print({k: round(v, 3) for k, v in weights.items()})
 ```
 
 ### 4.2 Maximum Sharpe Portfolio
@@ -294,9 +319,11 @@ print("Optimal weights:", result['weights'])
 ```python
 from eqlib import MaxSharpe
 
-result = optimizer.optimize(
-    method=MaxSharpe(risk_free_rate=0.03),
-    bounds=[Bound(0.05, 0.40)] * len(returns_df.columns),
+# Risk-free rate defaults to 0.03 (3%), matching the backtest metrics convention
+weights = portfolio_optimizer(
+    SECURITIES, prices,
+    target=MaxSharpe(risk_free_rate=0.03),
+    bounds=[Bound(0.05, 0.40)] * len(SECURITIES),
 )
 ```
 
@@ -305,16 +332,21 @@ result = optimizer.optimize(
 ```python
 from eqlib import RiskParity
 
-result = optimizer.optimize(
-    method=RiskParity(),
+# Each holding contributes equally to total portfolio risk
+weights = portfolio_optimizer(
+    SECURITIES, prices,
+    target=RiskParity(),
+    bounds=[Bound(0.05, 0.40)] * len(SECURITIES),
 )
 ```
 
 ### 4.4 Using Optimized Weights in a Strategy
 
 ```python
-SECURITIES = ['601390', '600519', '000858', '000001']
-WEIGHTS = [0.25, 0.35, 0.20, 0.20]  # Weights from the optimizer
+# Module-level constants: weights come from the portfolio_optimizer output above
+# (values shown here are for demonstration)
+SECURITIES = ['601398', '600519', '000858']
+WEIGHTS = [0.34, 0.33, 0.33]
 
 def monthly_rebalance(context):
     """Rebalance monthly."""
@@ -364,6 +396,8 @@ print("Annualized Alpha:  %.4f" % ff['alpha_annual'])
 | Alpha > 0 | Generating excess returns | Strategy is effective |
 | Beta > 1.5 | Much more volatile than the market | Consider reducing position size or diversifying |
 | Beta < 0.5 | Weak correlation with the market | May be an independent strategy |
+
+> When benchmark data is unavailable, `alpha`, `beta`, and `information_ratio` are `NaN` (shown as `N/A` in reports); the Alpha/Beta rows of the table above then don't apply.
 
 ---
 
@@ -446,4 +480,4 @@ After completing strategy optimization, the next step is to validate with real-t
 - **[Tutorial 05: RSI Mean Reversion Strategy](05-rsi-mean-reversion.md)** — Learn a fundamentally different strategy approach from dual moving averages
 - **[Tutorial 06: Sector Rotation Strategy](06-sector-rotation.md)** — Build an alpha strategy leveraging A-share sector rotation dynamics
 - **[Tutorial 07: Multi-Factor Stock Selection](07-multi-factor.md)** — Systematic multi-factor quantitative stock selection methods
-- **[Example 20: Support/Resistance Portfolio Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — A complete multi-stock portfolio strategy case study with pre-generated backtest reports (HTML/PNG/Markdown/JSON) for direct review of strategy performance
+- **[Example 19: Support/Resistance Portfolio Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — A complete multi-stock portfolio strategy case study with pre-generated backtest reports (HTML/PNG/Markdown/JSON) for direct review of strategy performance

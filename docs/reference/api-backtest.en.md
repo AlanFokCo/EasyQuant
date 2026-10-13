@@ -25,8 +25,11 @@ Run a backtest (without generating a report).
 run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0,
              frequency='daily', benchmark='000300.XSHG', securities=None,
              use_local=False, max_memory_mb=1024,
-             selection_func=None, selection_rebalance='monthly:1')
+             selection_func=None, selection_rebalance='monthly:1',
+             handle_data=None, debug_mode=False)
 ```
+
+`handle_data`: optional `handle_data(context, data)` callback, invoked once per bar. `debug_mode=True` prints extra diagnostics to help debug strategies with no trades, empty data, etc.
 
 Returns `{"context": Context, "trade_log": list, "recorded_values": dict, "benchmark": str}`.
 

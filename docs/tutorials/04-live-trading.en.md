@@ -20,7 +20,7 @@
 2. [Paper Trading](#2-paper-trading)
 3. [Exporting to PTrade/QMT](#3-exporting-to-ptradeqmt)
 4. [Live Trading Considerations](#4-live-trading-considerations)
-   - [4.6 Portfolio Risk Monitoring Recommendations](#46-portfolio-risk-monitoring-recommendations)
+   - [4.6 Portfolio Risk: Pre-Launch Health Check](#46-portfolio-risk-pre-launch-health-check)
 5. [FAQ](#5-faq)
 6. [Complete Example](#6-complete-example)
 
@@ -70,11 +70,11 @@ def market_open(context):
 
     price = hist['close'].iloc[-1]
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
 
     if price > ma5 > ma20:
         if g.security not in context.portfolio.positions:
-            order_value(g.security, context.portfolio.available_cash)
+            order_value(g.security, context.portfolio.available_cash * 0.95)
             log.info('BUY %s @ %.3f' % (g.security, price))
     elif price < ma5 < ma20:
         if g.security in context.portfolio.positions:
@@ -91,6 +91,8 @@ run_paper_trade(
 ```
 
 ### 2.2 Paper Trading Output
+
+Sample output format (numbers are illustrative, not real results):
 
 ```
 [09:30:00] total_value=100,000.00  PnL=+0.00 (+0.00%)
@@ -127,15 +129,23 @@ After paper trading validation, you can export the strategy to the PTrade/QMT pl
 
 ### 3.1 Using the Export Tool
 
-```bash
-python examples/12_paper_trade.py
+Exporting is done via `eqlib.ptrade_adapter.export_ptrade_script()`. Note that `examples/12_paper_trade.py` is a paper-trading demo and does not export anything:
+
+```python
+from eqlib.ptrade_adapter import export_ptrade_script
+
+# Convert your strategy file into a QMT-ready script
+export_ptrade_script(
+    strategy_file="my_strategy.py",                 # Must contain initialize(context)
+    output_file="ptrade_strategy_generated.py",     # Path of the generated file
+)
 ```
 
-This generates `examples/ptrade_strategy_generated.py` (by default using `examples/03_run_backtest.py` as the sample strategy).
+The generated file embeds your strategy code into the QMT template and adds the `init(ContextInfo)` / `handlebar(ContextInfo)` entry points automatically. Without `strategy_file`, the function prints the empty template to stdout and reads no files.
 
 ### 3.2 Custom Strategy Export
 
-In `examples/12_paper_trade.py`'s `if __name__ == '__main__':` block, change the `strategy_file` parameter in `export_ptrade_script(strategy_file=...)` to your own strategy `.py` path (must contain `initialize(context)`). You can also call it directly:
+Point `strategy_file` at your own strategy `.py` path (must contain `initialize(context)`):
 
 ```python
 from eqlib.ptrade_adapter import export_ptrade_script
@@ -155,13 +165,16 @@ export_ptrade_script(
 ```python
 from eqlib.ptrade_adapter import *
 
-# === Global variables ===
-g.security = '601390'
-g.fast_period = 5
-g.slow_period = 20
+# === Strategy parameters (module-level constants) ===
+SECURITY    = '601390'
+FAST_PERIOD = 5
+SLOW_PERIOD = 20
 
 # === Initialization function (identical to backtest) ===
 def initialize(context):
+    g.security    = SECURITY
+    g.fast_period = FAST_PERIOD
+    g.slow_period = SLOW_PERIOD
     set_benchmark('000300.XSHG')
     set_account('6000000248')  # Your QMT account
     run_daily(market_open, time='every_bar')
@@ -174,12 +187,12 @@ def market_open(context):
 
     price = hist['close'].iloc[-1]
     ma_fast = hist['close'].tail(g.fast_period).mean()
-    ma_slow = hist['close'].mean()
+    ma_slow = hist['close'].tail(g.slow_period).mean()
 
     if price > ma_fast > ma_slow:
         if g.security not in context.portfolio.positions or \
            context.portfolio.positions[g.security].amount == 0:
-            order_value(g.security, context.portfolio.available_cash)
+            order_value(g.security, context.portfolio.available_cash * 0.95)
             log.info('BUY %s @ %.3f' % (g.security, price))
     elif price < ma_fast < ma_slow:
         if g.security in context.portfolio.positions and \
@@ -247,7 +260,7 @@ The adapter automatically handles the following, so you don't need to change the
 def market_open(context):
     max_position_pct = 0.30  # No single stock exceeds 30%
     max_value = context.portfolio.total_value * max_position_pct
-    buy_value = min(context.portfolio.available_cash, max_value)
+    buy_value = min(context.portfolio.available_cash * 0.95, max_value)
     order_value(g.security, buy_value)
 
 # 2. Portfolio maximum drawdown limit
@@ -288,16 +301,28 @@ def market_open(context):
 - Monitor whether buy/sell points match expectations
 - Compare actual returns with backtest expectations; if the deviation is too large, investigate the cause
 
-### 4.6 Portfolio Risk Monitoring Recommendations
+### 4.6 Portfolio Risk: Pre-Launch Health Check
 
-When running multi-strategy portfolios live, it is recommended to use `PortfolioRiskMonitor` for daily risk inspections. It automatically calculates portfolio VaR, strategy correlations, position concentration, and other metrics, and triggers YELLOW / RED / KILL_SWITCH three-tier alerts based on thresholds, helping you intervene before risk spirals out of control.
+When running multiple strategies, give the portfolio a health check with `PortfolioRiskMonitor` before going live. It computes portfolio VaR, strategy correlations, position concentration, and other metrics, and produces YELLOW / RED / KILL_SWITCH three-tier alerts based on thresholds.
 
-Adjust the key parameters in `RiskThresholds` according to your risk tolerance. Conservative investors can lower `max_drawdown_red` to 0.15 and `single_stock_max` to 0.05; aggressive investors can relax them somewhat, but it is not recommended to exceed 1.5x the default values.
+Note its input contract: `PortfolioRiskMonitor` does not read the live context. It consumes each strategy's **backtest result** via `add_strategy(name, result)` (the dict returned by `run_backtest()`; the engine records `recorded_values` daily on its own), and `daily_check()` is a post-hoc analysis over those results. Calling it inside a live `market_open` will not crash, but with no strategy results fed in, VaR simply returns 0 — the check idles. For full usage (thresholds, report fields, kill-switch actions), see [Tutorial 10 §6–7](10-ashare-data-risk.md).
 
 ```python
-from eqlib import *
+from eqlib import (
+    run_backtest, PortfolioRiskMonitor, RiskThresholds, check_kill_switch,
+)
 
-# Customize thresholds based on risk preference
+# 1. Backtest each strategy first
+result_a = run_backtest(
+    initialize_ma, start_date='2024-01-01', end_date='2024-12-31',
+    starting_cash=100000,
+)
+result_b = run_backtest(
+    initialize_rsi, start_date='2024-01-01', end_date='2024-12-31',
+    starting_cash=100000,
+)
+
+# 2. Adjust thresholds to your risk tolerance
 thresholds = RiskThresholds(
     max_drawdown_yellow=0.12,
     max_drawdown_red=0.18,
@@ -306,18 +331,23 @@ thresholds = RiskThresholds(
 )
 monitor = PortfolioRiskMonitor(thresholds=thresholds)
 
-def market_open(context):
-    # ... strategy signal logic ...
+# 3. Feed backtest results and generate the risk report
+monitor.add_strategy('MA strategy', result_a)
+monitor.add_strategy('RSI strategy', result_b)
+report = monitor.daily_check()
 
-    # Daily risk inspection (recommended at the end of strategy logic)
-    report = monitor.daily_check()
-    if report.triggers:
-        log.warn('Risk alert: %s' % '; '.join(report.triggers))
-    for action in check_kill_switch(report):
-        log.error(action)  # Circuit breaker actions require immediate attention
+print('Alert level:', report.alert_level.value)
+for t in report.triggers:
+    print('Trigger:', t)
+for r in report.recommendations:
+    print('Recommendation:', r)
+
+# 4. On KILL_SWITCH, get the actions that must run immediately
+for action in check_kill_switch(report):
+    print('Kill-switch action:', action)
 ```
 
-`check_kill_switch()` returns a circuit breaker action list (e.g., pause strategy, force position reduction) when the report level reaches KILL_SWITCH. In live trading, it is recommended to connect this list to a notification channel (e.g., DingTalk / Feishu webhook) to ensure circuit breaker signals are received immediately, avoiding larger losses due to delayed human response in extreme market conditions.
+Tune thresholds to your risk tolerance. Conservative investors can lower `max_drawdown_red` to 0.15 and `single_stock_max` to 0.05; aggressive investors can relax them somewhat, but going beyond 1.5x the defaults is not recommended. During live trading, rerun this health check regularly and pipe the `check_kill_switch()` action list into a notification channel (e.g., DingTalk / Feishu webhook) so breaker signals are not delayed by manual response in extreme markets.
 
 ---
 
@@ -368,9 +398,10 @@ Below is the complete workflow from backtest to live trading:
 # ma_strategy.py -- for local backtesting
 from eqlib import *
 
-g.security = '601390'
+SECURITY = '601390'   # Module-level constant; the engine clears g before initialize
 
 def initialize(context):
+    g.security = SECURITY   # Attach runtime targets to g inside initialize
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0, close_tax=0.0005,
@@ -384,19 +415,19 @@ def market_open(context):
     if hist.empty or len(hist) < 20:
         return
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
     price = hist['close'].iloc[-1]
 
     if price > ma5 > ma20:
         if g.security not in context.portfolio.positions:
-            order_value(g.security, context.portfolio.available_cash)
+            order_value(g.security, context.portfolio.available_cash * 0.95)
     elif price < ma5 < ma20:
         if g.security in context.portfolio.positions:
             order_target(g.security, 0)
 
 result = run_strategy(
     initialize, '2024-01-01', '2024-12-31',
-    starting_cash=100000, securities=['601390'],
+    starting_cash=100000, securities=[SECURITY],
 )
 ```
 
@@ -418,7 +449,7 @@ if '--paper-trade' in sys.argv:
 else:
     result = run_strategy(
         initialize, '2024-01-01', '2024-12-31',
-        starting_cash=100000, securities=['601390'],
+        starting_cash=100000, securities=[SECURITY],
     )
 ```
 
@@ -428,9 +459,10 @@ else:
 # ma_strategy_ptrade.py -- runs in the QMT strategy editor
 from eqlib.ptrade_adapter import *
 
-g.security = '601390'
+SECURITY = '601390'
 
 def initialize(context):
+    g.security = SECURITY
     set_benchmark('000300.XSHG')
     set_account('6000000248')
     run_daily(market_open, time='every_bar')
@@ -440,12 +472,12 @@ def market_open(context):
     if hist.empty or len(hist) < 20:
         return
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
     price = hist['close'].iloc[-1]
 
     if price > ma5 > ma20:
         if g.security not in context.portfolio.positions:
-            order_value(g.security, context.portfolio.available_cash)
+            order_value(g.security, context.portfolio.available_cash * 0.95)
     elif price < ma5 < ma20:
         if g.security in context.portfolio.positions:
             order_target(g.security, 0)
@@ -472,5 +504,5 @@ You have completed the full workflow from strategy concept to live deployment!
 - [PTrade/QMT Export Guide](../how-to/export-ptrade.md) — Adapter API reference
 - [API Reference](../reference/index.md) — Complete API listing
 - [Utility Library Reference](../reference/utils.md) — Technical indicators, statistical tools, position sizing
-- [Example Code](../examples/index.md) — 20 ready-to-run examples
-- **[Example 20: Support/Resistance Portfolio Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — A complete multi-stock portfolio strategy case study with pre-generated backtest reports
+- [Example Code](../examples/index.md) — 25 ready-to-run examples
+- **[Example 19: Support/Resistance Portfolio Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — A complete multi-stock portfolio strategy case study with pre-generated backtest reports

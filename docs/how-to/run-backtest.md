@@ -44,7 +44,10 @@ result = run_backtest(
 面向多股票组合的高层接口。
 
 ```python
-from eqlib import StrategyConfig, run_portfolio_backtest
+from eqlib import (
+    StrategyConfig, run_portfolio_backtest,
+    attribute_history, order_value, order_target,
+)
 
 config = StrategyConfig(
     starting_cash=200000,
@@ -71,7 +74,27 @@ def my_strategy(context):
 result = run_portfolio_backtest(config, my_strategy, report_dir="reports")
 ```
 
-### 1.4 基准对比
+### 1.4 返回值结构
+
+三个接口都返回一个字典 `result`，常用键：
+
+| 键 | 内容 |
+|------|------|
+| `context` | 回测上下文；`result['context'].portfolio` 取最终持仓与资金 |
+| `trade_log` | 逐笔成交记录列表（日期、代码、方向、价格、数量、费用） |
+| `recorded_values` | 按日期排序的每日记录（总资产、`record()` 自定义字段） |
+| `benchmark` | 基准代码 |
+| `benchmark_values` | 基准每日收盘价序列（用于 alpha/beta 计算与画图） |
+
+组合回测额外带一个 `config` 键（回传入参）。
+
+```python
+final_value = result['context'].portfolio.total_value
+for trade in result['trade_log'][:5]:
+    print(trade['date'], trade['security'], trade['type'], trade['price'])
+```
+
+### 1.5 基准对比
 
 通过 `benchmark` 参数设置基准（默认 `000300.XSHG` 沪深300）。结果会自动计算 alpha、beta 和 information ratio。
 

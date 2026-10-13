@@ -10,7 +10,7 @@ This glossary explains professional terms commonly found in EasyQuant documentat
 The excess annualized return of a strategy relative to its benchmark (e.g., CSI 300), after adjusting for market risk — the "pure skill" component. A positive alpha means the strategy outperforms the benchmark at the same risk level.
 
 **annualized return**
-The total return over the holding period converted to an equivalent one-year rate. Formula: `(1 + total_return) ** (365 / days) - 1`.
+The total return over the holding period converted to an equivalent one-year rate. eqlib annualizes by **trading days**: `(1 + total_return) ** (244 / n_trading_days) - 1`, where 244 is the average number of A-share trading days per year (`TRADING_DAYS_PER_YEAR`).
 
 ---
 
@@ -20,7 +20,7 @@ The total return over the holding period converted to an equivalent one-year rat
 Simulating strategy execution on historical data to evaluate potential performance. EasyQuant uses an event-driven engine: each trading day sequentially calls `before_trading_start` → `run_daily` / `handle_data` → `after_trading_end`.
 
 **benchmark**
-The reference index used to measure strategy performance. Default is CSI 300 (`000300.XSHG`). Metrics such as Sharpe, alpha, and beta are all calculated relative to the benchmark.
+The reference index used to measure strategy performance. Default is CSI 300 (`000300.XSHG`). Alpha, beta, and the information ratio are computed relative to the benchmark; the Sharpe ratio is computed against the risk-free rate and does not depend on the benchmark.
 
 **beta**
 The sensitivity of strategy returns to benchmark returns. Beta = 1 means the strategy moves in lockstep with the benchmark; beta > 1 amplifies moves; beta < 1 dampens them.
@@ -67,7 +67,7 @@ An object used in EasyQuant strategies to store strategy-level global variables 
 ## I
 
 **Information Ratio (IR)**
-Mean of excess returns (strategy − benchmark) / standard deviation of excess returns × √252. Measures how much excess return is earned per unit of active risk.
+Mean of excess returns (strategy − benchmark) / standard deviation of excess returns × √244 (annualized over 244 trading days). Measures how much excess return is earned per unit of active risk.
 
 ---
 
@@ -141,7 +141,7 @@ After the lock-up period expires, previously non-tradable shares gain listing el
 ## S
 
 **Sharpe ratio**
-(Annualized return − annualized risk-free rate) / annualized volatility. Measures how much excess return is earned per unit of total risk. A Sharpe ratio > 1 is generally considered good.
+(Mean daily return − daily risk-free rate) / daily return standard deviation × √244. The risk-free rate defaults to 3% annualized (`RISK_FREE_RATE = 0.03`), annualized over 244 trading days. Measures how much excess return is earned per unit of total risk. A Sharpe ratio > 1 is generally considered good.
 
 **Sortino ratio**
 (Annualized return − MAR) / downside standard deviation. Unlike Sharpe, it only considers downside volatility (returns below the Minimum Acceptable Return, MAR = 0), and does not penalize positive volatility.
@@ -163,7 +163,7 @@ Using only currently listed stocks for backtesting while ignoring delisted or ST
 A-share trading rule: shares bought today can only be sold starting the next trading day. EasyQuant enforces this via `_t1_locked_amounts` to prevent false same-day trading signals in backtests.
 
 **trading calendar**
-The A-share trading calendar, excluding holidays and weekends. EasyQuant prefers Sina Finance's `ak.tool_trade_date_hist_sina()` for precise trading dates, cached in `PreloadedData._dates`.
+The A-share trading calendar, excluding holidays and weekends. The backtest engine uses the bundled exchange calendar as its backbone (`eqlib/static/ashare_trading_days.json`, covering 2020-01-01 through 2026-12-31, fully offline); outside that coverage it falls back to Sina Finance's `ak.tool_trade_date_hist_sina()`, then to an inferred calendar built from holiday rules. Suspension days stay in the calendar, keeping order semantics consistent.
 
 ---
 
@@ -200,7 +200,7 @@ Capital flowing into A-shares from Hong Kong via Shanghai-Hong Kong Stock Connec
 Leveraged trading where investors borrow funds from brokers to buy (margin buying) or borrow shares to sell short. A rapidly rising margin balance reflects overheated market sentiment, while a rapid decline reflects panic. EasyQuant provides this data via `get_margin_data()`.
 
 **Limit up / Limit down (涨跌停)**
-A-share daily price change limit system (main board ±10%, ChiNext / STAR Market ±20%). An abnormally high number of limit-down stocks is a systemic risk warning, while an abnormally high number of limit-up stocks may foreshadow a pullback. EasyQuant provides this data via `get_limit_up_down_stats()`.
+A-share daily price change limit system: main board ±10%, main-board ST ±5%, ChiNext ±20% (±10% before 2020-08-24), STAR Market ±20%, Beijing Stock Exchange ±30%. The backtest matching engine intercepts limit-touching orders against this table by default (`check_price_limit=True`). An abnormally high number of limit-down stocks is a systemic risk warning, while an abnormally high number of limit-up stocks may foreshadow a pullback. EasyQuant provides this data via `get_limit_up_down_stats()`.
 
 **Restricted share unlock (限售股解禁)**
 After the lock-up period expires, previously non-tradable shares gain listing eligibility. When a large unlock (> ¥5 billion) approaches, stock prices tend to come under pressure. EasyQuant provides this data via `get_restriction_release()`.

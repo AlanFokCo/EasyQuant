@@ -76,7 +76,11 @@ set_option('use_real_price', True)
 |-----|------|
 | `SlippageModel` | 基类，不调整价格 |
 | `FixedSlippage(pct=0.001)` | 固定比例滑点 |
-| `VolumeSlippage(impact=0.05)` | 与成交量成比例的冲击成本 |
+| `VolumeSlippage(impact=0.05, max_slippage_pct=0.05)` | 与成交量成比例的冲击成本 |
+
+**FixedSlippage**：每笔按固定比例偏移——买入 `price * (1 + pct)`，卖出 `price * (1 - pct)`；`pct` 默认 `0.001`（0.1%）。
+
+**VolumeSlippage**：冲击成本随订单占当日成交量比例放大——`impact_pct = impact * (order_shares / daily_volume)`，封顶 `max_slippage_pct`；`daily_volume` 为 0 或未知时不加滑点。`impact` 默认 `0.05`（占当日成交量 10% 的订单约产生 0.5% 滑点），`max_slippage_pct` 默认 `0.05`（5%）。
 
 ## BacktestSession 与 get_session
 

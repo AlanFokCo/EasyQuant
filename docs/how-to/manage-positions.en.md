@@ -61,7 +61,11 @@ def market_open(context):
 
 ## 2. Trading API
 
-> Important: `order` / `order_value` / `order_target` / `order_target_value` are **queued first** during backtesting and filled uniformly at the **next trading day's open price**.
+> Important: `order` / `order_value` / `order_target` / `order_target_value` are **queued first** during backtesting and filled uniformly at the **next trading day's open price**. Matching applies the market rules enabled by default since 2026-10:
+>
+> - **Price-limit interception** (`check_price_limit=True`): a buy whose open touches limit-up, or a sell touching limit-down, is cancelled the same day.
+> - **Suspension handling**: an order for a security with no bar that day cannot fill; it is cancelled the same day, not deferred.
+> - A cancelled order records the reason in the returned object's `cancel_reason`: `"limit-up"` / `"limit-down"` / `"no price data"` / `"suspended"`, etc.
 
 ### 2.1 `order(security, amount)`
 
@@ -114,6 +118,22 @@ Place an order using a percentage of available cash. Positive = buy, negative = 
 order_pct('601390', 0.5)     # Buy with 50% of available cash
 order_pct('601390', -0.3)    # Sell 30% of current position
 ```
+
+### 2.7 Return Value & Cancellation
+
+Every `order*` function returns an `Order` object (or `None` for an invalid request, e.g. zero amount). Use it to confirm the outcome:
+
+```python
+od = order_value('601390', 50000)
+
+# After matching on the next trading day:
+od.status          # 'filled' / 'partial_fill' / 'cancelled' / ...
+od.filled_amount   # Shares actually filled
+od.avg_cost        # Average fill price
+od.cancel_reason   # Why it did not fill, e.g. 'limit-up', 'suspended', 'no price data'
+```
+
+While the order is still queued (before matching), call `cancel_order(od)` to cancel it; already filled or cancelled orders are unaffected.
 
 ---
 

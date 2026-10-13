@@ -42,6 +42,52 @@
 | `avg_cost` | 持仓均价 | 框架自动计算 |
 | `total_value` | 持仓市值 | 框架自动计算 |
 | `price` | 当前价 | 只读 |
+| `price_stale` | `bool`：最新报价缺失/无效时为 `True`，估值沿用上一有效价；收到新报价恢复 `False` | 框架自动维护 |
+
+## Order
+
+单笔订单，由 `order()` 等下单函数返回。
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `order_id` | `str` | 订单唯一标识（自动生成） |
+| `security` | `str` | 股票代码 |
+| `amount` | `int` | 委托股数（恒为正，买卖方向看 `side`） |
+| `side` | `str` | `"buy"` / `"sell"`（目标订单在首次撮合前可为 `None`） |
+| `style` | — | `MarketOrder()` 或 `LimitOrder(price)` |
+| `status` | `str` | 订单状态（见下） |
+| `filled_amount` | `int` | 已成交股数 |
+| `avg_cost` | `float` | 成交均价 |
+| `commission` | `float` | 已付佣金 |
+| `datetime` | `datetime` | 创建时间 |
+| `submit_time` | `datetime \| None` | 提交时间 |
+| `fill_time` | `datetime \| None` | 成交时间 |
+| `reject_reason` | `str \| None` | 拒绝原因（状态为 `rejected` 时写入） |
+| `cancel_reason` | `str \| None` | 取消/过期原因（状态为 `cancelled` / `expired` 时写入，取值见下表） |
+
+方法：`is_complete()`（仅 `filled` 返回 `True`）；`remaining_amount()`（未成交股数；金额/目标订单在首次撮合解析股数前返回 `None`）。
+
+### 订单状态
+
+`pending` → `submitted` →（可经 `partial_fill`）→ `filled`；终止态还有 `rejected`、`cancelled`、`expired`。
+
+### cancel_reason 取值
+
+| 值 | 含义 |
+|------|------|
+| `"limit-up"` / `"limit-down"` | 买单遇涨停 / 卖单遇跌停，无法成交 |
+| `"suspended"` | 停牌（当日有行情但零成交） |
+| `"zero volume"` | 当日零成交量，滑点模型无法给出成交价 |
+| `"no bar data"` | 当日无 K 线数据 |
+| `"no open price"` | 金额/目标订单缺开盘价，无法换算股数 |
+| `"no price data"` | 缺少行情数据 |
+| `"sub-lot"` | 数量向下取整后不足 100 股 |
+| `"insufficient cash"` | 可用资金不足 |
+| `"no position"` | 卖出时无可卖持仓 |
+| `"no position change needed"` | 目标持仓与当前持仓一致 |
+| `"unknown action"` | 未知订单动作 |
+| `"delisted"` | 退市强制清算 |
+| `"timeout"` | 订单过期（状态为 `expired`） |
 
 ## g — GlobalObject
 

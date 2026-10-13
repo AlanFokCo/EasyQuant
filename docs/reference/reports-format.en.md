@@ -11,7 +11,7 @@ For the return value of `result = run_backtest(...)` or `run_strategy`:
 ```python
 from eqlib import analyze_returns
 
-m = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
+m = analyze_returns(result, risk_free_rate=0.03)  # trading_days defaults to 244 (TRADING_DAYS_PER_YEAR)
 ```
 
 When `result["recorded_values"]` is insufficient to construct a daily NAV series, the function may return **`None`**, in which case some metrics will also be missing from the HTML report.

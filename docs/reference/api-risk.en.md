@@ -126,6 +126,7 @@ RiskThresholds(
     correlation_kill=0.85,      # Kill switch correlation
     single_stock_max=0.10,      # Max single-stock weight
     single_sector_max=0.30,     # Max single-sector weight
+    small_cap_max=0.20,         # Max small-cap weight (<5B CNY market cap)
     var_confidence=0.95,        # VaR confidence level
 )
 ```

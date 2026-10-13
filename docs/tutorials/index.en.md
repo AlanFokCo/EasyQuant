@@ -33,7 +33,8 @@ docs/tutorials/
 ├── 07-multi-factor.md      ← Multi-factor stock selection
 ├── 08-combined-strategy.md ← Combined strategy (All-Weather Alpha)
 ├── 09-param-optimization.md  ← Strategy parameter optimization and auditing
-└── 10-ashare-data-risk.md  ← A-share specific data and risk control
+├── 10-ashare-data-risk.md  ← A-share specific data and risk control
+└── 11-ml-selection.md      ← Machine learning stock selection (MLSelector, feature pipelines)
 ```
 
 ---
@@ -111,8 +112,9 @@ After completing these steps, continue with [Tutorial 01](01-first-strategy.md) 
 | 06 | [Sector Rotation Strategy](06-sector-rotation.md) | Sector rotation | Momentum scoring, equal-weight rebalancing, industry API | 20 min |
 | 07 | [Multi-Factor Stock Selection](07-multi-factor.md) | Factor selection | Z-score normalization, factor combination, IC testing | 25 min |
 | 08 | [All-Weather Alpha Combined Strategy](08-combined-strategy.md) | Combined strategy | Multi-factor + sector rotation + RSI/Bollinger/MACD + ATR stop-loss | 30 min |
-| 09 | [Strategy Parameter Optimization & Auditing](09-param-optimization.md) | Parameterization & tools | PARAMS, `optimizer.py`, audit logs, review checklist | 20 min |
+| 09 | [Strategy Parameter Optimization & Auditing](09-param-optimization.md) | Parameterization & tools | PARAMS, `optimizer.py`, rolling OOS validation, scientific validation, audit logs | 60 min |
 | 10 | [A-Share Data & Risk Control](10-ashare-data-risk.md) | A-share specific data | North-bound capital, margin trading, limit up/down, restricted share unlock, portfolio risk control | 25 min |
+| 11 | [Machine Learning Stock Selection](11-ml-selection.md) | ML selection | FeaturePipeline, MLSelector, model comparison, custom features | 25 min |
 
 ---
 
@@ -190,11 +192,12 @@ Suited for: Users who want to tune parameters via scripts or custom workflows wh
 | **Multi-Factor Selection** | [Tutorial 07](07-multi-factor.md) | [Example 17](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py), [Example 09](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution.py) |
 | **Combined Strategy (All-Weather Alpha)** | [Tutorial 08](08-combined-strategy.md) | [Example 20](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/20_all_weather_alpha/README.md) |
 | **Grid Trading** | — | [Example 18](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/18_grid_trading.py) |
-| **Support/Resistance** | — | [Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py), [Example 19](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) |
+| **Support/Resistance** | — | [Example 19](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) |
 | **Portfolio Backtesting** | [Tutorial 02 Section 8](02-backtesting.md#8-portfolio-backtesting) | [Example 11](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/11_portfolio_backtest.py) |
 | **Parameter Optimization & Auditing** | [Tutorial 09](09-param-optimization.md) | [agent/optimizer.py](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/optimizer.py), [agent/strategy_template.py](https://github.com/AlanFokCo/EasyQuant/blob/main/agent/strategy_template.py) |
 | **Paper Trading / Live Trading** | [Tutorial 04](04-live-trading.md) | [Example 12](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py) |
-| **A-Share Specific Data & Risk Control** | [Tutorial 10](10-ashare-data-risk.md) | — |
+| **A-Share Specific Data & Risk Control** | [Tutorial 10](10-ashare-data-risk.md) | [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py) |
+| **ML Stock Selection** | [Tutorial 11](11-ml-selection.md) | [Example 21](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/21_ml_selector.py), [Example 24](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/24_custom_features.py) |
 
 ---
 

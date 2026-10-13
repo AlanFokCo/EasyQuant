@@ -134,10 +134,11 @@ print(whitewine_df_sorted[['name', 'price', 'pct_change']].head())
 ```python
 from eqlib import get_industry
 
-# 查询工商银行的行业
-info = get_industry('601390')
+# 查询工商银行的所属行业
+info = get_industry('601398')
 print(info)
-# 输出：{'code': '601390', 'name': '工商银行', 'industry': '银行'}
+# 返回 dict，含 code / name / industry 三个键（取自数据提供商的最新个股资料）：
+# {'code': '601398', 'name': '工商银行', 'industry': '银行'}
 ```
 
 ### 3.4 查询行业历史价格
@@ -293,16 +294,16 @@ if __name__ == '__main__':
     )
 ```
 
-> **注意：** `get_industry_stocks()` 和 `get_industry_representative()` 需要实时网络访问。如果回测报错，请确保网络连通，或把行业代表股票改为手动固定列表（见下文）。
+> **注意：** `get_industry_stocks()` 返回的是数据提供商的**当前快照**，没有历史成分记录。2026-10 起，在回测会话内调用它会发出 `FutureWarning`；若设置了 `set_option('avoid_future_data', True)` 则直接抛出 `ValueError`。此外该接口需要实时网络访问。**回测请优先使用 §5.1 的固定股票池**，动态查询只适合研究环境和实盘。
 
-### 5.1 使用固定股票池（更稳定的回测方案）
+### 5.1 使用固定股票池（回测的推荐默认）
 
-当行业数据接口不稳定，或者希望使用确定的历史数据回测时，可以用固定股票池代替动态行业查询：
+行业的历史成分无从获取，动态查询只能拿到今天的快照。回测中的稳健做法是把每个行业的代表股写成模块级常量：
 
 ```python
 # 每个行业选 1-2 只代表性股票（模块级常量，引擎不会清除）
 INDUSTRY_STOCKS = {
-    '银行':   '601390',   # 工商银行
+    '银行':   '601398',   # 工商银行
     '白酒':   '600519',   # 贵州茅台
     '新能源': '300750',   # 宁德时代
     '医药':   '600276',   # 恒瑞医药
@@ -377,6 +378,8 @@ def score_industries_multi(context, industry_stocks):
 
 避免买入估值严重偏高的行业（泡沫风险）：
 
+> `get_valuation()` 也是快照接口：返回的是当前 PE/PB/市值，回测会话内调用同样会触发 `FutureWarning`（`set_option('avoid_future_data', True)` 下抛 `ValueError`）。历史估值无从获取，回测中要么接受这一近似并容忍告警，要么关闭估值过滤。
+
 ```python
 def score_industries_with_valuation(context, industry_stocks):
     """估值过滤：PE 超过 50 的行业不纳入候选。"""
@@ -443,9 +446,9 @@ print('预计年化手续费: %.0f 元 (%.2f%%)' % (
 
 ### 7.3 行业数据延迟
 
-`get_industry_stocks()` 返回的是当前快照数据，在回测时并不代表历史上该日期的数据。严格意义上，这引入了一定的未来信息。
+`get_industry_stocks()` 返回的是当前快照数据，不代表回测历史时点的行业成分——用它构建历史股票池会引入幸存者偏差。2026-10 起引擎对此有硬性防护：回测会话内调用快照类 API（`get_industry_stocks` / `get_concept_stocks` / `get_index_stocks` / `get_valuation` / `scan_market` 等）会发出 `FutureWarning`；开启 `set_option('avoid_future_data', True)` 后直接抛 `ValueError`。
 
-**应对方法：** 改用固定股票池（如上面的 `g.industry_stocks` 字典），用已知的代表股票替代动态行业查询，确保回测结果可靠。
+**应对方法：** 回测改用固定股票池（如上面的 `INDUSTRY_STOCKS` 字典），用已知的代表股票替代动态行业查询；动态查询留给研究环境和实盘。
 
 ---
 
@@ -525,6 +528,8 @@ if __name__ == '__main__':
     )
 ```
 
+> **注意：** `initialize` 里的 `get_index_stocks()` 也是快照查询——拿到的是**今天**的指数成分，不是回测起点的成分。回测会话内调用会发出 `FutureWarning`（`avoid_future_data` 开启时抛 `ValueError`）。要严格复现历史，把候选池改成固定的股票列表。
+
 相关参考示例：[Example 10: 指数与概念策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py)
 
 ---
@@ -536,7 +541,7 @@ if __name__ == '__main__':
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 在固定股票池内，用多个因子打分，选出最优标的
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优（轮动周期、持仓数量）、组合优化
 - **[Example 10: 指数与概念策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py)** — 指数成分股轮动的完整代码
-- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 多因子方法的完整代码
+- **[Example 17: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 多因子方法的完整代码
 
 ### 练习
 

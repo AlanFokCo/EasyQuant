@@ -48,7 +48,7 @@ hide:
 <section class="eql-section" markdown="off">
   <div class="eql-wrap">
     <div class="eql-stats eql-reveal">
-      <div class="eql-stat"><div class="eql-stat__num" data-eql-count="1423">0<span class="suffix">+</span></div><div class="eql-stat__lbl">单元测试<br>对抗性审查驱动</div></div>
+      <div class="eql-stat"><div class="eql-stat__num" data-eql-count="1400">0<span class="suffix">+</span></div><div class="eql-stat__lbl">单元测试<br>对抗性审查驱动</div></div>
       <div class="eql-stat"><div class="eql-stat__num" data-eql-count="25">0<span class="suffix">个</span></div><div class="eql-stat__lbl">实战示例<br>从入门到多策略组合</div></div>
       <div class="eql-stat"><div class="eql-stat__num" data-eql-count="26">0<span class="suffix">个</span></div><div class="eql-stat__lbl">数据接口 PIT 防护<br>会话内杜绝未来数据</div></div>
       <div class="eql-stat"><div class="eql-stat__num" data-eql-count="244">0<span class="suffix">日</span></div><div class="eql-stat__lbl">年化口径<br>贴合 A 股真实交易日</div></div>
@@ -116,7 +116,7 @@ hide:
         <div class="eql-sec-head eql-reveal">
           <div class="eql-sec-tag">Rigor</div>
           <h2 class="eql-sec-title">四道防线，<br>让结果经得起复核</h2>
-          <p class="eql-sec-sub">多数回测框架的"收益"死于细节。EasyQuant 把 A 股市场的每一条硬规则做成了默认行为，而不是可选项。</p>
+          <p class="eql-sec-sub">A 股市场的硬规则——交易所日历、涨跌停、T+1、费用——在 EasyQuant 里是默认行为，不是可选项。</p>
         </div>
         <div class="eql-rigor__list eql-reveal">
           <div class="eql-rigor__item">
@@ -130,7 +130,7 @@ hide:
             <span class="eql-rigor__no">Ⅱ</span>
             <div class="eql-rigor__body">
               <h4>PIT 数据契约</h4>
-              <p>26 个取数接口在回测会话内截断到 T-1 或发出告警；<code>avoid_future_data</code> 严格模式直接报错。未来函数，无处可藏。</p>
+              <p>26 个取数接口在回测会话内截断到 T-1 或发出告警；<code>avoid_future_data</code> 严格模式直接报错。</p>
             </div>
           </div>
           <div class="eql-rigor__item">
@@ -173,6 +173,7 @@ result = run_strategy(initialize,
     starting_cash=100000, securities=['601390'])
 
 # ✓ 成交受涨跌停/T+1/费用约束，无未来函数
+# 示例输出（演示数据，非收益承诺）：
 # 总收益 +21.88% · 夏普 0.33 · 最大回撤 −9.4%</div>
         </div>
       </div>
@@ -207,7 +208,7 @@ result = run_strategy(initialize,
 
 <section class="eql-cta eql-grain" markdown="off">
   <div class="eql-wrap eql-reveal">
-    <h2 class="eql-cta__title">你的第一个 A 股策略，<br>只差 <em>15 分钟</em>。</h2>
+    <h2 class="eql-cta__title">从安装到第一份回测报告，<br>约 <em>15 分钟</em>。</h2>
     <p class="eql-sub" style="text-align:center">从安装到产出第一份可信回测报告——教程、示例、API 参考全部就绪。</p>
     <div class="eql-cta-row" style="justify-content:center">
       <a class="eql-btn eql-btn--primary" href="tutorials/00-getting-started/">开始教程 →</a>

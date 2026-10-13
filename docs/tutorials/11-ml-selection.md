@@ -5,7 +5,8 @@
     | 项目 | 说明 |
     |------|------|
     | **目标** | 使用 MLSelector 替代手工权重，让模型自动学习因子权重与交互 |
-    | **前置** | [运行回测](02-backtesting.md)、[选股策略框架](../how-to/selection-strategy.md) |
+    | **预计用时** | 约 25 分钟 |
+    | **前置** | [回测验证](02-backtesting.md)、[选股策略框架](../how-to/selection-strategy.md) |
 
 ---
 
@@ -20,7 +21,7 @@ selector = MultiFactorSelector(
     factors={"pe": -0.4, "pb": -0.2, "pct_change": 0.4},
     top_n=5,
 )
-```n
+```
 **问题**：
 - 权重是作者凭经验手工调的，可能只适合特定市场环境
 - 因子之间的交互关系被忽略（如"动量 + 高波动"在不同 regime 下效果不同）
@@ -47,6 +48,8 @@ def initialize(context):
     context.universe = ['601390', '600519', '000858', '002594', '601398']
 
     # ML 选股器：自动学习因子权重
+    # target='past_return_5d' 以历史 5 日收益作为标签（默认）。
+    # 要做真正的未来收益预测，需通过 label_data 传入预计算标签面板。
     g.selector = MLSelector(
         model='random_forest',
         features=['rsi', 'macd_hist', 'atr', 'momentum', 'volatility'],
@@ -54,10 +57,11 @@ def initialize(context):
         top_n=3,
     )
 
+    before_trading_start(train_model)   # 注册盘前训练回调
     run_weekly(rebalance, day_of_week=0, time='every_bar')
 
-def before_trading_start(context):
-    # 每周重新训练模型（使用最新数据）
+def train_model(context, data=None):
+    # 每个交易日开盘前重新训练模型（使用最新数据）
     g.selector.train(context.universe, context)
 
 def rebalance(context):
@@ -163,7 +167,7 @@ def rebalance(context):
 你可以添加自己的特征函数：
 
 ```python
-from eqlib.ml import FeaturePipeline, MLSelector
+from eqlib.ml import MLSelector
 
 def price_to_ma_ratio(close, high, low, volume):
     """价格相对 20 日均线的偏离度"""
@@ -172,14 +176,11 @@ def price_to_ma_ratio(close, high, low, volume):
     ma20 = close.iloc[-20:].mean()
     return float(close.iloc[-1] / ma20 - 1.0)
 
-# 创建带有自定义特征的 Pipeline
+# 通过构造器直接传入自定义特征（内部会创建对应的 FeaturePipeline）
 g.selector = MLSelector(
     features=['rsi', 'momentum', 'price_ma_ratio'],
     target='past_return_5d',
     top_n=3,
-)
-g.selector.pipeline = FeaturePipeline(
-    features=['rsi', 'momentum', 'price_ma_ratio'],
     custom_features={'price_ma_ratio': price_to_ma_ratio},
 )
 ```
@@ -223,15 +224,19 @@ lr = MLSelector(model='logistic_regression', features=[...], top_n=3)
 ### 7.3 训练频率
 
 ```python
-# 方式一：每周重新训练（推荐）
-def before_trading_start(context):
+# 方式一：每个交易日开盘前重新训练（推荐）
+def train_model(context, data=None):
     g.selector.train(context.universe, context)
 
-# 方式二：每月重新训练
+# 在 initialize 中注册：before_trading_start(train_model)
+# 注意：不要把回调命名为 before_trading_start —— 那会遮蔽 eqlib 的注册函数，
+# 导致回调从未被注册，模型永远不训练。
+
+# 方式二：大约每月重新训练
 g.train_counter = 0
-def before_trading_start(context):
+def train_model(context, data=None):
     g.train_counter += 1
-    if g.train_counter % 4 == 0:  # 每 4 周训练一次
+    if g.train_counter % 20 == 0:  # 约每 20 个交易日
         g.selector.train(context.universe, context)
 ```
 

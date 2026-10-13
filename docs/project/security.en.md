@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | Yes                |
-| 0.1.x   | No                 |
+| 1.0.x   | Yes — current release line (see [Changelog](changelog.md)) |
+| 0.1.x   | No — never released as a stable line; P0 fixes shipped in 1.0.2 |
 
 ## Reporting a Vulnerability
 

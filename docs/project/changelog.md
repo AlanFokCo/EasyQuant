@@ -10,23 +10,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **移除 Web 策略工作室**（2026-10-10）— `web_strategy_studio/`（FastAPI 后端 + React 前端）已从仓库中移除，项目重新聚焦于核心回测库 `eqlib`。相关文档（使用指南、部署指南、FAQ 条目、首页入口与导航）已同步删除。
 
-### eqlib Core — Correctness (P0)
+### eqlib Core — 正确性（P0）
 
 #### Fixed
 
-- **Annualization basis unified to 244 trading days** — `TRADING_DAYS_PER_YEAR` (244, the A-share correct value) is now imported from `eqlib.constants` everywhere it was previously hardcoded as 252. Affected: `eqlib/scientific/statistics.py`, `eqlib/scientific/risk.py`, `eqlib/scientific/overfitting.py`, `eqlib/utils/stats.py` (`rolling_sharpe`, `downside_deviation`), `eqlib/attribution.py` (`_calc_alpha_beta` and `analyze_returns`). The same backtest now produces matching Sharpe ratios across all modules — previously the same daily returns could yield different annualized values depending on which code path computed them.
-- **OrderCost defaults updated to 2024 fee rates** — `eqlib/objects.py:OrderCost` now defaults to `close_tax=0.0005`, `open_commission=close_commission=0.00025`, aligning with `examples/_defaults.py:DEFAULT_ORDER_COST` and the 2023-08-28 stamp-duty cut. Cascaded to `eqlib/engine.py`, `eqlib/strategies/*.py`, `eqlib/examples/multi_factor_momentum.py`, `web_strategy_studio/backend/studio_api/routers/strategies.py`, `web_strategy_studio/backend/studio_api/data/templates.json`, `web_strategy_studio/backend/studio_api/data/eqlib_symbols.json`, `agent/strategy_template.py`. The historical 0.001 stamp duty is still applied automatically for dates before 2023-08-28 via the existing date-branch logic.
-- **MLSelector honest naming** — `target='forward_return_5d'` now raises `NotImplementedError` instead of silently computing past returns. The default target remains `past_return_5d` (backward-compatible) but its docstring explicitly warns that it uses historical returns as labels — not a true forward-looking model. For true forward-return prediction, users must supply `label_data` as a panel DataFrame.
-- **`MLSelector` constructor signature completed** — `label_data` and `custom_features` parameters are now exposed in the public API (previously only accessible via internals), enabling panel-label training and user-supplied feature functions.
-- **`walk_forward_analysis` is now a true rolling window** — Replaced the previous single-backtest-and-slice proxy with a real walk-forward loop: the `[start_date, end_date]` range is divided into multiple train/test windows that slide forward by `step` days. Each window runs a fresh backtest on the train segment (in-sample) and the test segment (out-of-sample), and per-window Sharpe / return / max-drawdown are aggregated into `oos_is_ratio` and `is_sharpe_decay`. The dict-input path (slicing a pre-computed equity curve) is retained for backward compatibility.
-- **Cornish-Fisher VaR** — `eqlib/utils/stats.py:value_at_risk` and `eqlib/scientific/risk.py:value_at_risk` now accept `method='cornish_fisher'`, adjusting the parametric (normal) VaR for sample skew and excess kurtosis. Better suited for A-share daily returns, which are typically negatively skewed and heavy-tailed — plain `parametric` tends to underestimate tail risk.
-- **Statistical ddof consistency** — `eqlib/scientific/risk.py` now uses `ddof=1` (sample standard deviation) everywhere, matching `eqlib/attribution.py` and `eqlib/scientific/statistics.py`. Previously a few code paths used `ddof=0`, producing slightly different Sharpe/Sortino values for the same input series.
-- **`examples/18_grid_trading.py` fixed** — Original grid strategy generated 0 trades over the test period (MDD 97.4%). Rewrote `market_open` with level-crossing trigger logic (buy when price crosses DOWN to a lower grid level, sell when it crosses UP to a higher level), reduced grid levels from 10 to 8, shortened range lookback from 60 to 30 days, and added a 5% rebuild threshold to refresh the grid when the price range drifts. New result: 146 trades, MDD -19%, win rate 71.9%.
-- **Examples 21-24 normalized** — ML examples now use `examples._defaults` for trading costs and dates (instead of hardcoded values), removed `sys.path.insert(0, '.')` (provided by `pip install -e .`), and added module-level docstrings with number / title / teaching objectives / run command. Example 21 changed `target='forward_return_5d'` → `past_return_5d` to align with the honest naming above.
+- **年化口径统一为 244 个交易日** — `TRADING_DAYS_PER_YEAR`（244，A 股实际值）现在从 `eqlib.constants` 统一导入，替代原先各处硬编码的 252。涉及：`eqlib/scientific/statistics.py`、`eqlib/scientific/risk.py`、`eqlib/scientific/overfitting.py`、`eqlib/utils/stats.py`（`rolling_sharpe`、`downside_deviation`）、`eqlib/attribution.py`（`_calc_alpha_beta` 与 `analyze_returns`）。同一次回测现在各模块算出的夏普比率一致——此前同一段日收益在不同代码路径下会得出不同的年化值。
+- **OrderCost 默认费率更新** — `eqlib/objects.py:OrderCost` 佣金默认改为 `open_commission=close_commission=0.00025`，与 `examples/_defaults.py:DEFAULT_ORDER_COST` 及 2023-08-28 印花税下调后的费率对齐。`close_tax` 显式默认仍为 `None`：未配置时按法定印花税率日期感知（2023-08-28 起 0.05%，此前 0.1%）；`examples/_defaults.py` 固定的 0.0005 适用于 2023-08-28 之后的回测区间。
+- **MLSelector 诚实命名** — `target='forward_return_5d'` 现在抛出 `NotImplementedError`，不再静默改用过去收益计算。默认 target 仍为 `past_return_5d`（向后兼容），但 docstring 明确警告它用的是历史收益作为标签，不是真正的前向预测。要做真正的前向收益预测，须通过 `label_data` 传入面板 DataFrame。
+- **`MLSelector` 构造函数签名补全** — `label_data` 与 `custom_features` 参数进入公开 API（此前只能走内部属性），支持面板标签训练与用户自定义特征函数。
+- **`walk_forward_analysis` 改为真滚动窗口** — 替换原先的"单次回测 + 切片"近似：将 `[start_date, end_date]` 划分为多个训练/测试窗口，按 `step` 天向前滑动。每个窗口在训练段（样本内）与测试段（样本外）各跑一次独立回测，逐窗口的夏普 / 收益 / 最大回撤聚合为 `oos_is_ratio` 与 `is_sharpe_decay`。dict 输入路径（切片已有净值曲线）保留以兼容旧代码。
+- **Cornish-Fisher VaR** — `eqlib/utils/stats.py:value_at_risk` 与 `eqlib/scientific/risk.py:value_at_risk` 新增 `method='cornish_fisher'`，在参数法（正态）VaR 上按样本偏度与超额峰度修正。更贴合 A 股日收益通常负偏、厚尾的特征——普通 `parametric` 容易低估尾部风险。
+- **统计 ddof 一致性** — `eqlib/scientific/risk.py` 现在统一使用 `ddof=1`（样本标准差），与 `eqlib/attribution.py`、`eqlib/scientific/statistics.py` 对齐。此前个别代码路径使用 `ddof=0`，同一输入序列会算出略不同的 Sharpe/Sortino。
+- **修复 `examples/18_grid_trading.py`** — 原网格策略在测试区间 0 笔成交（MDD 97.4%）。重写 `market_open` 为价位穿越触发逻辑（价格向下穿越网格线买入、向上穿越卖出），网格层数 10 → 8，区间回看 60 → 30 天，新增 5% 重建阈值在价格区间漂移时刷新网格。新结果：146 笔成交，MDD -19%，胜率 71.9%。
+- **示例 21-24 规范化** — ML 示例改用 `examples._defaults` 的交易成本与日期（不再硬编码），移除 `sys.path.insert(0, '.')`（由 `pip install -e .` 提供），补上模块级 docstring（编号 / 标题 / 教学目标 / 运行命令）。示例 21 将 `target='forward_return_5d'` 改为 `past_return_5d`，与上面的诚实命名对齐。
 
-### eqlib Core — Market Rules & Data Honesty（2026-10 审查修复轮）
+### eqlib Core — 市场规则与数据口径（2026-10 修复轮）
 
-本轮修复源自一次覆盖用法、能力、体验、可靠性、准确性的全面对抗性审查（含独立 evaluator 复核）。以下变更会让旧回测结果发生变化，均如实标注。
+以下变更会让旧回测结果发生变化，均如实标注。
+
+#### Added
+
+- **通知函数提升为顶层 API** — `set_notification_webhook` / `enable_notification` / `notify_signal` 现在可直接 `from eqlib import ...`（此前须从 `eqlib.engine` / `eqlib.notification` 深路径导入）。
 
 #### Changed（⚠️ breaking）
 
@@ -60,25 +64,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Security
 
-- **Real JWT authentication** — `studio_api/auth.py:get_current_user` now validates JWT bearer tokens (or short-lived SSE query tokens), looks up the user in the database, checks `is_active`, and verifies session revocation via `UserSession`. Previously the function was a stub that always returned a demo user, defeating the protected routes.
-- **`ensure_admin_user` sets `role=ROLE_ADMIN`** — Admin user created on startup now actually has admin privileges. Also refuses to start without `EQ_ADMIN_PASSWORD` unless `EQ_STUDIO_TESTING=1`.
+- **真正的 JWT 鉴权** — `studio_api/auth.py:get_current_user` 现在校验 JWT bearer token（或短期 SSE query token）、查库确认用户、检查 `is_active`，并通过 `UserSession` 校验会话是否已吊销。此前该函数是始终返回演示用户的桩代码，受保护路由形同虚设。
+- **`ensure_admin_user` 设置 `role=ROLE_ADMIN`** — 启动时创建的管理员用户现在真正拥有管理员权限；未设置 `EQ_ADMIN_PASSWORD` 时拒绝启动（`EQ_STUDIO_TESTING=1` 除外）。
 
-### Documentation
+### 文档
 
 #### Added
 
-- Tutorial 11 (ML Selection) — both `docs/tutorials/11-ml-selection.md` and `.en.md` now use the 2024 fee rates.
-- `docs/reference/api-ml.md` — `MLSelector` constructor signature now shows `label_data` and `custom_features`; new sections for `check_feature_drift` and `auto_tune_selector`.
-- `docs/reference/api-scientific.md` — `walk_forward_analysis` documented with the new true rolling-window behavior, including return values (`oos_is_ratio`, `is_sharpe_decay`, per-window `train_start/end` / `test_start/end`).
-- `docs/reference/api-risk.md` — Cornish-Fisher VaR method documented.
-- `docs/tutorials/index.md` and `.en.md` — fixed stale "Example N" numbering that did not match the actual file names.
+- 教程 11（ML 选股）— `docs/tutorials/11-ml-selection.md` 与 `.en.md` 均改用 2024 费率。
+- `docs/reference/api-ml.md` — `MLSelector` 构造函数签名补上 `label_data` 与 `custom_features`；新增 `check_feature_drift` 与 `auto_tune_selector` 小节。
+- `docs/reference/api-scientific.md` — `walk_forward_analysis` 按真滚动窗口行为重新记录，含返回值（`oos_is_ratio`、`is_sharpe_decay`、逐窗口 `train_start/end` / `test_start/end`）。
+- `docs/reference/api-risk.md` — 记录 Cornish-Fisher VaR 方法。
+- `docs/tutorials/index.md` 与 `.en.md` — 修复与实际文件名不符的旧 "Example N" 编号。
 
 ### CI/CD
 
 #### Fixed
 
-- `doc-sync.yml` now installs docs extras via `pip install -e ".[docs]"` instead of a hardcoded package list — `mkdocs-git-revision-date-localized-plugin` was missing, causing `mkdocs build --strict` to fail.
-- Studio Tests Backend (Python 3.10/3.11), Studio Tests Frontend, and Doc Sync Check workflows all pass.
+- `doc-sync.yml` 改用 `pip install -e ".[docs]"` 安装文档依赖，替代硬编码包列表——此前缺少 `mkdocs-git-revision-date-localized-plugin`，导致 `mkdocs build --strict` 失败。
+- Studio Tests Backend（Python 3.10/3.11）、Studio Tests Frontend 与 Doc Sync Check 工作流全部通过。
 
 ---
 
@@ -239,7 +243,7 @@ in practice.
   out-of-sample validation framework.
 - `StrategyConfig.use_local` field — promotes `use_local` from a hardcoded
   `True` to a user-configurable parameter in `run_portfolio_backtest`.
-- Glossary page (`docs/glossary.md`) added to documentation site.
+- Glossary page added to the documentation site (now at `docs/explanation/glossary.md`).
 - `tools/profiling/` directory for performance benchmarking scripts (moved
   from `examples/21_combined_strategy/`).
 
@@ -316,13 +320,14 @@ in practice.
 
 ### Documentation
 
-- M10: mkdocs nav now points to the split-by-chapter user guide
-  (`doc/user_guide/index.md`); the old single-page version is still
-  accessible but no longer in the top nav.
+- M10: mkdocs nav now points to the split-by-chapter user guide (since
+  restructured into `docs/tutorials/` and `docs/how-to/`); the old
+  single-page version is still accessible but no longer in the top nav.
 - M11: CHANGELOG, CONTRIBUTING, and SECURITY added to the nav under
   "项目动态 / Project Updates".
-- E6: `doc/utils_reference.md` added to the API reference section of the nav.
-- E9: Glossary page added (`docs/glossary.md`).
+- E6: utils reference page added to the API reference section of the nav
+  (now at `docs/reference/utils.md`).
+- E9: Glossary page added (now at `docs/explanation/glossary.md`).
 
 ### Risk Disclosures Added
 
@@ -334,14 +339,15 @@ in practice.
 
 ## [0.1.1] — 2025-07 (P0 patch)
 
-See [Unreleased] section for the full list.  This will be tagged once all
-P0 backtest correctness fixes are merged.
+未正式发布。计划中 0.1.x 线上的 P0 回测正确性修复最终随 [1.0.2] 一起发布（见上文）。
 
 ---
 
 ## [0.1.0] — 2025-05
 
 Initial release.
+
+> 示例编号后来重组过，下列路径已按当前 `examples/` 目录对应到新编号。
 
 ### Added
 
@@ -353,10 +359,10 @@ Initial release.
 - PTrade/QMT adapter for live deployment
 - Comprehensive test suite
 - Dual index charts (CSI300 + SSE) in HTML backtest reports
-- Support/Resistance strategy (`examples/20_sr_strategy/`)
+- Support/Resistance strategy (`examples/19_sr_portfolio/`)
 - Stock selection strategy (`examples/22_stock_selection_strategy.py`)
-- Local data backtest (`examples/19_local_data_backtest.py`) with CSV cache
-- Portfolio backtesting with equal-weight rebalancing (`examples/12_portfolio_backtest.py`)
+- Local data backtest (`examples/06_local_data.py`) with CSV cache
+- Portfolio backtesting with equal-weight rebalancing (`examples/11_portfolio_backtest.py`)
 - Brinson attribution and factor analysis
 - HTML report with interactive charts via Lightweight Charts
 - MkDocs documentation site with CI/CD via GitHub Pages

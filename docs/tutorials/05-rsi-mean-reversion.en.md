@@ -94,7 +94,7 @@ from eqlib import attribute_history
 from eqlib import utils
 
 # Get historical closing prices (at least N + 10 bars for stable calculation)
-hist = attribute_history('601390', 30, '1d', ['close'])
+hist = attribute_history('601398', 30, '1d', ['close'])
 close_prices = hist['close']
 
 # Calculate 14-day RSI
@@ -132,7 +132,7 @@ from eqlib import *
 from eqlib import utils
 
 # ========== Strategy parameters (module-level constants, not cleared by engine) ==========
-SECURITY       = '601390'   # Target: ICBC
+SECURITY       = '601398'   # Target: ICBC
 RSI_PERIOD     = 14         # RSI calculation period
 RSI_OVERSOLD   = 30         # Oversold threshold
 RSI_OVERBOUGHT = 70         # Overbought threshold
@@ -172,7 +172,7 @@ def market_open(context):
     if current_rsi < RSI_OVERSOLD:
         if security not in context.portfolio.positions or \
            context.portfolio.positions[security].amount == 0:
-            order_value(security, context.portfolio.available_cash)
+            order_value(security, context.portfolio.available_cash * 0.95)
             log.info('BUY %s @ %.3f, RSI=%.1f (oversold)' % (
                 security, current_price, current_rsi))
 
@@ -199,7 +199,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=100000,
         benchmark='000300.XSHG',
-        securities=['601390'],
+        securities=['601398'],
         report_dir='reports',
     )
 ```
@@ -257,16 +257,16 @@ def market_open(context):
 rsi_prev = rsi_series.iloc[-2]   # Previous day's RSI
 
 # RSI was below 30 and is now starting to recover -> more reliable buy signal
-if current_rsi < g.rsi_oversold and current_rsi > rsi_prev:
+if current_rsi < RSI_OVERSOLD and current_rsi > rsi_prev:
     # Bottom confirmed: RSI recovering from oversold
-    order_value(security, context.portfolio.available_cash)
+    order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 5.4 Volume Confirmation
 
 ```python
 # Oversold + shrinking volume -> may signal the end of selling pressure
-hist = attribute_history(security, g.bars_needed, '1d', ['close', 'volume'])
+hist = attribute_history(security, BARS_NEEDED, '1d', ['close', 'volume'])
 close_prices = hist['close']
 volumes = hist['volume']
 
@@ -274,8 +274,8 @@ avg_vol = volumes.tail(20).mean()
 current_vol = volumes.iloc[-1]
 
 # Buy condition: RSI oversold + volume below average (selling pressure has weakened)
-if current_rsi < g.rsi_oversold and current_vol < avg_vol * 0.8:
-    order_value(security, context.portfolio.available_cash)
+if current_rsi < RSI_OVERSOLD and current_vol < avg_vol * 0.8:
+    order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 5.5 Complete Version with Risk Controls
@@ -285,7 +285,7 @@ from eqlib import *
 from eqlib import utils
 
 # Module-level constants (not cleared by engine)
-SECURITY       = '601390'
+SECURITY       = '601398'
 RSI_PERIOD     = 14
 RSI_OVERSOLD   = 30
 RSI_OVERBOUGHT = 70
@@ -349,7 +349,7 @@ def market_open(context):
             market_bullish and
             current_vol < avg_vol * 1.2 and   # Not heavy-volume decline
             not in_position):
-        order_value(security, context.portfolio.available_cash)
+        order_value(security, context.portfolio.available_cash * 0.95)
         log.info('BUY %s @ %.3f, RSI=%.1f->%.1f' % (
             security, current_price, prev_rsi, current_rsi))
         record(price=current_price, rsi=current_rsi, signal='BUY')
@@ -372,7 +372,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=100000,
         benchmark='000300.XSHG',
-        securities=['601390'],
+        securities=['601398'],
         report_dir='reports',
     )
 ```
@@ -395,8 +395,9 @@ A single-stock RSI strategy is limited by that stock's price movement. Extending
 from eqlib import *
 from eqlib import utils
 
-g.securities = [
-    '601390',  # ICBC (Banking)
+# ========== Strategy parameters (module-level constants, not cleared by engine) ==========
+SECURITIES = [
+    '601398',  # ICBC (Banking)
     '600519',  # Kweichow Moutai (Consumer)
     '000858',  # Wuliangye (Consumer)
     '600036',  # China Merchants Bank (Banking)
@@ -406,13 +407,20 @@ g.securities = [
     '000651',  # Gree Electric (Home Appliances)
 ]
 
-g.rsi_period     = 14
-g.rsi_oversold   = 30
-g.rsi_overbought = 70
-g.position_pct   = 0.25   # Each stock uses at most 25% of available cash
+RSI_PERIOD     = 14
+RSI_OVERSOLD   = 30
+RSI_OVERBOUGHT = 70
+POSITION_PCT   = 0.25   # Each stock uses at most 25% of available cash
 
 
 def initialize(context):
+    # The engine clears g before initialize; attach runtime parameters to g here
+    g.securities     = SECURITIES
+    g.rsi_period     = RSI_PERIOD
+    g.rsi_oversold   = RSI_OVERSOLD
+    g.rsi_overbought = RSI_OVERBOUGHT
+    g.position_pct   = POSITION_PCT
+
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0, close_tax=0.0005,
@@ -458,7 +466,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=200000,
         benchmark='000300.XSHG',
-        securities=g.securities,
+        securities=SECURITIES,
         report_dir='reports',
     )
 ```
@@ -525,7 +533,7 @@ current_price = close_prices.iloc[-1]
 
 # RSI oversold + price touching Bollinger lower band -> dual confirmation
 if rsi_val < 30 and current_price <= lower.iloc[-1]:
-    order_value(security, context.portfolio.available_cash)
+    order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ---
@@ -541,7 +549,7 @@ After mastering the RSI mean reversion strategy, you can continue learning:
 
 ### Exercises
 
-1. Change `g.rsi_oversold = 25` and observe the impact on trading frequency and returns
+1. Change `RSI_OVERSOLD = 25` and observe the impact on trading frequency and returns
 2. Change the market filter threshold from MA20 to MA60 (longer-term trend judgment) and observe the effect
 3. Compare backtest results with and without a stop-loss to quantify the stop-loss impact
 4. Try backtesting separately in 2022 (bear market) and 2024 (range-bound market) to compare performance across market environments

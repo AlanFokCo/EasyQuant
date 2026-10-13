@@ -41,7 +41,7 @@
 - **鲁棒性**：在牛市、熊市、震荡市都能有效运行，不依赖单一市场环境
 - **多维度**：同时利用基本面（因子得分）、技术面（RSI / MACD / 布林带）和结构面（支撑阻力位）
 - **风险可控**：多层止损（硬止损 + ATR 追踪止损），严格的仓位上限
-- **可解释性**：每一个买卖决策都有可追溯的量化依据
+- **可解释性**：每笔交易在日志中记录触发的信号（因子得分、RSI、止损价），可逐条复盘
 
 ### 1.2 策略架构
 
@@ -237,7 +237,7 @@ final_score = factor_score + 0.10 × sector_z_score
 多因子模型确定了"应该持有哪些股票"，但不告诉我们"什么时候买入最合适"。
 技术指标负责这个"精确入场时机"的工作。
 
-### 4.1 RSI 均值回归入场（Tutorial 06: RSI 均值回归）
+### 4.1 RSI 均值回归入场（Tutorial 05: RSI 均值回归）
 
 **公式：**
 ```
@@ -258,7 +258,7 @@ rsi_series = utils.rsi(close, period=14)
 oversold   = rsi_series.iloc[-1] < 35
 ```
 
-### 4.2 布林带均值回归（Example 14）
+### 4.2 布林带均值回归（Example 15）
 
 **公式：**
 ```
@@ -277,7 +277,7 @@ buy_signal  = price <= bb_lower.iloc[-1]
 sell_signal = price >= bb_upper.iloc[-1] and rsi >= 65
 ```
 
-### 4.3 MACD 趋势确认（Example 15）
+### 4.3 MACD 趋势确认（Example 16）
 
 **公式：**
 ```
@@ -324,7 +324,7 @@ current_atr   = atr_values.iloc[-1]
 trailing_stop = highest_since_buy - 2.5 * current_atr
 ```
 
-### 4.5 支撑阻力位确认（Example 20）
+### 4.5 支撑阻力位确认（Example 19）
 
 支撑阻力位通过识别历史价格中的摆动高低点聚类得到：
 
@@ -350,7 +350,7 @@ dist_to_support = (price − nearest_support) / price < 2.5%
 dist_to_resistance = (nearest_resistance − price) / price < 2.5%
 ```
 
-### 4.6 成交量确认（Example 15）
+### 4.6 成交量确认（Example 16）
 
 **公式：**
 ```
@@ -360,10 +360,10 @@ vol_ratio = current_volume / mean(volume[-20:])
 **确认条件：** `vol_ratio ≥ 1.2`
 
 **逻辑：** 价格下跌到支撑位，同时成交量扩大，说明有资金在接盘，
-下跌可能即将结束。Example 15 使用 1.5× 阈值；本策略使用 1.2× 阈值
+下跌可能即将结束。Example 16 使用 1.5× 阈值；本策略使用 1.2× 阈值
 （稍宽松，因为已经有多个其他条件把关）。
 
-### 4.7 唐奇安通道（Example 20）
+### 4.7 唐奇安通道（Example 19）
 
 **公式：**
 ```
@@ -426,12 +426,12 @@ per_stock_value = min(
 
 ## 6. 生命周期回调集成
 
-参考 [Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)，策略注册了两个生命周期回调。
+参考 [Example 07](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)，策略注册了两个生命周期回调。
 
 ### 6.1 开盘前（before_trading_start）
 
 ```python
-def _before_market_open(context):
+def _before_market_open(context, data=None):
     # 记录当前持仓状态
     log.info("PRE-MARKET | total=%.2f | cash=%.2f | positions=%d"
              % (...))
@@ -464,69 +464,82 @@ def _after_market_close(context):
 
 除了个股层面的止损和仓位控制，综合策略还需要在**组合层面**进行风险监控。`PortfolioRiskMonitor` 提供了一站式的组合风险仪表盘，覆盖集中度、波动率、回撤等关键维度。
 
-### 7.1 初始化与每日检查
+### 7.1 回测后的组合体检
 
-在 `initialize` 中创建监控实例，在 `before_trading_start` 回调中执行每日检查：
+`PortfolioRiskMonitor` 不读取实盘持仓，它消费的是**回测结果**：对每个子策略（或同一策略的不同参数组）跑一次 `run_backtest()`，把返回的 result dict 喂给监控器，再由 `daily_check()` 输出一份 `RiskReport`。
 
 ```python
-from eqlib import PortfolioRiskMonitor
+from eqlib import PortfolioRiskMonitor, RiskThresholds, run_backtest
 
-def initialize(context):
-    # ... 其他初始化代码 ...
-    context.risk_monitor = PortfolioRiskMonitor(
-        max_single_weight=0.20,    # 单股最大权重 20%
-        max_sector_weight=0.40,    # 单行业最大权重 40%
-        max_drawdown_threshold=0.15,  # 回撤预警阈值 15%
-    )
+# 阈值全部可配；下面列出的就是默认值
+thresholds = RiskThresholds(
+    max_drawdown_yellow=0.15,   # 回撤 ≥ 15% → 黄色预警
+    max_drawdown_red=0.20,      # 回撤 ≥ 20% → 红色预警
+    max_drawdown_kill=0.25,     # 回撤 ≥ 25% → 熔断
+    correlation_yellow=0.60,    # 策略相关性预警阈值
+    correlation_red=0.75,
+    correlation_kill=0.85,
+    single_stock_max=0.10,      # 单股最大占比
+    single_sector_max=0.30,     # 单板块最大占比
+    small_cap_max=0.20,         # 微盘股（市值 < 50 亿）最大占比
+    var_confidence=0.95,        # VaR 置信水平
+)
+monitor = PortfolioRiskMonitor(thresholds=thresholds)   # 不传 thresholds 即全默认
 
+# 每个策略跑一次回测，再把结果注册进监控器
+result = run_backtest(initialize, start_date="2022-01-01",
+                      end_date="2024-12-31", starting_cash=500_000)
+monitor.add_strategy("全天候Alpha", result)   # result 必须含 recorded_values，否则 ValueError
 
-def _before_market_open(context):
-    # 每日风控检查（开盘前执行）
-    report = context.risk_monitor.daily_check(context.portfolio)
-
-    if report['alerts']:
-        for alert in report['alerts']:
-            log.warning("RISK ALERT: %s" % alert)
-
-    # 如果回撤超过阈值，暂停当日买入
-    if report.get('drawdown_breached'):
-        context.pause_buying = True
-        log.warning("Drawdown %.2f%% exceeded threshold, pausing buys"
-                     % (report['current_drawdown'] * 100))
-    else:
-        context.pause_buying = False
+report = monitor.daily_check()
+print(report.alert_level)      # AlertLevel.YELLOW / RED / KILL_SWITCH
+print(report.triggers)         # 触发的预警列表
+print(report.recommendations)  # 建议操作列表
 ```
+
+| `RiskReport` 字段 | 含义 |
+|------------------|------|
+| `alert_level` | `AlertLevel` 枚举：无触发时也是 `YELLOW` 起步，触发阈值后升级为 `RED` / `KILL_SWITCH` |
+| `triggers` | 触发的预警信息（回撤、相关性、集中度、regime） |
+| `portfolio_var` / `portfolio_var_pct` | 组合 VaR（金额 / 百分比，历史模拟法，需 ≥ 30 天日收益） |
+| `correlation_matrix` | 策略间日收益相关性矩阵（策略数 < 2 时为 None） |
+| `concentration` | 持仓集中度（单股 / 单板块 / 微盘股占比） |
+| `regime` | 市场状态：`bull` / `bear` / `oscillation` / `unknown` |
+
+`add_strategy()` 之间互相独立：把 Tutorial 05/06/07 的策略各跑一次回测加进来，`daily_check()` 才能算出有意义的策略相关性——单一策略时相关性矩阵为空。完整的 VaR、集中度、熔断（`check_kill_switch`）用法见 [Tutorial 10 第 6–7 节](10-ashare-data-risk.md#6-组合风控portfolioriskmonitor)；实盘里用 `before_trading_start` 做盘前检查的写法见 [Tutorial 10 §7.4](10-ashare-data-risk.md#74-在实盘中集成风控)。
 
 ### 7.2 北向资金体制信号
 
 北向资金流向可作为组合层面的**体制信号**（regime signal），在 `before_trading_start` 中判断当前市场情绪，动态调整仓位上限：
 
 ```python
+from datetime import timedelta
 from eqlib import get_north_money_flow
 
 def _check_north_regime(context):
     """
-    北向资金体制信号：根据近 5 日净流入判断市场情绪体制。
+    北向资金体制信号：根据近 5 日净买入判断市场情绪体制。
 
     返回:
         str: 'risk_on'（乐观）, 'neutral'（中性）, 'risk_off'（悲观）
     """
-    df = get_north_money_flow(days=5)
+    end_dt = context.current_dt.date()
+    start_dt = end_dt - timedelta(days=45)   # 多取几天，覆盖节假日
+    df = get_north_money_flow(start_date=start_dt, end_date=end_dt)
     if df is None or df.empty:
         return 'neutral'
 
-    net_5d = df['north_net'].sum()        # 5 日累计净流入（亿元）
-    avg_daily = net_5d / len(df)
+    net_5d = df["net_buy"].tail(5).sum()  # 近 5 日累计净买入（亿元）
 
-    if avg_daily > 20:                    # 日均净流入 > 20 亿
+    if net_5d > 50:
         return 'risk_on'
-    elif avg_daily < -20:                 # 日均净流出 > 20 亿
+    elif net_5d < -50:
         return 'risk_off'
     else:
         return 'neutral'
 
 
-def _before_market_open(context):
+def _before_market_open(context, data=None):
     # ... 其他检查 ...
 
     regime = _check_north_regime(context)
@@ -540,6 +553,8 @@ def _before_market_open(context):
     }
     context.max_position_pct = regime_caps.get(regime, 0.8)
 ```
+
+`get_north_money_flow()` 返回列为 `date / net_buy / total_buy / total_sell`（单位：亿元）。回测会话内请求区间会被自动截断到模拟时钟（决策回调内为 T-1），不会引入未来数据；完整 API 说明见 [Tutorial 10 §2](10-ashare-data-risk.md#2-北向资金流向)。`combined_strategy.py` 用的正是上面的写法（阈值 50 亿）。
 
 将北向资金体制信号与 `PortfolioRiskMonitor` 结合使用，可以在综合策略中实现**自上而下**的风控：先判断市场环境（体制信号），再监控组合健康度（风险仪表盘），最后才到个股的买卖信号。
 
@@ -618,9 +633,9 @@ initialize(context)                    # 策略入口（必须有）
 python examples/20_all_weather_alpha/run_backtest.py
 ```
 
-**回测参数：**
-- 时间段：2022-01-01 至 2024-12-31（3 年）
-- 初始资金：¥500,000
+**回测参数（默认值，均可用命令行参数覆盖）：**
+- 时间段：`examples/_defaults.py` 的相对日期——结束日为 30 天前，开始日为再往前 3 年（`--start` / `--end` 覆盖）
+- 初始资金：¥500,000（`--cash` 覆盖）
 - 基准：沪深 300（000300.XSHG）
 - 股票池：12 只（8 个行业）
 
@@ -636,28 +651,30 @@ python examples/20_all_weather_alpha/run_backtest.py
 # run_backtest.py 核心片段
 
 import sys, os
-sys.path.insert(0, ".")                          # 项目根目录
-sys.path.insert(0, "examples/21_combined_strategy")  # 策略所在目录
+sys.path.insert(0, ".")                              # 项目根目录
+sys.path.insert(0, "examples/20_all_weather_alpha")  # 策略所在目录
 
 from combined_strategy import initialize, STOCK_POOL
 from eqlib import run_strategy, analyze_returns
+from examples._defaults import START_DATE, END_DATE
 
 result = run_strategy(
     initialize_func=initialize,     # 策略入口函数
-    start_date="2022-01-01",
-    end_date="2024-12-31",
+    start_date=START_DATE,          # 默认：3 年前的相对日期
+    end_date=END_DATE,              # 默认：30 天前
     starting_cash=500_000,
     benchmark="000300.XSHG",
     securities=STOCK_POOL,          # 预加载数据，加快回测速度
-    report_dir="reports",
 )
 
 # 绩效分析
 metrics = analyze_returns(result, risk_free_rate=0.03)
 print("Sharpe ratio : %.4f" % metrics["sharpe_ratio"])
 print("Max drawdown : %.2f%%" % (metrics["max_drawdown"] * 100))
-print("Win rate     : %.2f%%" % (metrics["win_rate"] * 100))
+print("Win rate     : %.2f%%" % (metrics["win_rate_trade"] * 100))
 ```
+
+`win_rate_trade` 按 FIFO 配对买卖、以**扣除双边佣金与印花税后的净盈亏**判定胜负；`analyze_returns` 另有 `win_rate_daily`（盈利交易日占比）。未设置基准时 `alpha` / `beta` 为 `NaN`，报告中显示为 N/A。
 
 ### 9.3 回测结果解读指南
 
@@ -712,16 +729,16 @@ python examples/20_all_weather_alpha/run_paper_trade.py \
 
 ### 10.3 部署到 PTrade/QMT
 
-参考 [Tutorial 05: 模拟盘到实盘](04-live-trading.md) 和 [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py)，
-可以将本策略导出为 PTrade/QMT 格式：
+参考 [Tutorial 04: 模拟盘到实盘](04-live-trading.md) 和 [Example 12](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py)，
+可以将本策略导出为 PTrade/QMT 格式。`export_ptrade_script` 接收的是策略**文件路径**（需包含 `initialize(context)`），不是函数对象：
 
 ```python
 from eqlib.ptrade_adapter import export_ptrade_script
 
 # 生成 QMT 可运行的策略文件
 export_ptrade_script(
-    initialize_func=initialize,
-    output_path="combined_strategy_qmt.py",
+    strategy_file="examples/20_all_weather_alpha/combined_strategy.py",
+    output_file="combined_strategy_qmt.py",
 )
 ```
 
@@ -824,18 +841,18 @@ position_pct = min(kelly_f * 0.5, g.max_single_pct)
 
 | 教程 | 相关内容 |
 |------|---------|
-| [Tutorial 06: RSI 均值回归](05-rsi-mean-reversion.md) | RSI 原理、布林带对比 |
-| [Tutorial 07: 行业轮动](06-sector-rotation.md) | 动量轮动、多维度行业评分 |
-| [Tutorial 08: 多因子选股](07-multi-factor.md) | Z-Score 标准化、IC 检验 |
+| [Tutorial 05: RSI 均值回归](05-rsi-mean-reversion.md) | RSI 原理、布林带对比 |
+| [Tutorial 06: 行业轮动](06-sector-rotation.md) | 动量轮动、多维度行业评分 |
+| [Tutorial 07: 多因子选股](07-multi-factor.md) | Z-Score 标准化、IC 检验 |
 | [Tutorial 03: 策略优化与改进](03-optimization.md) | 大盘过滤、止损设计 |
 
 | 示例 | 相关代码 |
 |------|---------|
-| [Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) | Bollinger 均值回归 |
-| [Example 15: MACD 策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_macd_volume.py) | MACD+成交量+ATR |
-| [Example 16: 多因子策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py) | 动量+成交量选股 |
-| [Example 20: 支撑阻力策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) | S/R+MACD+ATR 完整案例 |
-| [Example 11: 工具库](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py) | 所有技术指标演示 |
+| [Example 15: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) | Bollinger 均值回归 |
+| [Example 16: MACD 策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/16_macd_volume.py) | MACD+成交量+ATR |
+| [Example 17: 多因子策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py) | 动量+成交量选股 |
+| [Example 19: 支撑阻力策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md) | S/R+MACD+ATR 完整案例 |
+| [Example 08: 工具库](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/08_utils_library.py) | 所有技术指标演示 |
 
 ---
 

@@ -49,7 +49,7 @@ hide:
 <section class="eql-section" markdown="off">
   <div class="eql-wrap">
     <div class="eql-stats eql-reveal">
-      <div class="eql-stat"><div class="eql-stat__num" data-eql-count="1423">0<span class="suffix">+</span></div><div class="eql-stat__lbl">unit tests<br>driven by adversarial audits</div></div>
+      <div class="eql-stat"><div class="eql-stat__num" data-eql-count="1400">0<span class="suffix">+</span></div><div class="eql-stat__lbl">unit tests<br>driven by adversarial audits</div></div>
       <div class="eql-stat"><div class="eql-stat__num" data-eql-count="25">0</div><div class="eql-stat__lbl">battle-tested examples<br>from first backtest to portfolios</div></div>
       <div class="eql-stat"><div class="eql-stat__num" data-eql-count="26">0</div><div class="eql-stat__lbl">data APIs with PIT guards<br>no future data in-session</div></div>
       <div class="eql-stat"><div class="eql-stat__num" data-eql-count="244">0<span class="suffix">d</span></div><div class="eql-stat__lbl">annualization basis<br>true A-share trading days</div></div>
@@ -117,7 +117,7 @@ hide:
         <div class="eql-sec-head eql-reveal">
           <div class="eql-sec-tag">Rigor</div>
           <h2 class="eql-sec-title">Four lines of defense,<br>so results survive review</h2>
-          <p class="eql-sec-sub">Most backtest "returns" die in the details. EasyQuant makes every hard A-share market rule a default behavior, not an option.</p>
+          <p class="eql-sec-sub">The hard rules of the A-share market — exchange calendar, price limits, T+1, fees — are default behaviors in EasyQuant, not options.</p>
         </div>
         <div class="eql-rigor__list eql-reveal">
           <div class="eql-rigor__item">
@@ -131,7 +131,7 @@ hide:
             <span class="eql-rigor__no">Ⅱ</span>
             <div class="eql-rigor__body">
               <h4>PIT data contract</h4>
-              <p>26 data APIs truncate to T-1 or warn inside backtest sessions; <code>avoid_future_data</code> strict mode raises. No future function can hide.</p>
+              <p>26 data APIs truncate to T-1 or warn inside backtest sessions; <code>avoid_future_data</code> strict mode raises.</p>
             </div>
           </div>
           <div class="eql-rigor__item">
@@ -174,6 +174,7 @@ result = run_strategy(initialize,
     starting_cash=100000, securities=['601390'])
 
 # ✓ Fills respect price limits / T+1 / fees, no look-ahead
+# Sample output (synthetic data, not a promise of returns):
 # Total return +21.88% · Sharpe 0.33 · Max drawdown -9.4%</div>
         </div>
       </div>
@@ -208,7 +209,7 @@ result = run_strategy(initialize,
 
 <section class="eql-cta eql-grain" markdown="off">
   <div class="eql-wrap eql-reveal">
-    <h2 class="eql-cta__title">Your first A-share strategy,<br><em>15 minutes</em> away.</h2>
+    <h2 class="eql-cta__title">From install to your first backtest report<br>in about <em>15 minutes</em>.</h2>
     <p class="eql-sub" style="text-align:center">From install to your first trustworthy backtest report — tutorials, examples and API references are all ready.</p>
     <div class="eql-cta-row" style="justify-content:center">
       <a class="eql-btn eql-btn--primary" href="tutorials/00-getting-started/">Start the tutorial →</a>

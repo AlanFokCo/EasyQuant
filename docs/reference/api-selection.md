@@ -55,6 +55,8 @@ result = run_strategy(initialize, selection_func=my_selection, selection_rebalan
 | `TopNSelector(factor, top_n, ascending)` | 单因子 Top-N 选择器 |
 | `MultiFactorSelector(factors, top_n)` | 多因子加权选择器 |
 
+注意：`filter_high_pe_stocks` 在回测模式下**原样返回输入列表**（历史 PE 不可得，为避免实时快照引入前视）；实盘/研究模式用实时 PE 过滤。
+
 ### TopNSelector
 
 单因子 Top-N 选股器，按单个因子排序选出前 N 只股票。

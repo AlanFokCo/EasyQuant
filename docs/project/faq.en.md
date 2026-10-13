@@ -83,18 +83,22 @@ Minute bars and tick data depend on the corresponding `akshare` interfaces and s
 
 1. **Trading day restriction:** Northbound capital flow data is only updated on trading days; no data is available on weekends and holidays.
 2. **Network issues:** The data source (East Money) API may be unstable; try again later.
-3. **Date range:** `get_north_money_flow(count=N)` returns data for the most recent N trading days. If N is too large, it may exceed the data source limit.
+3. **Date range:** `get_north_money_flow(start_date=None, end_date=None)` covers the last 30 days up to today by default; ranges too far back may exceed the data source's coverage.
 
 **Solution:**
 
 ```python
 from eqlib import get_north_money_flow
 
-df = get_north_money_flow(count=30)
+df = get_north_money_flow()  # default: last 30 days up to today
+# or pass an explicit date range
+df = get_north_money_flow(start_date='2026-09-01', end_date='2026-10-01')
 if df.empty:
     log.warn("Northbound capital flow data unavailable, using fallback logic")
     # Use cached data or historical averages as a substitute
 ```
+
+Columns: `date` / `net_buy` / `total_buy` / `total_sell` (unit: 100M CNY; Shanghai + Shenzhen Connect combined).
 
 It's recommended to preload and cache northbound capital flow data in `initialize` to avoid making requests on every `handle_data` call.
 
@@ -121,14 +125,45 @@ df = get_limit_up_down_stats()
 **Solution:**
 
 ```python
-from eqlib import get_margin_trading
+from eqlib import get_margin_data
 
-df = get_margin_trading('601390', count=30)
+df = get_margin_data()  # default: last 30 days up to today
 # Remove the first row with NaN
 df = df.dropna(subset=['margin_repay'])
 
 # Or fill with a default value
 df['margin_repay'] = df['margin_repay'].fillna(0)
+```
+
+Note: `get_margin_data(start_date=None, end_date=None)` returns **market-wide aggregates** (Shanghai + Shenzhen combined) with columns `date` / `margin_balance` / `margin_buy` / `margin_repay` / `short_balance` (unit: 100M CNY). There is no per-stock granularity and no `count` parameter.
+
+### Q: Why did the `g.xxx` I set outside `run_backtest` disappear?
+
+**Cause:** `run_backtest` (and `run_strategy`) **clears the `g` object** on every call. This is by design — each backtest session should have its own independent state, avoiding data pollution between runs.
+
+**Solution:** Set `g` attributes inside `initialize()` instead of outside `run_backtest`:
+
+```python
+# ❌ Wrong
+g.security = '601398'
+result = run_backtest(initialize, ...)
+
+# ✅ Correct
+def initialize(context):
+    g.security = '601398'
+    run_daily(market_open, time='every_bar')
+
+result = run_backtest(initialize, ...)
+```
+
+For module-level configuration, use plain Python variables instead of `g`:
+
+```python
+# Module-level constant (not cleared)
+MY_SECURITY = '601398'
+
+def initialize(context):
+    g.security = MY_SECURITY
 ```
 
 ---
@@ -177,9 +212,9 @@ It's used to calculate **alpha, beta, information ratio, and excess returns**, a
 
 <a id="faq-benchmark-null"></a>
 
-### Q: `benchmark_return` is `null` and Alpha / Beta are close to 0 — is this normal?
+### Q: `benchmark_return` is `null` and Alpha / Beta show N/A — is this normal?
 
-**Possible causes:** When fetching or aligning **benchmark index daily returns** fails (network issues, index code conversion errors, empty date intersection, etc.), excess returns and CAPM-related displays may show **0 or placeholder values**. **Strategy NAV, PNG static charts, and trade tables still use strategy data**. Check your network connection and rerun, or verify that `set_benchmark` has valid index data for the backtest period.
+**Possible causes:** When fetching or aligning **benchmark index daily returns** fails (network issues, index code conversion errors, empty date intersection, etc.), `alpha` / `beta` / `information_ratio` are returned as **NaN**, rendered as **N/A** with a methodology note in HTML / Markdown reports, and the corresponding JSON checks are marked `pass: null` (the old silent defaults of 0.0 / 1.0 are gone). **Strategy NAV, PNG static charts, and trade tables still use strategy data**. Check your network connection and rerun, or verify that `set_benchmark` has valid index data for the backtest period.
 
 ### Q: How to run backtest only without automatically generating all four reports?
 

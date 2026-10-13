@@ -51,6 +51,7 @@ ML model wrapper — unifies the sklearn model interface.
 ```python
 BaseMLModel(
     model_type: str = 'random_forest',
+    is_classifier: bool = True,
     **kwargs,
 )
 ```
@@ -58,6 +59,7 @@ BaseMLModel(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `model_type` | `str` | Model type: `random_forest`, `logistic_regression`, `gradient_boosting`, `xgboost` |
+| `is_classifier` | `bool` | `True` for a classifier (default, backward-compatible); set `False` for regression when the target is continuous (e.g. returns) |
 | `**kwargs` | | Passed to the underlying model |
 
 ### Methods
@@ -65,10 +67,10 @@ BaseMLModel(
 #### fit
 
 ```python
-fit(X: pd.DataFrame, y: pd.Series) -> None
+fit(X: pd.DataFrame, y: pd.Series) -> BaseMLModel
 ```
 
-Train the model.
+Train the model. Returns `self` for chaining.
 
 #### predict
 

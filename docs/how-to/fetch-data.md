@@ -112,34 +112,36 @@ eqlib 提供多个 A 股市场特有的数据接口，覆盖北向资金、融�
 ```python
 from eqlib import get_north_money_flow
 
-# 获取北向资金净流入数据（近 N 个交易日）
-df = get_north_money_flow(count=30)
-# 返回字段：date, buy_value, sell_value, net_inflow, total_inflow
+# 获取北向资金流向（不传日期默认近 30 天）
+df = get_north_money_flow(start_date='2024-01-01', end_date='2024-06-30')
+# 返回字段：date, net_buy, total_buy, total_sell（单位：亿元）
 
 # 在策略中使用北向资金信号
 def market_open(context):
-    north_flow = get_north_money_flow(count=5)
+    north_flow = get_north_money_flow()
     if not north_flow.empty:
-        recent_net = north_flow['net_inflow'].iloc[-1]
-        if recent_net > 1e9:  # 净流入超 10 亿
-            log.info("北向资金今日大幅净流入: %.2f 亿" % (recent_net / 1e8))
+        recent_net = north_flow['net_buy'].tail(3).sum()
+        if recent_net > 100:  # 近 3 日净买入超 100 亿
+            log.info("北向资金大幅净流入: %.1f 亿" % recent_net)
 ```
 
 #### 1.10.2 融资融券
 
-融资融券数据反映杠杆资金动向。
+融资融券数据反映杠杆资金动向。该接口是**全市场汇总**口径（沪深两市合计），没有个股粒度。
 
 ```python
-from eqlib import get_margin_trading
+from eqlib import get_margin_data
 
-# 获取个股融资融券数据
-df = get_margin_trading('601390', count=30)
-# 返回字段：date, margin_buy, margin_sell, margin_repay, margin_balance, etc.
+# 获取全市场融资融券汇总（不传日期默认近 30 天）
+df = get_margin_data(start_date='2024-01-01', end_date='2024-06-30')
+# 返回字段：date, margin_balance, margin_buy, margin_repay, short_balance
+# （单位：亿元；margin_repay 由余额推算，首行为 NaN）
 
 # 查看融资余额变化
 if not df.empty:
-    balance_change = df['margin_balance'].diff()
-    log.info("融资余额 5 日变化: %s" % balance_change.tail(5).tolist())
+    if len(df) >= 6:
+        change_5d = df['margin_balance'].iloc[-1] - df['margin_balance'].iloc[-6]
+    log.info("融资余额 5 日变化: %.1f 亿" % change_5d)
 ```
 
 #### 1.10.3 涨跌停统计
@@ -151,13 +153,16 @@ from eqlib import get_limit_up_down_stats
 
 # 获取涨跌停统计数据
 df = get_limit_up_down_stats()
-# 返回字段：date, limit_up_count, limit_down_count, limit_up_ratio, etc.
+# 返回字段：date, limit_up_count, limit_down_count, api_error_count
+# 数据源只保留最近约 30 个交易日，更早的区间拿不到
 
 # 判断市场情绪
 if not df.empty:
     latest = df.iloc[-1]
-    if latest['limit_up_count'] > 100:
-        log.info("市场情绪高涨，涨停数: %d" % latest['limit_up_count'])
+    if latest['limit_down_count'] > 100:
+        log.warn("跌停超 100 只，系统性风险信号")
+    elif latest['limit_up_count'] / max(latest['limit_down_count'], 1) > 3:
+        log.info("涨跌停比 > 3，情绪偏强")
 ```
 
 #### 1.10.4 限售股解禁
@@ -167,15 +172,40 @@ if not df.empty:
 ```python
 from eqlib import get_restriction_release
 
-# 获取未来 30 天的解禁计划
-df = get_restriction_release(start_date='2024-01-01', end_date='2024-01-31')
-# 返回字段：code, name, release_date, release_value, release_amount, etc.
+# 获取未来 30 天的解禁计划（days 是唯一参数，窗口从真实当天起算）
+df = get_restriction_release(days=30)
+# 返回字段：code, name, release_date, release_amount（万股）,
+#           release_value（亿元）, release_pct（占解禁前流通市值比例）
 
-# 筛选大额解禁
-big_releases = df[df['release_value'] > 1e9]  # 解禁市值超 10 亿
+# 筛选大额解禁（release_value 单位是亿元）
+big_releases = df[df['release_value'] > 10]
 if not big_releases.empty:
     log.info("大额解禁股票: %s" % big_releases['code'].tolist())
 ```
+
+解禁窗口永远从**真实当天**起算，数据源不带公告日历史——这是快照型接口，回测中调用会触发 `FutureWarning`（见 §2）。
+
+---
+
+## 2. 回测中的数据可见性（PIT）
+
+回测会话内，数据接口按"模拟时钟能看到什么"分两档处理。决策时回调（`before_trading_start`、定时函数、`handle_data`）的可见边界是 **T-1**；当天数据在收盘后的回调里才可见。
+
+| 接口 | 回测内行为 |
+|------|-----------|
+| `history` / `attribute_history` | 读预加载数据，天然不含未来数据，回测内首选 |
+| `get_price` | 只返回模拟当天之前的 bar |
+| `fetch_stock_data` / `load_stock_local` | 截断到 T-1；起点晚于截断日返回空 DataFrame |
+| `fetch_minute_data` | 只返回模拟时钟之前的 bar |
+| `get_money_flow` / `get_billboard_list` / `check_golden_cross` | 截断到 T-1 |
+| `get_north_money_flow` / `get_margin_data` / `get_limit_up_down_stats` | 日期区间截断到 T-1；完全越界返回空 DataFrame |
+| `get_current_data` / `get_valuation` / `get_extras` | 快照型：触发 `FutureWarning` |
+| `get_index_stocks` / `get_industry_stocks` / `get_concept_stocks` / `get_index_weights` | 快照型（成分取当前名单，有幸存者偏差）：`FutureWarning` |
+| `scan_market` / `get_financial_screen` / `get_financial_abstract` | 快照型：`FutureWarning` |
+| `get_restriction_release` / `get_tick_data` | 快照型：`FutureWarning` |
+| `get_fundamentals` | `date` 参数被忽略（数据源无披露日历史）：`FutureWarning` |
+
+快照型接口在 `set_option('avoid_future_data', True)` 下把警告升级为 `ValueError`，回测直接报错退出——写论文级严谨回测时打开它。研究和实盘场景不受这些限制。
 
 ---
 

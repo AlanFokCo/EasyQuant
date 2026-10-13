@@ -32,7 +32,7 @@ Calculate comprehensive risk metrics.
 metrics = analyze_returns(result, risk_free_rate=0.03)
 ```
 
-Returns a `dict`: `total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`.
+Returns a `dict`: `total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`. Returns **`None`** when `result["recorded_values"]` is empty, lacks `total_value`, or the initial cash is not positive.
 
 Conventions:
 

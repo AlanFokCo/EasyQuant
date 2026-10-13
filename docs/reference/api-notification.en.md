@@ -5,6 +5,12 @@
     During paper trading, receive trade signal notifications via DingTalk or Feishu webhooks.
     Upon receiving a notification, you can manually execute the trade in your live account.
 
+All three functions are importable from the `eqlib` top level:
+
+```python
+from eqlib import set_notification_webhook, enable_notification, notify_signal
+```
+
 ---
 
 ## set_notification_webhook

@@ -76,7 +76,11 @@ Set the slippage model.
 |-------|-------------|
 | `SlippageModel` | Base class, no price adjustment |
 | `FixedSlippage(pct=0.001)` | Fixed percentage slippage |
-| `VolumeSlippage(impact=0.05)` | Volume-proportional market impact |
+| `VolumeSlippage(impact=0.05, max_slippage_pct=0.05)` | Volume-proportional market impact |
+
+**FixedSlippage**: shifts every trade by a fixed fraction — buys at `price * (1 + pct)`, sells at `price * (1 - pct)`; `pct` defaults to `0.001` (0.1%).
+
+**VolumeSlippage**: impact scales with the order's share of daily volume — `impact_pct = impact * (order_shares / daily_volume)`, capped at `max_slippage_pct`; no slippage when `daily_volume` is 0 or unknown. `impact` defaults to `0.05` (an order at 10% of daily volume incurs ~0.5% slippage); `max_slippage_pct` defaults to `0.05` (5%).
 
 ## BacktestSession and get_session
 

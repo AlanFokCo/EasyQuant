@@ -5,6 +5,12 @@
     在模拟盘运行时，通过钉钉或飞书 Webhook 接收交易信号通知，
     收到通知后可手动执行实盘操作。
 
+三个接口均可从 `eqlib` 顶层导入：
+
+```python
+from eqlib import set_notification_webhook, enable_notification, notify_signal
+```
+
 ---
 
 ## set_notification_webhook

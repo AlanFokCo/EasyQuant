@@ -61,6 +61,10 @@ from eqlib.engine import (
 from eqlib.engine import set_benchmark, set_option, set_order_cost, set_slippage
 from eqlib.objects import OrderCost
 
+# Notifications  [STABLE]
+from eqlib.engine import set_notification_webhook, enable_notification
+from eqlib.notification import notify_signal
+
 # Slippage models  [STABLE]
 from eqlib.slippage import SlippageModel, FixedSlippage, VolumeSlippage
 
@@ -278,12 +282,15 @@ __all__ = [
     "set_handle_data", "record", "run_paper_trade",
     # Config
     "set_benchmark", "set_option", "set_order_cost", "set_slippage", "OrderCost",
+    # Notifications
+    "set_notification_webhook", "enable_notification", "notify_signal",
     # Slippage models
     "SlippageModel", "FixedSlippage", "VolumeSlippage",
     # Session management
     "BacktestSession", "get_session",
     # Trading
     "order", "order_target", "order_value", "order_target_value", "cancel_order",
+    "order_lots", "order_pct",
     # Data
     "get_price", "history", "attribute_history", "get_all_securities",
     "download_stock_data", "load_csv",

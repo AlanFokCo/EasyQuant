@@ -68,8 +68,8 @@ touch my_first_strategy.py
 
 - **买入信号**：5 日均线上穿 20 日均线（金叉），且当前价格高于 5 日均线
 - **卖出信号**：5 日均线下穿 20 日均线（死叉）
-- **仓位管理**：买入时使用全部可用现金，卖出时全部清仓
-- **操作标的**：601390（工商银行）
+- **仓位管理**：买入时使用 95% 可用现金（留出手续费缓冲），卖出时全部清仓
+- **操作标的**：601398（工商银行）
 - **回测区间**：2024-01-01 至 2024-12-31
 
 ### 为什么选择双均线？
@@ -88,10 +88,12 @@ touch my_first_strategy.py
 ```python
 from eqlib import *
 
-# ========== 全局变量 ==========
-g.security = '601390'     # 操作标的
-g.fast_period = 5         # 短期均线周期
-g.slow_period = 20        # 长期均线周期
+# ========== 模块级常量（配置参数） ==========
+# 引擎会在调用 initialize 之前清空 g 的全部属性（见 §5.1），
+# 所以配置参数用普通常量保存，不要挂在模块顶层的 g 上
+SECURITY = '601398'       # 操作标的（工商银行）
+FAST_PERIOD = 5           # 短期均线周期
+SLOW_PERIOD = 20          # 长期均线周期
 
 
 # ========== 初始化函数 ==========
@@ -108,6 +110,12 @@ def initialize(context):
         close_commission=0.00025,  # 卖出佣金 0.025%
         min_commission=5,         # 最低佣金 5 元
     ))
+
+    # 把参数挂到 g 上，供每个交易日的回调使用
+    # g 在 initialize 之后不会被清除，可跨交易日保持
+    g.security = SECURITY
+    g.fast_period = FAST_PERIOD
+    g.slow_period = SLOW_PERIOD
 
     # 每天运行一次
     run_daily(market_open, time='every_bar')
@@ -128,21 +136,22 @@ def market_open(context):
 
     close_prices = close_data['close']
 
-    # 2. 计算均线
+    # 2. 计算均线：对最近 N 根收盘价求均值
     ma_fast = close_prices.tail(g.fast_period).mean()
-    ma_slow = close_prices.mean()
+    ma_slow = close_prices.tail(g.slow_period).mean()
     current_price = close_prices.iloc[-1]
 
-    # 3. 判断买入条件：金叉 + 价格在短期均线上方
+    # 3. 判断买入条件：多头排列（价格 > 快线 > 慢线）
     if current_price > ma_fast > ma_slow:
         # 检查当前是否没有持仓
         if security not in context.portfolio.positions or \
            context.portfolio.positions[security].amount == 0:
-            order_value(security, context.portfolio.available_cash)
+            # 只用 95% 现金：留出佣金缓冲，避免订单因差几元手续费而资金不足
+            order_value(security, context.portfolio.available_cash * 0.95)
             log.info('买入 %s @ %.3f, MA快=%.3f, MA慢=%.3f' % (
                 security, current_price, ma_fast, ma_slow))
 
-    # 4. 判断卖出条件：死叉
+    # 4. 判断卖出条件：空头排列
     elif current_price < ma_fast < ma_slow:
         # 检查当前是否有持仓
         if security in context.portfolio.positions and \
@@ -168,10 +177,12 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=100000,       # 10 万元
         benchmark='000300.XSHG',
-        securities=['601390'],      # 预加载数据，加速回测
+        securities=[SECURITY],      # 预加载数据，加速回测
         report_dir='reports',
     )
 ```
+
+> **信号口径说明**：上面的 `价格 > MA5 > MA20` 是**状态判断**（多头/空头排列），不是严格意义的"当日穿越"检测。要对金叉/死叉当日精确下单，需要比较前后两天的均线关系，写法见 [examples/02_write_strategy.py](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/02_write_strategy.py) 中的 `golden_cross` / `death_cross` 判定。
 
 ### 代码结构说明
 
@@ -179,10 +190,10 @@ if __name__ == '__main__':
 导入库
   |
   v
-全局变量 (g.*)  ← 跨交易日持久化
+模块级常量     ← 配置参数（SECURITY / FAST_PERIOD / SLOW_PERIOD）
   |
   v
-initialize()   ← 只调用一次：设置基准、费率、调度
+initialize()   ← 只调用一次：设置基准、费率、调度，并把参数挂到 g
   |
   v
 market_open()  ← 每个交易日调用：获取数据 → 计算信号 → 下单
@@ -199,24 +210,24 @@ run_strategy() ← 运行回测并生成报告
 python my_first_strategy.py
 ```
 
-运行后会输出：
+运行后终端会打印日志与 `reports/` 下的报告路径。下面是一段**示意输出**（数字与日期仅为格式示例，以你实际运行为准）：
 
 ```
-[2024-01-02] 双均线策略初始化完成: 601390, MA5/MA20
-[2024-01-15] 买入 601390 @ 4.850, MA快=4.820, MA慢=4.780
-[2024-03-20] 卖出 601390 @ 5.120, MA快=5.080, MA慢=5.110
+09:30:01 | ℹ️ INFO     | 双均线策略初始化完成: 601398, MA5/MA20
+09:30:05 | ℹ️ INFO     | 买入 601398 @ 4.850, MA快=4.820, MA慢=4.780
+09:30:12 | ℹ️ INFO     | 卖出 601398 @ 5.120, MA快=5.080, MA慢=5.110
 ...
 
 ==================================================
-Final value: 108,234.56
-P&L: +8,234.56 (+8.23%)
-Trades: 12
-
 Chart:  reports/backtest_20260503_143000.png
 HTML:   reports/backtest_20260503_143000.html
 Report: reports/backtest_20260503_143000.md
 Data:   reports/backtest_20260503_143000.json
 ```
+
+日志行的实际格式为 `HH:MM:SS | ℹ️ INFO | 消息`。报告文件名的共同部分是时间戳，每次运行都不同。
+
+> **成交拦截**：引擎默认开启涨跌停检查（`check_price_limit=True`）——涨停开盘的买单、跌停开盘的卖单会被取消并记录 `cancel_reason`；停牌当日的订单同样会被取消。可用 `set_option('check_price_limit', False)` 关闭涨跌停拦截。另外，持仓标的一旦退市，超过 30 个交易日无行情后会被强制清算（交易记录中标为 `DELIST_LIQUIDATE`）。
 
 ### 查看报告
 
@@ -237,7 +248,7 @@ Data:   reports/backtest_20260503_143000.json
 
 ```python
 # 模块级常量 — 配置参数（不会被引擎清除）
-SECURITY = '601390'
+SECURITY = '601398'
 MA_PERIOD = 20
 
 # g — 运行时状态（在 initialize 中初始化，跨交易日保持）
@@ -255,7 +266,7 @@ def market_open(context):
 
 ```python
 # ❌ 错误！这些值会在 initialize 之前被清除
-g.security = '601390'
+g.security = '601398'
 g.ma_period = 20
 ```
 
@@ -293,7 +304,7 @@ def market_open(context):
 run_daily(market_open, time='every_bar')
 
 # 每周运行（如每周一）
-run_weekly(rebalance, day_of_week=1, time='every_bar')
+run_weekly(rebalance, day_of_week=0, time='every_bar')  # day_of_week: 0=周一 … 4=周五
 
 # 每月运行（如每月 1 号）
 run_monthly(rebalance, day_of_month=1, time='every_bar')
@@ -304,30 +315,30 @@ run_monthly(rebalance, day_of_month=1, time='every_bar')
 ```python
 # 方式一：attribute_history（策略中最常用）
 # 获取最近 N 根 bar 的数据
-hist = attribute_history('601390', 20, '1d', ['close'])
+hist = attribute_history('601398', 20, '1d', ['close'])
 
 # 方式二：history（简洁写法）
-close = history(20, '1d', 'close', security='601390')
+close = history(20, '1d', 'close', security='601398')
 
 # 方式三：get_price（指定日期范围，适合 initialize 中）
-df = get_price('601390', start_date='2024-01-01', end_date='2024-06-30')
+df = get_price('601398', start_date='2024-01-01', end_date='2024-06-30')
 ```
 
 ### 5.5 交易 API
 
 ```python
 # 按股数买卖（正数=买入，负数=卖出）
-order('601390', 1000)        # 买入 1000 股
+order('601398', 1000)        # 买入 1000 股
 
 # 按金额买卖
-order_value('601390', 50000)  # 买入 5 万元
+order_value('601398', 50000)  # 买入 5 万元
 
 # 调到目标股数
-order_target('601390', 5000)  # 调到 5000 股
-order_target('601390', 0)     # 清仓
+order_target('601398', 5000)  # 调到 5000 股
+order_target('601398', 0)     # 清仓
 
 # 调到目标市值
-order_target_value('601390', 100000)  # 持仓市值 10 万
+order_target_value('601398', 100000)  # 持仓市值 10 万
 ```
 
 ### 5.6 日志与记录
@@ -337,7 +348,8 @@ order_target_value('601390', 100000)  # 持仓市值 10 万
 log.info('买入 %s @ %.2f' % (security, price))
 log.warn('数据不足，跳过')
 
-# 记录数值（会出现在 JSON 报告中）
+# 记录数值：保存在 result['recorded_values'] 中
+# 引擎每天还会自动记录 total_value 与 cash，用于报告的净值曲线
 record(price=price, ma5=ma5, signal='BUY')
 ```
 
@@ -397,7 +409,12 @@ if index_price < index_ma20:
 ### 6.4 扩展为多股轮动
 
 ```python
-g.securities = ['601390', '600519', '000858']
+# 模块级常量 — 不要在模块顶层给 g 赋值
+SECURITIES = ['601398', '600519', '000858']
+
+def initialize(context):
+    g.securities = SECURITIES
+    # ...
 
 def market_open(context):
     for security in g.securities:
@@ -424,7 +441,7 @@ def market_open(context):
 1. 修改均线周期（如 MA10/MA30），观察结果变化
 2. 给策略加上止损（如 -8% 强制卖出）
 3. 换成另一只股票回测
-4. 尝试把 `order_value(..., available_cash)` 改为 `order_value(..., available_cash * 0.5)`，只半仓操作
+4. 尝试把 `order_value(..., available_cash * 0.95)` 改为 `order_value(..., available_cash * 0.5)`，只半仓操作
 
 
 ## 支撑压力位的完整示例

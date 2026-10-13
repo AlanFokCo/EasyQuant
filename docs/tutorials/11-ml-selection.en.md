@@ -3,9 +3,10 @@
 !!! abstract "Overview"
 
     | Item | Description |
-|------|-------------|
-| **Goal** | Replace hand-tuned factor weights with `MLSelector` — let the model learn factor weights and interactions automatically |
-| **Prerequisites** | [Run a backtest](02-backtesting.en.md), [Selection strategy framework](../how-to/selection-strategy.en.md) |
+    |------|-------------|
+    | **Goal** | Replace hand-tuned factor weights with `MLSelector` — let the model learn factor weights and interactions automatically |
+    | **Est. Time** | ~25 minutes |
+    | **Prerequisites** | [Backtest Validation](02-backtesting.md), [Selection strategy framework](../how-to/selection-strategy.md) |
 
 ---
 
@@ -177,7 +178,7 @@ def rebalance(context):
 You can add your own feature functions:
 
 ```python
-from eqlib.ml import FeaturePipeline, MLSelector
+from eqlib.ml import MLSelector
 
 def price_to_ma_ratio(close, high, low, volume):
     """Price deviation from 20-day MA."""
@@ -186,14 +187,11 @@ def price_to_ma_ratio(close, high, low, volume):
     ma20 = close.iloc[-20:].mean()
     return float(close.iloc[-1] / ma20 - 1.0)
 
-# Create a pipeline with custom features
+# Pass custom features straight to the constructor (it builds the FeaturePipeline internally)
 g.selector = MLSelector(
     features=['rsi', 'momentum', 'price_ma_ratio'],
     target='past_return_5d',
     top_n=3,
-)
-g.selector.pipeline = FeaturePipeline(
-    features=['rsi', 'momentum', 'price_ma_ratio'],
     custom_features={'price_ma_ratio': price_to_ma_ratio},
 )
 ```

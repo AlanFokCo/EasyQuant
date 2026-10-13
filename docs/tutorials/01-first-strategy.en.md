@@ -68,8 +68,8 @@ Let's implement a classic **dual moving average strategy**:
 
 - **Buy signal**: The 5-day moving average crosses above the 20-day moving average (golden cross), and the current price is above the 5-day moving average
 - **Sell signal**: The 5-day moving average crosses below the 20-day moving average (death cross)
-- **Position management**: Use all available cash when buying; liquidate everything when selling
-- **Target security**: 601390 (ICBC — Industrial and Commercial Bank of China)
+- **Position management**: Buy with 95% of available cash (leaving a buffer for fees); liquidate everything when selling
+- **Target security**: 601398 (ICBC — Industrial and Commercial Bank of China)
 - **Backtest period**: 2024-01-01 to 2024-12-31
 
 ### Why Dual Moving Average?
@@ -88,8 +88,10 @@ Write the following code in `my_first_strategy.py`:
 ```python
 from eqlib import *
 
-# ========== Module-level constants (won't be cleared by the engine) ==========
-SECURITY = '601390'       # Target security
+# ========== Module-level constants (configuration) ==========
+# The engine clears all attributes of g before calling initialize (see §5.1),
+# so keep configuration in plain constants, not in top-level g assignments.
+SECURITY = '601398'       # Target security (ICBC)
 FAST_PERIOD = 5           # Short-term moving average period
 SLOW_PERIOD = 20          # Long-term moving average period
 
@@ -109,40 +111,48 @@ def initialize(context):
         min_commission=5,          # Minimum commission 5 CNY
     ))
 
+    # Attach parameters to g so daily callbacks can use them.
+    # g is not cleared after initialize, so it persists across trading days.
+    g.security = SECURITY
+    g.fast_period = FAST_PERIOD
+    g.slow_period = SLOW_PERIOD
+
     # Run once per trading day
     run_daily(market_open, time='every_bar')
 
     log.info('Dual MA strategy initialized: %s, MA%d/MA%d' % (
-        SECURITY, FAST_PERIOD, SLOW_PERIOD))
+        g.security, g.fast_period, g.slow_period))
 
 
 # ========== Daily trading logic ==========
 def market_open(context):
     """Runs on every trading day."""
-    security = SECURITY
+    security = g.security
 
     # 1. Get the last 25 days of closing prices (fetch a few extra to ensure MA20 can be computed)
     close_data = attribute_history(security, 25, '1d', ['close'])
-    if close_data.empty or len(close_data) < SLOW_PERIOD:
+    if close_data.empty or len(close_data) < g.slow_period:
         return  # Insufficient data, skip
 
     close_prices = close_data['close']
 
-    # 2. Compute moving averages
-    ma_fast = close_prices.tail(FAST_PERIOD).mean()
-    ma_slow = close_prices.mean()
+    # 2. Compute moving averages: mean of the last N closing prices
+    ma_fast = close_prices.tail(g.fast_period).mean()
+    ma_slow = close_prices.tail(g.slow_period).mean()
     current_price = close_prices.iloc[-1]
 
-    # 3. Check buy condition: golden cross + price above fast MA
+    # 3. Check buy condition: bullish alignment (price > fast MA > slow MA)
     if current_price > ma_fast > ma_slow:
         # Check that we don't already hold a position
         if security not in context.portfolio.positions or \
            context.portfolio.positions[security].amount == 0:
-            order_value(security, context.portfolio.available_cash)
+            # Use only 95% of cash: keep a fee buffer so the order is not
+            # rejected for being a few CNY short
+            order_value(security, context.portfolio.available_cash * 0.95)
             log.info('BUY %s @ %.3f, MA_fast=%.3f, MA_slow=%.3f' % (
                 security, current_price, ma_fast, ma_slow))
 
-    # 4. Check sell condition: death cross
+    # 4. Check sell condition: bearish alignment
     elif current_price < ma_fast < ma_slow:
         # Check that we currently hold a position
         if security in context.portfolio.positions and \
@@ -168,10 +178,12 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=100000,       # 100,000 CNY
         benchmark='000300.XSHG',
-        securities=['601390'],      # Preload data to speed up backtest
+        securities=[SECURITY],      # Preload data to speed up backtest
         report_dir='reports',
     )
 ```
+
+> **Signal semantics**: `price > MA5 > MA20` above is a **state check** (bullish/bearish alignment), not a strict "crossed today" detection. To trade on the exact crossover day, compare today's and yesterday's MA relationship — see the `golden_cross` / `death_cross` logic in [examples/02_write_strategy.py](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/02_write_strategy.py).
 
 ### Code Structure Overview
 
@@ -179,10 +191,10 @@ if __name__ == '__main__':
 Import library
   |
   v
-Module-level constants  <-- Configuration (not cleared by engine)
+Module-level constants  <-- Configuration (SECURITY / FAST_PERIOD / SLOW_PERIOD)
   |
   v
-initialize()            <-- Called once: set benchmark, fees, scheduling
+initialize()            <-- Called once: set benchmark, fees, scheduling; attach parameters to g
   |
   v
 market_open()           <-- Called every trading day: fetch data -> compute signals -> place orders
@@ -199,24 +211,24 @@ run_strategy()          <-- Run the backtest and generate reports
 python my_first_strategy.py
 ```
 
-After running, you'll see output like:
+After running, the terminal prints log lines and the report paths under `reports/`. Below is **illustrative output** (numbers and dates are format examples only — your actual run will differ):
 
 ```
-[2024-01-02] Dual MA strategy initialized: 601390, MA5/MA20
-[2024-01-15] BUY 601390 @ 4.850, MA_fast=4.820, MA_slow=4.780
-[2024-03-20] SELL 601390 @ 5.120, MA_fast=5.080, MA_slow=5.110
+09:30:01 | ℹ️ INFO     | Dual MA strategy initialized: 601398, MA5/MA20
+09:30:05 | ℹ️ INFO     | BUY 601398 @ 4.850, MA_fast=4.820, MA_slow=4.780
+09:30:12 | ℹ️ INFO     | SELL 601398 @ 5.120, MA_fast=5.080, MA_slow=5.110
 ...
 
 ==================================================
-Final value: 108,234.56
-P&L: +8,234.56 (+8.23%)
-Trades: 12
-
 Chart:  reports/backtest_20260503_143000.png
 HTML:   reports/backtest_20260503_143000.html
 Report: reports/backtest_20260503_143000.md
 Data:   reports/backtest_20260503_143000.json
 ```
+
+Log lines actually look like `HH:MM:SS | ℹ️ INFO | message`. Report filenames share a timestamp that changes on every run.
+
+> **Order interception**: the engine checks price limits by default (`check_price_limit=True`) — buy orders at limit-up open and sell orders at limit-down open are cancelled with a `cancel_reason`; orders on suspension days are cancelled too. Disable with `set_option('check_price_limit', False)`. If a held stock is delisted, it is force-liquidated after 30 trading days without bars (logged as `DELIST_LIQUIDATE`).
 
 ### Viewing the Reports
 
@@ -237,7 +249,7 @@ Data:   reports/backtest_20260503_143000.json
 
 ```python
 # Module-level constants -- configuration parameters (not cleared by the engine)
-SECURITY = '601390'
+SECURITY = '601398'
 MA_PERIOD = 20
 
 # g -- runtime state (initialized in initialize(), persists across trading days)
@@ -255,7 +267,7 @@ def market_open(context):
 
 ```python
 # WRONG! These values will be cleared before initialize() runs
-g.security = '601390'
+g.security = '601398'
 g.ma_period = 20
 ```
 
@@ -293,7 +305,7 @@ def market_open(context):
 run_daily(market_open, time='every_bar')
 
 # Run weekly (e.g., every Monday)
-run_weekly(rebalance, day_of_week=1, time='every_bar')
+run_weekly(rebalance, day_of_week=0, time='every_bar')  # day_of_week: 0=Monday ... 4=Friday
 
 # Run monthly (e.g., 1st of each month)
 run_monthly(rebalance, day_of_month=1, time='every_bar')
@@ -304,30 +316,30 @@ run_monthly(rebalance, day_of_month=1, time='every_bar')
 ```python
 # Method 1: attribute_history (most commonly used in strategies)
 # Get the last N bars of data
-hist = attribute_history('601390', 20, '1d', ['close'])
+hist = attribute_history('601398', 20, '1d', ['close'])
 
 # Method 2: history (concise syntax)
-close = history(20, '1d', 'close', security='601390')
+close = history(20, '1d', 'close', security='601398')
 
 # Method 3: get_price (specify date range, suitable for use in initialize())
-df = get_price('601390', start_date='2024-01-01', end_date='2024-06-30')
+df = get_price('601398', start_date='2024-01-01', end_date='2024-06-30')
 ```
 
 ### 5.5 Trading API
 
 ```python
 # Buy/sell by share count (positive = buy, negative = sell)
-order('601390', 1000)        # Buy 1,000 shares
+order('601398', 1000)        # Buy 1,000 shares
 
 # Buy/sell by amount
-order_value('601390', 50000)  # Buy 50,000 CNY worth
+order_value('601398', 50000)  # Buy 50,000 CNY worth
 
 # Adjust to a target share count
-order_target('601390', 5000)  # Adjust to 5,000 shares
-order_target('601390', 0)     # Liquidate
+order_target('601398', 5000)  # Adjust to 5,000 shares
+order_target('601398', 0)     # Liquidate
 
 # Adjust to a target market value
-order_target_value('601390', 100000)  # Position market value = 100,000 CNY
+order_target_value('601398', 100000)  # Position market value = 100,000 CNY
 ```
 
 ### 5.6 Logging and Recording
@@ -337,7 +349,9 @@ order_target_value('601390', 100000)  # Position market value = 100,000 CNY
 log.info('BUY %s @ %.2f' % (security, price))
 log.warn('Insufficient data, skipping')
 
-# Record values (will appear in the JSON report)
+# Record values: stored in result['recorded_values'].
+# The engine also records total_value and cash automatically each day;
+# they drive the equity curve in the reports.
 record(price=price, ma5=ma5, signal='BUY')
 ```
 
@@ -397,7 +411,7 @@ if index_price < index_ma20:
 ### 6.4 Extending to Multi-Stock Rotation
 
 ```python
-SECURITIES = ['601390', '600519', '000858']
+SECURITIES = ['601398', '600519', '000858']
 
 def market_open(context):
     for security in SECURITIES:
@@ -424,7 +438,7 @@ You've learned how to write and run your first strategy. What's next:
 1. Change the moving average periods (e.g., MA10/MA30) and observe how the results change
 2. Add a stop-loss to the strategy (e.g., force sell at -8%)
 3. Backtest with a different stock
-4. Try changing `order_value(..., available_cash)` to `order_value(..., available_cash * 0.5)` for half-position trading
+4. Try changing `order_value(..., available_cash * 0.95)` to `order_value(..., available_cash * 0.5)` for half-position trading
 
 
 ## Complete support/resistance example

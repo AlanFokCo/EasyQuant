@@ -49,6 +49,15 @@ python agent/optimizer.py \
   --periods "2022-01-01:2022-12-31" "2023-01-01:2023-12-31"
 ```
 
+判定逻辑：对每个 `--periods` 区间分别回测，所有区间同时满足阈值（`--min-sharpe`、`--max-drawdown`、`--min-annual-return`、`--min-win-rate`）才判通过；指标为 NaN/Inf 一律判失败。
+
+产物：
+
+- `audit_log/session_<时间戳>.jsonl` — 逐次迭代的结构化记录
+- `audit_log/session_<时间戳>.md` — 人类可读摘要
+- `--output-strategy <path>` — 达标后写出最优参数的策略文件
+- `--audit-dir <dir>` — 改审计日志目录（默认 `audit_log`）
+
 ### 3. 审计日志
 
 使用 `audit_log.py` 时，会话产物示例：
@@ -62,4 +71,3 @@ audit_log/
 详细说明见 [Tutorial 09：策略参数优化与审计](../tutorials/09-param-optimization.md)。
 
 ---
-

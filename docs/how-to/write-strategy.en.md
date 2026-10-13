@@ -16,7 +16,7 @@ A runnable strategy must contain at least: **`initialize(context)`** (initializa
 from eqlib import *
 
 def initialize(context):
-    g.security = '601390'          # Industrial and Commercial Bank of China
+    g.security = '601390'          # China Railway Group
     set_benchmark('000300.XSHG')   # CSI 300 as benchmark
     set_option('use_real_price', True)
     run_daily(market_open, time='every_bar')
@@ -65,6 +65,13 @@ handle_data(context, data)   ← Called once per trading day
     v
 after_trading_end(ctx, data) ← Called after market close on each trading day (optional)
 ```
+
+!!! note "Market rules enabled by default since 2026-10"
+    The following three rules are on by default — no configuration needed:
+
+    - **Price-limit interception**: a buy whose open touches limit-up, or a sell touching limit-down, is cancelled the same day (disable with `set_option('check_price_limit', False)`).
+    - **Suspension cancellation**: an order for a security with no bar that day is cancelled the same day instead of being deferred; the reason is recorded in the order's `cancel_reason`.
+    - **Delisting liquidation**: a position whose security has had no quote for 30 consecutive trading days is treated as delisted and force-liquidated at the last close, logged with trade type `DELIST_LIQUIDATE`.
 
 ### 2.1 `initialize(context)`
 

@@ -104,9 +104,10 @@ def demo_restriction_filter():
         print()
         return
 
-    # Filter for significant releases (> 1% of float)
+    # Filter for significant releases (> 1% of float market cap).
+    # release_pct is a fraction: 0.01 = 1%.
     if "release_pct" in releases.columns:
-        significant = releases[releases["release_pct"] > 1.0]
+        significant = releases[releases["release_pct"] > 0.01]
     else:
         significant = releases
 

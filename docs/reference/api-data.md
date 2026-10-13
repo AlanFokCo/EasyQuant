@@ -69,8 +69,11 @@ scan_market(min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50)
 按财务指标筛选。
 
 ```python
-get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None, min_roe=None)
+get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None,
+                     min_roe=None, min_revenue=None, min_profit=None)
 ```
+
+注意：当前实现仅 `min_pe` / `max_pe` / `min_pb` / `max_pb` 参与过滤；`min_roe` / `min_revenue` / `min_profit` 保留在签名中但暂不生效（现货快照数据源无对应字段）。
 
 ## get_all_securities
 

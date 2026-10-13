@@ -56,7 +56,7 @@ A 股代码为 **6 位数字**，前缀决定上市地和板块：
 
 | 前缀 | 交易所 | 板块 | 例子 |
 |------|-------|------|------|
-| `600xxx` `601xxx` `603xxx` `605xxx` | 上海交易所（SSE） | 沪市主板 | `601390`（工商银行）`600519`（贵州茅台） |
+| `600xxx` `601xxx` `603xxx` `605xxx` | 上海交易所（SSE） | 沪市主板 | `601390`（中国中铁）`600519`（贵州茅台） |
 | `000xxx` `001xxx` | 深圳交易所（SZSE） | 深市主板 | `000858`（五粮液） |
 | `002xxx` `003xxx` | 深圳交易所 | 中小板（已并入主板） | `002415`（海康威视） |
 | `300xxx` `301xxx` | 深圳交易所 | 创业板（GEM） | `300750`（宁德时代） |
@@ -151,16 +151,19 @@ A 股单日价格涨跌幅有限制：
 
 ### 对策略的影响
 
+上表是当前口径；创业板在 2020-08-24 注册制改革前为 ±10%，eqlib 按交易日期自动切换。
+
 ```python
 # 涨停的股票当天无法买入（没有卖出方）
 # 跌停的股票当天无法卖出（没有买入方）
-# eqlib 回测会忽略流动性限制，实盘中需要注意
+# eqlib 回测默认就拦截：开盘价触及涨停的买单、触及跌停的卖单会被取消，
+# 并在订单上记录 cancel_reason（set_option('check_price_limit', False) 可关闭）
 
-# 正确做法：过滤掉当天已涨停的股票
+# 手动过滤仍然有教学价值——例如在信号层就跳过涨停股，而不是等订单被取消：
 hist = attribute_history(security, 2, '1d', ['close'])
 prev_close = hist['close'].iloc[-2]
 today_close = hist['close'].iloc[-1]
-limit_up = today_close >= prev_close * 1.099  # 接近涨停
+limit_up = today_close >= prev_close * 1.099  # 接近涨停（主板口径）
 
 if limit_up:
     continue  # 跳过，不买涨停股
@@ -209,9 +212,9 @@ safe_stocks = filter_st_stocks(candidates)
 ### 7.2 单次买卖的实际成本
 
 以 10 万元买卖为例（佣金 0.025%，最低 5 元）：
-- 买入：10 万 × 0.03% = 30 元
-- 卖出：10 万 × 0.03% + 10 万 × 0.05% = 30 + 50 = 80 元
-- **一个来回总成本：110 元（0.11%）**
+- 买入：10 万 × 0.025% = 25 元
+- 卖出：10 万 × 0.025% + 10 万 × 0.05% = 25 + 50 = 75 元
+- **一个来回总成本：100 元（0.10%）**
 
 频繁交易会严重侵蚀收益！
 
@@ -228,7 +231,7 @@ def initialize(context):
     ))
 ```
 
-> 如果不设置，eqlib 默认不收手续费——这会让回测结果虚高！务必设置合理费率。
+> 不设置也有默认值：eqlib 会话启动即使用 `OrderCost(open_tax=0, close_tax=None, open_commission=0.00025, close_commission=0.00025, min_commission=5)`。`close_tax=None` 表示按**日期感知的法定印花税率**计算（2023-08-28 起 0.05%，此前 0.1%）；一旦显式传入 `close_tax` 则全程固定为该值。显式设置的意义在于确定性与可复现，而不是"补上"缺失的费率。
 
 ---
 
@@ -299,8 +302,9 @@ df_sorted = df.sort_values('pe', ascending=True)
 ```python
 from eqlib import get_money_flow
 
-money_flow = get_money_flow('601390', days=5)
-# 返回 DataFrame，包含 net_main（主力净流入）等字段
+money_flow = get_money_flow('601390', count=5)   # count 控制返回最近几天
+# 返回 DataFrame：date / close / pct_change / main_net_inflow（主力净流入额）
+# 以及 super/big/mid/small_order_net 等分级净流入字段
 ```
 
 ---
@@ -499,8 +503,10 @@ safe_candidates = [c for c in candidates if c not in large_release_codes]
 | 规则 | eqlib 的处理方式 |
 |------|----------------|
 | T+1 | `position.closeable_amount` 在买入当天为 0 |
-| 涨跌停 | 回测不自动过滤（需手动判断）；实盘中影响委托成交 |
-| 印花税 | `OrderCost(close_tax=0.0005)` 设置 |
+| 涨跌停 | 回测默认按板块/日期拦截（主板 ±10%、ST ±5%、创业板 ±20%〔2020-08-24 前 ±10%〕、科创板 ±20%、北交所 ±30%）；涨停买/跌停卖的订单取消并记 `cancel_reason`，`set_option('check_price_limit', False)` 可关闭 |
+| 停牌 | 当日无行情（或零成交）的订单当日取消，`cancel_reason` 为 `"no price data"` / `"suspended"`，不顺延至复牌 |
+| 退市 | 持仓 30 个交易日无行情即按最后收盘价强制清算（`trade_log` 记 `DELIST_LIQUIDATE`）；`set_option('delisted_position_handling', 'keep')` 保留持仓、`delisted_liquidation_haircut` 模拟清算折价 |
+| 印花税 | `OrderCost(close_tax=0.0005)` 显式设置；`close_tax=None`（默认）按交易日走法定税率（2023-08-28 起 0.05%，此前 0.1%） |
 | ST 过滤 | `filter_st_stocks(securities)` |
 | 指数成分股 | `get_index_stocks('000300.XSHG')` |
 | 基准对比 | `set_benchmark('000300.XSHG')` |

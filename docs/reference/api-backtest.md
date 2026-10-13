@@ -25,8 +25,11 @@ run_strategy(initialize_func, start_date, end_date, starting_cash=100000,
 run_backtest(initialize_func, start_date, end_date, starting_cash=100000.0,
              frequency='daily', benchmark='000300.XSHG', securities=None,
              use_local=False, max_memory_mb=1024,
-             selection_func=None, selection_rebalance='monthly:1')
+             selection_func=None, selection_rebalance='monthly:1',
+             handle_data=None, debug_mode=False)
 ```
+
+`handle_data`：可选的 `handle_data(context, data)` 回调，每根 bar 调用一次。`debug_mode=True` 时打印额外诊断信息，用于排查无交易、数据为空等问题。
 
 返回 `{"context": Context, "trade_log": list, "recorded_values": dict, "benchmark": str}`。
 

@@ -12,6 +12,26 @@
 
 `eqlib.utils` provides technical indicators, statistical analysis, money management, and support/resistance level calculation tools.
 
+### 1.0 A Runnable End-to-End Example
+
+Fetch data → compute indicators → print. Runs as-is (network required for data):
+
+```python
+from eqlib import fetch_stock_data, utils
+
+df = fetch_stock_data('601398', '2024-01-01', '2024-06-30')
+close = df['close']
+
+daily_returns = close.pct_change().dropna()
+
+print("Latest MA20 : %.2f" % utils.ma(close, 20).iloc[-1])
+print("RSI(14)     : %.1f" % utils.rsi(close, 14).iloc[-1])
+print("Ann. Sharpe : %.2f" % utils.rolling_sharpe(daily_returns, window=20).iloc[-1])
+print("VaR(5%%)    : %.2f%%" % (utils.value_at_risk(daily_returns, confidence=0.05) * 100))
+```
+
+`value_at_risk` supports three methods: `historical` (empirical quantile, default), `parametric` (normal assumption), and `cornish_fisher` (skew/kurtosis-adjusted — better suited to the fat-tailed returns typical of A-shares).
+
 ### 1.1 Technical Indicators
 
 ```python
@@ -51,7 +71,3 @@ fib = utils.fibonacci_retracement(high, low, close)
 ```
 
 See the [Utility Library Reference](../reference/utils.md) for details.
-
----
-
-See the [Utility Library Reference](../reference/utils.md) for full function parameters and mathematical definitions.

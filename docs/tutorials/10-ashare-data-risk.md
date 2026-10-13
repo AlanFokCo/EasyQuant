@@ -10,7 +10,7 @@
 
 > A 股市场有其独特的微观结构——北向资金、融资融券、涨跌停板、限售股解禁——这些信号在海外市场并不存在或形态迥异。本篇将逐一讲解如何利用 `eqlib` 提供的四个 A 股特色 API 获取这些信号，并用 `PortfolioRiskMonitor` 构建组合级风控体系。
 
-**文档索引：** [指南总览](../how-to/index.md) | **相关示例：** [Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)
+**文档索引：** [指南总览](../how-to/index.md) | **相关示例：** [Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)
 
 ---
 
@@ -168,11 +168,11 @@ if not margin.empty:
     # 杠杆过热预警：5 日平均变化率超过 0.5%
     latest_change = margin["balance_change_5d"].dropna().iloc[-1]
     if latest_change > 0.005:
-        print(f"⚠️ 杠杆过热预警：融资余额 5 日平均变化率 {latest_change:.4%}")
+        print(f"杠杆过热预警：融资余额 5 日平均变化率 {latest_change:.4%}")
     elif latest_change < -0.005:
-        print(f"📉 去杠杆信号：融资余额 5 日平均变化率 {latest_change:.4%}")
+        print(f"去杠杆信号：融资余额 5 日平均变化率 {latest_change:.4%}")
     else:
-        print(f"✅ 杠杆情绪平稳：{latest_change:.4%}")
+        print(f"杠杆情绪平稳：{latest_change:.4%}")
 ```
 
 ### 3.3 融资买入占比
@@ -205,6 +205,8 @@ from eqlib import get_limit_up_down_stats
 
 > **重要限制**：该 API **仅支持最近 30 个交易日**的数据。超出范围会打印警告，返回结果可能不完整。缓存有效期 30 分钟（交易时段内数据会变化）。
 
+> **与回测引擎的关系**：本节是"统计口径"的涨跌停数据；回测引擎另有**默认开启**的涨跌停拦截——开盘价触及涨停的买单、触及跌停的卖单无法成交，订单取消并记入 `cancel_reason`。幅度按板块与日期区分（主板 ±10%、ST ±5%、创业板 2020-08-24 起 ±20%、科创板 ±20%、北交所 ±30%），可用 `set_option('check_price_limit', False)` 关闭。
+
 ### 4.2 系统性风险预警
 
 大面积跌停（如超过 100 只）是市场恐慌的明确信号：
@@ -225,9 +227,9 @@ if not stats.empty:
     # 系统性风险预警
     latest_down = stats["limit_down_count"].iloc[-1]
     if latest_down > 100:
-        print(f"🚨 系统性风险预警：{latest_down} 只股票跌停")
+        print(f"系统性风险预警：{latest_down} 只股票跌停")
     elif latest_down > 50:
-        print(f"⚠️ 市场情绪偏弱：{latest_down} 只股票跌停")
+        print(f"市场情绪偏弱：{latest_down} 只股票跌停")
 
     # 市场宽度指标：涨停/跌停比
     stats["up_down_ratio"] = (
@@ -425,7 +427,7 @@ if not corr.empty:
                 max_corr = abs(corr.iloc[i, j])
 
     if max_corr > 0.75:
-        print(f"⚠️ 策略间最高相关性 {max_corr:.2f}，分散化效果不足")
+        print(f"策略间最高相关性 {max_corr:.2f}，分散化效果不足")
 ```
 
 | 相关性 | 含义 | 建议 |
@@ -512,11 +514,11 @@ if report.recommendations:
 actions = check_kill_switch(report)
 
 if actions:
-    print("⚠️ 需要立即执行的操作：")
+    print("需要立即执行的操作：")
     for action in actions:
         print(f"  {action}")
 else:
-    print("✅ 无需熔断操作")
+    print("无需熔断操作")
 ```
 
 `KILL_SWITCH` 级别的熔断操作示例：
@@ -547,19 +549,19 @@ def risk_check_callback(context, data):
     report = monitor.daily_check()
 
     if report.alert_level == AlertLevel.KILL_SWITCH:
-        log.warning(f"🚨 熔断预警！触发条件: {report.triggers}")
+        log.warning(f"熔断预警！触发条件: {report.triggers}")
         actions = check_kill_switch(report)
         for action in actions:
             log.warning(action)
         # 在实际交易中，此处应调用清仓接口或发送紧急通知
 
     elif report.alert_level == AlertLevel.RED:
-        log.warning(f"🔴 红色预警: {report.triggers}")
+        log.warning(f"红色预警: {report.triggers}")
         for rec in report.recommendations:
             log.info(f"  建议: {rec}")
 
     elif report.triggers:
-        log.info(f"🟡 关注: {report.triggers}")
+        log.info(f"关注: {report.triggers}")
 
 # 在 initialize 中注册回调
 def initialize(context):
@@ -585,7 +587,7 @@ def initialize(context):
 """
 
 from eqlib import (
-    run_backtest, analyze_returns, order_target, order_value,
+    run_backtest, analyze_returns, order_target_value,
     get_north_money_flow, get_limit_up_down_stats,
     before_trading_start, g, log, set_benchmark, attribute_history,
 )
@@ -647,12 +649,12 @@ def before_market_check(context, data):
         if recent_down > 100:
             g.can_trade = False
             log.warning(
-                f"🚨 市场恐慌：近 3 日平均 {recent_down:.0f} 只跌停，暂停交易"
+                f"市场恐慌：近 3 日平均 {recent_down:.0f} 只跌停，暂停交易"
             )
         elif recent_down > 50:
             g.position_pct = min(g.position_pct, 0.3)
             log.warning(
-                f"⚠️ 市场偏弱：近 3 日平均 {recent_down:.0f} 只跌停，限制仓位"
+                f"市场偏弱：近 3 日平均 {recent_down:.0f} 只跌停，限制仓位"
             )
         else:
             g.can_trade = True
@@ -676,10 +678,10 @@ def handle_data(context, data):
 
     if ma5 > ma20:
         # 短期均线在上 → 买入至目标仓位
-        order_target(g.security, value=target_value)
+        order_target_value(g.security, target_value)
     elif ma5 < ma20 * 0.98:
         # 短期均线明显在下 → 清仓
-        order_target(g.security, value=0)
+        order_target_value(g.security, 0)
 
 
 # ── 运行回测 ──────────────────────────────────────────
@@ -689,6 +691,7 @@ if __name__ == "__main__":
         start_date="2024-01-01",
         end_date="2024-12-31",
         starting_cash=100000,
+        handle_data=handle_data,   # 不注册 handle_data 或任何 run_daily/run_weekly，回测零交易
     )
 
     metrics = analyze_returns(result, risk_free_rate=0.03)
@@ -700,9 +703,16 @@ if __name__ == "__main__":
 ### 案例要点
 
 1. **`before_trading_start` 注册**：在 `initialize` 中调用，确保每天开盘前执行风控检查；回调签名为 `(context, data)`
-2. **信号分层**：北向资金提供"大方向"信号（加仓/减仓），均线提供"入场/离场"时机
-3. **风控熔断**：`g.can_trade` 标记在 `before_market_check` 中设置，`handle_data` 中检查
-4. **仓位动态调整**：`g.position_pct` 根据市场状态在 30%~80% 之间浮动
+2. **`handle_data` 注册**：通过 `run_backtest(..., handle_data=handle_data)` 传入（或在 `initialize` 里调用 `set_handle_data(handle_data)`）。`handle_data` 只在模块里定义而不注册，回测不会执行任何交易
+3. **下单口径**：`order_target_value(security, value)` 按**金额**调到目标市值；`order_target(security, amount)` 按**股数**调，二者不要混用
+4. **信号分层**：北向资金提供"大方向"信号（加仓/减仓），均线提供"入场/离场"时机
+5. **风控熔断**：`g.can_trade` 标记在 `before_market_check` 中设置，`handle_data` 中检查
+
+!!! note "引擎默认行为对本案的影响"
+
+    - 买入价触及涨停、卖出价触及跌停的订单会被取消并记录 `cancel_reason`（默认开启，`set_option('check_price_limit', False)` 可关闭）；停牌当日订单同样当日取消
+    - 标的 30 个交易日无行情会被强制清算，`trade_log` 记为 `DELIST_LIQUIDATE`
+    - 报告中的胜率按 FIFO 配对、含双边费用判定；未设基准时 `alpha` / `beta` 为 `NaN`，报告渲染为 N/A
 
 ---
 
@@ -721,8 +731,8 @@ if __name__ == "__main__":
 
 ### 相关示例
 
-- **[Example 25](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)**：A 股市场情绪指标——完整演示四个数据 API 的用法
-- **[Example 08](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)**：生命周期回调——`before_trading_start` 与 `after_trading_end` 的详细用法
+- **[Example 13](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/13_ashare_sentiment.py)**：A 股市场情绪指标——完整演示四个数据 API 的用法
+- **[Example 07](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/07_lifecycle.py)**：生命周期回调——`before_trading_start` 与 `after_trading_end` 的详细用法
 
 ### 下一步
 

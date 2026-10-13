@@ -36,6 +36,9 @@ EasyQuant 采用**事件驱动**的回测模型，与 JoinQuant / Zipline 一致
 | **100 股整数倍** | 买入数量自动向下取整到 100 的整数倍 | 符合 A 股最小交易单位 |
 | **前视偏差防护** | 策略只能访问 `context.current_dt` 及之前的数据 | 确保回测结果可信 |
 | **下一日成交** | `order*` 在当前回调入队，下一交易日开盘价成交 | 避免使用当日收盘价下单的偏差 |
+| **涨跌停拦截** | 默认开启（`check_price_limit=True`）：开盘价触及涨停的买单、触及跌停的卖单当日取消，原因记入订单的 `cancel_reason` | 复现触板不可成交的真实约束 |
+| **停牌当日取消** | 当日无行情的标的无法成交，订单当日取消、不顺延复牌（`cancel_reason` 为 `"no price data"` / `"suspended"`） | 消除停牌订单滞留的旧行为歧义 |
+| **退市强制清算** | 持仓标的连续 30 个交易日无行情 → 按最后收盘价强制清算，交易记录为 `DELIST_LIQUIDATE`；可用 `delisted_position_handling` / `delisted_liquidation_haircut` 选项调整 | 防止已退市标的无限期滞留组合 |
 | **内存限制** | 默认限制 1024 MB，可通过 `max_memory_mb` 调整 | 防止大回测 OOM |
 
 ## 订单执行语义

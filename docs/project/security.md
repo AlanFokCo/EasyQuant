@@ -1,26 +1,26 @@
-# Security Policy
+# 安全政策
 
-## Supported Versions
+## 支持版本
 
-| Version | Supported          |
+| 版本 | 是否支持 |
 | ------- | ------------------ |
-| 1.0.x   | Yes                |
-| 0.1.x   | No                 |
+| 1.0.x   | 支持——当前发布线（见[更新日志](changelog.md)） |
+| 0.1.x   | 不支持——从未作为稳定线发布，P0 修复已随 1.0.2 发出 |
 
-## Reporting a Vulnerability
+## 报告漏洞
 
-EasyQuant is a quantitative research framework intended for **backtesting and paper trading only**. It is not designed for handling real-money transactions or sensitive user data.
+EasyQuant 是量化研究框架，只面向**回测与模拟盘**场景，不处理真实资金交易或敏感用户数据。
 
-If you discover a security issue:
+发现安全问题：
 
-1. **Do not** open a public GitHub Issue.
-2. Email the maintainer directly: `alanfok2868@gmail.com`
-3. Include a description of the vulnerability, steps to reproduce, and suggested fix (if any).
-4. We will respond within 48 hours and work with you to resolve the issue.
+1. **不要**开公开 GitHub Issue。
+2. 直接邮件联系维护者：`alanfok2868@gmail.com`
+3. 附上漏洞描述、复现步骤、修复建议（如有）。
+4. 我们会在 48 小时内回复并跟进处理。
 
-## Security Best Practices
+## 安全实践
 
-- **Never** commit API keys, account IDs, or credentials to the repository
-- Use `.env` or environment variables for sensitive configuration
-- The `.gitignore` excludes `.env`, `.env.local`, and `*.local.json`
-- Review strategy code before running with real accounts — EasyQuant provides no warranty for live trading losses
+- **永远不要**把 API Key、账号、凭证提交进仓库
+- 敏感配置用 `.env` 或环境变量
+- `.gitignore` 已排除 `.env`、`.env.local`、`*.local.json`
+- 用真实账户跑策略前先审查代码——EasyQuant 不对实盘亏损负责

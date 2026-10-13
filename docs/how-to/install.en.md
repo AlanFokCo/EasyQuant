@@ -43,6 +43,8 @@ python -m pytest tests/
 
 `eqlib` is a quantitative strategy backtesting framework for the **China A-share market**. It sources data from `akshare`, uses an event-driven strategy API, and supports a complete workflow from backtesting to paper trading.
 
+**Network requirement:** the `akshare` data source needs internet access; offline environments can only use previously cached local data (`use_local=True`).
+
 **Supported use cases:**
 - A-share daily / minute-level backtesting
 - Strategy development and validation

@@ -92,68 +92,68 @@ The A-share market has unique characteristics that allow construction of proprie
 
 North-bound capital refers to foreign capital entering the A-share market via Shanghai-Hong Kong Stock Connect and Shenzhen-Hong Kong Stock Connect. Since north-bound capital is generally regarded as "smart money," its flow direction has strong predictive power for market sentiment.
 
-**Economic rationale:**
-
-- Sustained north-bound net inflows → Foreign investors are bullish on A-shares → Market sentiment is optimistic
-- Sustained north-bound net outflows → Foreign investors are bearish on A-shares → Market sentiment is pessimistic
+**Economic rationale:** North-bound capital is generally regarded as "smart money." Sustained net inflows mean foreign investors are adding to A-shares and sentiment leans optimistic; sustained net outflows mean they are pulling back and sentiment leans pessimistic.
 
 **Factor construction example:**
 
 ```python
+from datetime import datetime, timedelta
 from eqlib import get_north_money_flow
 
 def compute_north_money_factor(lookback_days=5):
     """
-    North-bound capital flow factor: net inflow ratio over the last N days.
+    North-bound capital flow factor: net buy as a share of total turnover over the last N trading days.
 
     Returns:
-        float: Net inflow as a proportion of turnover; positive means net inflow
+        float: Net inflow ratio; positive means net inflow. None when data is insufficient.
     """
-    df = get_north_money_flow(days=lookback_days)
+    end_date = datetime.now().date()
+    # Fetch twice the days to cover weekends and holidays
+    start_date = end_date - timedelta(days=lookback_days * 2 + 10)
+    df = get_north_money_flow(start_date=start_date, end_date=end_date)
     if df is None or df.empty:
         return None
 
-    # Calculate cumulative net inflow
-    total_net_inflow = df['north_net'].sum()
-    total_turnover = df['north_money'].sum()  # Total turnover
+    # Take the latest N trading days (columns: date / net_buy / total_buy / total_sell, in 100M CNY)
+    recent = df.tail(lookback_days)
+    total_net = recent['net_buy'].sum()
+    total_turnover = (recent['total_buy'] + recent['total_sell']).sum()
 
     if total_turnover == 0:
         return None
 
-    # Net inflow ratio
-    net_ratio = total_net_inflow / total_turnover
-    return net_ratio
+    return total_net / total_turnover
 
 
 def compute_north_momentum_factor(lookback_days=10):
     """
-    North-bound capital momentum factor: net inflow trend over the last N days.
+    North-bound capital momentum factor: trend slope of the net buy series over the last N trading days (100M CNY/day).
 
-    Calculates the net inflow trend slope via linear regression.
+    The slope is computed via simple linear regression.
     """
     import numpy as np
 
-    df = get_north_money_flow(days=lookback_days)
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=lookback_days * 2 + 10)
+    df = get_north_money_flow(start_date=start_date, end_date=end_date)
     if df is None or len(df) < lookback_days:
         return None
 
-    # Net inflow series
-    net_flows = df['north_net'].values
+    # Net buy series (100M CNY)
+    net_flows = df['net_buy'].tail(lookback_days).values
 
-    # Simple linear regression for trend
     x = np.arange(len(net_flows))
-    y = net_flows
 
-    # Slope = Cov(x, y) / Var(x)
-    cov_xy = np.cov(x, y, ddof=0)[0, 1]
+    cov_xy = np.cov(x, net_flows, ddof=0)[0, 1]
     var_x = np.var(x, ddof=0)
 
     if var_x == 0:
         return None
 
-    slope = cov_xy / var_x
-    return slope
+    return cov_xy / var_x
 ```
+
+> **Behavior inside backtests**: `get_north_money_flow()` is point-in-time safe — inside a backtest session the requested range is clamped at the simulated clock (T-1 during decision-time callbacks such as `before_trading_start`, scheduled functions, and `handle_data`), and ranges fully beyond the cutoff return an empty DataFrame without leaking future data. The canonical in-backtest pattern pins `end_date` to `context.current_dt.date()`; see `examples/20_all_weather_alpha/combined_strategy.py`.
 
 **Use cases:**
 
@@ -166,79 +166,64 @@ def compute_north_momentum_factor(lookback_days=10):
 
 Restricted share unlock (限售股解禁) refers to shares that were previously prohibited from trading on the secondary market becoming tradeable, typically creating selling pressure. The unlock factor is primarily used for risk avoidance.
 
-**Economic rationale:**
-
-- Large-scale restricted share unlocks → Potential selling pressure → Stock price may decline
-- The higher the unlock market value as a proportion of total market cap, the greater the impact
+**Economic rationale:** Large-scale restricted share unlocks mean potential selling pressure. The higher the unlock value as a share of float market cap, the heavier the pressure on the price.
 
 **Factor construction example:**
 
 ```python
-from eqlib import get_restriction_release
-import datetime
+from eqlib import get_restriction_release, log
 
 def compute_restriction_risk_factor(code, lookforward_days=30):
     """
-    Restricted share unlock risk factor: unlock pressure score over the next N days.
+    Restricted share unlock risk factor: unlock pressure score for the stock over the next N days.
 
     Returns:
-        float: Unlock risk score; higher means greater risk.
-              0 means no unlock or negligible impact.
+        float: Risk score in [0, 1]; 0 means no unlock within the next N days.
     """
-    today = datetime.date.today()
-    end_date = today + datetime.timedelta(days=lookforward_days)
-
-    df = get_restriction_release(
-        code=code,
-        start_date=today.strftime('%Y%m%d'),
-        end_date=end_date.strftime('%Y%m%d')
-    )
-
+    # The API returns a market-wide list of upcoming unlocks; filter by the code column
+    df = get_restriction_release(days=lookforward_days)
     if df is None or df.empty:
-        return 0.0  # No unlock scheduled
-
-    # Calculate unlock market value
-    total_release_value = df['release_value'].sum()
-
-    # Get current market cap
-    from eqlib import get_valuation
-    val = get_valuation(code)
-    if val is None:
         return 0.0
 
-    market_cap = val.get('market_cap', 0)
-    if market_cap <= 0:
+    rows = df[df['code'] == code]
+    if rows.empty:
         return 0.0
 
-    # Unlock ratio = unlock market value / current market cap
-    release_ratio = total_release_value / market_cap
+    # release_pct: unlock value as a fraction of pre-unlock float market cap (0.05 means 5%)
+    # release_value (100M CNY) and release_amount (10K shares) are also available
+    release_pct = float(rows['release_pct'].max())
 
-    # Convert to risk score (0-1; unlock ratio above 10% is considered high risk)
-    risk_score = min(release_ratio / 0.10, 1.0)
-    return risk_score
+    # Unlock ratio reaching 10% (0.10) is considered high risk
+    return min(release_pct / 0.10, 1.0)
 
 
 def filter_stocks_by_restriction(stock_pool, lookforward_days=30, threshold=0.05):
     """
-    Filter out stocks with upcoming restricted share unlocks.
+    Filter out stocks with upcoming large-scale restricted share unlocks.
 
     Args:
         stock_pool: List of stock codes
         lookforward_days: Look-forward window in days
-        threshold: Unlock ratio threshold; stocks above this are filtered out
+        threshold: release_pct threshold (fraction; 0.05 means 5%); stocks above it are filtered out
 
     Returns:
         list: Filtered stock list
     """
+    df = get_restriction_release(days=lookforward_days)
+    if df is None or df.empty:
+        return list(stock_pool)
+
+    risky = set(df.loc[df['release_pct'] > threshold, 'code'])
     filtered = []
     for code in stock_pool:
-        risk = compute_restriction_risk_factor(code, lookforward_days)
-        if risk < threshold:
-            filtered.append(code)
+        if code in risky:
+            log.info('%s has a large unlock within %d days, filtered out' % (code, lookforward_days))
         else:
-            log.info(f'{code} unlock risk too high ({risk:.2%}), filtered out')
+            filtered.append(code)
     return filtered
 ```
+
+> **Behavior inside backtests**: `get_restriction_release()` is a snapshot interface — the unlock schedule is computed from announcements as of the *real* today, and the provider carries no announcement-date history. Calling it inside a backtest session emits a `FutureWarning`; with `set_option('avoid_future_data', True)` it raises `ValueError`. Use unlock filtering in research and live contexts; for backtests, build a fixed stock pool offline first.
 
 **Use cases:**
 
@@ -414,17 +399,19 @@ def score_stock_with_financials(code):
         if pb and 0 < pb < 20:
             pb_factor = 1.0 / pb
 
-    # Quality factor (ROE = net profit / net assets, from financial summary)
+    # Quality factor (ROE, from the financial summary)
     roe_factor = 0.0
     try:
         fin = get_financial_abstract(code)
-        if fin is not None and not fin.empty:
-            # Financial summary row index includes various metrics; try to get ROE
-            if 'ROE' in fin.index:
-                roe = float(fin.loc['ROE'].iloc[-1])
-                # ROE stored as decimal (e.g., 0.15 = 15%), valid range 0-1
-                if 0 < roe < 1:
-                    roe_factor = roe
+        if fin is not None and not fin.empty and '指标' in fin.columns:
+            # The row index is the metric category ("选项"); Chinese metric names live
+            # in the "指标" column, and report-period columns are sorted newest first
+            roe_rows = fin[fin['指标'].astype(str).str.contains('净资产收益率')]
+            if not roe_rows.empty:
+                # Latest report period (first column after "指标"); value is a percent (4.31 = 4.31%)
+                roe = float(roe_rows.iloc[0, 1])
+                if 0 < roe < 100:
+                    roe_factor = roe / 100.0
     except Exception:
         pass
 
@@ -666,13 +653,18 @@ Before putting a factor into use, you need to verify whether it actually has pre
 
 ### 9.1 IC (Information Coefficient) Test
 
-IC is the correlation between factor values and next-period returns. The higher the absolute IC value, the stronger the predictive power:
+IC is the correlation between the **factor value at day T** and the **return over the N days after T**. The higher the absolute IC value, the stronger the predictive power. The two must not share the same window — using the "past 5-day return" as the factor and the same 5 days as the "future return" yields a pseudo-forward IC with no predictive meaning. The implementation below splits the history into two segments: the factor uses only data up to T, and the return spans T → T+N:
 
 ```python
-def compute_ic(stock_pool, factor_func, forward_period=5):
+def compute_ic(stock_pool, factor_func, forward_period=5, factor_window=40):
     """
-    Calculate factor IC (correlation between factor values and future N-day returns).
-    factor_func: function(code) -> float | None
+    Calculate factor IC (Pearson correlation between factor value at T and T→T+N return).
+
+    Args:
+        factor_func: function(hist) -> float | None
+            Receives history up to day T and returns a factor value
+        forward_period: Forward horizon N (trading days)
+        factor_window: Number of historical bars the factor needs
     """
     import statistics
 
@@ -680,16 +672,19 @@ def compute_ic(stock_pool, factor_func, forward_period=5):
     forward_returns = []
 
     for code in stock_pool:
-        # Factor value (computed today)
-        f = factor_func(code)
+        # Fetch enough at once: factor_window bars for the factor, forward_period for the return
+        hist = attribute_history(
+            code, factor_window + forward_period + 5, '1d', ['close'])
+        if hist.empty or len(hist) < factor_window + forward_period:
+            continue
+
+        hist_t = hist.iloc[:-forward_period]   # Data up to day T
+        f = factor_func(hist_t)
         if f is None:
             continue
 
-        # Future N-day return (for validation)
-        hist = attribute_history(code, forward_period + 5, '1d', ['close'])
-        if hist.empty or len(hist) < forward_period + 1:
-            continue
-        fwd_ret = (hist['close'].iloc[-1] / hist['close'].iloc[-(forward_period + 1)]) - 1
+        # True forward return from T to T+N
+        fwd_ret = hist['close'].iloc[-1] / hist_t['close'].iloc[-1] - 1
 
         factor_values.append(f)
         forward_returns.append(fwd_ret)
@@ -709,10 +704,11 @@ def compute_ic(stock_pool, factor_func, forward_period=5):
     return ic
 
 
-# Example: Test IC of the momentum factor
+# Example: test the IC of the 20-day momentum factor (reusing STOCK_POOL from §8)
 ic_value = compute_ic(
-    g.stock_pool,
-    lambda code: compute_momentum(code, period=20),
+    STOCK_POOL,
+    lambda hist: (hist['close'].iloc[-1] / hist['close'].iloc[-20] - 1)
+                 if len(hist) >= 20 else None,
     forward_period=5,
 )
 if ic_value is not None:
@@ -723,20 +719,22 @@ if ic_value is not None:
 
 ### 9.2 Long-Short Quintile Return Analysis
 
-Sort stocks into 5 groups (Q1-Q5) by factor value from high to low. If the factor is effective, Q1 (highest score) should clearly outperform Q5 (lowest score):
+Sort stocks into 5 groups (Q1-Q5) by their factor value at day T, then compare each group's return from T to T+N. If the factor is effective, Q1 (highest score) should clearly outperform Q5 (lowest score):
 
 ```python
-def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
-    """Factor quintile analysis: sort stocks into 5 groups by factor value and compare returns."""
+def factor_quintile_analysis(stock_pool, factor_func, forward_period=5, factor_window=40):
+    """Factor quintile analysis: group by factor value at T, compare T→T+N returns."""
     data = []
     for code in stock_pool:
-        f = factor_func(code)
+        hist = attribute_history(
+            code, factor_window + forward_period + 5, '1d', ['close'])
+        if hist.empty or len(hist) < factor_window + forward_period:
+            continue
+        hist_t = hist.iloc[:-forward_period]
+        f = factor_func(hist_t)
         if f is None:
             continue
-        hist = attribute_history(code, lookback + 3, '1d', ['close'])
-        if hist.empty or len(hist) < lookback + 1:
-            continue
-        fwd = (hist['close'].iloc[-1] / hist['close'].iloc[-(lookback+1)]) - 1
+        fwd = hist['close'].iloc[-1] / hist_t['close'].iloc[-1] - 1
         data.append((code, f, fwd))
 
     if len(data) < 5:
@@ -777,9 +775,9 @@ No factor works forever — factors become "stale":
 
 ### 10.3 Data Bias
 
-Backtests use current financial data (`get_valuation`) rather than the data that was actually published at that historical point in time. This can introduce **financial data look-ahead bias**. A rigorous multi-factor strategy should use historical financial data snapshots.
+Backtests use current financial data (`get_valuation` / `get_financial_abstract`) rather than the data actually published at that historical point in time, which introduces **financial data look-ahead bias**. Since 2026-10, calling these snapshot interfaces inside a backtest session emits a `FutureWarning`, and with `set_option('avoid_future_data', True)` it raises `ValueError` — a rigorous multi-factor backtest should only use data available at that historical point.
 
-**Practical advice:** In backtests, primarily use **price and volume factors** (no look-ahead bias), and reserve financial factors as supplementary references or live-trading screening conditions.
+**Practical advice:** In backtests, primarily use **price and volume factors** (no look-ahead bias), and reserve financial factors as supplementary references or live-trading screening conditions. North-bound capital (`get_north_money_flow`) is the exception: it is clamped to T-1 against the simulated clock inside backtests and is safe to use.
 
 ---
 

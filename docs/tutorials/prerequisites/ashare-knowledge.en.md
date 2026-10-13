@@ -56,7 +56,7 @@ A-share codes are **6-digit numbers**; the prefix determines the exchange and bo
 
 | Prefix | Exchange | Board | Examples |
 |--------|----------|-------|---------|
-| `600xxx` `601xxx` `603xxx` `605xxx` | Shanghai (SSE) | SSE Main Board | `601390` (ICBC) `600519` (Kweichow Moutai) |
+| `600xxx` `601xxx` `603xxx` `605xxx` | Shanghai (SSE) | SSE Main Board | `601390` (China Railway Group) `600519` (Kweichow Moutai) |
 | `000xxx` `001xxx` | Shenzhen (SZSE) | SZSE Main Board | `000858` (Wuliangye) |
 | `002xxx` `003xxx` | Shenzhen | SME Board (merged into Main Board) | `002415` (Hikvision) |
 | `300xxx` `301xxx` | Shenzhen | ChiNext (GEM) | `300750` (CATL) |
@@ -151,16 +151,21 @@ A-share daily price movements are capped:
 
 ### Impact on Strategies
 
+The table above shows current rules; ChiNext was ±10% before the registration-based reform on 2020-08-24, and eqlib switches the limit automatically by trade date.
+
 ```python
 # A stock that hit the limit-up price cannot be bought (no sellers)
 # A stock that hit the limit-down price cannot be sold (no buyers)
-# eqlib backtests ignore liquidity constraints; live trading must account for them
+# eqlib backtests enforce this by default: buy orders whose open touches
+# limit-up and sell orders touching limit-down are cancelled, with the
+# cancel_reason recorded on the order (set_option('check_price_limit', False) disables)
 
-# Best practice: filter out stocks that have hit limit-up today
+# Manual filtering is still useful at the signal layer — skip limit-up stocks
+# instead of waiting for the order to be cancelled:
 hist = attribute_history(security, 2, '1d', ['close'])
 prev_close = hist['close'].iloc[-2]
 today_close = hist['close'].iloc[-1]
-limit_up = today_close >= prev_close * 1.099  # near limit-up
+limit_up = today_close >= prev_close * 1.099  # near limit-up (main-board rule)
 
 if limit_up:
     continue  # skip, do not buy limit-up stocks
@@ -228,7 +233,7 @@ def initialize(context):
     ))
 ```
 
-> If you do not set trading costs, eqlib defaults to zero fees — this will inflate your backtest results! Always set realistic fees.
+> Defaults exist even if you set nothing: every eqlib session starts with `OrderCost(open_tax=0, close_tax=None, open_commission=0.00025, close_commission=0.00025, min_commission=5)`. `close_tax=None` applies the **date-aware statutory stamp duty** (0.05% on/after 2023-08-28, 0.1% before); passing an explicit `close_tax` pins that rate for the whole run. Set costs explicitly for determinism and reproducibility — not to "fill in" missing fees.
 
 ---
 
@@ -299,8 +304,9 @@ Consecutive days of net main inflow → Institutions are accumulating, often a p
 ```python
 from eqlib import get_money_flow
 
-money_flow = get_money_flow('601390', days=5)
-# Returns a DataFrame with fields including net_main (net main inflow)
+money_flow = get_money_flow('601390', count=5)   # count limits how many recent days are returned
+# Returns a DataFrame: date / close / pct_change / main_net_inflow (net main inflow)
+# plus tiered inflow fields such as super/big/mid/small_order_net
 ```
 
 ---
@@ -499,8 +505,10 @@ safe_candidates = [c for c in candidates if c not in large_release_codes]
 | Rule | How eqlib Handles It |
 |------|----------------------|
 | T+1 settlement | `position.closeable_amount` is 0 on the day of purchase |
-| Limit up/down | Backtests do not auto-filter (manual logic required); affects order fills in live trading |
-| Stamp duty | Set via `OrderCost(close_tax=0.0005)` |
+| Limit up/down | Enforced by default in backtests by board/date (main board ±10%, ST ±5%, ChiNext ±20% [±10% before 2020-08-24], STAR ±20%, BSE ±30%); limit-up buys / limit-down sells are cancelled with a `cancel_reason`; disable via `set_option('check_price_limit', False)` |
+| Suspension | Orders for a security with no bar (or zero volume) that day are cancelled the same day (`cancel_reason` = `"no price data"` / `"suspended"`), never deferred to resumption |
+| Delisting | A position with no bars for 30 trading days is force-liquidated at the last close (`DELIST_LIQUIDATE` in the trade log); `set_option('delisted_position_handling', 'keep')` keeps it, `delisted_liquidation_haircut` models a liquidation discount |
+| Stamp duty | Set explicitly via `OrderCost(close_tax=0.0005)`; with `close_tax=None` (default) the statutory rate applies by trade date (0.05% since 2023-08-28, 0.1% before) |
 | ST filtering | `filter_st_stocks(securities)` |
 | Index constituents | `get_index_stocks('000300.XSHG')` |
 | Benchmark comparison | `set_benchmark('000300.XSHG')` |

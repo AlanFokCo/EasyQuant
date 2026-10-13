@@ -69,8 +69,11 @@ scan_market(min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50)
 Screen by financial metrics.
 
 ```python
-get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None, min_roe=None)
+get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None,
+                     min_roe=None, min_revenue=None, min_profit=None)
 ```
+
+Note: only `min_pe` / `max_pe` / `min_pb` / `max_pb` are applied today; `min_roe` / `min_revenue` / `min_profit` remain in the signature but are not yet effective (the spot-snapshot source carries no such fields).
 
 ## get_all_securities
 

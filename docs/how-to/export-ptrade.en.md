@@ -52,11 +52,18 @@ The adapter is built on the QMT Python API documentation ([QMT_Python_API_Doc](h
 
 ### 2.1 Easiest Way: Use the Export Tool
 
-```bash
-python examples/12_paper_trade.py
+There is no ready-made export script under `examples/`; call `export_ptrade_script` directly:
+
+```python
+from eqlib.ptrade_adapter import export_ptrade_script
+
+export_ptrade_script(
+    strategy_file='my_strategy.py',              # your EasyQuant strategy file
+    output_file='ptrade_strategy_generated.py',  # generated QMT strategy file
+)
 ```
 
-Generates `examples/ptrade_strategy_generated.py` (by default generated from `examples/03_run_backtest.py` as a sample). Copy it into the QMT strategy editor to run.
+The generated file already wraps your strategy in QMT's `init()` / `handlebar()` entry points — paste it into the QMT strategy editor, fill in your account ID, and run. Without `strategy_file`, the function prints the template to stdout.
 
 ### 2.2 Manual Way: Three-Step Migration
 
@@ -299,10 +306,13 @@ def handlebar(ContextInfo):
 
 Best for existing complete EasyQuant strategy files.
 
-```bash
-# You can modify strategy_file / output_file in 12_paper_trade.py
-python examples/12_paper_trade.py
-# Output: examples/ptrade_strategy_generated.py → copy to QMT
+```python
+from eqlib.ptrade_adapter import export_ptrade_script
+
+export_ptrade_script(
+    strategy_file='my_strategy.py',
+    output_file='ptrade_strategy_generated.py',  # → copy to QMT
+)
 ```
 
 ---

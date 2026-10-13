@@ -47,7 +47,7 @@ Backtest engine → Simulated trades → Trade log + Portfolio equity curve
 - **Validate ideas**: Does the strategy you think works actually make money?
 - **Discover flaws**: Are there edge cases you haven't considered?
 - **Parameter selection**: Which parameter combination is more reasonable?
-- **Build confidence**: Get a quantitative assessment before risking real capital
+- **Quantitative assessment**: Test the strategy on historical data before risking real capital
 
 ### What a Backtest Cannot Tell You
 
@@ -73,7 +73,9 @@ After running a backtest, you'll get a set of core metrics:
 | **Beta** | Sensitivity to the broad market | Close to 1 = tracks the market |
 | **Win Rate** | May refer to "daily win rate" or "trade win rate" in the HTML, which have different meanings | See below and [Report Format Guide](../reference/reports-format.md) |
 
-> **Note:** `analyze_returns` returns **`win_rate_daily`** (percentage of profitable trading days) and **`win_rate_trade`** (percentage of profitable round-trip trades). You cannot directly compare these two numbers to judge strategy quality.
+> **Note:** `analyze_returns` returns **`win_rate_daily`** (percentage of profitable trading days) and **`win_rate_trade`** (percentage of profitable round-trip trades — FIFO-matched, with a win counted on net P&L after both buy-side and sell-side fees). You cannot directly compare these two numbers to judge strategy quality.
+
+> **Alpha / Beta may show as N/A**: both depend on the benchmark series. When benchmark data is unavailable, `alpha`, `beta`, and `information_ratio` are `NaN` and shown as `N/A` in reports — that is not a computation error, it means there was no benchmark to compare against.
 
 ---
 
@@ -81,24 +83,21 @@ After running a backtest, you'll get a set of core metrics:
 
 A real backtest writes four sets of files (`.html` / `.png` / `.md` / `.json`) under the repository root's **`reports/`** directory. Filenames include timestamps; those with suffixes (e.g., `_19_localdata`) typically correspond to a `report_suffix` or script description in the example scripts.
 
-**Recommended reading:** The repository's [`reports/README.md`](../how-to/read-reports.md) lists a mapping table for the example scripts. The HTML screenshot below and **`backtest_20260511_234245_19_localdata.html`** are from the same run (example [`06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py)); a copy is placed in `assets/tutorials/` for easy display on the web — **when studying locally, open the corresponding `.html` file in your browser** alongside the [Report Format Guide](../reference/reports-format.md).
+**Recommended reading:** [Reading Backtest Reports](../how-to/read-reports.md) explains the four report formats. The screenshot below comes from a real run of example [`06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py); the repository ships PNG screenshots only (`docs/assets/tutorials/`) — run the example script locally to generate the interactive `.html`.
 
 ![Example: Local data backtest HTML report (19_localdata)](../assets/tutorials/example_report_html_19_localdata.png)
 
-**You can also open from the same result set:**
-
-- `../reports/backtest_20260511_234245_19_localdata.html` (under the repo root's `reports/`, interactive report; the **cumulative return and drawdown charts** include both CSI 300 and SSE Composite dual benchmarks)
-- If you haven't generated it yet: run `python examples/06_local_data.py` in the repo root, then find the latest `*_19_localdata.*` in `reports/`.
+**To open the interactive version yourself:** run `python examples/06_local_data.py` in the repo root, then open the latest `.html` under `reports/` in your browser (the **cumulative return and drawdown charts** include both CSI 300 and SSE Composite dual benchmarks).
 
 The abstract "strategy vs benchmark" line chart is still available at: `../assets/tutorials/sample_equity_vs_benchmark.svg`.
 
-**Cross-referencing the HTML header and metric card readings:** After opening the `.html` file mentioned above, follow [Report Format Guide](../reference/reports-format.md) **Section 2.8** to cross-reference each item (same source as the HTML screenshot above); if the chart area is blank, it's likely due to CDN blocking — see the [FAQ](../project/faq.md).
+**Cross-referencing the HTML header and metric card readings:** After opening your locally generated `.html`, cross-reference each item against the metric definitions in the [Report Format Guide](../reference/reports-format.md); if the chart area is blank, it's likely due to CDN blocking — see the [FAQ](../project/faq.md).
 
 ---
 
 ## 2.2 How Do Different Strategies' Backtest Reports Look?
 
-Within the same framework, reports from different strategies have the **same structure but different numbers**. Below are 6 completed examples: open each script's corresponding `.html` to see identical page layouts with vastly different metric card values.
+Within the same framework, reports from different strategies have the **same structure but different numbers**. The 6 screenshots below come from completed example runs: identical page layouts, vastly different metric card values. Interactive `.html` files are not shipped with the repository — run the corresponding example script locally to generate one.
 
 > Note: The numbers below are from specific backtest periods and stock selections. **Results will vary significantly** depending on market conditions, time period, and stock selection. These are for illustration only and do not constitute investment advice.
 
@@ -108,37 +107,37 @@ Within the same framework, reports from different strategies have the **same str
 
 > The Bollinger Bands strategy excels in range-bound markets — buy when price touches the lower band, sell at the upper band, a natural buy-low-sell-high logic. Actual backtest results will vary with market conditions.
 
-### MACD Trend + Volume Confirmation (Example 16, stock 600536 China Software)
+### MACD Trend + Volume Confirmation (Example 16, stock 002594 BYD)
 
 ![MACD + volume HTML report](../assets/tutorials/example_report_html_macd_volume.png)
 
 > Tech stocks are highly volatile; a MACD golden cross confirmed by rising volume effectively captures trend initiation points. Actual backtest results will vary with market conditions.
 
-### Grid Trading (Example 18, stock 601857 PetroChina)
+### Grid Trading (Example 18, stock 601398 ICBC)
 
 ![Grid trading HTML report](../assets/tutorials/example_report_html_grid.png)
 
 > Grid trading suits low-volatility stocks with clear price ranges — repeatedly "buying low and selling high" within the range. Actual backtest results will vary with market conditions.
 
-### Multi-Factor Stock Selection (Example 17, 10-stock universe)
+### Multi-Factor Stock Selection (Example 17, 7-stock universe)
 
 ![Multi-factor stock selection HTML report](../assets/tutorials/example_report_html_multifactor.png)
 
-> The multi-factor model selects the top 3 stocks each week from a pool of 10 based on composite momentum/volume/volatility scores, with high turnover. Actual backtest results will vary with market conditions.
+> The multi-factor model selects the top 3 stocks each week from a pool of 7 based on composite momentum/volume/volatility scores, with high turnover. Actual backtest results will vary with market conditions.
 
-### Stock Selection Strategy Interface (Example 10, 14-stock universe)
+### Single-Stock Strategy Report Page (security 002384)
 
 ![Stock selection strategy HTML report](../assets/tutorials/example_report_html_stock_selection.png)
 
-> Selection based on low PE valuation + monthly rebalancing, held through the end of the period. Actual backtest results will vary with market conditions.
+> The same report template serves a low-frequency single-stock strategy: candlesticks with buy/sell markers, cumulative return, drawdown, daily P&L, and trade details. Actual backtest results will vary with market conditions.
 
-### Portfolio Backtest (Example 11, 5 stocks equal-weight)
+### Portfolio Backtest (Example 11, top 3 of 5 candidates)
 
 ![Portfolio backtest HTML report](../assets/tutorials/example_report_html_portfolio.png)
 
-> The momentum strategy's performance varies significantly depending on market regime — it may perform well in trending markets but poorly in ranging ones. Actual backtest results will vary with market conditions.
+> The portfolio example holds the top 3 of 5 candidate stocks ranked by 20-day momentum. A momentum strategy's performance varies significantly depending on market regime — it may perform well in trending markets but poorly in ranging ones. Actual backtest results will vary with market conditions.
 
-**Reading suggestion:** Open each corresponding `.html` file in your browser (see [`reports/README.md`](../how-to/read-reports.md)), and observe how the same page structure presents different metric cards, candlestick charts, drawdown curves, and trade tables across strategies.
+**Reading suggestion:** Run any of the example scripts locally (e.g., `python examples/15_bollinger_strategy.py`), open the generated `.html` in your browser, and observe how the same page structure presents different metric cards, candlestick charts, drawdown curves, and trade tables across strategies.
 
 ---
 
@@ -150,7 +149,7 @@ Within the same framework, reports from different strategies have the **same str
 from eqlib import *
 
 def initialize(context):
-    g.security = '601390'
+    g.security = '601398'
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0, close_tax=0.0005,
@@ -164,12 +163,12 @@ def market_open(context):
     if hist.empty or len(hist) < 20:
         return
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
     price = hist['close'].iloc[-1]
 
     if price > ma5 > ma20:
         if g.security not in context.portfolio.positions:
-            order_value(g.security, context.portfolio.available_cash)
+            order_value(g.security, context.portfolio.available_cash * 0.95)  # keep a 5% fee buffer
             log.info('BUY %s @ %.3f' % (g.security, price))
     elif price < ma5 < ma20:
         if g.security in context.portfolio.positions:
@@ -184,7 +183,7 @@ result = run_strategy(
     end_date='2024-12-31',
     starting_cash=100000,
     benchmark='000300.XSHG',
-    securities=['601390'],
+    securities=['601398'],
 )
 ```
 
@@ -194,54 +193,67 @@ result = run_strategy(
 
 Open `reports/backtest_*.html` in your browser (no local web server needed). From top to bottom, it typically includes: **Summary** → **Metric Cards** (annualized return, Sharpe ratio, max drawdown, Alpha/Beta, etc. — click for tooltips) → **Candlestick & Technical Indicators** → **Cumulative Returns** (strategy vs benchmark) → **Drawdown** → **Daily P&L / Daily Returns** → **Trades, Positions** tabs.
 
-The mapping between each field and the `analyze_returns` dictionary keys is detailed in the [**Report Format Guide**](../reference/reports-format.md). **The repository includes an example export index** for cross-referencing real HTML/PNG: [`reports/README.md`](../how-to/read-reports.md).
+The mapping between each field and the `analyze_returns` dictionary keys is detailed in the [**Report Format Guide**](../reference/reports-format.md); for how to read each section, see [Reading Backtest Reports](../how-to/read-reports.md).
 
 ### 3.3 Markdown Report
 
 File path: `reports/backtest_YYYYMMDD_HHMMSS.md`
 
-```markdown
-# Backtest Report: 601390
+The report is produced by `generate_report_md`. Its title is `# Backtest Report — 601398` (an em dash followed by the first traded security). Sections appear in this order:
 
-## Summary
-- **Period**: 2024-01-01 to 2024-12-31
-- **Initial Capital**: 100,000.00
-- **Final Value**: 108,234.56
-- **P&L**: +8,234.56 (+8.23%)
-- **Buy Orders**: 6
-- **Sell Orders**: 5
-
-## Trade Log
-| # | Date | Action | Security | Price | Amount | Commission |
-|---|------|--------|----------|-------|--------|------------|
-| 1 | 2024-01-15 | BUY | 601390 | 4.850 | 20,618 | 29.80 |
-| 2 | 2024-03-20 | SELL | 601390 | 5.120 | 20,618 | 31.75 |
-| 3 | 2024-04-10 | BUY | 601390 | 5.050 | 20,500 | 29.62 |
-...
-```
+| Section | Contents |
+|---------|----------|
+| `## Strategy Summary` | Period, initial capital, final value, P&L, benchmark and benchmark return (table) |
+| `## Grade Breakdown` | Per-dimension score, grade, and key metrics, with an Overall row at the end |
+| `## Performance Metrics` | Annual return, volatility, Sharpe, Sortino, max drawdown, Calmar, Alpha, Beta, information ratio, trade win rate, profit/loss ratio, trade count (with a benchmark comparison column) |
+| `## Monthly Returns` | Year × month return matrix + YTD |
+| `## Rolling Metrics` | 60-day rolling Sharpe/volatility (quarterly sampled) |
+| `## Top 5 Drawdown Periods` | Five deepest drawdowns: start, trough, recovery, depth, duration |
+| `## Trade Analysis` | Buy/sell counts, total commission, number of securities traded; multi-stock runs add `### Per-Stock P&L` |
+| `## Trade P&L` | FIFO-matched table: `\| # \| Security \| Buy Date \| Buy Price \| Sell Date \| Sell Price \| P&L \|` |
+| `## Factor Analysis` / `## Brinson Attribution` | Factor exposure and Brinson attribution (only when data is available) |
+| `## Data Sources` | Data sources, risk-free rate convention, and disclaimer |
 
 **Key areas to focus on:**
 
-1. **P&L (Profit and Loss)**:
-   - Absolute return (+8,234.56) and relative return (+8.23%)
-   - Compare with the CSI 300 over the same period: if the CSI 300 gained 15% while your strategy only gained 8%, the strategy underperformed the benchmark
+1. **P&L vs benchmark** (Strategy Summary):
+   - Look at both absolute and relative returns
+   - Compare with Benchmark Return: if the strategy gained 8% while the CSI 300 gained 15% over the same period, the strategy underperformed
 
-2. **Trading frequency**:
-   - 6 buys, 5 sells → 11 total trades
+2. **Trading frequency** (Trade Analysis):
    - Too many trades = high turnover = commissions eating into profits
    - Too few trades = signals may not be responsive enough
 
-3. **Per-trade P&L**:
-   - Review each buy and sell price trade by trade
+3. **Per-trade P&L** (Trade P&L):
+   - Review each buy and sell price trade by trade; P&L is net of both-side fees
    - If most trades are losing, the signal quality is poor
 
-4. **Commission costs**:
-   - Check the commission ratio for each trade
-   - Small trades may have disproportionately high commission costs (due to the 5 CNY minimum)
+4. **Commission costs** (Trade Analysis):
+   - Compare Total commission against P&L
+   - Small trades carry a disproportionately high commission share (5 CNY minimum)
 
 ### 3.4 JSON Report
 
 File path: `reports/backtest_YYYYMMDD_HHMMSS.json`
+
+Generated by `generate_report_json`. Top-level keys:
+
+| Key | Contents |
+|-----|----------|
+| `verdict` | `pass` / `grade` / `score` / `bottleneck` / `action` (`complete` or `adjust_params`) / `summary` |
+| `targets` | Per-metric pass/fail checks: `metric`, `value`, `target`, `pass` (failures sorted by `priority`; benchmark-dependent metrics get `pass: null` when unavailable) |
+| `diagnostics` | Bottleneck diagnostics |
+| `recommendations` | Parameter adjustment suggestions |
+| `grade` | Grade details (per-dimension scores) |
+| `metrics` | All scalar metrics from `analyze_returns` (`NaN`/`inf` serialized as `null`) |
+| `time_series` | `monthly_returns`, `rolling_sharpe_60d`, `rolling_volatility_60d`, `drawdown_periods` |
+| `summary` | `start_date`, `end_date`, `initial_capital`, `final_value`, `pnl`, `pnl_pct`, `num_trades`, `securities`, `benchmark`, `benchmark_return` |
+| `risk_metrics` | Legacy-compatible metrics subset |
+| `cumulative_returns` | Daily `{date, total_value, cumulative_return}` |
+| `trades` | Per-fill records: `type`, `date`, `security`, `price`, `amount`, `commission` |
+| `positions` | End-of-backtest positions: `amount`, `avg_cost`, `total_value` |
+| `chart_data` | Candlestick, volume, cumulative return, and drawdown series for charting |
+| `factor_analysis` / `brinson_attribution` | Attribution results (only when data is available) |
 
 ```python
 import json
@@ -250,16 +262,18 @@ with open('reports/backtest_20260503_143000.json') as f:
     report = json.load(f)
 
 # Basic metrics
-print("Total return: %.2f%%" % report['pnl_pct'])
-print("Number of trades:", report['num_trades'])
+print("Total return: %.2f%%" % report['summary']['pnl_pct'])
+print("Number of trades:", report['summary']['num_trades'])
+print("Sharpe ratio: %.2f" % report['metrics']['sharpe_ratio'])
 
 # Daily portfolio value curve
-for entry in report['portfolio_values']:
-    print(entry['date'], entry['value'])
+for entry in report['cumulative_returns']:
+    print(entry['date'], entry['total_value'], entry['cumulative_return'])
 
-# Custom recorded values (written via record())
-for entry in report['recorded_values']:
-    print(entry['date'], entry['price'], entry['ma5'])
+# Target checks: which metrics failed
+for t in report['targets']:
+    if t['pass'] is False:
+        print("Failed:", t['metric'], t['gap'])
 ```
 
 The JSON report is suitable for further data analysis, such as:
@@ -267,91 +281,22 @@ The JSON report is suitable for further data analysis, such as:
 - Analyzing the ratio of days in-position vs out-of-position
 - Plotting the cumulative return curve
 
-### 3.5 HTML Interactive Report — Layer-by-Layer Guide
+### 3.5 How to Read the HTML Interactive Report
 
-The HTML report is the most critical backtest analysis tool. After opening it in a browser, it is organized **from top to bottom** in the following layers:
+The HTML report is the primary backtest analysis tool. After opening it in a browser, the sections and how to read them:
 
-#### Layer 1: Header Summary
+| Section | Contents | How to read |
+|---------|----------|-------------|
+| **Header summary** | Security, period, initial/final capital, and P&L | Is P&L positive, and how large relative to initial capital? |
+| **Summary cards** | Annualized return, excess return, Sharpe, max drawdown, win rate (trade), Calmar | Don't stop at returns — Sharpe and drawdown tell you how much risk bought them. Reference: Sharpe > 1, drawdown < 20%, Calmar > 1 |
+| **Detailed metric row** | Annualized volatility, Sortino, Alpha, Beta, information ratio, daily win rate, profit/loss ratio | Positive Alpha + Beta near 1 means genuine excess return, not a directional bet. Alpha/Beta need a benchmark; they show N/A when the benchmark is missing |
+| **Candlestick & indicators** | Price line + MA5/MA20 + buy/sell markers + volume; green shading marks holding periods | Are buys near lows? Did price rise while holding? Is trading too dense? |
+| **Cumulative returns** | Strategy curve vs benchmark curves (CSI 300 + SSE Composite) | Strategy line consistently above the benchmark = steady outperformance; parallel lines = no alpha |
+| **Drawdown curve** | Depth of decline from the historical peak | Look at the deepest point: could you tolerate that period? |
+| **Daily P&L / returns** | Per-day profit/loss bars | Consecutive losses? Single-day losses too large? Returns concentrated in a few days? |
+| **Tabs** | Trades, end-of-backtest positions, Brinson attribution | Review trades one by one; attribution shows whether returns came from allocation or selection |
 
-The top of the page displays the backtest target, date range, initial capital, and the final asset P&L amount and percentage. This is where you **judge strategy profitability at a glance**.
-
-**Focus:** Is P&L positive? What is the profit relative to initial capital?
-
-#### Layer 2: Summary Cards
-
-Below the header, a row of small cards shows the most critical strategy metrics:
-
-| Card | Meaning | Good Value |
-|------|---------|------------|
-| **Annualized Return** | Compound annual growth rate | > 10% acceptable, > 20% excellent |
-| **Excess Return** | Strategy return − Benchmark return | Positive = outperformed the market |
-| **Sharpe Ratio** | Excess return per unit of risk | > 1 good, > 2 excellent |
-| **Max Drawdown** | Largest peak-to-trough decline | < 15% good, < 20% acceptable |
-| **Win Rate (Trade)** | Percentage of profitable round-trip trades | > 50% good |
-| **Calmar Ratio** | Annualized return / \|max drawdown\| | > 1 good |
-
-**Focus:** Don't just look at returns! The Sharpe ratio and max drawdown tell you "how much risk was taken to earn this return."
-
-#### Layer 3: Detailed Metric Row
-
-Below the summary cards, a more detailed metric row includes:
-
-| Metric | Meaning | How to Read |
-|--------|---------|-------------|
-| **Annualized Volatility** | Standard deviation of returns (annualized) | Lower = more stable |
-| **Sortino Ratio** | Risk-adjusted return considering only downside risk | More conservative than Sharpe |
-| **Alpha** | Excess return unexplained by the market | Positive = genuine alpha |
-| **Beta** | Sensitivity to the broad market | 1 = in sync, >1 = more aggressive |
-| **Information Ratio** | Active return / tracking error | > 0.5 good |
-| **Daily Win Rate** | Percentage of profitable trading days | Note: different meaning from trade win rate |
-| **Profit/Loss Ratio** | Average profit / average loss | > 1.5 good |
-
-**Focus:** Positive Alpha + Beta near 1 means the strategy truly generates excess return, not just leveraging up or betting on direction.
-
-#### Layer 4: Candlestick & Technical Indicator Chart
-
-The strategy's price chart typically includes:
-- **Main chart**: Price line + moving averages (MA5/MA20) + buy/sell markers
-- **Volume**: Bar chart below
-- **Green shading**: Periods when a position was held
-
-**How to read:**
-1. Are buy/sell points reasonable? (buys at lows, sells at highs)
-2. Did the price rise during holding periods?
-3. Is trading frequency reasonable? (too dense may indicate overtrading)
-
-#### Layer 5: Cumulative Returns
-
-Strategy cumulative return curve vs benchmark index curve. **Key comparison: Is the strategy line above the benchmark line?**
-
-- Strategy line consistently above benchmark → Strategy steadily outperforms
-- Strategy line drops significantly below benchmark during some period → Strategy failed during that period
-- Both lines nearly parallel → Strategy merely tracked the market, no alpha
-
-#### Layer 6: Drawdown Curve
-
-Shows the depth of the portfolio's decline from its historical high. **Focus on the deepest point:** Could you have tolerated that period?
-
-#### Layer 7: Daily P&L / Returns
-
-Bar chart showing daily profit/loss. Look for:
-- Consecutive losing days
-- Whether losing-day bars are longer than winning-day bars (single losses too large)
-- Whether returns are concentrated in just a few days
-
-#### Layer 8: Tabs (Trades, Positions, etc.)
-
-- **Trades Tab**: Time, price, quantity, and commission for each trade. Review trade by trade for reasonableness.
-- **Positions Tab**: Position state at the end of the backtest.
-- **Attribution Tab**: Brinson attribution (allocation effect, selection effect, interaction effect).
-
-**Recommended reading flow:**
-1. Header → Did it make money?
-2. Metric cards → Sharpe > 1? Drawdown < 20%?
-3. Cumulative return chart → Did it beat the benchmark?
-4. Drawdown curve → Can you accept the worst case?
-5. Trade table → Is each trade reasonable?
-6. Attribution → Did returns come from allocation or selection?
+**Reading order:** header (did it make money?) → metric cards (Sharpe > 1? drawdown < 20%?) → cumulative return chart (beat the benchmark?) → drawdown curve (worst case acceptable?) → trade table (each trade reasonable?) → attribution (allocation or selection?).
 
 ---
 
@@ -420,6 +365,8 @@ print("Beta:                  %.3f" % metrics['beta'])
 print("Daily win rate:        %.2f%%" % (metrics['win_rate'] * 100))
 ```
 
+> Notes: `win_rate` is a backward-compatible alias for `win_rate_daily`; the round-trip trade win rate is `metrics['win_rate_trade']`, which counts a win on net P&L after both buy-side and sell-side fees. When benchmark data is unavailable, `alpha` / `beta` / `information_ratio` are `NaN` and will print as `nan` — check `math.isfinite` first, or display `N/A` as the reports do.
+
 ### 5.2 Brinson Attribution (Multi-Stock Portfolios)
 
 Decomposes returns into three sources:
@@ -476,10 +423,10 @@ metrics = analyze_returns(result, risk_free_rate=0.03)
 
 checks = []
 checks.append(("Return > 0", metrics['total_return'] > 0))
-checks.append(("Beat benchmark", metrics['alpha'] > 0))
+checks.append(("Beat benchmark", metrics['alpha'] > 0))  # alpha is NaN without a benchmark, so this check fails automatically
 checks.append(("Sharpe > 1", metrics['sharpe_ratio'] > 1))
 checks.append(("Drawdown < 20%", abs(metrics['max_drawdown']) < 0.20))
-checks.append(("Win rate > 50%", metrics['win_rate'] > 0.50))
+checks.append(("Trade win rate > 50%", metrics['win_rate_trade'] > 0.50))
 
 print("--- Strategy Evaluation ---")
 passed = 0
@@ -497,13 +444,13 @@ print("Passed %d/%d checks" % (passed, len(checks)))
 # Training set: 2020-2023, used for parameter tuning
 result_train = run_strategy(
     initialize, '2020-01-01', '2023-12-31',
-    starting_cash=100000, securities=['601390'],
+    starting_cash=100000, securities=['601398'],
 )
 
 # Test set: 2024, used for validation
 result_test = run_strategy(
     initialize, '2024-01-01', '2024-12-31',
-    starting_cash=100000, securities=['601390'],
+    starting_cash=100000, securities=['601398'],
 )
 
 # If training Sharpe = 2.0, test Sharpe = 0.3 -> overfitting
@@ -553,6 +500,17 @@ Only backtested 3 months → May have coincided with a bull/bear market
 → Recommend at least 1-2 years, covering different market environments
 ```
 
+### 7.6 Not Knowing the Engine's Default Behaviors
+
+These defaults directly affect fills; know they exist before reading a report:
+
+| Behavior | Default | Details |
+|----------|---------|---------|
+| Price-limit interception | On (`check_price_limit=True`) | Buy orders at limit-up open and sell orders at limit-down open are cancelled with a `cancel_reason`; disable via `set_option('check_price_limit', False)` |
+| Suspension handling | Same-day order cancellation | A missing bar or zero volume counts as suspended; no orders are routed that day |
+| Delisting liquidation | Forced liquidation after 30 trading days without bars | Logged with trade type `DELIST_LIQUIDATE`; tune via `set_option('delist_gap_days', N)` |
+| Snapshot data APIs | `FutureWarning` inside a backtest | `get_fundamentals` and friends return the current snapshot; `set_option('avoid_future_data', True)` turns the warning into an error |
+
 ---
 
 ## 8. Portfolio Backtesting
@@ -574,7 +532,7 @@ from eqlib import StrategyConfig, run_portfolio_backtest
 # Define configuration
 config = StrategyConfig(
     starting_cash=200000,
-    securities=['601390', '600519', '000858'],
+    securities=['601398', '600519', '000858'],
     benchmark='000300.XSHG',
     position_pct=0.33,       # Each stock uses at most 33% of available cash
     start_date='2024-01-01',
@@ -602,10 +560,13 @@ result = run_portfolio_backtest(config, my_strategy)
 
 ### 8.3 Portfolio Backtest Output
 
+Below is **illustrative output** (numbers are format examples only — your actual run will differ):
+
 ```
 ==================================================
 Portfolio Backtest: 2024-01-01 → 2024-12-31
-Universe: ['601390', '600519', '000858']
+Universe: ['601398', '600519', '000858']
+Rebalance: daily
 ==================================================
 Starting Cash:         200,000.00
 Final Value:           215,342.00
@@ -614,7 +575,7 @@ Total Trades:              12
 
 --- Per-Stock Summary ---
   600519: 3 buys, 3 sells, net shares 0, realized ¥5,200.00
-  601390: 4 buys, 4 sells, net shares 0, realized ¥3,100.00
+  601398: 4 buys, 4 sells, net shares 0, realized ¥3,100.00
   000858: 5 buys, 5 sells, net shares 0, realized ¥7,042.00
 ```
 
@@ -626,5 +587,5 @@ After learning to interpret backtest results, here's what's next:
 
 - **[Tutorial 03: Strategy Optimization & Improvement](03-optimization.md)** — Parameter tuning, portfolio optimization, attribution analysis, avoiding overfitting
 - **[Tutorial 05: RSI Mean Reversion Strategy](05-rsi-mean-reversion.md)** — Switch to a different strategy approach: mean reversion
-- **[Example 20: Support/Resistance Portfolio Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — A complete multi-stock portfolio strategy case study with pre-generated backtest reports for direct review
+- **[Example 19: Support/Resistance Portfolio Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — A complete multi-stock portfolio strategy case study with pre-generated backtest reports for direct review
 - **[Tutorial 04: Paper Trading to Live Trading](04-live-trading.md)** — From paper trading to PTrade/QMT live deployment

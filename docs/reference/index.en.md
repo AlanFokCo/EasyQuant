@@ -66,8 +66,11 @@ from eqlib import (
     # Configuration
     set_benchmark, set_option, set_order_cost, set_slippage,
     OrderCost, SlippageModel, FixedSlippage, VolumeSlippage,
+    # Notifications
+    set_notification_webhook, enable_notification, notify_signal,
     # Trading
     order, order_target, order_value, order_target_value,
+    cancel_order, order_lots, order_pct,
     # Data
     get_price, history, attribute_history, get_all_securities,
     fetch_stock_data, download_stock_data, load_csv, clear_cache,
@@ -95,6 +98,7 @@ from eqlib import (
     portfolio_optimizer, Bound, MinVariance, MaxSharpe, RiskParity,
     # Analysis
     analyze_returns, brinson_attribution, simple_factor_analysis,
+    grade_strategy, diagnose_bottleneck, recommend_params,
     # Portfolio risk (experimental)
     PortfolioRiskMonitor, RiskThresholds, RiskReport, AlertLevel,
     check_kill_switch,
@@ -107,6 +111,14 @@ from eqlib import (
     filter_st_stocks, filter_paused_stocks,
     filter_low_price_stocks, filter_high_pe_stocks,
     fetch_factor_data,
+    # Machine learning (experimental)
+    FeaturePipeline, BaseMLModel, MLSelector,
+    optimize_hyperparams, auto_tune_selector,
+    validate_ml_strategy, check_feature_drift,
+    # Utilities module
+    utils,
+    # Built-in strategy templates
+    SRRiskConfig, make_sr_risk_budget_strategy,
     # Caching
     set_cache_dir, set_local_data_dir, fetch_cached, estimate_memory_mb,
     save_stock_local, load_stock_local, has_local_data,

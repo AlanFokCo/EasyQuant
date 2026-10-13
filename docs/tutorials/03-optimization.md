@@ -49,14 +49,14 @@
 from eqlib import *
 import datetime
 
-g.securities = ['601390']
+SECURITIES = ['601398']   # 模块级常量：引擎会在 initialize 前清空 g
 
 def test_ma_combo(fast_period, slow_period):
     """测试一组均线参数"""
     results_log = []
 
     def initialize(context):
-        g.security = '601390'
+        g.security = SECURITIES[0]
         g.fast = fast_period
         g.slow = slow_period
         set_benchmark('000300.XSHG')
@@ -72,12 +72,12 @@ def test_ma_combo(fast_period, slow_period):
         if hist.empty or len(hist) < g.slow:
             return
         ma_fast = hist['close'].tail(g.fast).mean()
-        ma_slow = hist['close'].mean()
+        ma_slow = hist['close'].tail(g.slow).mean()
         price = hist['close'].iloc[-1]
 
         if price > ma_fast > ma_slow:
             if g.security not in context.portfolio.positions:
-                order_value(g.security, context.portfolio.available_cash)
+                order_value(g.security, context.portfolio.available_cash * 0.95)  # 留 5% 费用缓冲
         elif price < ma_fast < ma_slow:
             if g.security in context.portfolio.positions:
                 order_target(g.security, 0)
@@ -85,7 +85,7 @@ def test_ma_combo(fast_period, slow_period):
     result = run_backtest(
         initialize, '2024-01-01', '2024-12-31',
         starting_cash=100000, benchmark='000300.XSHG',
-        securities=g.securities,
+        securities=SECURITIES,
     )
     if result:
         ctx = result['context']
@@ -122,6 +122,8 @@ for fast, slow in combos:
             r['max_dd'] * 100, r['trades']))
 ```
 
+> 扫描结果已经包含引擎的默认行为：涨跌停拦截（`check_price_limit=True`）、停牌当日订单取消、退市 30 个交易日无行情后强制清算（`DELIST_LIQUIDATE`）。这些与实盘更接近，不要为了让曲线好看而关掉它们。
+
 ### 2.2 稳定性检验
 
 ```python
@@ -155,7 +157,7 @@ def market_open(context):
 
     price = hist['close'].iloc[-1]
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
 
     # === 止损优先 ===
     if security in context.portfolio.positions:
@@ -170,7 +172,7 @@ def market_open(context):
     # === 原有信号 ===
     if price > ma5 > ma20:
         if security not in context.portfolio.positions:
-            order_value(security, context.portfolio.available_cash)
+            order_value(security, context.portfolio.available_cash * 0.95)
     elif price < ma5 < ma20:
         if security in context.portfolio.positions:
             order_target(security, 0)
@@ -205,7 +207,7 @@ close_prices = hist['close']
 volume = hist['volume']
 
 ma5 = close_prices.tail(5).mean()
-ma20 = close_prices.mean()
+ma20 = close_prices.tail(20).mean()
 price = close_prices.iloc[-1]
 
 avg_vol_20 = volume.tail(20).mean()
@@ -214,7 +216,7 @@ current_vol = volume.iloc[-1]
 # 放量确认：当日成交量 > 20 日均量的 1.5 倍
 if price > ma5 > ma20 and current_vol > avg_vol_20 * 1.5:
     if security not in context.portfolio.positions:
-        order_value(security, context.portfolio.available_cash)
+        order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 3.4 MACD 辅助确认
@@ -226,7 +228,7 @@ hist = attribute_history(security, 40, '1d', ['close'])
 close_prices = hist['close']
 
 ma5 = close_prices.tail(5).mean()
-ma20 = close_prices.mean()
+ma20 = close_prices.tail(20).mean()
 price = close_prices.iloc[-1]
 
 # MACD 金叉
@@ -236,7 +238,7 @@ macd_golden_cross = dif.iloc[-1] > dea.iloc[-1] and dif.iloc[-2] <= dea.iloc[-2]
 # 双条件确认：均线金叉 + MACD 金叉
 if price > ma5 > ma20 and macd_golden_cross:
     if security not in context.portfolio.positions:
-        order_value(security, context.portfolio.available_cash)
+        order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 3.5 ATR 追踪止损
@@ -254,7 +256,7 @@ close = hist['close']
 price = close.iloc[-1]
 
 # 计算 14 日 ATR
-atr14 = utils.atr(high, low, close, 14)[-1]
+atr14 = utils.atr(high, low, close, 14).iloc[-1]
 
 if security in context.portfolio.positions:
     pos = context.portfolio.positions[security]
@@ -269,24 +271,47 @@ if security in context.portfolio.positions:
 
 ## 4. 组合优化
 
-当你有多只股票时，可以用 `eqlib` 内置的组合优化器来分配权重。
+多标的时用 `portfolio_optimizer` 分配权重。函数签名：
+
+```python
+portfolio_optimizer(securities, prices, target=None, constraints=None,
+                    bounds=None, default_range=(0.0, 1.0), ftol=1e-9,
+                    return_none_if_fail=True)
+```
+
+| 参数 | 说明 |
+|------|------|
+| `securities` | 股票代码列表 |
+| `prices` | **价格** DataFrame（index=日期，columns=股票代码）——内部自行用 `pct_change` 换算收益率，不要传收益率矩阵 |
+| `target` | 优化目标：`MinVariance()`（默认）、`MaxSharpe(risk_free_rate=0.03)`、`RiskParity()` |
+| `bounds` | 每只股票一个 `Bound(lower, upper)`；不传则全用 `default_range` |
+| `constraints` | dict，支持 `max_weight`、`min_weight` |
+| `return_none_if_fail` | 默认 True：求解失败返回 `None` 而非抛异常 |
+
+返回值是 `pd.Series`（股票代码 → 权重，权重和为 1），失败时为 `None`。数据要求：至少 2 只股票、至少 20 个有效日收益，否则返回 `None`。协方差矩阵用 Ledoit-Wolf 收缩估计，小样本下比样本协方差稳定。
 
 ### 4.1 最小方差组合
 
 ```python
-from eqlib import portfolio_optimizer, MinVariance
+import pandas as pd
+from eqlib import get_price, portfolio_optimizer, MinVariance, Bound
 
-# 获取历史收益率
-returns_df = ...  # 各股票的日收益率 DataFrame，列为股票代码
+SECURITIES = ['601398', '600519', '000858']
 
-optimizer = portfolio_optimizer(returns_df)
-result = optimizer.optimize(
-    method=MinVariance(),
-    bounds=[Bound(0.05, 0.40)] * len(returns_df.columns),  # 每只 5%-40%
+# get_price 传入列表时返回 {代码: DataFrame} 字典
+frames = get_price(SECURITIES, start_date='2023-01-01', end_date='2024-12-31')
+prices = pd.DataFrame({sec: df['close'] for sec, df in frames.items()}).dropna()
+
+weights = portfolio_optimizer(
+    SECURITIES, prices,
+    target=MinVariance(),
+    bounds=[Bound(0.05, 0.40)] * len(SECURITIES),  # 每只 5%–40%
 )
 
-print("最优权重:", result['weights'])
-# 示例输出: [0.25, 0.35, 0.20, 0.20]
+if weights is None:
+    print("优化失败：数据不足或求解未收敛")
+else:
+    print({k: round(v, 3) for k, v in weights.items()})
 ```
 
 ### 4.2 最大夏普组合
@@ -294,9 +319,11 @@ print("最优权重:", result['weights'])
 ```python
 from eqlib import MaxSharpe
 
-result = optimizer.optimize(
-    method=MaxSharpe(risk_free_rate=0.03),
-    bounds=[Bound(0.05, 0.40)] * len(returns_df.columns),
+# 无风险利率默认 0.03（3%），与回测指标计算口径一致
+weights = portfolio_optimizer(
+    SECURITIES, prices,
+    target=MaxSharpe(risk_free_rate=0.03),
+    bounds=[Bound(0.05, 0.40)] * len(SECURITIES),
 )
 ```
 
@@ -305,22 +332,26 @@ result = optimizer.optimize(
 ```python
 from eqlib import RiskParity
 
-result = optimizer.optimize(
-    method=RiskParity(),
+# 各标的对组合总风险的贡献相等
+weights = portfolio_optimizer(
+    SECURITIES, prices,
+    target=RiskParity(),
+    bounds=[Bound(0.05, 0.40)] * len(SECURITIES),
 )
 ```
 
 ### 4.4 在策略中使用优化权重
 
 ```python
-g.securities = ['601390', '600519', '000858', '000001']
-g.weights = [0.25, 0.35, 0.20, 0.20]  # 优化器算出的权重
+# 模块级常量：权重来自上面 portfolio_optimizer 的输出（此处数值为演示）
+SECURITIES = ['601398', '600519', '000858']
+WEIGHTS = [0.34, 0.33, 0.33]
 
 def monthly_rebalance(context):
     """每月调仓"""
     total_value = context.portfolio.total_value
 
-    for sec, weight in zip(g.securities, g.weights):
+    for sec, weight in zip(SECURITIES, WEIGHTS):
         target_value = total_value * weight
         order_target_value(sec, target_value)
 
@@ -364,6 +395,8 @@ print("年化 Alpha: %.4f" % ff['alpha_annual'])
 | Alpha > 0 | 有超额收益 | 策略有效 |
 | Beta > 1.5 | 比大盘波动大很多 | 考虑降仓或分散 |
 | Beta < 0.5 | 与大盘相关性弱 | 可能是独立策略 |
+
+> 基准数据缺失时 `alpha`、`beta`、`information_ratio` 为 `NaN`（报告中显示 `N/A`），上表前两条判断不适用。
 
 ---
 
@@ -422,7 +455,7 @@ def run_strategy_b(context):
 
 ```python
 # 策略参数集中管理
-g.params = {
+PARAMS = {
     'fast_period': 5,
     'slow_period': 20,
     'stop_loss_pct': 0.08,
@@ -432,7 +465,7 @@ g.params = {
 }
 
 def market_open(context):
-    p = g.params
+    p = PARAMS
     # ... 使用 p['fast_period'], p['stop_loss_pct'] 等 ...
 ```
 
@@ -446,4 +479,4 @@ def market_open(context):
 - **[Tutorial 05: RSI 均值回归策略](05-rsi-mean-reversion.md)** — 学习一个与双均线思路截然不同的策略
 - **[Tutorial 06: 行业轮动策略](06-sector-rotation.md)** — 利用 A 股行业轮动特性构建超额收益策略
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 系统性的多因子量化选股方法
-- **[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），可直接查看策略表现
+- **[Example 19: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告（HTML/PNG/Markdown/JSON），可直接查看策略表现

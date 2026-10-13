@@ -49,6 +49,15 @@ python agent/optimizer.py \
   --periods "2022-01-01:2022-12-31" "2023-01-01:2023-12-31"
 ```
 
+Decision logic: each `--periods` window is backtested separately, and a parameter set passes only if every window meets all thresholds (`--min-sharpe`, `--max-drawdown`, `--min-annual-return`, `--min-win-rate`). NaN/Inf metrics always count as failures.
+
+Artifacts:
+
+- `audit_log/session_<timestamp>.jsonl` — structured per-iteration records
+- `audit_log/session_<timestamp>.md` — human-readable summary
+- `--output-strategy <path>` — writes the strategy file with the winning parameters on success
+- `--audit-dir <dir>` — override the audit log directory (default `audit_log`)
+
 ### 3. Audit Log
 
 When using `audit_log.py`, the session artifacts look like:
@@ -62,4 +71,3 @@ audit_log/
 See [Tutorial 09: Strategy Parameter Optimization & Auditing](../tutorials/09-param-optimization.md) for details.
 
 ---
-

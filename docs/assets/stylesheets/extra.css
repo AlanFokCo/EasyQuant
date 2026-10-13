@@ -1222,6 +1222,36 @@ body {
   scroll-margin-top: 5rem;
 }
 
+/* ----- Admonition inner tables stay plain (e.g. 本篇导览 boxes) ----- */
+.md-typeset .admonition table:not([class]),
+.md-typeset details table:not([class]) {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-variant-numeric: normal;
+}
+
+.md-typeset .admonition table:not([class]) th,
+.md-typeset details table:not([class]) th {
+  position: static;
+  background: transparent;
+  border-bottom: 1px solid var(--eq-border) !important;
+  border-radius: 0;
+  white-space: normal;
+}
+
+.md-typeset .admonition table:not([class]) td,
+.md-typeset details table:not([class]) td {
+  border-bottom: 1px solid var(--eq-border);
+  border-radius: 0;
+}
+
+.md-typeset .admonition table:not([class]) tbody tr:hover,
+.md-typeset details table:not([class]) tbody tr:hover {
+  background: transparent;
+}
+
 /* ----- Light scheme: header source link legibility ----- */
 [data-md-color-scheme="default"] .md-header__source {
   color: var(--eq-text-2) !important;

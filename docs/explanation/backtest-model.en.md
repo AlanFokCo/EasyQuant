@@ -36,6 +36,9 @@ Each trading day:
 | **100-share multiples** | Buy quantities are automatically rounded down to the nearest multiple of 100 | Complies with A-share minimum lot size |
 | **Look-ahead bias prevention** | Strategies can only access data up to and including `context.current_dt` | Ensures credible backtest results |
 | **Next-day execution** | `order*` calls are enqueued during the current callback and filled at the next trading day's open | Avoids the bias of placing orders at the current day's close |
+| **Price-limit interception** | On by default (`check_price_limit=True`): a buy whose open touches limit-up, or a sell touching limit-down, is cancelled the same day; the reason lands in the order's `cancel_reason` | Reproduces the real constraint that limit-locked orders cannot fill |
+| **Same-day suspension cancellation** | An order for a security with no bar that day is cancelled the same day instead of deferred (`cancel_reason`: `"no price data"` / `"suspended"`) | Removes the old ambiguous behavior of orders lingering through suspensions |
+| **Delisting liquidation** | A position with no quote for 30 consecutive trading days is force-liquidated at the last close, logged as `DELIST_LIQUIDATE`; tunable via the `delisted_position_handling` / `delisted_liquidation_haircut` options | Prevents delisted securities from lingering in the portfolio indefinitely |
 | **Memory limit** | Default 1024 MB limit, adjustable via `max_memory_mb` | Prevents OOM in large backtests |
 
 ## Order Execution Semantics

@@ -47,7 +47,7 @@
 - **验证想法**：你觉得有效的策略，真的能赚钱吗？
 - **发现缺陷**：策略有没有你没想到的边界情况？
 - **参数选择**：哪个参数组合更合理？
-- **建立信心**：在投入真金白银之前，有一个量化的评估
+- **量化评估**：在投入真金白银之前，先用历史数据检验策略
 
 ### 回测不能告诉你什么
 
@@ -73,7 +73,9 @@
 | **Beta** | 相对大盘的敏感度 | 接近 1 = 跟随大盘 |
 | **胜率** | 在 HTML 中可能对应「日胜率」或「交易胜率」，含义不同 | 见下文与 [报告格式详解](../reference/reports-format.md) |
 
-> **说明：**`analyze_returns` 返回的 **`win_rate_daily`** 为按交易日统计的胜率；**`win_rate_trade`** 为完整买卖配对后的胜率。二者不可直接比较数值高低来判断策略好坏。
+> **说明：**`analyze_returns` 返回的 **`win_rate_daily`** 为按交易日统计的胜率；**`win_rate_trade`** 为完整买卖配对后的胜率（FIFO 配对，按扣除买卖双边费用后的净盈亏计胜负）。二者不可直接比较数值高低来判断策略好坏。
+
+> **Alpha / Beta 可能显示 N/A**：二者依赖基准序列。基准数据缺失时 `alpha`、`beta`、`information_ratio` 为 `NaN`，报告中显示为 `N/A`——这不是计算错误，而是没有可对比的基准。
 
 ---
 
@@ -81,24 +83,21 @@
 
 真实回测会在仓库根目录的 **`reports/`** 下写出四套文件（`.html` / `.png` / `.md` / `.json`）。文件名带时间戳；带后缀的（如 `_19_localdata`）通常对应示例脚本里的 `report_suffix` 或脚本说明。
 
-**推荐阅读：** 仓库内 [`reports/README.md`](../how-to/read-reports.md) 列出了与示例脚本对应的对照表。下面 HTML 截图与其中 **`backtest_20260511_234245_19_localdata.html`** 为同一次运行（示例 [`06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py)）；副本放在 `assets/tutorials/` 便于在网页里直接显示，**你本地学习时请同时用浏览器打开同名的 `.html`** 对照 [报告格式详解](../reference/reports-format.md)。
+**推荐阅读：** [解读回测报告](../how-to/read-reports.md) 讲解了四种报告的读法。下面的截图来自示例 [`06_local_data.py`](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/06_local_data.py) 的一次真实运行；仓库只保存 PNG 截图（`docs/assets/tutorials/`），交互式 `.html` 需要你本地运行示例脚本生成。
 
 ![示例：本地数据回测 HTML 报告（19_local_data）](../assets/tutorials/example_report_html_19_localdata.png)
 
-**同一组结果还可打开：**
-
-- `../reports/backtest_20260511_234245_19_localdata.html`（仓库根下 `reports/`，交互式报告；**累计收益与回撤图**中含沪深300与上证综指双线基准）
-- 若你尚未生成：在仓库根执行 `python examples/06_local_data.py`，再在 `reports/` 中找到最新生成的 `*_19_localdata.*`。
+**想自己打开交互式版本：** 在仓库根执行 `python examples/06_local_data.py`，然后在 `reports/` 中用浏览器打开最新生成的 `.html`（**累计收益与回撤图**中含沪深300与上证综指双线基准）。
 
 抽象「策略 vs 基准」折线示意见仍保留：`../assets/tutorials/sample_equity_vs_benchmark.svg`。
 
-**对照 HTML 页眉与指标卡片读数：**打开上节同名 `.html` 后，按 [报告格式详解](../reference/reports-format.md) **第 2.8 节**逐条对照（与上 HTML 截图同源示例）；若图区空白，多为 CDN 被拦，见 [FAQ](../project/faq.md)。
+**对照 HTML 页眉与指标卡片读数：**打开本地生成的 `.html` 后，按 [报告格式详解](../reference/reports-format.md) 的指标说明逐条对照；若图区空白，多为 CDN 被拦，见 [FAQ](../project/faq.md)。
 
 ---
 
 ## 2.2 不同策略的回测报告长什么样？
 
-同一个框架，不同策略的报告 **结构相同、数值不同**。下面用 6 个已跑通的示例展示：打开各脚本对应的 `.html`，可以看到相同的页面结构、截然不同的指标卡片数值。
+同一个框架，不同策略的报告 **结构相同、数值不同**。下面 6 张截图来自已跑通的示例：页面结构相同，指标卡片数值截然不同。交互式 `.html` 不随仓库分发，在本地运行对应示例脚本即可生成。
 
 > 注意：以下数字为特定回测区间和标的下的结果，**仅供展示报告格式**，实际收益会因市场环境、回测区间、标的选择而大幅变化，不构成任何投资建议。
 
@@ -108,37 +107,37 @@
 
 > 布林带策略在震荡市表现优异——价格触及下轨买入、上轨卖出，天然的低买高卖逻辑。实际回测结果因市场环境而异。
 
-### MACD 趋势 + 成交量确认（Example 16，股票 600536 中国软件）
+### MACD 趋势 + 成交量确认（Example 16，股票 002594 比亚迪）
 
 ![MACD+成交量 HTML 报告](../assets/tutorials/example_report_html_macd_volume.png)
 
 > 科技股波动大，MACD 金叉配合放量确认，能较好地捕捉趋势启动点。实际回测结果因市场环境而异。
 
-### 网格交易（Example 18，股票 601857 中国石油）
+### 网格交易（Example 18，股票 601398 工商银行）
 
 ![网格交易 HTML 报告](../assets/tutorials/example_report_html_grid.png)
 
 > 网格适合低波动、有明确价格区间的股票——在区间内反复"低吸高抛"。实际回测结果因市场环境而异。
 
-### 多因子选股（Example 17，10 只股票池）
+### 多因子选股（Example 17，7 只股票池）
 
 ![多因子选股 HTML 报告](../assets/tutorials/example_report_html_multifactor.png)
 
-> 多因子模型每周从 10 只股票中选出动量/成交量/波动率综合得分最高的 3 只，高频换手。实际回测结果因市场环境而异。
+> 多因子模型每周从 7 只股票中选出动量/成交量/波动率综合得分最高的 3 只，高频换手。实际回测结果因市场环境而异。
 
-### 选股策略界面（Example 10，14 只股票池）
+### 单标的策略报告页（标的 002384）
 
 ![选股策略 HTML 报告](../assets/tutorials/example_report_html_stock_selection.png)
 
-> 基于 PE 低估值选股 + 月度调频，买入后持有至期末。实际回测结果因市场环境而异。
+> 同一份报告模板用于单标的中低频策略：K 线 + 买卖点、累计收益、回撤、每日盈亏、成交明细。实际回测结果因市场环境而异。
 
-### 组合回测（Example 11，5 只股票等权）
+### 组合回测（Example 11，5 只候选选前 3）
 
 ![组合回测 HTML 报告](../assets/tutorials/example_report_html_portfolio.png)
 
-> 动量策略在某些市场环境中可能"追涨杀跌"导致亏损，在另一些环境中可能表现较好。实际回测结果因市场环境而异。
+> 组合示例在 5 只候选股中按 20 日动量选前 3 只持仓。动量策略在某些市场环境中可能"追涨杀跌"导致亏损，在另一些环境中可能表现较好。实际回测结果因市场环境而异。
 
-**阅读建议：** 用浏览器逐个打开上述对应的 `.html` 文件（见 [`reports/README.md`](../how-to/read-reports.md)），观察相同页面结构下，不同策略的指标卡片、K 线、回撤曲线、成交表的差异。
+**阅读建议：** 任选上述示例脚本在本地运行（如 `python examples/15_bollinger_strategy.py`），用浏览器打开生成的 `.html`，观察相同页面结构下，不同策略的指标卡片、K 线、回撤曲线、成交表的差异。
 
 ---
 
@@ -150,7 +149,7 @@
 from eqlib import *
 
 def initialize(context):
-    g.security = '601390'
+    g.security = '601398'
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0, close_tax=0.0005,
@@ -164,12 +163,12 @@ def market_open(context):
     if hist.empty or len(hist) < 20:
         return
     ma5 = hist['close'].tail(5).mean()
-    ma20 = hist['close'].mean()
+    ma20 = hist['close'].tail(20).mean()
     price = hist['close'].iloc[-1]
 
     if price > ma5 > ma20:
         if g.security not in context.portfolio.positions:
-            order_value(g.security, context.portfolio.available_cash)
+            order_value(g.security, context.portfolio.available_cash * 0.95)  # 留 5% 费用缓冲
             log.info('BUY %s @ %.3f' % (g.security, price))
     elif price < ma5 < ma20:
         if g.security in context.portfolio.positions:
@@ -184,7 +183,7 @@ result = run_strategy(
     end_date='2024-12-31',
     starting_cash=100000,
     benchmark='000300.XSHG',
-    securities=['601390'],
+    securities=['601398'],
 )
 ```
 
@@ -194,54 +193,67 @@ result = run_strategy(
 
 用浏览器打开 `reports/backtest_*.html`（无需本地 Web 服务器）。自上而下通常为：**摘要** → **指标卡片**（年化收益、夏普、最大回撤、Alpha/Beta 等，可点击看释义）→ **K 线与技术指标** → **累计收益率**（策略 vs 基准）→ **回撤** → **每日盈亏 / 每日收益率** → **成交、持仓**等标签页。
 
-各字段与 `analyze_returns` 字典键的对应关系见 [**报告格式详解**](../reference/reports-format.md)。**仓库内已有一份示例导出索引**，便于对照真实 HTML/PNG：[`reports/README.md`](../how-to/read-reports.md)。
+各字段与 `analyze_returns` 字典键的对应关系见 [**报告格式详解**](../reference/reports-format.md)；各区块的读法见 [解读回测报告](../how-to/read-reports.md)。
 
 ### 3.3 Markdown 报告
 
 文件路径：`reports/backtest_YYYYMMDD_HHMMSS.md`
 
-```markdown
-# Backtest Report: 601390
+报告由 `generate_report_md` 生成，标题为 `# Backtest Report — 601398`（破折号后接首个成交标的）。各区块按以下顺序出现：
 
-## Summary
-- **Period**: 2024-01-01 to 2024-12-31
-- **Initial Capital**: 100,000.00
-- **Final Value**: 108,234.56
-- **P&L**: +8,234.56 (+8.23%)
-- **Buy Orders**: 6
-- **Sell Orders**: 5
-
-## Trade Log
-| # | Date | Action | Security | Price | Amount | Commission |
-|---|------|--------|----------|-------|--------|------------|
-| 1 | 2024-01-15 | BUY | 601390 | 4.850 | 20,618 | 29.80 |
-| 2 | 2024-03-20 | SELL | 601390 | 5.120 | 20,618 | 31.75 |
-| 3 | 2024-04-10 | BUY | 601390 | 5.050 | 20,500 | 29.62 |
-...
-```
+| 区块 | 内容 |
+|------|------|
+| `## Strategy Summary` | 区间、初始资金、期末资产、P&L、基准及基准收益（表格） |
+| `## Grade Breakdown` | 各维度得分、评级与关键指标，末尾 Overall 行 |
+| `## Performance Metrics` | 年化收益、波动率、夏普、索提诺、最大回撤、卡玛、Alpha、Beta、信息比率、交易胜率、盈亏比、交易次数（含基准对照列） |
+| `## Monthly Returns` | 年 × 月收益矩阵 + YTD |
+| `## Rolling Metrics` | 60 日滚动夏普/波动率（按季度抽样） |
+| `## Top 5 Drawdown Periods` | 前五回撤区间：起点、谷底、修复、深度、持续天数 |
+| `## Trade Analysis` | 买/卖单数、总佣金、成交标的数；多标的时附 `### Per-Stock P&L` |
+| `## Trade P&L` | FIFO 配对表：`\| # \| Security \| Buy Date \| Buy Price \| Sell Date \| Sell Price \| P&L \|` |
+| `## Factor Analysis` / `## Brinson Attribution` | 因子暴露与 Brinson 归因（数据可得时才有） |
+| `## Data Sources` | 数据来源、无风险利率口径与免责声明 |
 
 **重点关注：**
 
-1. **P&L 盈亏**：
-   - 绝对收益（+8,234.56）和相对收益（+8.23%）
-   - 与同期沪深 300 对比：如果沪深 300 涨了 15%，你的策略只涨了 8%，说明跑输了基准
+1. **P&L 与基准**（Strategy Summary）：
+   - 同时看绝对收益和相对收益
+   - 与 Benchmark Return 对比：策略涨 8% 而同期沪深 300 涨 15%，就是跑输基准
 
-2. **交易频率**：
-   - 买 6 次、卖 5 次 → 总共 11 笔交易
+2. **交易频率**（Trade Analysis）：
    - 交易次数过多 = 换手率高 = 手续费吃利润
    - 交易次数过少 = 可能信号不够灵敏
 
-3. **每笔交易盈亏**：
-   - 逐笔检查买入价和卖出价
+3. **每笔配对盈亏**（Trade P&L）：
+   - 逐笔检查买入价和卖出价，P&L 已扣除双边费用
    - 如果大部分交易都亏损，说明信号质量不好
 
-4. **佣金成本**：
-   - 检查每笔佣金占比
-   - 小额交易的佣金占比可能很高（最低 5 元限制）
+4. **佣金成本**（Trade Analysis）：
+   - 对比 Total commission 与 P&L 的量级
+   - 小额交易的佣金占比会很高（最低 5 元限制）
 
 ### 3.4 JSON 报告
 
 文件路径：`reports/backtest_YYYYMMDD_HHMMSS.json`
+
+由 `generate_report_json` 生成，顶层键：
+
+| 键 | 内容 |
+|------|------|
+| `verdict` | `pass` / `grade` / `score` / `bottleneck` / `action`（`complete` 或 `adjust_params`）/ `summary` |
+| `targets` | 逐项指标达标检查：`metric`、`value`、`target`、`pass`（未达标按 `priority` 排序；基准缺失的指标 `pass` 为 `null`） |
+| `diagnostics` | 瓶颈诊断列表 |
+| `recommendations` | 参数调整建议 |
+| `grade` | 评级明细（各维度得分） |
+| `metrics` | `analyze_returns` 的全部标量指标（`NaN`/`inf` 序列化为 `null`） |
+| `time_series` | `monthly_returns`、`rolling_sharpe_60d`、`rolling_volatility_60d`、`drawdown_periods` |
+| `summary` | `start_date`、`end_date`、`initial_capital`、`final_value`、`pnl`、`pnl_pct`、`num_trades`、`securities`、`benchmark`、`benchmark_return` |
+| `risk_metrics` | 兼容旧版的指标子集 |
+| `cumulative_returns` | 每日 `{date, total_value, cumulative_return}` |
+| `trades` | 逐笔成交：`type`、`date`、`security`、`price`、`amount`、`commission` |
+| `positions` | 期末持仓：`amount`、`avg_cost`、`total_value` |
+| `chart_data` | K 线、成交量、累计收益、回撤等绘图数据 |
+| `factor_analysis` / `brinson_attribution` | 归因结果（数据可得时才有） |
 
 ```python
 import json
@@ -250,16 +262,18 @@ with open('reports/backtest_20260503_143000.json') as f:
     report = json.load(f)
 
 # 基本指标
-print("总收益: %.2f%%" % report['pnl_pct'])
-print("交易次数:", report['num_trades'])
+print("总收益: %.2f%%" % report['summary']['pnl_pct'])
+print("交易次数:", report['summary']['num_trades'])
+print("夏普比率: %.2f" % report['metrics']['sharpe_ratio'])
 
 # 每日组合价值曲线
-for entry in report['portfolio_values']:
-    print(entry['date'], entry['value'])
+for entry in report['cumulative_returns']:
+    print(entry['date'], entry['total_value'], entry['cumulative_return'])
 
-# 自定义记录的数值（通过 record() 写入）
-for entry in report['recorded_values']:
-    print(entry['date'], entry['price'], entry['ma5'])
+# 达标检查：哪些指标没过
+for t in report['targets']:
+    if t['pass'] is False:
+        print("未达标:", t['metric'], t['gap'])
 ```
 
 JSON 报告适合做进一步的数据分析，比如：
@@ -267,91 +281,22 @@ JSON 报告适合做进一步的数据分析，比如：
 - 分析持仓/空仓天数比例
 - 画出累计收益曲线
 
-### 3.5 HTML 交互式报告逐层解读
+### 3.5 HTML 交互式报告怎么读
 
-HTML 报告是最核心的回测分析工具。用浏览器打开后，**自上而下**分为以下层次：
+HTML 报告是最常用的回测分析工具。用浏览器打开后，自上而下的区块与读法：
 
-#### 第 1 层：页头摘要
-
-页面顶部显示回测标的、时间区间、初始资金和最终资产的盈亏金额与百分比。这是**一眼判断策略盈亏**的地方。
-
-**关注点：** 盈亏是否为正？盈利金额相对于初始资金的比例是多少？
-
-#### 第 2 层：核心指标卡片（Summary Cards）
-
-页头下方一排小卡片，展示最关键的策略指标：
-
-| 卡片 | 含义 | 好值参考 |
-|------|------|---------|
-| **年化收益** | 折算为一年的复利年化 | > 10% 合格，> 20% 优秀 |
-| **超额收益** | 策略收益 − 基准收益 | 正数 = 跑赢大盘 |
-| **夏普比率** | 每单位风险换取的超额收益 | > 1 好，> 2 优秀 |
-| **最大回撤** | 从峰值到谷底的最大跌幅 | < 15% 好，< 20% 可接受 |
-| **胜率（交易）** | 完整买卖回合中盈利的比例 | > 50% 好 |
-| **卡玛比率** | 年化收益 / \|最大回撤\| | > 1 好 |
-
-**关注点：** 不要只看收益！夏普比率和最大回撤能告诉你「赚这个钱承担了多少风险」。
-
-#### 第 3 层：详细指标行（Metric Row）
-
-在核心卡片下方，更详细的指标行包含：
-
-| 指标 | 含义 | 读法 |
+| 区块 | 内容 | 读法 |
 |------|------|------|
-| **年化波动率** | 收益的标准差（年化） | 越低越稳定 |
-| **索提诺比率** | 只看下行风险的风险调整收益 | 比夏普更保守 |
-| **Alpha** | 市场无法解释的超额收益 | 正数 = 有真正的 alpha |
-| **Beta** | 相对大盘的敏感度 | 1 = 同步，>1 = 更激进 |
-| **信息比率** | 主动收益 / 跟踪误差 | > 0.5 好 |
-| **日胜率** | 盈利交易日占比 | 注意与交易胜率含义不同 |
-| **盈亏比** | 平均盈利 / 平均亏损 | > 1.5 好 |
+| **页头摘要** | 标的、区间、初始/最终资金与盈亏 | 盈亏是否为正、占初始资金比例多少 |
+| **核心指标卡片** | 年化收益、超额收益、夏普、最大回撤、胜率（交易）、卡玛比率 | 别只看收益——夏普和回撤说明「赚这个钱承担了多少风险」。参考值：夏普 > 1、回撤 < 20%、卡玛 > 1 |
+| **详细指标行** | 年化波动率、索提诺、Alpha、Beta、信息比率、日胜率、盈亏比 | Alpha 为正 + Beta 接近 1：超额收益不是赌方向赌来的。Alpha/Beta 依赖基准，基准缺失时显示 N/A |
+| **K 线与技术指标** | 价格线 + MA5/MA20 + 买卖点标记 + 成交量，绿色阴影为持仓期 | 买点是否在低位、持仓期价格是否上涨、交易是否过密 |
+| **累计收益率** | 策略曲线 vs 基准曲线（沪深300 + 上证综指双线） | 策略线持续在基准上方 = 稳定跑赢；两线平行 = 没有 alpha |
+| **回撤曲线** | 从历史新高的回落深度 | 看最深处：那段时间你能否接受 |
+| **每日盈亏/收益率** | 每个交易日的盈亏柱状图 | 有无连续亏损、单日亏损是否过大、收益是否集中在少数几天 |
+| **标签页** | 成交明细、期末持仓、Brinson 归因 | 逐笔检查成交；归因看收益来自配置还是选股 |
 
-**关注点：** Alpha 为正 + Beta 接近 1 意味着策略真的有超额收益，不是靠加杠杆或赌方向。
-
-#### 第 4 层：K 线与技术指标图
-
-策略的价格走势图，通常包含：
-- **主图**：价格线 + 均线（MA5/MA20） + 买卖点标记
-- **成交量**：下方的柱状图
-- **绿色阴影**：持仓期间
-
-**读法：**
-1. 看买卖点是否合理（买入在低位，卖出在高位）
-2. 看持仓期间价格是否上涨
-3. 看交易频率（太密集可能过度交易）
-
-#### 第 5 层：累计收益率
-
-策略累计收益曲线 vs 基准指数曲线。**核心对比：策略线是否在基准线上方**。
-
-- 策略线持续在基准线上方 → 策略稳定跑赢
-- 策略线在某段时间大幅下穿基准线 → 该期间策略失效
-- 两条线几乎平行 → 策略只是跟踪了大盘，没有 alpha
-
-#### 第 6 层：回撤曲线
-
-显示组合从历史新高的回落深度。**关注最深处：** 那段时间你是否能接受？
-
-#### 第 7 层：每日盈亏/收益率
-
-柱状图展示每个交易日的盈亏。看：
-- 是否有连续亏损的天数
-- 亏损日的柱子是否比盈利日更长（单次亏损过大）
-- 收益是否集中在某几天
-
-#### 第 8 层：标签页（成交、持仓等）
-
-- **成交 Tab**：每笔买卖的时间、价格、数量、佣金。逐笔检查是否合理。
-- **持仓 Tab**：回测结束时的持仓状态。
-- **归因 Tab**：Brinson 归因（配置效应、选股效应、交互效应）。
-
-**完整阅读流程建议：**
-1. 看页头 → 赚钱了吗？
-2. 看指标卡片 → 夏普 > 1？回撤 < 20%？
-3. 看累计收益图 → 跑赢基准了吗？
-4. 看回撤曲线 → 最差情况能接受吗？
-5. 看成交表 → 每笔交易合理吗？
-6. 看归因 → 收益来自配置还是选股？
+**阅读顺序：** 页头（赚钱了吗）→ 指标卡片（夏普 > 1？回撤 < 20%？）→ 累计收益图（跑赢基准了吗）→ 回撤曲线（最差情况能接受吗）→ 成交表（每笔交易合理吗）→ 归因（收益来自配置还是选股）。
 
 ---
 
@@ -420,6 +365,8 @@ print("Beta:       %.3f" % metrics['beta'])
 print("日胜率:     %.2f%%" % (metrics['win_rate'] * 100))
 ```
 
+> 说明：`win_rate` 是 `win_rate_daily`（日胜率）的兼容别名；配对交易胜率用 `metrics['win_rate_trade']`，它按扣除买卖双边费用后的净盈亏判胜负。基准数据缺失时 `alpha` / `beta` / `information_ratio` 为 `NaN`，直接 `%` 格式化会打出 `nan`——展示前先判 `math.isfinite`，或按报告惯例显示 `N/A`。
+
 ### 5.2 Brinson 归因（多股票组合）
 
 将收益拆解为三个来源：
@@ -476,10 +423,10 @@ metrics = analyze_returns(result, risk_free_rate=0.03)
 
 checks = []
 checks.append(("收益 > 0", metrics['total_return'] > 0))
-checks.append(("跑赢基准", metrics['alpha'] > 0))
+checks.append(("跑赢基准", metrics['alpha'] > 0))  # 无基准时 alpha 为 NaN，该项自动 FAIL
 checks.append(("夏普 > 1", metrics['sharpe_ratio'] > 1))
 checks.append(("回撤 < 20%", abs(metrics['max_drawdown']) < 0.20))
-checks.append(("胜率 > 50%", metrics['win_rate'] > 0.50))
+checks.append(("交易胜率 > 50%", metrics['win_rate_trade'] > 0.50))
 
 print("--- 策略评估 ---")
 passed = 0
@@ -497,13 +444,13 @@ print("通过 %d/%d 项检查" % (passed, len(checks)))
 # 训练集：2020-2023，用来调整参数
 result_train = run_strategy(
     initialize, '2020-01-01', '2023-12-31',
-    starting_cash=100000, securities=['601390'],
+    starting_cash=100000, securities=['601398'],
 )
 
 # 测试集：2024，用来验证
 result_test = run_strategy(
     initialize, '2024-01-01', '2024-12-31',
-    starting_cash=100000, securities=['601390'],
+    starting_cash=100000, securities=['601398'],
 )
 
 # 如果训练集夏普 2.0，测试集夏普 0.3 → 过拟合
@@ -552,6 +499,17 @@ result_test = run_strategy(
 → 建议至少回测 1-2 年，涵盖不同市场环境
 ```
 
+### 7.6 不了解引擎的默认行为
+
+以下默认行为直接影响成交结果，读报告前先知道它们存在：
+
+| 行为 | 默认 | 说明 |
+|------|------|------|
+| 涨跌停拦截 | 开（`check_price_limit=True`） | 涨停开盘的买单、跌停开盘的卖单被取消并记 `cancel_reason`；`set_option('check_price_limit', False)` 关闭 |
+| 停牌处理 | 当日订单取消 | 无行情或零成交视为停牌，当日不下发订单 |
+| 退市清算 | 30 个无行情交易日后强制平仓 | 交易记录类型为 `DELIST_LIQUIDATE`；`set_option('delist_gap_days', N)` 调整 |
+| 快照类数据接口 | 回测内调用发 `FutureWarning` | `get_fundamentals` 等返回当前快照；`set_option('avoid_future_data', True)` 升级为报错 |
+
 ---
 
 ## 8. 组合回测
@@ -573,7 +531,7 @@ from eqlib import StrategyConfig, run_portfolio_backtest
 # 定义配置
 config = StrategyConfig(
     starting_cash=200000,
-    securities=['601390', '600519', '000858'],
+    securities=['601398', '600519', '000858'],
     benchmark='000300.XSHG',
     position_pct=0.33,       # 每只股票最多用 33% 可用资金
     start_date='2024-01-01',
@@ -601,10 +559,13 @@ result = run_portfolio_backtest(config, my_strategy)
 
 ### 8.3 组合回测输出
 
+下面是**示意输出**（数字仅为格式示例，以实际运行为准）：
+
 ```
 ==================================================
 Portfolio Backtest: 2024-01-01 → 2024-12-31
-Universe: ['601390', '600519', '000858']
+Universe: ['601398', '600519', '000858']
+Rebalance: daily
 ==================================================
 Starting Cash:         200,000.00
 Final Value:           215,342.00
@@ -613,7 +574,7 @@ Total Trades:              12
 
 --- Per-Stock Summary ---
   600519: 3 buys, 3 sells, net shares 0, realized ¥5,200.00
-  601390: 4 buys, 4 sells, net shares 0, realized ¥3,100.00
+  601398: 4 buys, 4 sells, net shares 0, realized ¥3,100.00
   000858: 5 buys, 5 sells, net shares 0, realized ¥7,042.00
 ```
 
@@ -625,5 +586,5 @@ Total Trades:              12
 
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、组合优化、归因分析、避免过拟合
 - **[Tutorial 05: RSI 均值回归策略](05-rsi-mean-reversion.md)** — 换一种策略思路，学习均值回归
-- **[Example 20: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告，可直接查看策略表现
+- **[Example 19: 支撑阻力位组合策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/19_sr_portfolio/README.md)** — 一个完整的多股票组合策略实战案例，包含预生成的回测报告，可直接查看策略表现
 - **[Tutorial 04: 模拟盘到实盘](04-live-trading.md)** — 从模拟盘到 PTrade/QMT 实盘部署

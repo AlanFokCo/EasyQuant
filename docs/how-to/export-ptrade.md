@@ -52,11 +52,18 @@ EasyQuant 的 PTrade 适配器是一个兼容层（compatibility layer），让�
 
 ### 2.1 最简单的方式：使用导出工具
 
-```bash
-python examples/12_paper_trade.py
+`examples/` 中没有现成的导出脚本，直接调用 `export_ptrade_script` 即可：
+
+```python
+from eqlib.ptrade_adapter import export_ptrade_script
+
+export_ptrade_script(
+    strategy_file='my_strategy.py',              # 你的 EasyQuant 策略文件
+    output_file='ptrade_strategy_generated.py',  # 生成的 QMT 策略文件
+)
 ```
 
-生成 `examples/ptrade_strategy_generated.py`（默认由 `examples/03_run_backtest.py` 生成样例），复制到 QMT 策略编辑器即可运行。
+生成文件已包好 QMT 的 `init()` / `handlebar()` 入口，复制到 QMT 策略编辑器、填入账号即可运行。不传 `strategy_file` 时，函数把模板打印到 stdout。
 
 ### 2.2 手动方式：三步迁移
 
@@ -299,10 +306,13 @@ def handlebar(ContextInfo):
 
 适用于已有完整的 EasyQuant 策略文件。
 
-```bash
-# 可在 12_paper_trade.py 中修改 strategy_file / output_file
-python examples/12_paper_trade.py
-# 输出 examples/ptrade_strategy_generated.py → 复制到 QMT
+```python
+from eqlib.ptrade_adapter import export_ptrade_script
+
+export_ptrade_script(
+    strategy_file='my_strategy.py',
+    output_file='ptrade_strategy_generated.py',  # → 复制到 QMT
+)
 ```
 
 ---

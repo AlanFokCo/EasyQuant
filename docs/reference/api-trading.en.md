@@ -122,7 +122,7 @@ order_pct('601390', -0.3)    # Sell 30% of current position
 
 ## Commission Fees
 
-Configure via [`set_order_cost()`](api-config.md#set_order_cost) (see [Configuration API](api-config.md)). Defaults: buy stamp duty 0%, sell stamp duty 0.05% (halved since Aug 2023), buy/sell commission 0.025%, minimum commission 5 yuan.
+Configure via [`set_order_cost()`](api-config.md#set_order_cost) (see [Configuration API](api-config.md)). Defaults: buy stamp duty 0%, sell stamp duty 0.05% (halved since 2023-08-28), buy/sell commission 0.025%, minimum commission 5 CNY. `OrderCost.close_tax` defaults to `None`, meaning the statutory rate applies date-aware: 0.05% on/after 2023-08-28 and 0.1% before — long-history backtests crossing that date need no manual handling; an explicit value always overrides.
 
 ## Execution, status and security keys
 

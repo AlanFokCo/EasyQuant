@@ -14,13 +14,14 @@
 
 Chart file: `reports/backtest_YYYYMMDD_HHMMSS.png`
 
-- **Gray line (Close)**: Stock daily closing price
-- **Blue line (MA5)**: 5-day moving average (short-term trend)
-- **Orange line (MA20)**: 20-day moving average (medium-term trend)
-- **Green circles (BUY)**: Buy signals
-- **Red circles (SELL)**: Sell signals
-- **Green shaded area**: Holding period
-- **Green line (right axis)**: Portfolio total asset value
+The PNG is a dark-themed, four-panel dashboard:
+
+- **Top-left: cumulative return (%)** — strategy vs. benchmark cumulative curves; green ▲ marks buys, red ▼ marks sells; the title bar shows P&L and trade count, and the lower-right corner annotates annualized return, Sharpe, and max drawdown
+- **Top-right: six-dimension score bars** — scores (0–100) for return, risk, risk-adjusted, trade quality, excess, and stability, plus the overall grade
+- **Middle: drawdown band** — portfolio drawdown (%) from its running peak
+- **Bottom: last-12-month returns strip** — monthly returns, color-coded by sign
+
+The PNG contains no per-stock candlesticks or moving averages — for K-line, MA, RSI, MACD and similar detail, use the HTML report (see §4.3).
 
 ### 1.2 Interactive HTML Report
 
@@ -28,7 +29,7 @@ File: `reports/backtest_YYYYMMDD_HHMMSS.html` — open with a browser.
 
 The page is organized top-to-bottom:
 
-1. **Header summary** — Backtest target, date range, initial/final capital; quickly assess profitability
+1. **Header summary** — Backtest target, date range, initial/final capital, P&L amount
 2. **Core metric cards** — Annualized return, excess return, Sharpe ratio, max drawdown, win rate, Calmar ratio
 3. **Detailed metric row** — Annualized volatility, Sortino ratio, Alpha, Beta, information ratio, daily win rate, profit/loss ratio
 4. **Candlestick & technical indicators chart** — Price candles + moving averages + buy/sell markers + volume bars
@@ -89,6 +90,8 @@ print("Allocation effect: %.4f" % attr['allocation_effect'])
 print("Selection effect: %.4f" % attr['selection_effect'])
 ```
 
+This is a single-period BHB decomposition that is mathematically closed: `allocation_effect + selection_effect + interaction_effect` always sums exactly to portfolio return minus benchmark return. The result also includes `portfolio_return`, `benchmark_return`, `benchmark_model` (how the benchmark was constructed), and a per-sector `sectors` breakdown.
+
 ### 2.3 `simple_factor_analysis`: Factor Analysis
 
 ```python
@@ -125,7 +128,7 @@ The terminal will print file paths (timestamps vary each run):
 
 | File | Purpose |
 |------|---------|
-| `reports/backtest_YYYYMMDD_HHMMSS.png` | Static chart: price, moving averages, buy/sell signals, portfolio NAV/drawdown, etc. (related to strategy implementation) |
+| `reports/backtest_YYYYMMDD_HHMMSS.png` | Static chart: dark four-panel dashboard — strategy vs. benchmark cumulative return (with trade markers), six-dimension scores, drawdown, last-12-month returns |
 | `reports/backtest_YYYYMMDD_HHMMSS.html` | **Interactive report**: metric cards, candlestick chart, cumulative returns, drawdown, daily P&L, trades and positions, etc. |
 | `reports/backtest_YYYYMMDD_HHMMSS.md` | Human-readable summary + tabular trade records |
 | `reports/backtest_YYYYMMDD_HHMMSS.json` | Structured data for programmatic analysis |
@@ -240,7 +243,9 @@ Bar or curve showing **day-over-day** portfolio value changes; useful for spotti
 
 ### 4.8 Walkthrough Example
 
-Below is a real export (target **601398**, period **2021-06-06 to 2024-06-06**) explaining **what each section means when you open the HTML**. After running `python examples/06_local_data.py`, open the **latest** `*.html` in `reports/` and read along with the table below (values below are a snapshot from that run, same source as the tutorial screenshots).
+Below is a **historical example output** (target **601398**, period **2021-06-06 to 2024-06-06**, exported before the 2026-10 fix round) explaining **what each section means when you open the HTML**. After running `python examples/06_local_data.py`, open the **latest** `*.html` in `reports/` and read along with the table below.
+
+> **Caveat on values:** the absolute numbers are a snapshot from that run. The current engine annualizes over 244 trading days, computes trade win rate on cost-inclusive FIFO round-trips, and `examples/06` now sets commission and slippage by default — rerunning produces different numbers. Focus on where each block lives and how to read it.
 
 > **Note:** This example strategy is a simple MA 5/20 crossover strategy that **made a modest profit** in this period — positive Sharpe, controlled drawdown, and a decent win rate make it a good example for understanding what a "normal" strategy report looks like.
 
@@ -260,8 +265,8 @@ Below is a real export (target **601398**, period **2021-06-06 to 2024-06-06**) 
 | **Profit/Loss Ratio** | **0.97** | Average winner vs. average loser; close to 1 means winning and losing trades are roughly similar in magnitude. |
 | **Trade Count (Paired)** | ~**95** | Number of completed "buy + sell" round-trips; differs from JSON `summary.num_trades` (one-sided trade count, 191 in this example) — see [FAQ](../project/faq.md#faq-json-num-trades). |
 | **Annualized Turnover** | Low | This is a low-frequency timing strategy with relatively low turnover. |
-| **Total Commission** | **0.00** | This example uses local data backtesting, so commission shows as 0; in real trading, commissions would apply. |
-| **Alpha / Beta / Information Ratio** | Depends on benchmark alignment | May be placeholders when the benchmark series is misaligned; when `summary.benchmark_return` is `null`, see [FAQ](../project/faq.md#faq-benchmark-null). |
+| **Total Commission** | **0.00** (historical snapshot) | That run had no OrderCost configured; `examples/06_local_data.py` now sets commission and slippage by default, so new reports show the actual charged amount. |
+| **Alpha / Beta / Information Ratio** | Depends on benchmark data | When the benchmark series is missing or overlaps the strategy by fewer than 10 trading days, all three come back as NaN: rendered as **N/A** in reports and `null` in JSON. See [FAQ](../project/faq.md#faq-benchmark-null). |
 
 **Interactive area (candlestick, cumulative returns, drawdown, daily P&L)**: Drag and zoom with the mouse; compare the strategy line vs. the benchmark line to see "did it beat the index?" If **the entire chart area is blank**, it's most likely due to **CDN scripts being blocked by your network** — you need internet access or a different network (see [FAQ — HTML Charts Blank](../project/faq.md#faq-html-blank)).
 
@@ -271,14 +276,14 @@ Below is a real export (target **601398**, period **2021-06-06 to 2024-06-06**) 
 
 ## 5. How to Read the PNG Chart (`generate_chart`)
 
-Typical elements include:
+Read it panel by panel:
 
-- **Price and moving averages**: Assess whether the trend and signals appear at reasonable levels.
-- **Buy/sell markers**: Cross-reference with strategy logic — is there "chasing highs and panic selling"?
-- **Portfolio total value or return**: Right-side or sub-chart — check whether the equity curve rises smoothly.
-- **Drawdown band**: Bottom area showing drawdown depth.
+- **Top-left cumulative return**: the strategy curve's position and slope versus the benchmark; cross-check the ▲/▼ trade markers against your strategy logic for "chasing highs, panic selling"; annualized return, Sharpe, and max drawdown sit in the lower-right corner.
+- **Top-right score bars**: weak dimensions stand out immediately; when one dimension scores near 0, investigate that metric rather than the overall grade.
+- **Middle drawdown band**: depth and duration of drawdowns; a wide red stretch with no new highs marks the strategy's main risk regime.
+- **Bottom monthly strip**: the last 12 months of returns; runs of same-colored months signal a trending or ranging market.
 
-If the chart is missing the NAV curve, check whether `record` / recorded data is complete per [FAQ — PNG Is Sparse](../project/faq.md).
+If the chart is missing the cumulative-return curve, check whether `record` / recorded data is complete per [FAQ — PNG Is Sparse](../project/faq.md).
 
 ---
 
@@ -286,37 +291,17 @@ If the chart is missing the NAV curve, check whether `record` / recorded data is
 
 Below are screenshots from 4 different strategies — same report structure, different numbers. Actual results will vary significantly depending on the backtest period, stock selection, and market conditions. These screenshots are for illustration only and do not imply the strategy will perform similarly in all market environments.
 
-### Strategy 1: MACD Trend + Volume Confirmation
-
 ![MACD + Volume HTML report](../assets/tutorials/example_report_html_macd_volume.png)
-
-- **Type**: Trend-following strategy relying on MACD golden cross with volume confirmation
-- **Key observation**: Check whether Sharpe ratio is positive and the cumulative return curve trends upward
-- **Caveat**: Trend strategies may underperform in ranging markets
-
-### Strategy 2: Bollinger Band Mean Reversion
-
 ![Bollinger Bands HTML report](../assets/tutorials/example_report_html_bollinger.png)
-
-- **Type**: Mean-reversion strategy — buy near lower band, sell near upper band
-- **Key observation**: Low trading frequency; tends to work well in ranging markets
-- **Caveat**: May suffer consecutive losses during strong trending periods
-
-### Strategy 3: Multi-Factor Stock Selection
-
 ![Multi-factor HTML report](../assets/tutorials/example_report_html_multifactor.png)
-
-- **Type**: Portfolio rotation across multiple stocks
-- **Key observation**: Pay attention to turnover rate and commission cost erosion
-- **Caveat**: High-frequency rotation can significantly reduce net returns
-
-### Strategy 4: Momentum Portfolio
-
 ![Portfolio backtest HTML report](../assets/tutorials/example_report_html_portfolio.png)
 
-- **Type**: Momentum strategy — buy recent outperformers
-- **Key observation**: Check Sharpe ratio, max drawdown, and daily win rate
-- **Caveat**: May perform poorly when trends reverse or markets become choppy
+| Strategy | Type | Suitable Market | Key Metrics | Main Weakness |
+|----------|------|-----------------|-------------|---------------|
+| MACD trend + volume confirmation | Trend-following | One-way trends | Sharpe, cumulative-return slope | Repeated stop-outs in ranging markets |
+| Bollinger mean reversion | Mean reversion | Range-bound | Win rate, profit/loss ratio | Consecutive losses in trending markets |
+| Multi-factor selection | Portfolio rotation | Stable style regimes | Turnover, commission share of returns | High turnover erodes returns |
+| Momentum portfolio | Momentum | Persistent trends | Sharpe, max drawdown, daily win rate | Large drawdowns on reversals and chop |
 
 ### How to Judge Strategy Quality from Reports
 

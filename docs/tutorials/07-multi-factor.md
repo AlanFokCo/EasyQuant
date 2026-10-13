@@ -92,68 +92,68 @@ A 股市场有一些独特的市场特征，可以构建特有的因子来捕捉
 
 北向资金指通过沪股通和深股通进入 A 股市场的外资。由于北向资金通常被视为"聪明钱"，其流向对市场情绪有较强的预测能力。
 
-**经济含义：**
-
-- 北向资金持续净流入 → 外资看好 A 股 → 市场情绪偏乐观
-- 北向资金持续净流出 → 外资看淡 A 股 → 市场情绪偏悲观
+**经济含义：** 北向资金通常被视为"聪明钱"。持续净流入说明外资在加仓 A 股，情绪偏乐观；持续净流出说明外资在撤离，情绪偏悲观。
 
 **因子构建示例：**
 
 ```python
+from datetime import datetime, timedelta
 from eqlib import get_north_money_flow
 
 def compute_north_money_factor(lookback_days=5):
     """
-    北向资金流因子：近 N 日北向资金净流入占比。
+    北向资金流因子：近 N 个交易日净买入占成交总额的比例。
 
     返回:
-        float: 净流入占成交额比例，正值表示净流入
+        float: 净流入占比，正值表示净流入；数据不足返回 None
     """
-    df = get_north_money_flow(days=lookback_days)
+    end_date = datetime.now().date()
+    # 多取一倍天数，覆盖周末和节假日
+    start_date = end_date - timedelta(days=lookback_days * 2 + 10)
+    df = get_north_money_flow(start_date=start_date, end_date=end_date)
     if df is None or df.empty:
         return None
 
-    # 计算累计净流入
-    total_net_inflow = df['north_net'].sum()
-    total_turnover = df['north_money'].sum()  # 总成交额
+    # 取最近 N 个交易日（列为 date / net_buy / total_buy / total_sell，单位：亿元）
+    recent = df.tail(lookback_days)
+    total_net = recent['net_buy'].sum()
+    total_turnover = (recent['total_buy'] + recent['total_sell']).sum()
 
     if total_turnover == 0:
         return None
 
-    # 净流入比例
-    net_ratio = total_net_inflow / total_turnover
-    return net_ratio
+    return total_net / total_turnover
 
 
 def compute_north_momentum_factor(lookback_days=10):
     """
-    北向资金动量因子：近 N 日北向资金净流入趋势。
+    北向资金动量因子：近 N 个交易日净买入序列的趋势斜率（亿元/日）。
 
     通过线性回归计算净流入趋势斜率。
     """
     import numpy as np
 
-    df = get_north_money_flow(days=lookback_days)
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=lookback_days * 2 + 10)
+    df = get_north_money_flow(start_date=start_date, end_date=end_date)
     if df is None or len(df) < lookback_days:
         return None
 
-    # 净流入序列
-    net_flows = df['north_net'].values
+    # 净买入序列（亿元）
+    net_flows = df['net_buy'].tail(lookback_days).values
 
-    # 简单线性回归计算趋势
     x = np.arange(len(net_flows))
-    y = net_flows
 
-    # 斜率 = Cov(x, y) / Var(x)
-    cov_xy = np.cov(x, y, ddof=0)[0, 1]
+    cov_xy = np.cov(x, net_flows, ddof=0)[0, 1]
     var_x = np.var(x, ddof=0)
 
     if var_x == 0:
         return None
 
-    slope = cov_xy / var_x
-    return slope
+    return cov_xy / var_x
 ```
+
+> **回测内行为**：`get_north_money_flow()` 有 point-in-time 防护——回测会话内请求的日期范围会被截断到模拟时钟（`before_trading_start`、定时任务、`handle_data` 等决策时回调内为 T-1），完全超出截断点的请求返回空 DataFrame，不会泄露未来数据。回测中的标准写法是把 `end_date` 固定为 `context.current_dt.date()`，参照 `examples/20_all_weather_alpha/combined_strategy.py`。
 
 **使用场景：**
 
@@ -166,79 +166,64 @@ def compute_north_momentum_factor(lookback_days=10):
 
 限售股解禁是指原本不能在二级市场流通的股票变为可流通，通常会带来抛售压力。解禁因子主要用于风险规避。
 
-**经济含义：**
-
-- 大量限售股解禁 → 潜在抛售压力 → 股价可能下跌
-- 解禁市值占总市值比例越高，影响越大
+**经济含义：** 大量限售股解禁意味着潜在抛售压力，解禁市值占流通市值的比例越高，股价承压越明显。
 
 **因子构建示例：**
 
 ```python
-from eqlib import get_restriction_release
-import datetime
+from eqlib import get_restriction_release, log
 
 def compute_restriction_risk_factor(code, lookforward_days=30):
     """
-    限售解禁风险因子：未来 N 日内的解禁压力评分。
+    限售解禁风险因子：未来 N 日内该股票的解禁压力评分。
 
     返回:
-        float: 解禁风险评分，越高表示风险越大
-              0 表示无解禁或解禁影响可忽略
+        float: 0~1 的风险评分，0 表示未来 N 日无解禁
     """
-    today = datetime.date.today()
-    end_date = today + datetime.timedelta(days=lookforward_days)
-
-    df = get_restriction_release(
-        code=code,
-        start_date=today.strftime('%Y%m%d'),
-        end_date=end_date.strftime('%Y%m%d')
-    )
-
+    # 接口返回全市场未来 N 天的解禁列表，按 code 列自行过滤
+    df = get_restriction_release(days=lookforward_days)
     if df is None or df.empty:
-        return 0.0  # 无解禁计划
-
-    # 计算解禁市值
-    total_release_value = df['release_value'].sum()
-
-    # 获取当前市值
-    from eqlib import get_valuation
-    val = get_valuation(code)
-    if val is None:
         return 0.0
 
-    market_cap = val.get('market_cap', 0)
-    if market_cap <= 0:
+    rows = df[df['code'] == code]
+    if rows.empty:
         return 0.0
 
-    # 解禁比例 = 解禁市值 / 当前市值
-    release_ratio = total_release_value / market_cap
+    # release_pct：解禁市值占解禁前流通市值的比例（小数，0.05 表示 5%）
+    # release_value（亿元）、release_amount（万股）也可直接使用
+    release_pct = float(rows['release_pct'].max())
 
-    # 转换为风险评分（0-1，解禁比例超过 10% 视为高风险）
-    risk_score = min(release_ratio / 0.10, 1.0)
-    return risk_score
+    # 解禁比例达到 10%（0.10）视为高风险
+    return min(release_pct / 0.10, 1.0)
 
 
 def filter_stocks_by_restriction(stock_pool, lookforward_days=30, threshold=0.05):
     """
-    过滤即将解禁的股票。
+    过滤即将大比例解禁的股票。
 
     参数:
         stock_pool: 股票代码列表
         lookforward_days: 前瞻天数
-        threshold: 解禁比例阈值，超过则过滤
+        threshold: release_pct 阈值（小数，0.05 表示 5%），超过则过滤
 
     返回:
         list: 过滤后的股票列表
     """
+    df = get_restriction_release(days=lookforward_days)
+    if df is None or df.empty:
+        return list(stock_pool)
+
+    risky = set(df.loc[df['release_pct'] > threshold, 'code'])
     filtered = []
     for code in stock_pool:
-        risk = compute_restriction_risk_factor(code, lookforward_days)
-        if risk < threshold:
-            filtered.append(code)
+        if code in risky:
+            log.info('%s 未来 %d 日内解禁比例过高，已过滤' % (code, lookforward_days))
         else:
-            log.info(f'{code} 解禁风险过高 ({risk:.2%})，已过滤')
+            filtered.append(code)
     return filtered
 ```
+
+> **回测内行为**：`get_restriction_release()` 是快照接口——解禁名单按**真实今天**已公告的信息计算，数据提供商没有公告日历史。回测会话内调用会发出 `FutureWarning`；`set_option('avoid_future_data', True)` 下抛 `ValueError`。解禁过滤适合研究与实盘环境；回测中建议用它离线生成固定股票池后再跑。
 
 **使用场景：**
 
@@ -347,7 +332,7 @@ def compute_value(code):
 
 我们先用三个纯技术因子构建一个基础版本，避免依赖实时财务数据：
 
-### 4.1 因子定义
+### 5.1 因子定义
 
 | 因子 | 含义 | 权重 |
 |------|------|------|
@@ -355,7 +340,7 @@ def compute_value(code):
 | 成交量放大 | 近 5 日均量 / 近 20 日均量 | 30% |
 | 短期反转修正 | 近 5 日收益率的负值（避免短期追高） | 30% |
 
-### 4.2 因子计算示例
+### 5.2 因子计算示例
 
 ```python
 from eqlib import attribute_history
@@ -414,17 +399,18 @@ def score_stock_with_financials(code):
         if pb and 0 < pb < 20:
             pb_factor = 1.0 / pb
 
-    # 质量因子（ROE = 净利润 / 净资产，从财务摘要中获取）
+    # 质量因子（ROE，从财务摘要中获取）
     roe_factor = 0.0
     try:
         fin = get_financial_abstract(code)
-        if fin is not None and not fin.empty:
-            # 财务摘要的行索引包含各财务指标，尝试获取 ROE
-            if 'ROE' in fin.index:
-                roe = float(fin.loc['ROE'].iloc[-1])
-                # ROE 以小数形式存储（如 0.15 表示 15%），合理范围为 0 ~ 1
-                if 0 < roe < 1:
-                    roe_factor = roe
+        if fin is not None and not fin.empty and '指标' in fin.columns:
+            # 行索引是指标分类（"选项"列）；指标中文名在"指标"列，报告期列按时间倒序
+            roe_rows = fin[fin['指标'].astype(str).str.contains('净资产收益率')]
+            if not roe_rows.empty:
+                # 取最新报告期（"指标"列之后的第一列），单位是百分数（4.31 表示 4.31%）
+                roe = float(roe_rows.iloc[0, 1])
+                if 0 < roe < 100:
+                    roe_factor = roe / 100.0
     except Exception:
         pass
 
@@ -441,7 +427,7 @@ def score_stock_with_financials(code):
 
 不同因子的量纲不同（动量是百分比，成交量比是倍数），直接加权会出现某个因子主导的问题。需要先标准化再合成。
 
-### 6.1 Z-Score 标准化
+### 7.1 Z-Score 标准化
 
 ```python
 def zscore_normalize(values_dict):
@@ -485,7 +471,7 @@ def merge_factor_scores(factor_dicts, weights):
     return combined
 ```
 
-### 6.2 使用示例
+### 7.2 使用示例
 
 ```python
 stock_pool = ['601390', '600519', '000858', '600036', '601318',
@@ -664,15 +650,20 @@ if __name__ == '__main__':
 
 在投入使用前，需要检验因子是否真的有预测能力。
 
-### 8.1 IC（信息系数）检验
+### 9.1 IC（信息系数）检验
 
-IC 是因子值与下期收益率的相关系数。IC 绝对值越大，预测能力越强：
+IC 是 **T 日因子值**与 **T 之后 N 日收益率**的相关系数。IC 绝对值越大，预测能力越强。注意二者不能共用同一个时间窗口——拿"过去 5 日收益"当因子、再拿同一段 5 日收益当"未来收益"，算出来的是伪前向 IC，没有预测含义。下面的实现把历史数据切成两段：因子只用截至 T 日的数据，收益取 T → T+N：
 
 ```python
-def compute_ic(stock_pool, factor_func, forward_period=5):
+def compute_ic(stock_pool, factor_func, forward_period=5, factor_window=40):
     """
-    计算因子 IC（因子值与未来 N 日收益率的相关系数）。
-    factor_func: function(code) -> float | None
+    计算因子 IC（T 日因子值与 T→T+N 日收益率的 Pearson 相关）。
+
+    参数:
+        factor_func: function(hist) -> float | None
+            输入截至 T 日的历史数据，返回因子值
+        forward_period: 前瞻期 N（交易日）
+        factor_window: 因子计算所需的历史 bar 数
     """
     import statistics
 
@@ -680,16 +671,19 @@ def compute_ic(stock_pool, factor_func, forward_period=5):
     forward_returns = []
 
     for code in stock_pool:
-        # 因子值（今天计算）
-        f = factor_func(code)
+        # 一次取够：factor_window 根算因子，forward_period 根算前向收益
+        hist = attribute_history(
+            code, factor_window + forward_period + 5, '1d', ['close'])
+        if hist.empty or len(hist) < factor_window + forward_period:
+            continue
+
+        hist_t = hist.iloc[:-forward_period]   # 截至 T 日的数据
+        f = factor_func(hist_t)
         if f is None:
             continue
 
-        # 未来 N 日收益率（用于验证）
-        hist = attribute_history(code, forward_period + 5, '1d', ['close'])
-        if hist.empty or len(hist) < forward_period + 1:
-            continue
-        fwd_ret = (hist['close'].iloc[-1] / hist['close'].iloc[-(forward_period + 1)]) - 1
+        # T → T+N 的真实前向收益
+        fwd_ret = hist['close'].iloc[-1] / hist_t['close'].iloc[-1] - 1
 
         factor_values.append(f)
         forward_returns.append(fwd_ret)
@@ -709,10 +703,11 @@ def compute_ic(stock_pool, factor_func, forward_period=5):
     return ic
 
 
-# 示例：检验动量因子的 IC
+# 示例：检验 20 日动量因子的 IC（股票池沿用 §8 的 STOCK_POOL）
 ic_value = compute_ic(
-    g.stock_pool,
-    lambda code: compute_momentum(code, period=20),
+    STOCK_POOL,
+    lambda hist: (hist['close'].iloc[-1] / hist['close'].iloc[-20] - 1)
+                 if len(hist) >= 20 else None,
     forward_period=5,
 )
 if ic_value is not None:
@@ -721,22 +716,24 @@ if ic_value is not None:
     # IC > 0.10 属于较强的预测信号
 ```
 
-### 8.2 多空分组收益分析
+### 9.2 多空分组收益分析
 
-将股票按因子值从高到低分成 5 组（Q1~Q5），如果因子有效，Q1 组（最高分）应明显跑赢 Q5 组（最低分）：
+将股票按 T 日因子值从高到低分成 5 组（Q1~Q5），比较各组 T→T+N 的收益。如果因子有效，Q1 组（最高分）应明显跑赢 Q5 组（最低分）：
 
 ```python
-def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
-    """因子分组收益分析：将股票按因子值分成 5 组，比较各组收益。"""
+def factor_quintile_analysis(stock_pool, factor_func, forward_period=5, factor_window=40):
+    """因子分组收益分析：按 T 日因子值分 5 组，比较各组 T→T+N 收益。"""
     data = []
     for code in stock_pool:
-        f = factor_func(code)
+        hist = attribute_history(
+            code, factor_window + forward_period + 5, '1d', ['close'])
+        if hist.empty or len(hist) < factor_window + forward_period:
+            continue
+        hist_t = hist.iloc[:-forward_period]
+        f = factor_func(hist_t)
         if f is None:
             continue
-        hist = attribute_history(code, lookback + 3, '1d', ['close'])
-        if hist.empty or len(hist) < lookback + 1:
-            continue
-        fwd = (hist['close'].iloc[-1] / hist['close'].iloc[-(lookback+1)]) - 1
+        fwd = hist['close'].iloc[-1] / hist_t['close'].iloc[-1] - 1
         data.append((code, f, fwd))
 
     if len(data) < 5:
@@ -760,7 +757,7 @@ def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
 
 ## 10. 多因子选股的局限性
 
-### 9.1 A 股散户市场的特殊性
+### 10.1 A 股散户市场的特殊性
 
 | 因子 | 在美股 | 在 A 股 |
 |------|--------|---------|
@@ -769,17 +766,17 @@ def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
 | 质量因子（高 ROE） | 稳定有效 | 有效，但绩优股有时被冷落 |
 | 成长因子 | 有效 | 在牛市中效果更强 |
 
-### 9.2 因子衰减与轮换
+### 10.2 因子衰减与轮换
 
 没有一个因子永远有效，因子会"过时"：
 - 当太多资金追逐同一因子时，预测能力下降
 - 建议定期（每季度）检验 IC，判断因子是否仍有效
 
-### 9.3 数据偏差
+### 10.3 数据偏差
 
-回测时使用的是当前的财务数据（`get_valuation`），而非历史上该时点公布的数据。这可能引入**财务数据前瞻偏差**（Look-ahead Bias）。严格的多因子策略应当使用历史财务数据快照。
+回测时使用的是当前的财务数据（`get_valuation` / `get_financial_abstract`），而非历史上该时点公布的数据，这会引入**财务数据前瞻偏差**（Look-ahead Bias）。2026-10 起，引擎在回测会话内调用这些快照接口时发出 `FutureWarning`，`set_option('avoid_future_data', True)` 下直接抛 `ValueError`——严格的多因子回测应当只使用历史时点可得的数据。
 
-**实用建议：** 在回测中主要使用**价格和成交量类因子**（无前瞻偏差），把财务因子留作辅助参考或实盘筛选条件。
+**实用建议：** 在回测中主要使用**价格和成交量类因子**（无前瞻偏差），把财务因子留作辅助参考或实盘筛选条件。北向资金（`get_north_money_flow`）例外：它在回测内按模拟时钟做 T-1 截断，可安全使用。
 
 ---
 
@@ -789,7 +786,7 @@ def factor_quintile_analysis(stock_pool, factor_func, lookback=5):
 
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、归因分析，检验多因子策略的稳健性
 - **[Tutorial 06: 行业轮动](06-sector-rotation.md)** — 将多因子选股与行业轮动结合，先选行业再选股
-- **[Example 16: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 完整可运行的多因子示例代码
+- **[Example 17: 多因子选股策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/17_multi_factor.py)** — 完整可运行的多因子示例代码
 - **[Example 09: 绩效归因分析](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/09_attribution.py)** — 对策略收益进行深度归因，了解选股效应和配置效应
 - **[工具库参考](../reference/utils.md)** — `utils.zscore`、`utils.rolling_sharpe`、`utils.max_drawdown` 等工具的详细说明
 

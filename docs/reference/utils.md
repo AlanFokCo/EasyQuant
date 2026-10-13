@@ -15,6 +15,7 @@
 2. [统计分析 (stats)](#2-统计分析-stats)
 3. [资金管理 (money)](#3-资金管理-money)
 4. [支撑阻力位 (levels)](#4-支撑阻力位-levels)
+5. [权益曲线 (equity)](#5-权益曲线-equity)
 
 ---
 
@@ -358,6 +359,23 @@ is_death = utils.death_cross(ma5, ma20)
 ```
 检测两条均线是否发生交叉。
 
+### 1.13 批量计算全部指标
+
+#### `compute_all_indicators(close, high, low, volume, rsi_period=14, boll_period=20, boll_std=2.0, macd_fast=12, macd_slow=26, macd_signal=9, atr_period=14, donchian_period=20)`
+
+**用法：**
+```python
+from eqlib.utils.indicators import compute_all_indicators
+
+ind = compute_all_indicators(df['close'], df['high'], df['low'], df['volume'])
+```
+
+一次性计算全部标准指标，返回与输入对齐的 DataFrame，比逐指标调用更快（复用 rolling/ewm 窗口）。
+
+返回列：`rsi`、`bb_upper` / `bb_mid` / `bb_lower`、`macd_dif` / `macd_dea` / `macd_hist`、`atr`、`dc_upper` / `dc_mid` / `dc_lower`。
+
+注意：该函数未从 `eqlib.utils` 顶层再导出，需从 `eqlib.utils.indicators` 导入。
+
 ---
 
 ## 2. 统计分析 (stats)
@@ -387,13 +405,13 @@ corr = utils.rolling_corr(stock_ret, market_ret, 20)
 
 ### 2.3 滚动夏普比率
 
-#### `rolling_sharpe(returns, window, risk_free=0.0, annualize=252)`
+#### `rolling_sharpe(returns, window, risk_free=0.0, annualize=244)`
 
 **计算原理：**
 ```
 Sharpe = (μ * annualize - risk_free) / (σ * √annualize)
 ```
-其中 μ 和 σ 在 rolling window 内计算。
+其中 μ 和 σ 在 rolling window 内计算。`annualize` 默认取 `TRADING_DAYS_PER_YEAR`（244，A 股实际交易日数，见 `eqlib/constants.py`），与全库年化口径统一。
 
 ### 2.4 Z-Score
 
@@ -430,13 +448,13 @@ t_stat = β / SE(β)
 
 ### 2.7 下行偏差
 
-#### `downside_deviation(returns, target=0.0, annualize=252)`
+#### `downside_deviation(returns, target=0.0, annualize=244)`
 
 **计算原理：**
 ```
 DD = √[ mean(r²) for r in returns where r < target ] * √annualize
 ```
-只考虑低于目标值的收益，是索提诺比率的分母。
+只考虑低于目标值的收益，是索提诺比率的分母。`annualize` 默认同为 `TRADING_DAYS_PER_YEAR`（244）。
 
 ### 2.8 风险价值 (VaR)
 
@@ -670,6 +688,16 @@ normalized_return(t) = r(t) / σ_20(t)
 ```
 用滚动 20 日标准差标准化收益率。
 
+### 3.8 资金百分比换算
+
+#### `percent_of_equity(capital, pct)`
+
+**计算原理：**
+```
+amount = capital * pct
+```
+返回总资金的指定百分比金额，如 `percent_of_equity(100000, 0.1)` → `10000.0`。
+
 ---
 
 ## 4. 支撑阻力位 (levels)
@@ -882,6 +910,24 @@ trailing_stop(t) = max(stop_level(0), ..., stop_level(t))
 
 ---
 
+## 5. 权益曲线 (equity)
+
+组合风控（`eqlib.portfolio_risk`）共用的权益曲线校验助手。未从 `eqlib.utils` 顶层再导出，需显式导入：
+
+```python
+from eqlib.utils.equity import normalize_recorded_values, daily_returns
+```
+
+### `normalize_recorded_values(recorded_values)`
+
+把 `recorded_values`（dict 或 list[dict]）整理为按日期排序的 `total_value` Series。日期必须唯一、数值必须有限且为正，否则抛 `ValueError`。
+
+### `daily_returns(recorded_values)`
+
+基于 `normalize_recorded_values` 计算日收益 Series，不做缺失填充。
+
+---
+
 ## 附录：完整导入方式
 
 ```python
@@ -914,4 +960,5 @@ utils.cagr(100, 200, 2)
 utils.kelly_criterion(0.55, 1500, 1000)
 utils.atr_position_size(100000, 0.02, 0.30)
 utils.risk_parity_weights([0.15, 0.25, 0.20])
+utils.percent_of_equity(100000, 0.1)
 ```

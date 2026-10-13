@@ -94,7 +94,7 @@ from eqlib import attribute_history
 from eqlib import utils
 
 # 获取历史收盘价（至少 N + 10 根 bar，确保计算稳定）
-hist = attribute_history('601390', 30, '1d', ['close'])
+hist = attribute_history('601398', 30, '1d', ['close'])
 close_prices = hist['close']
 
 # 计算 14 日 RSI
@@ -132,7 +132,7 @@ from eqlib import *
 from eqlib import utils
 
 # ========== 策略参数（模块级常量，引擎不会清除） ==========
-SECURITY       = '601390'   # 操作标的：工商银行
+SECURITY       = '601398'   # 操作标的：工商银行
 RSI_PERIOD     = 14         # RSI 计算周期
 RSI_OVERSOLD   = 30         # 超卖阈值
 RSI_OVERBOUGHT = 70         # 超买阈值
@@ -172,7 +172,7 @@ def market_open(context):
     if current_rsi < RSI_OVERSOLD:
         if security not in context.portfolio.positions or \
            context.portfolio.positions[security].amount == 0:
-            order_value(security, context.portfolio.available_cash)
+            order_value(security, context.portfolio.available_cash * 0.95)
             log.info('买入 %s @ %.3f，RSI=%.1f（超卖）' % (
                 security, current_price, current_rsi))
 
@@ -199,7 +199,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=100000,
         benchmark='000300.XSHG',
-        securities=['601390'],
+        securities=['601398'],
         report_dir='reports',
     )
 ```
@@ -257,16 +257,16 @@ def market_open(context):
 rsi_prev = rsi_series.iloc[-2]   # 前一天的 RSI
 
 # RSI 曾经低于 30，且今天开始回升 → 更可靠的买入信号
-if current_rsi < g.rsi_oversold and current_rsi > rsi_prev:
+if current_rsi < RSI_OVERSOLD and current_rsi > rsi_prev:
     # 底部确认：RSI 从超卖开始回升
-    order_value(security, context.portfolio.available_cash)
+    order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 5.4 成交量确认
 
 ```python
 # 超卖 + 量能萎缩 → 可能是抛售结束的信号
-hist = attribute_history(security, g.bars_needed, '1d', ['close', 'volume'])
+hist = attribute_history(security, BARS_NEEDED, '1d', ['close', 'volume'])
 close_prices = hist['close']
 volumes = hist['volume']
 
@@ -274,8 +274,8 @@ avg_vol = volumes.tail(20).mean()
 current_vol = volumes.iloc[-1]
 
 # 买入条件：RSI 超卖 + 成交量低于均量（说明抛售力道已减弱）
-if current_rsi < g.rsi_oversold and current_vol < avg_vol * 0.8:
-    order_value(security, context.portfolio.available_cash)
+if current_rsi < RSI_OVERSOLD and current_vol < avg_vol * 0.8:
+    order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ### 5.5 完整的带风控版本
@@ -285,7 +285,7 @@ from eqlib import *
 from eqlib import utils
 
 # 模块级常量（引擎不会清除）
-SECURITY       = '601390'
+SECURITY       = '601398'
 RSI_PERIOD     = 14
 RSI_OVERSOLD   = 30
 RSI_OVERBOUGHT = 70
@@ -349,7 +349,7 @@ def market_open(context):
             market_bullish and
             current_vol < avg_vol * 1.2 and   # 非放量下跌
             not in_position):
-        order_value(security, context.portfolio.available_cash)
+        order_value(security, context.portfolio.available_cash * 0.95)
         log.info('买入 %s @ %.3f，RSI=%.1f→%.1f' % (
             security, current_price, prev_rsi, current_rsi))
         record(price=current_price, rsi=current_rsi, signal='BUY')
@@ -372,7 +372,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=100000,
         benchmark='000300.XSHG',
-        securities=['601390'],
+        securities=['601398'],
         report_dir='reports',
     )
 ```
@@ -395,8 +395,9 @@ if __name__ == '__main__':
 from eqlib import *
 from eqlib import utils
 
-g.securities = [
-    '601390',  # 工商银行（银行）
+# ========== 策略参数（模块级常量，引擎不会清除） ==========
+SECURITIES = [
+    '601398',  # 工商银行（银行）
     '600519',  # 贵州茅台（消费）
     '000858',  # 五粮液（消费）
     '600036',  # 招商银行（银行）
@@ -406,13 +407,20 @@ g.securities = [
     '000651',  # 格力电器（家电）
 ]
 
-g.rsi_period     = 14
-g.rsi_oversold   = 30
-g.rsi_overbought = 70
-g.position_pct   = 0.25   # 每只股票最多用 25% 可用资金
+RSI_PERIOD     = 14
+RSI_OVERSOLD   = 30
+RSI_OVERBOUGHT = 70
+POSITION_PCT   = 0.25   # 每只股票最多用 25% 可用资金
 
 
 def initialize(context):
+    # 引擎在 initialize 之前会清空 g，运行时要用的参数在这里挂到 g
+    g.securities     = SECURITIES
+    g.rsi_period     = RSI_PERIOD
+    g.rsi_oversold   = RSI_OVERSOLD
+    g.rsi_overbought = RSI_OVERBOUGHT
+    g.position_pct   = POSITION_PCT
+
     set_benchmark('000300.XSHG')
     set_order_cost(OrderCost(
         open_tax=0, close_tax=0.0005,
@@ -458,7 +466,7 @@ if __name__ == '__main__':
         end_date='2024-12-31',
         starting_cash=200000,
         benchmark='000300.XSHG',
-        securities=g.securities,
+        securities=SECURITIES,
         report_dir='reports',
     )
 ```
@@ -506,7 +514,7 @@ RSI 均值回归和布林带均值回归都是常见的均值回归策略，但�
 | **参数** | RSI 周期、超买/超卖阈值 | Bollinger 周期、标准差倍数 |
 | **信号特点** | 更关注**短期涨跌力度** | 更关注**当前价格相对历史的位置** |
 | **假信号** | 强趋势时频繁触发超卖/超买 | 趋势突破时会在带外停留很长时间 |
-| **相关示例** | 本教程 | [Example 14](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
+| **相关示例** | 本教程 | [Example 15](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py) |
 
 ### 8.1 结合使用
 
@@ -525,7 +533,7 @@ current_price = close_prices.iloc[-1]
 
 # RSI 超卖 + 价格触及布林带下轨 → 双重确认
 if rsi_val < 30 and current_price <= lower.iloc[-1]:
-    order_value(security, context.portfolio.available_cash)
+    order_value(security, context.portfolio.available_cash * 0.95)
 ```
 
 ---
@@ -537,11 +545,11 @@ if rsi_val < 30 and current_price <= lower.iloc[-1]:
 - **[Tutorial 06: 行业轮动策略](06-sector-rotation.md)** — 利用 A 股行业轮动特性，通过板块切换赚取超额收益
 - **[Tutorial 07: 多因子选股](07-multi-factor.md)** — 结合动量、价值、质量多个因子，系统化选股
 - **[Tutorial 03: 策略优化与改进](03-optimization.md)** — 参数调优、避免过拟合、归因分析
-- **[Example 14: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py)** — 另一种经典均值回归策略的完整代码
+- **[Example 15: 布林带策略](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/15_bollinger_strategy.py)** — 另一种经典均值回归策略的完整代码
 
 ### 练习
 
-1. 修改 `g.rsi_oversold = 25`，观察交易频率和收益的变化
+1. 修改 `RSI_OVERSOLD = 25`，观察交易频率和收益的变化
 2. 将大盘过滤阈值从 MA20 改为 MA60（更长期趋势判断），观察效果
 3. 对比有止损和无止损的回测结果，量化止损的效果
 4. 尝试在 2022 年（熊市）和 2024 年（震荡市）分别回测，对比两个市场环境下的表现

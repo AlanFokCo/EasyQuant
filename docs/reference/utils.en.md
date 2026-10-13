@@ -15,6 +15,7 @@
 2. [Statistical Analysis (stats)](#2-statistical-analysis-stats)
 3. [Money Management (money)](#3-money-management-money)
 4. [Support & Resistance Levels (levels)](#4-support--resistance-levels-levels)
+5. [Equity Curve (equity)](#5-equity-curve-equity)
 
 ---
 
@@ -358,6 +359,23 @@ Death cross:  fast_ma(t-1) >= slow_ma(t-1) AND fast_ma(t) < slow_ma(t)
 ```
 Detects whether two moving averages have crossed.
 
+### 1.13 Batch-Compute All Indicators
+
+#### `compute_all_indicators(close, high, low, volume, rsi_period=14, boll_period=20, boll_std=2.0, macd_fast=12, macd_slow=26, macd_signal=9, atr_period=14, donchian_period=20)`
+
+**Usage:**
+```python
+from eqlib.utils.indicators import compute_all_indicators
+
+ind = compute_all_indicators(df['close'], df['high'], df['low'], df['volume'])
+```
+
+Computes all standard indicators in one pass and returns a DataFrame aligned with the input — faster than calling each indicator separately (rolling/ewm windows are reused internally).
+
+Returned columns: `rsi`, `bb_upper` / `bb_mid` / `bb_lower`, `macd_dif` / `macd_dea` / `macd_hist`, `atr`, `dc_upper` / `dc_mid` / `dc_lower`.
+
+Note: this function is not re-exported at the `eqlib.utils` top level; import it from `eqlib.utils.indicators`.
+
 ---
 
 ## 2. Statistical Analysis (stats)
@@ -387,13 +405,13 @@ corr = utils.rolling_corr(stock_ret, market_ret, 20)
 
 ### 2.3 Rolling Sharpe Ratio
 
-#### `rolling_sharpe(returns, window, risk_free=0.0, annualize=252)`
+#### `rolling_sharpe(returns, window, risk_free=0.0, annualize=244)`
 
 **Calculation:**
 ```
 Sharpe = (μ * annualize - risk_free) / (σ * √annualize)
 ```
-where μ and σ are computed within the rolling window.
+where μ and σ are computed within the rolling window. `annualize` defaults to `TRADING_DAYS_PER_YEAR` (244, the actual A-share trading-day count; see `eqlib/constants.py`), unified with the annualization basis across the library.
 
 ### 2.4 Z-Score
 
@@ -430,13 +448,13 @@ Returns alpha, beta, R², t-statistic, and the residual series.
 
 ### 2.7 Downside Deviation
 
-#### `downside_deviation(returns, target=0.0, annualize=252)`
+#### `downside_deviation(returns, target=0.0, annualize=244)`
 
 **Calculation:**
 ```
 DD = √[ mean(r²) for r in returns where r < target ] * √annualize
 ```
-Only considers returns below the target value; this is the denominator of the Sortino ratio.
+Only considers returns below the target value; this is the denominator of the Sortino ratio. `annualize` likewise defaults to `TRADING_DAYS_PER_YEAR` (244).
 
 ### 2.8 Value at Risk (VaR)
 
@@ -670,6 +688,16 @@ normalized_return(t) = r(t) / σ_20(t)
 ```
 Normalizes returns using a rolling 20-day standard deviation.
 
+### 3.8 Percentage of Equity
+
+#### `percent_of_equity(capital, pct)`
+
+**Calculation:**
+```
+amount = capital * pct
+```
+Returns the dollar amount for a percentage of total equity, e.g. `percent_of_equity(100000, 0.1)` → `10000.0`.
+
 ---
 
 ## 4. Support & Resistance Levels (levels)
@@ -882,6 +910,24 @@ Gap zones often form future support/resistance levels.
 
 ---
 
+## 5. Equity Curve (equity)
+
+Equity-curve validation helpers shared by portfolio risk monitoring (`eqlib.portfolio_risk`). Not re-exported at the `eqlib.utils` top level — import them explicitly:
+
+```python
+from eqlib.utils.equity import normalize_recorded_values, daily_returns
+```
+
+### `normalize_recorded_values(recorded_values)`
+
+Normalizes `recorded_values` (dict or list[dict]) into a date-sorted `total_value` Series. Dates must be unique and values finite and positive, otherwise `ValueError` is raised.
+
+### `daily_returns(recorded_values)`
+
+Computes the daily return Series on top of `normalize_recorded_values`, without filling missing observations.
+
+---
+
 ## Appendix: Complete Import Reference
 
 ```python
@@ -914,4 +960,5 @@ utils.cagr(100, 200, 2)
 utils.kelly_criterion(0.55, 1500, 1000)
 utils.atr_position_size(100000, 0.02, 0.30)
 utils.risk_parity_weights([0.15, 0.25, 0.20])
+utils.percent_of_equity(100000, 0.1)
 ```

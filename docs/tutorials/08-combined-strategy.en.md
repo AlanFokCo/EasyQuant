@@ -41,7 +41,7 @@ The "All-Weather Alpha" strategy is designed to:
 - **Robustness**: Operate effectively in bull markets, bear markets, and sideways markets without depending on a single market condition
 - **Multi-dimensional**: Simultaneously leverage fundamentals (factor scores), technicals (RSI / MACD / Bollinger Bands), and structural factors (support/resistance levels)
 - **Controlled risk**: Multi-layer stop-loss (hard stop + ATR trailing stop), strict position caps
-- **Explainability**: Every buy/sell decision has a traceable quantitative rationale
+- **Explainability**: Every trade logs the triggering signal (factor score, RSI, stop price) for post-hoc review
 
 ### 1.2 Strategy Architecture
 
@@ -422,7 +422,7 @@ Following [Example 07](https://github.com/AlanFokCo/EasyQuant/blob/main/examples
 ### 6.1 Pre-Market (before_trading_start)
 
 ```python
-def _before_market_open(context):
+def _before_market_open(context, data=None):
     # Log current position state
     log.info("PRE-MARKET | total=%.2f | cash=%.2f | positions=%d"
              % (...))
@@ -455,70 +455,83 @@ def _after_market_close(context):
 
 Beyond per-stock stop-losses and position control, a combined strategy also requires **portfolio-level** risk monitoring. `PortfolioRiskMonitor` provides a one-stop portfolio risk dashboard covering concentration, volatility, drawdown, and other key dimensions.
 
-### 7.1 Initialization and Daily Checks
+### 7.1 Post-Backtest Portfolio Health Check
 
-Create the monitor instance in `initialize` and run daily checks in the `before_trading_start` callback:
+`PortfolioRiskMonitor` does not read live positions — it consumes **backtest results**. Run `run_backtest()` once per sub-strategy (or per parameter set of the same strategy), feed each returned result dict into the monitor, then call `daily_check()` to get a `RiskReport`.
 
 ```python
-from eqlib import PortfolioRiskMonitor
+from eqlib import PortfolioRiskMonitor, RiskThresholds, run_backtest
 
-def initialize(context):
-    # ... other init code ...
-    context.risk_monitor = PortfolioRiskMonitor(
-        max_single_weight=0.20,    # Max single stock weight 20%
-        max_sector_weight=0.40,    # Max single sector weight 40%
-        max_drawdown_threshold=0.15,  # Drawdown alert threshold 15%
-    )
+# All thresholds are configurable; the values below are the defaults
+thresholds = RiskThresholds(
+    max_drawdown_yellow=0.15,   # drawdown >= 15% -> YELLOW alert
+    max_drawdown_red=0.20,      # drawdown >= 20% -> RED alert
+    max_drawdown_kill=0.25,     # drawdown >= 25% -> kill switch
+    correlation_yellow=0.60,    # strategy-correlation alert thresholds
+    correlation_red=0.75,
+    correlation_kill=0.85,
+    single_stock_max=0.10,      # max single-stock weight
+    single_sector_max=0.30,     # max single-sector weight
+    small_cap_max=0.20,         # max small-cap weight (market cap < 5B CNY)
+    var_confidence=0.95,        # VaR confidence level
+)
+monitor = PortfolioRiskMonitor(thresholds=thresholds)   # omit for all defaults
 
+# Backtest each strategy once, then register the result with the monitor
+result = run_backtest(initialize, start_date="2022-01-01",
+                      end_date="2024-12-31", starting_cash=500_000)
+monitor.add_strategy("AllWeatherAlpha", result)   # result must contain recorded_values, else ValueError
 
-def _before_market_open(context):
-    # Daily risk check (executed before market open)
-    report = context.risk_monitor.daily_check(context.portfolio)
-
-    if report['alerts']:
-        for alert in report['alerts']:
-            log.warning("RISK ALERT: %s" % alert)
-
-    # If drawdown exceeds threshold, pause buying for the day
-    if report.get('drawdown_breached'):
-        context.pause_buying = True
-        log.warning("Drawdown %.2f%% exceeded threshold, pausing buys"
-                     % (report['current_drawdown'] * 100))
-    else:
-        context.pause_buying = False
+report = monitor.daily_check()
+print(report.alert_level)      # AlertLevel.YELLOW / RED / KILL_SWITCH
+print(report.triggers)         # triggered alerts
+print(report.recommendations)  # recommended actions
 ```
+
+| `RiskReport` field | Meaning |
+|--------------------|---------|
+| `alert_level` | `AlertLevel` enum: starts at `YELLOW` even with no triggers; escalates to `RED` / `KILL_SWITCH` past thresholds |
+| `triggers` | Triggered alerts (drawdown, correlation, concentration, regime) |
+| `portfolio_var` / `portfolio_var_pct` | Portfolio VaR (amount / percentage, historical simulation, needs >= 30 days of daily returns) |
+| `correlation_matrix` | Daily-return correlation across strategies (None with fewer than 2 strategies) |
+| `concentration` | Position concentration (single stock / sector / small-cap weights) |
+| `regime` | Market state: `bull` / `bear` / `oscillation` / `unknown` |
+
+Strategies registered via `add_strategy()` are independent: backtest the strategies from Tutorials 05/06/07 and add them all for a meaningful correlation matrix — with a single strategy the matrix is empty. For full VaR, concentration, and kill-switch (`check_kill_switch`) usage, see [Tutorial 10 Sections 6-7](10-ashare-data-risk.md#6-portfolio-risk-control-portfolioriskmonitor); for wiring pre-market checks into live trading via `before_trading_start`, see [Tutorial 10 §7.4](10-ashare-data-risk.md#74-integrating-risk-control-in-live-trading).
 
 ### 7.2 North-Bound Capital Regime Signal
 
 North-bound capital (north-capital) flow can serve as a portfolio-level **regime signal** in `before_trading_start`, dynamically adjusting position limits based on market sentiment:
 
 ```python
+from datetime import timedelta
 from eqlib import get_north_money_flow
 
 def _check_north_regime(context):
     """
     North-bound capital regime signal: determines market sentiment regime
-    based on net inflows over the last 5 days.
+    based on net buying over the last 5 days.
 
     Returns:
         str: 'risk_on' (bullish), 'neutral', 'risk_off' (bearish)
     """
-    df = get_north_money_flow(days=5)
+    end_dt = context.current_dt.date()
+    start_dt = end_dt - timedelta(days=45)   # extra days to cover holidays
+    df = get_north_money_flow(start_date=start_dt, end_date=end_dt)
     if df is None or df.empty:
         return 'neutral'
 
-    net_5d = df['north_net'].sum()        # 5-day cumulative net inflow (100M CNY)
-    avg_daily = net_5d / len(df)
+    net_5d = df["net_buy"].tail(5).sum()  # 5-day cumulative net buy (100M CNY)
 
-    if avg_daily > 20:                    # Daily avg net inflow > 2B CNY
+    if net_5d > 50:
         return 'risk_on'
-    elif avg_daily < -20:                 # Daily avg net outflow > 2B CNY
+    elif net_5d < -50:
         return 'risk_off'
     else:
         return 'neutral'
 
 
-def _before_market_open(context):
+def _before_market_open(context, data=None):
     # ... other checks ...
 
     regime = _check_north_regime(context)
@@ -532,6 +545,8 @@ def _before_market_open(context):
     }
     context.max_position_pct = regime_caps.get(regime, 0.8)
 ```
+
+`get_north_money_flow()` returns columns `date / net_buy / total_buy / total_sell` (unit: 100M CNY). Inside a backtest the requested range is clamped at the simulated clock (T-1 during decision-time callbacks), so no future data leaks in; see [Tutorial 10 §2](10-ashare-data-risk.md#2-north-bound-capital-flow) for the full API. `combined_strategy.py` uses exactly this pattern (threshold: 5B CNY).
 
 Combining the north-bound capital regime signal with `PortfolioRiskMonitor` enables **top-down** risk control in a combined strategy: first assess the market environment (regime signal), then monitor portfolio health (risk dashboard), and finally execute individual stock buy/sell signals.
 
@@ -610,9 +625,9 @@ initialize(context)                    # Strategy entry point (required)
 python examples/20_all_weather_alpha/run_backtest.py
 ```
 
-**Backtest parameters:**
-- Period: 2022-01-01 to 2024-12-31 (3 years)
-- Starting capital: 500,000 CNY
+**Backtest parameters (defaults; all overridable via CLI flags):**
+- Period: relative dates from `examples/_defaults.py` — end date is 30 days ago, start date is 3 years before that (override with `--start` / `--end`)
+- Starting capital: 500,000 CNY (override with `--cash`)
 - Benchmark: CSI 300 (000300.XSHG)
 - Stock pool: 12 stocks (8 sectors)
 
@@ -628,28 +643,30 @@ python examples/20_all_weather_alpha/run_backtest.py
 # run_backtest.py core snippet
 
 import sys, os
-sys.path.insert(0, ".")                          # Project root
+sys.path.insert(0, ".")                              # Project root
 sys.path.insert(0, "examples/20_all_weather_alpha")  # Strategy directory
 
 from combined_strategy import initialize, STOCK_POOL
 from eqlib import run_strategy, analyze_returns
+from examples._defaults import START_DATE, END_DATE
 
 result = run_strategy(
     initialize_func=initialize,     # Strategy entry function
-    start_date="2022-01-01",
-    end_date="2024-12-31",
+    start_date=START_DATE,          # Default: relative date 3 years back
+    end_date=END_DATE,              # Default: 30 days ago
     starting_cash=500_000,
     benchmark="000300.XSHG",
     securities=STOCK_POOL,          # Preload data to speed up backtest
-    report_dir="reports",
 )
 
 # Performance analysis
 metrics = analyze_returns(result, risk_free_rate=0.03)
 print("Sharpe ratio : %.4f" % metrics["sharpe_ratio"])
 print("Max drawdown : %.2f%%" % (metrics["max_drawdown"] * 100))
-print("Win rate     : %.2f%%" % (metrics["win_rate"] * 100))
+print("Win rate     : %.2f%%" % (metrics["win_rate_trade"] * 100))
 ```
+
+`win_rate_trade` matches buys and sells FIFO and counts a win only when the round-trip P&L is positive **after both-side commissions and stamp duty**; `analyze_returns` also returns `win_rate_daily` (share of profitable trading days). Without a benchmark, `alpha` / `beta` are `NaN` and render as N/A in reports.
 
 ### 9.3 Backtest Results Interpretation Guide
 
@@ -707,13 +724,15 @@ python examples/20_all_weather_alpha/run_paper_trade.py \
 Following [Tutorial 04: Paper Trading to Live Trading](04-live-trading.md) and [Example 12](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/12_paper_trade.py),
 you can export this strategy to PTrade/QMT format:
 
+`export_ptrade_script` takes the strategy **file path** (which must contain `initialize(context)`), not a function object:
+
 ```python
 from eqlib.ptrade_adapter import export_ptrade_script
 
 # Generate a QMT-compatible strategy file
 export_ptrade_script(
-    initialize_func=initialize,
-    output_path="combined_strategy_qmt.py",
+    strategy_file="examples/20_all_weather_alpha/combined_strategy.py",
+    output_file="combined_strategy_qmt.py",
 )
 ```
 

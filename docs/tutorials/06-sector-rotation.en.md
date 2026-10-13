@@ -135,9 +135,10 @@ print(whitewine_df_sorted[['name', 'price', 'pct_change']].head())
 from eqlib import get_industry
 
 # Query ICBC's industry
-info = get_industry('601390')
+info = get_industry('601398')
 print(info)
-# Output: {'code': '601390', 'name': 'ICBC', 'industry': 'Banking'}
+# Returns a dict with code / name / industry keys (from the provider's latest stock profile):
+# {'code': '601398', 'name': '工商银行', 'industry': '银行'}
 ```
 
 ### 3.4 Query Industry Historical Prices
@@ -293,16 +294,16 @@ if __name__ == '__main__':
     )
 ```
 
-> **Note:** `get_industry_stocks()` and `get_industry_representative()` require real-time network access. If backtesting fails, ensure network connectivity or replace dynamic industry queries with a fixed stock list (see below).
+> **Note:** `get_industry_stocks()` returns the provider's **current snapshot** with no historical membership record. Since 2026-10, calling it inside a backtest session emits a `FutureWarning`; with `set_option('avoid_future_data', True)` it raises `ValueError` outright. The interface also requires live network access. **For backtests, prefer the fixed stock pool in §5.1**; keep dynamic queries for research and live contexts.
 
-### 5.1 Using a Fixed Stock Pool (More Stable Backtesting)
+### 5.1 Using a Fixed Stock Pool (Recommended Default for Backtesting)
 
-When the industry data interface is unstable, or you want to backtest with deterministic historical data, you can replace dynamic industry queries with a fixed stock pool:
+Historical sector membership is unavailable — dynamic queries only return today's snapshot. The robust approach in backtests is to write each sector's representative stock as a module-level constant:
 
 ```python
 # Select 1-2 representative stocks per sector (module-level constants, not cleared by engine)
 INDUSTRY_STOCKS = {
-    'Banking':        '601390',   # ICBC
+    'Banking':        '601398',   # ICBC
     'Baijiu':         '600519',   # Kweichow Moutai
     'New Energy':     '300750',   # CATL
     'Pharma':         '600276',   # Hengrui Medicine
@@ -377,6 +378,8 @@ def score_industries_multi(context, industry_stocks):
 
 Avoid buying sectors with extremely high valuations (bubble risk):
 
+> `get_valuation()` is also a snapshot interface: it returns current PE/PB/market cap, and calling it inside a backtest session triggers the same `FutureWarning` (or `ValueError` with `set_option('avoid_future_data', True)`). Historical valuations are unavailable, so in backtests either accept the approximation (and tolerate the warning) or drop the valuation filter.
+
 ```python
 def score_industries_with_valuation(context, industry_stocks):
     """Valuation filter: exclude sectors with PE above 50."""
@@ -443,9 +446,9 @@ print('Estimated annual transaction cost: %.0f (%.2f%%)' % (
 
 ### 7.3 Industry Data Latency
 
-`get_industry_stocks()` returns a current snapshot, which does not represent historical data on that date during backtesting. Strictly speaking, this introduces some look-ahead information.
+`get_industry_stocks()` returns a current snapshot and does not represent sector membership at the historical backtest date — building a historical universe from it introduces survivorship bias. Since 2026-10 the engine enforces this: calling snapshot APIs (`get_industry_stocks` / `get_concept_stocks` / `get_index_stocks` / `get_valuation` / `scan_market`, etc.) inside a backtest session emits a `FutureWarning`, and with `set_option('avoid_future_data', True)` it raises `ValueError`.
 
-**Mitigation:** Use a fixed stock pool (like the `INDUSTRY_STOCKS` dictionary above) with known representative stocks instead of dynamic industry queries to ensure reliable backtest results.
+**Mitigation:** In backtests, use a fixed stock pool (like the `INDUSTRY_STOCKS` dictionary above) with known representative stocks instead of dynamic industry queries; keep dynamic queries for research and live contexts.
 
 ---
 
@@ -524,6 +527,8 @@ if __name__ == '__main__':
         report_dir='reports',
     )
 ```
+
+> **Note:** The `get_index_stocks()` call inside `initialize` is also a snapshot query — it returns **today's** index constituents, not the constituents at the backtest start date. Inside a backtest session it emits a `FutureWarning` (or raises `ValueError` with `avoid_future_data` enabled). For strict historical reproduction, replace the candidate pool with a fixed stock list.
 
 Related reference example: [Example 10: Index & Concept Strategy](https://github.com/AlanFokCo/EasyQuant/blob/main/examples/10_index_concept.py)
 

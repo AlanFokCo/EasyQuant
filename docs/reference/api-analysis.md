@@ -32,7 +32,7 @@ generate_chart(result, out_path)
 metrics = analyze_returns(result, risk_free_rate=0.03)
 ```
 
-返回 `dict`：`total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`。
+返回 `dict`：`total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`。当 `result["recorded_values"]` 为空、缺少 `total_value` 或初始资金非正时，返回 **`None`**。
 
 口径说明：
 

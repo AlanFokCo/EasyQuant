@@ -19,7 +19,7 @@ Find the right guide for your task. Each guide focuses on a specific task and pr
 | Understand HTML/PNG/JSON reports | [Reading Backtest Reports](read-reports.md) | 20 min |
 | Run a strategy on live market data | [Paper Trading](paper-trade.md) | 15 min |
 | Build stock selection and rebalancing strategies | [Stock Selection Framework](selection-strategy.md) | 20 min |
-| Monitor portfolio risk (VaR, concentration) | [Portfolio Risk Control](portfolio-risk.md) | 15 min |
+| Monitor portfolio risk (VaR, concentration) | [Portfolio Risk Monitoring](portfolio-risk.md) | 15 min |
 | Parameterize a strategy and keep audit records | [Parameter Optimization & Auditing](param-optimization.md) | 20 min |
 | Run an adversarial audit of dependencies, wheels, and runtime contracts | [Run the eqlib Adversarial Dependency Evaluator](dependency-evaluator.md) | 10 min |
 | Export strategies to PTrade/QMT | [PTrade/QMT Adapter](export-ptrade.md) | 20 min |

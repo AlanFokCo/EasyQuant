@@ -83,18 +83,22 @@ pip install .
 
 1. **交易日限制**：北向资金数据仅在交易日更新，周末和节假日无数据。
 2. **网络问题**：数据源（东方财富）接口不稳定，可稍后重试。
-3. **日期范围**：`get_north_money_flow(count=N)` 返回最近 N 个交易日数据，若 N 过大可能超出数据源限制。
+3. **日期范围**：`get_north_money_flow(start_date=None, end_date=None)` 默认取近 30 天至今；区间过早可能超出数据源覆盖范围。
 
 **处理：**
 
 ```python
 from eqlib import get_north_money_flow
 
-df = get_north_money_flow(count=30)
+df = get_north_money_flow()  # 默认近 30 天至今
+# 或显式指定日期范围
+df = get_north_money_flow(start_date='2026-09-01', end_date='2026-10-01')
 if df.empty:
     log.warn("北向资金数据暂不可用，使用备用逻辑")
     # 可使用缓存或历史均值作为替代
 ```
+
+返回列为 `date` / `net_buy` / `total_buy` / `total_sell`（单位：亿元，沪股通 + 深股通合计）。
 
 建议在 `initialize` 中预加载并缓存北向资金数据，避免每次 `handle_data` 都请求。
 
@@ -121,15 +125,17 @@ df = get_limit_up_down_stats()
 **处理：**
 
 ```python
-from eqlib import get_margin_trading
+from eqlib import get_margin_data
 
-df = get_margin_trading('601390', count=30)
+df = get_margin_data()  # 默认近 30 天至今
 # 去除首行 NaN
 df = df.dropna(subset=['margin_repay'])
 
 # 或使用前值填充
 df['margin_repay'] = df['margin_repay'].fillna(0)
 ```
+
+注意：`get_margin_data(start_date=None, end_date=None)` 返回**全市场汇总**数据（沪 + 深合计），返回列为 `date` / `margin_balance` / `margin_buy` / `margin_repay` / `short_balance`（单位：亿元），没有单票粒度，也没有 `count` 参数。
 
 ### Q: 为什么我在 run_backtest 外设置的 g.xxx 丢失了？
 
@@ -206,9 +212,9 @@ def initialize(context):
 
 <a id="faq-benchmark-null"></a>
 
-### Q: `benchmark_return` 为 `null`，Alpha / Beta 接近 0 是否正常？
+### Q: `benchmark_return` 为 `null`，Alpha / Beta 显示 N/A 是否正常？
 
-**可能原因：**拉取或对齐 **基准指数日收益** 失败（网络、指数代码转换、日期交集为空等）时，超额收益与 CAPM 相关展示可能为 **0 或占位**。**策略净值、PNG 静态图、成交表仍以策略数据为准**。可检查网络后重跑，或确认 `set_benchmark` 与回测区间中有有效指数行情。
+**可能原因：**拉取或对齐 **基准指数日收益** 失败（网络、指数代码转换、日期交集为空等）时，`alpha` / `beta` / `information_ratio` 返回 **NaN**，HTML / Markdown 报告渲染为 **N/A** 并附口径说明，JSON 中对应检查项标记为 `pass: null`（不再是旧版的静默默认值 0.0 / 1.0）。**策略净值、PNG 静态图、成交表仍以策略数据为准**。可检查网络后重跑，或确认 `set_benchmark` 与回测区间中有有效指数行情。
 
 ### Q: 如何只跑回测、不要自动生成四份报告？
 

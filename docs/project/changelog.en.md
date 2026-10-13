@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Fixed
 
 - **Annualization basis unified to 244 trading days** — `TRADING_DAYS_PER_YEAR` (244, the A-share correct value) is now imported from `eqlib.constants` everywhere it was previously hardcoded as 252. Affected: `eqlib/scientific/statistics.py`, `eqlib/scientific/risk.py`, `eqlib/scientific/overfitting.py`, `eqlib/utils/stats.py` (`rolling_sharpe`, `downside_deviation`), `eqlib/attribution.py` (`_calc_alpha_beta` and `analyze_returns`). The same backtest now produces matching Sharpe ratios across all modules — previously the same daily returns could yield different annualized values depending on which code path computed them.
-- **OrderCost defaults updated to 2024 fee rates** — `eqlib/objects.py:OrderCost` now defaults to `close_tax=0.0005`, `open_commission=close_commission=0.00025`, aligning with `examples/_defaults.py:DEFAULT_ORDER_COST` and the 2023-08-28 stamp-duty cut. Cascaded to `eqlib/engine.py`, `eqlib/strategies/*.py`, `eqlib/examples/multi_factor_momentum.py`, `web_strategy_studio/backend/studio_api/routers/strategies.py`, `web_strategy_studio/backend/studio_api/data/templates.json`, `web_strategy_studio/backend/studio_api/data/eqlib_symbols.json`, `agent/strategy_template.py`. The historical 0.001 stamp duty is still applied automatically for dates before 2023-08-28 via the existing date-branch logic.
+- **OrderCost default commission rates updated** — `eqlib/objects.py:OrderCost` now defaults to `open_commission=close_commission=0.00025`, aligning with `examples/_defaults.py:DEFAULT_ORDER_COST` and the 2023-08-28 stamp-duty cut. The explicit `close_tax` default remains `None`: when unset, the statutory stamp duty applies date-aware (0.05% on/after 2023-08-28, 0.1% before); `examples/_defaults.py` pins 0.0005, suitable for backtests on/after 2023-08-28.
 - **MLSelector honest naming** — `target='forward_return_5d'` now raises `NotImplementedError` instead of silently computing past returns. The default target remains `past_return_5d` (backward-compatible) but its docstring explicitly warns that it uses historical returns as labels — not a true forward-looking model. For true forward-return prediction, users must supply `label_data` as a panel DataFrame.
 - **`MLSelector` constructor signature completed** — `label_data` and `custom_features` parameters are now exposed in the public API (previously only accessible via internals), enabling panel-label training and user-supplied feature functions.
 - **`walk_forward_analysis` is now a true rolling window** — Replaced the previous single-backtest-and-slice proxy with a real walk-forward loop: the `[start_date, end_date]` range is divided into multiple train/test windows that slide forward by `step` days. Each window runs a fresh backtest on the train segment (in-sample) and the test segment (out-of-sample), and per-window Sharpe / return / max-drawdown are aggregated into `oos_is_ratio` and `is_sharpe_decay`. The dict-input path (slicing a pre-computed equity curve) is retained for backward compatibility.
@@ -26,7 +26,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### eqlib Core — Market Rules & Data Honesty (2026-10 audit fixes)
 
-This round of fixes comes from a full adversarial review of usability, capability, experience, reliability and correctness (with an independent evaluator re-check). The following changes alter backtest results produced by older versions and are labelled accordingly.
+The following changes alter backtest results produced by older versions and are labelled accordingly.
+
+#### Added
+
+- **Notification functions promoted to top-level API** — `set_notification_webhook` / `enable_notification` / `notify_signal` can now be imported directly (`from eqlib import ...`); previously they required deep imports from `eqlib.engine` / `eqlib.notification`.
 
 #### Changed (⚠️ breaking)
 
@@ -239,7 +243,7 @@ in practice.
   out-of-sample validation framework.
 - `StrategyConfig.use_local` field — promotes `use_local` from a hardcoded
   `True` to a user-configurable parameter in `run_portfolio_backtest`.
-- Glossary page (`docs/glossary.md`) added to documentation site.
+- Glossary page added to the documentation site (now at `docs/explanation/glossary.md`).
 - `tools/profiling/` directory for performance benchmarking scripts (moved
   from `examples/20_all_weather_alpha/`).
 
@@ -316,13 +320,14 @@ in practice.
 
 ### Documentation
 
-- M10: mkdocs nav now points to the split-by-chapter user guide
-  (`doc/user_guide/index.md`); the old single-page version is still
-  accessible but no longer in the top nav.
+- M10: mkdocs nav now points to the split-by-chapter user guide (since
+  restructured into `docs/tutorials/` and `docs/how-to/`); the old
+  single-page version is still accessible but no longer in the top nav.
 - M11: CHANGELOG, CONTRIBUTING, and SECURITY added to the nav under
   "Project Updates".
-- E6: `doc/utils_reference.md` added to the API reference section of the nav.
-- E9: Glossary page added (`docs/glossary.md`).
+- E6: utils reference page added to the API reference section of the nav
+  (now at `docs/reference/utils.md`).
+- E9: Glossary page added (now at `docs/explanation/glossary.md`).
 
 ### Risk Disclosures Added
 
@@ -334,14 +339,16 @@ in practice.
 
 ## [0.1.1] — 2025-07 (P0 patch)
 
-See [Unreleased] section for the full list.  This will be tagged once all
-P0 backtest correctness fixes are merged.
+Never tagged. The P0 backtest-correctness fixes planned for the 0.1.x line
+ultimately shipped with [1.0.2] (see above).
 
 ---
 
 ## [0.1.0] — 2025-05
 
 Initial release.
+
+> Example numbering has since been reorganized; the paths below map to the current `examples/` directory.
 
 ### Added
 

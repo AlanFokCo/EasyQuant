@@ -11,7 +11,7 @@
 ```python
 from eqlib import analyze_returns
 
-m = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
+m = analyze_returns(result, risk_free_rate=0.03)  # trading_days 默认 244（TRADING_DAYS_PER_YEAR）
 ```
 
 当 `result["recorded_values"]` 不足以构造日净值序列时，函数可能返回 **`None`**，此时 HTML 中部分指标也会缺失。

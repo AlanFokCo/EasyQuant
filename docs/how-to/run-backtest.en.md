@@ -44,7 +44,10 @@ result = run_backtest(
 High-level interface for multi-stock portfolio backtesting.
 
 ```python
-from eqlib import StrategyConfig, run_portfolio_backtest
+from eqlib import (
+    StrategyConfig, run_portfolio_backtest,
+    attribute_history, order_value, order_target,
+)
 
 config = StrategyConfig(
     starting_cash=200000,
@@ -71,7 +74,27 @@ def my_strategy(context):
 result = run_portfolio_backtest(config, my_strategy, report_dir="reports")
 ```
 
-### 1.4 Benchmark Comparison
+### 1.4 Return Value Structure
+
+All three interfaces return a `result` dict. Commonly used keys:
+
+| Key | Content |
+|-----|---------|
+| `context` | Backtest context; `result['context'].portfolio` holds final positions and cash |
+| `trade_log` | List of executed trades (date, security, side, price, amount, commission) |
+| `recorded_values` | Daily records sorted by date (total value, custom `record()` fields) |
+| `benchmark` | Benchmark code |
+| `benchmark_values` | Benchmark daily close series (used for alpha/beta and charts) |
+
+The portfolio backtest adds a `config` key (the input config, echoed back).
+
+```python
+final_value = result['context'].portfolio.total_value
+for trade in result['trade_log'][:5]:
+    print(trade['date'], trade['security'], trade['type'], trade['price'])
+```
+
+### 1.5 Benchmark Comparison
 
 Set the benchmark via the `benchmark` parameter (defaults to `000300.XSHG`, the CSI 300 Index). The results will automatically calculate alpha, beta, and information ratio.
 

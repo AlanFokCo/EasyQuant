@@ -63,9 +63,9 @@ python examples/03_run_backtest.py
 
 脚本会下载（或更新）数据并运行回测。结束后终端会打印 `reports/` 下的 **PNG、HTML、Markdown、JSON** 路径。
 
-用浏览器打开其中的 **`.html` 文件`**，从上到下浏览：指标卡片 → 图表 → 成交与持仓。各字段含义见 [**报告与指标详解**](../reference/reports-format.md)。
+用浏览器打开其中的 **`.html` 文件**，从上到下浏览：指标卡片 → 图表 → 成交与持仓。各字段含义见 [**报告与指标详解**](../reference/reports-format.md)。
 
-与 **`reports/`** 中已保存的示例导出如何对照，见 **[`reports/README.md`](../how-to/read-reports.md)**（推荐与 [`example_report_html_19_localdata.png`](../assets/tutorials/example_report_html_19_localdata.png) 及 Tutorial 02 配图一起阅读）。
+报告各区块的读法见 [解读回测报告](../how-to/read-reports.md)，可配合 [`example_report_html_19_localdata.png`](../assets/tutorials/example_report_html_19_localdata.png) 与 Tutorial 02 的配图对照阅读。
 
 ---
 
@@ -90,7 +90,7 @@ python - <<'PY'
 from eqlib import set_local_data_dir, save_stock_local, list_local_stocks
 
 set_local_data_dir('/home/user/eqlib_data')  # 推荐绝对路径，便于多项目复用
-targets = ['601390', '600519', '000858', '000300.XSHG']  # 含基准
+targets = ['601398', '600519', '000858', '000300.XSHG']  # 含基准
 
 for sec in targets:
     path = save_stock_local(sec, start_date='2020-01-01', end_date='2024-12-31')
@@ -107,7 +107,7 @@ result = run_strategy(
     initialize,
     start_date='2024-01-01',
     end_date='2024-12-31',
-    securities=['601390'],
+    securities=['601398'],
     use_local=True,
 )
 ```
@@ -165,7 +165,7 @@ result = run_strategy(
 > "我觉得工商银行最近涨得不错，均线看起来要金叉了，买点试试。"
 
 量化交易思路：
-> "当 601390 的 5 日均线向上穿越 20 日均线，且当日收盘价高于 5 日均线 2% 以上时，用全部可用现金买入；当 5 日均线下穿 20 日均线时，全部卖出。"
+> "当 601398（工商银行）的 5 日均线向上穿越 20 日均线，且当日收盘价高于 5 日均线 2% 以上时，用全部可用现金买入；当 5 日均线下穿 20 日均线时，全部卖出。"
 
 两者的核心区别在于：**可验证、可复制、可回溯**。
 
@@ -193,7 +193,7 @@ EasyQuant（`eqlib`）是一个面向 **中国 A 股市场** 的轻量级量化�
 ### 2.1 股票池（Universe）
 
 确定你要操作哪些股票。常见的选择方式：
-- **固定列表**：事先选定几只股票（如 `'601390', '600519', '000858'`）
+- **固定列表**：事先选定几只股票（如 `'601398', '600519', '000858'`）
 - **指数成分股**：沪深 300、中证 500 的成分股
 - **行业板块**：某个行业的成分股（如白酒、新能源）
 - **动态筛选**：按财务指标（PE/PB/ROE）、技术指标（均线排列）、资金流向等条件实时筛选
@@ -324,19 +324,22 @@ set_order_cost(OrderCost(
 ### 4.2 未来函数（Look-ahead Bias）
 
 ```python
+# 伪代码示意（get_today_close 并不存在于 eqlib——开盘时根本拿不到它）
 # 错误：使用了当天收盘价做决策，但决策是在开盘时做的
 def market_open(context):
     # 在开盘时就拿到了当天收盘价——这是不可能的！
-    today_close = get_today_close('601390')
+    today_close = get_today_close('601398')
     if today_close > ma20:
         order(...)
 
 # 正确做法：只用历史数据做决策
 def market_open(context):
     # 用昨天及之前的数据
-    hist = attribute_history('601390', 20, '1d', ['close'])
+    hist = attribute_history('601398', 20, '1d', ['close'])
     # hist 只包含昨天及之前的 20 天数据
 ```
+
+> **快照类接口也会引入未来数据**：`get_fundamentals`、`get_index_stocks`、`get_industry_stocks`、`get_valuation` 等返回的是数据源的**当前快照**，`date` 参数不做时点过滤。在回测会话内调用会触发 `FutureWarning`；用 `set_option('avoid_future_data', True)` 可将其升级为 `ValueError`。这类接口留给研究/实盘场景，回测里请用 `attribute_history`、`history` 等按日对齐的接口。
 
 ### 4.3 幸存者偏差
 
