@@ -112,6 +112,9 @@ run_paper_trade(
 ### 2.4 Paper Trading Notes
 
 - Run during trading hours to receive real-time quotes
+- **Session gating**: the engine only matches orders and fetches quotes within 09:15–15:00 (CST); the loop idles outside this window. The day's first fill waits for the open call auction to complete (09:25). Orders with temporarily unavailable quotes stay pending, covered by the order timeout mechanism (see `set_order_timeout`)
+- **Callback ordering**: `before_trading_start` runs exactly once before any scheduled function or `handle_data` of the day — even when the loop first wakes during the call auction (09:15–09:25) — matching backtest ordering. Orders queued during the auction do not participate in the 09:25 auction match; they fill the next trading day under the unified T→T+1 model
+- A user callback (scheduled function or `handle_data`) is disabled by a circuit breaker after 3 consecutive failures — a single faulty callback no longer kills the process
 - Use `Ctrl+C` to stop
 - Paper trading does not generate real orders and does not actually buy or sell stocks
 - Recommend running for at least 1-2 weeks to observe whether signals are reasonable

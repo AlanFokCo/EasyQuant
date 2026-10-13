@@ -45,6 +45,9 @@ attribute_history(security, count, unit='1d', fields=('close',), df=True, skip_p
 
 获取全部 A 股实时快照。返回 `dict[str, dict]`，包含 `code`, `name`, `price`, `pct_change`, `volume`, `pe`, `pb`, `total_value` 等字段。
 
+!!! warning "非时点（PIT）安全"
+    返回**最新快照**（当前价格/PE/PB 等），无历史时点版本；回测会话内调用会发出 `FutureWarning`（`avoid_future_data=True` 时报错）。
+
 ## get_security_info
 
 获取单只股票基本信息。返回 `SecurityInfo` 对象（`code`, `name`, `industry`, `total_shares`, `float_shares`, `total_value`, `list_date`）。
@@ -86,6 +89,9 @@ get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None, min_roe
 | `get_industry_stocks(industry_name)` | 某行业成分股 | `DataFrame` |
 | `get_industry(code)` | 单只股票行业分类 | `dict` 或 `None` |
 | `get_index_weights(index_code, date=None)` | 指数成分股权重 | `DataFrame` |
+
+!!! warning "幸存者偏差"
+    `get_index_stocks` 返回**当前**成分股名单，无历史时点版本。用它构建历史回测股票池会引入幸存者偏差（已退市/调出的股票被静默排除）。在回测会话内调用会发出告警；历史 universe 建议用显式股票列表并自行处理退市。
 
 ## 概念板块
 
@@ -272,13 +278,22 @@ q = query(valuation.code, valuation.market_cap, valuation.pe) \
 df = get_fundamentals(q)
 ```
 
+!!! warning "非时点（PIT）安全"
+    `get_fundamentals` 返回数据源的**最新快照**，`date` 参数在 V1 中被忽略（底层数据源无披露日期历史）。在回测会话内调用会引入前视偏差：框架会发出 `FutureWarning`；设置 `set_option('avoid_future_data', True)` 后升级为 `ValueError`。回测中的基本面因子请使用自建的历史财务数据；研究模式与实盘不受限制。
+
 ## get_current_data_object
 
 获取带属性访问的实时行情快照。返回 `dict[str, _StockDataObj]`。
 
+!!! warning "非时点（PIT）安全"
+    与 `get_current_data` 同源的**最新快照**（含由当前名称推导的 ST 状态）；回测会话内调用会发出 `FutureWarning`（`avoid_future_data=True` 时报错）。
+
 ## get_extras
 
 获取额外数据字段（`'is_st'` 或 `'net_value'`）。
+
+!!! warning "非时点（PIT）安全"
+    返回**最新快照**（如当前 ST 状态），无历史时点版本；回测会话内调用会发出 `FutureWarning`（`avoid_future_data=True` 时报错）。回测中需要 PIT 安全的 ST 状态请使用 `set_option('st_status_map', ...)`。
 
 ## 股票池管理
 
@@ -308,3 +323,26 @@ get_universe()                 # 获取当前股票池
 预载数据必须与 `fq` 的复权口径相符：默认 qfq 预载只支持 `fq="pre"`；请求 `fq=None`（不复权）会抛出 `ValueError`，除非预载数据本身明确标为不复权。请使用真实原始价格数据，不要将前复权数据冒充原始价格。缓存返回值可以由调用方处理，不会修改共享缓存。
 
 `get_price_minute` 也限制模拟时间，只返回时间戳严格早于 `current_dt` 的分钟 bar；当前 bar 被保守排除。支持 1m、5m、15m、30m、60m，按时间排序后再取最后 `count` 行。
+
+## 回测会话中的时点（PIT）截断
+
+回测进行中，以下数据接口统一按模拟时钟截断，与 `get_price` 的语义一致：
+
+| API | 会话内行为 |
+|-----|-----------|
+| `fetch_stock_data` | 决策期回调（`before_trading_start`、定时函数、`handle_data`）截断到 T-1；收盘后回调与回测结束后包含当日；纯未来请求直接返回空 |
+| `fetch_minute_data` | 按精确模拟时钟截断（同 `get_price_minute`） |
+| `get_money_flow` | 按同一截止日期过滤后再取 `count` |
+| `get_billboard_list` / `get_north_money_flow` / `get_margin_data` / `get_limit_up_down_stats` | 查询区间钳制到截止日期 |
+| `load_stock_local` | 按模拟时钟截断本地 CSV（同 `fetch_stock_data`）；引擎预载与回测结束后的基准读取经显式豁免不受限 |
+| `fetch_cached`（`eqlib.data_cache`） | 磁盘缓存命中分支按同一截止日期截断；网络未命中分支已在 `fetch_stock_data` 内截断 |
+| `check_golden_cross` | 历史序列按同一截止日期截断后再计算均线交叉 |
+| `get_fundamentals` / `get_financial_abstract` | 快照接口无法截断 — 发出 `FutureWarning`（`avoid_future_data=True` 时报错） |
+| `get_valuation` / `get_extras` / `scan_market` / `get_financial_screen` | 同上：最新行情快照（当前 PE/PB/ST 状态等），无历史时点版本 |
+| `get_current_data` / `get_current_data_object` | 同上：全市场最新行情快照（当前价格/PE/PB/换手等），无历史时点版本 |
+| `get_restriction_release` | 同上：按真实"今天"计算的当前已公告解禁日程，无公告日历史 |
+| `get_index_stocks` / `get_index_weights` / `get_concept_stocks` / `get_industry_stocks` | 同上：仅当前成分快照，构建历史股票池有幸存者偏差 |
+| `get_tick_data` | 同上：仅当日 tick 快照，`trade_date` 被忽略 |
+| `get_industry` / `get_concept_list` / `get_industry_list` / `get_all_securities` / `get_security_info` | 名称/分类/基本资料类接口，不纳入防护（注意：`get_security_info` 的 `name` 为当前名称、可能含 ST 标记，`total_value` 为当前快照——时点敏感用途请改用 `st_status_map` 等 PIT 通道） |
+
+研究模式（无活动回测上下文）与模拟盘不做截断，按请求范围读取。引擎内部的全量预载取数有显式豁免，不受影响。

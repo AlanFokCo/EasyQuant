@@ -319,6 +319,8 @@ set_order_cost(OrderCost(
 ))
 ```
 
+> **提示**：印花税是日期敏感的——2023-08-28 前为 0.1%。上面显式固定 0.05% 适用于近期区间；跨 2023-08-28 的长历史回测请用 `close_tax=None`，让引擎按成交日适用法定税率。
+
 ### 4.2 未来函数（Look-ahead Bias）
 
 ```python
@@ -380,6 +382,8 @@ avg_volume = vol['volume'].mean()
 # 回测中订单会先入队，在下一交易日开盘价成交
 # 但实际交易中会有滑点，通常估计为 0.1%-0.3%
 ```
+
+示例代码已内置滑点：`examples/_defaults.py` 定义 `DEFAULT_SLIPPAGE = FixedSlippage(0.001)`（每笔成交 0.1% 不利偏移），回测示例在 `initialize` 中通过 `set_slippage(DEFAULT_SLIPPAGE)` 启用。流动性差的小盘股建议提高到 0.2%-0.3%。
 
 ### 4.7 忽视 A 股的 T+1 制度
 

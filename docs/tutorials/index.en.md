@@ -242,4 +242,4 @@ A complete multi-stock portfolio strategy case study, including pre-generated ba
 that can be opened directly in a browser to review strategy performance, or re-run via backtesting.
 
 **Strategy highlights:** 8 A-share stocks across different sectors, combining support/resistance + RSI + MACD + ATR stop-loss,
-total return of +137% over the backtest period (2020-2026).
+total return of +137% over the backtest period (2020-2026) — a figure from the committed pre-generated report, produced under pre-2026-10 engine defaults (no price-limit checks, no slippage); rerunning under current defaults will differ, so trust your own rerun.

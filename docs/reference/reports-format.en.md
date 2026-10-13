@@ -20,19 +20,19 @@ When `result["recorded_values"]` is insufficient to construct a daily NAV series
 |-----|-------------|
 | `total_return` | Total return over the full period (based on start/end portfolio value) |
 | `annual_return` | Annualized return derived from geometric annualization of daily returns |
-| `annual_volatility` | Daily return standard deviation × √252 |
+| `annual_volatility` | Daily return standard deviation × √244 |
 | `sharpe_ratio` | Sharpe ratio (annualized, net of risk-free rate) |
 | `sortino_ratio` | Sortino ratio |
 | `max_drawdown` | Max drawdown (negative number) |
 | `calmar_ratio` | Annualized return / \|max drawdown\| |
-| `alpha` | Annualized Alpha (relative to benchmark) |
-| `beta` | Beta |
+| `alpha` | Annualized Alpha (relative to benchmark; NaN, rendered N/A, when the benchmark is unavailable) |
+| `beta` | Beta (same — may be NaN/N/A) |
 | `information_ratio` | Information ratio |
 | `win_rate_daily` | Daily win rate |
-| `win_rate_trade` | Paired-trade win rate |
+| `win_rate_trade` | Paired-trade win rate (FIFO round trips, both-side fees included) |
 | `trade_count` | Number of completed paired trades |
 | `win_count` / `loss_count` | Number of profitable / losing trades |
-| `profit_loss_ratio` | Profit/loss ratio |
+| `profit_loss_ratio` | Profit/loss ratio (both-side fees included) |
 | `annual_turnover` | Annualized turnover (relative trade volume) |
 | `total_commission` | Total commissions (for reporting; NAV already reflects costs) |
 | `net_return` | Same meaning as `total_return` (see source code comments) |
@@ -50,7 +50,7 @@ When `result["recorded_values"]` is insufficient to construct a daily NAV series
 | `rolling_sharpe_60d` | 60-day rolling Sharpe series (`[{"date": "...", "value": ...}]`) |
 | `rolling_volatility_60d` | 60-day rolling volatility series |
 | `daily_returns_stats` | Daily return statistics (mean, std, skewness, kurtosis, best/worst day, histogram) |
-| `per_stock_pnl` | Per-stock P&L dict (FIFO matching, `{"000001": 5000.0, ...}`) |
+| `per_stock_pnl` | Per-stock P&L dict (FIFO matching, both-side fees included, `{"000001": 5000.0, ...}`) |
 | `drawdown_periods` | Top 5 drawdown periods (start/trough/recovery dates, depth, duration days) |
 
 The risk-free rate defaults to **`risk_free_rate=0.03`** (annualized 3%) and can be adjusted as needed.

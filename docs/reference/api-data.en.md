@@ -45,6 +45,9 @@ Returns a `DataFrame` with columns: `open`, `high`, `low`, `close`, `volume`, `m
 
 Retrieve real-time snapshots for all A-shares. Returns `dict[str, dict]` containing fields such as `code`, `name`, `price`, `pct_change`, `volume`, `pe`, `pb`, `total_value`, etc.
 
+!!! warning "Not point-in-time safe"
+    Returns the **latest snapshot** (current price/PE/PB etc.) — there is no point-in-time history. Calling it inside a backtest session emits a `FutureWarning` (raises with `avoid_future_data=True`).
+
 ## get_security_info
 
 Retrieve basic information for a single stock. Returns a `SecurityInfo` object (`code`, `name`, `industry`, `total_shares`, `float_shares`, `total_value`, `list_date`).
@@ -86,6 +89,9 @@ Retrieve the trading calendar. Returns `list[date]`.
 | `get_industry_stocks(industry_name)` | Stocks in a given industry | `DataFrame` |
 | `get_industry(code)` | Industry classification for a single stock | `dict` or `None` |
 | `get_index_weights(index_code, date=None)` | Index constituent weights | `DataFrame` |
+
+!!! warning "Survivorship bias"
+    `get_index_stocks` returns the **current** constituent list — there is no point-in-time historical version. Building a historical backtest universe from it introduces survivorship bias (delisted/removed stocks are silently excluded). Calling it inside a backtest session emits a warning; prefer explicit stock lists for historical universes and handle delistings yourself.
 
 ## Concept Sectors
 
@@ -272,13 +278,22 @@ q = query(valuation.code, valuation.market_cap, valuation.pe) \
 df = get_fundamentals(q)
 ```
 
+!!! warning "Not point-in-time safe"
+    `get_fundamentals` returns the provider's **latest snapshot**; the `date` parameter is ignored in V1 (the underlying sources carry no disclosure-date history). Calling it inside a backtest leaks future information: the framework emits a `FutureWarning`, and `set_option('avoid_future_data', True)` escalates it to a `ValueError`. Use your own historical fundamentals for in-backtest factors; research mode and live trading are unaffected.
+
 ## get_current_data_object
 
 Retrieve real-time market snapshots with attribute access. Returns `dict[str, _StockDataObj]`.
 
+!!! warning "Not point-in-time safe"
+    Same source as `get_current_data` — the **latest snapshot** (including ST status derived from the current name). Calling it inside a backtest session emits a `FutureWarning` (raises with `avoid_future_data=True`).
+
 ## get_extras
 
 Retrieve additional data fields (`'is_st'` or `'net_value'`).
+
+!!! warning "Not point-in-time safe"
+    Returns the **latest snapshot** (e.g. the current ST status) — there is no point-in-time history. Calling it inside a backtest session emits a `FutureWarning` (raises with `avoid_future_data=True`). For PIT-safe ST status inside backtests use `set_option('st_status_map', ...)`.
 
 ## Universe Management
 
@@ -308,3 +323,26 @@ get_universe()                 # Get the current universe
 Preloaded prices must match `fq`: default qfq preload supports `fq="pre"`; requesting `fq=None` (raw prices) raises `ValueError` unless the preload explicitly contains unadjusted data. Use genuine raw prices rather than treating adjusted prices as raw. Mutating returned data does not mutate the shared cache.
 
 `get_price_minute` also enforces simulation visibility: only bar timestamps strictly before `current_dt` are returned, conservatively excluding the current bar. Supported periods are 1m, 5m, 15m, 30m and 60m; rows are sorted before taking the last `count` bars.
+
+## Point-in-time truncation inside backtests
+
+While a backtest is running, the following data APIs are uniformly truncated by the simulated clock, matching `get_price` semantics:
+
+| API | In-session behavior |
+|-----|---------------------|
+| `fetch_stock_data` | Truncated to T-1 during decision-time callbacks (`before_trading_start`, scheduled functions, `handle_data`); the current day is included in post-close callbacks and after the loop; pure-future requests return empty without touching the network |
+| `fetch_minute_data` | Truncated at the exact simulated clock (same as `get_price_minute`) |
+| `get_money_flow` | Filtered by the cutoff date before applying `count` |
+| `get_billboard_list` / `get_north_money_flow` / `get_margin_data` / `get_limit_up_down_stats` | Query range clamped to the cutoff date |
+| `load_stock_local` | Local CSV rows truncated at the simulated clock (same as `fetch_stock_data`); engine-internal preload and post-loop benchmark reads are explicitly exempt |
+| `fetch_cached` (`eqlib.data_cache`) | Disk-hit branch truncated at the same cutoff; the network-miss branch is already truncated inside `fetch_stock_data` |
+| `check_golden_cross` | History truncated at the same cutoff before the moving averages are computed |
+| `get_fundamentals` / `get_financial_abstract` | Snapshot APIs, cannot be truncated — emit `FutureWarning` (raise with `avoid_future_data=True`) |
+| `get_valuation` / `get_extras` / `scan_market` / `get_financial_screen` | Same: latest spot snapshot (current PE/PB/ST status etc.), no point-in-time history |
+| `get_current_data` / `get_current_data_object` | Same: latest full-market spot snapshot (current price/PE/PB/turnover etc.), no point-in-time history |
+| `get_restriction_release` | Same: the unlock schedule announced as of the real today (window computed from the real clock), no announcement-date history |
+| `get_index_stocks` / `get_index_weights` / `get_concept_stocks` / `get_industry_stocks` | Same: current constituents snapshot only — historical universes built from them suffer survivorship bias |
+| `get_tick_data` | Same: current-day tick snapshot only; `trade_date` is ignored |
+| `get_industry` / `get_concept_list` / `get_industry_list` / `get_all_securities` / `get_security_info` | Name/classification/master-data lookups — intentionally not guarded (caveat: `get_security_info`'s `name` is the current name and may carry an ST tag, and `total_value` is a current snapshot — for time-sensitive uses switch to PIT channels such as `st_status_map`) |
+
+Research mode (no active backtest context) and paper trading are not truncated and honor the requested range. The engine's internal full-range preload fetches are explicitly exempt.

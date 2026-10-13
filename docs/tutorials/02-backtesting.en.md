@@ -188,6 +188,8 @@ result = run_strategy(
 )
 ```
 
+> **Cost conventions**: these are the current rates (stamp duty 0.05% since 2023-08-28, 0.1% before). Pinning `close_tax` explicitly overrides the engine's built-in date-aware logic; for long history spanning 2023-08-28 use `close_tax=None`. For slippage see the [Configuration API](../reference/api-config.md) (examples default to `FixedSlippage(0.001)`).
+
 ### 3.2 Interactive HTML Report
 
 Open `reports/backtest_*.html` in your browser (no local web server needed). From top to bottom, it typically includes: **Summary** → **Metric Cards** (annualized return, Sharpe ratio, max drawdown, Alpha/Beta, etc. — click for tooltips) → **Candlestick & Technical Indicators** → **Cumulative Returns** (strategy vs benchmark) → **Drawdown** → **Daily P&L / Daily Returns** → **Trades, Positions** tabs.
@@ -425,12 +427,14 @@ Decomposes returns into three sources:
 ```python
 from eqlib import brinson_attribution
 
-attr = brinson_attribution(result)
+attr = brinson_attribution(result, sector_data={"601398.XSHG": "Financials", "600519.XSHG": "Consumer"})
 
 print("Allocation effect: %.4f  <-- Returns from asset allocation (sector/industry selection)" % attr['allocation_effect'])
 print("Selection effect:  %.4f  <-- Returns from individual stock selection" % attr['selection_effect'])
 print("Interaction effect: %.4f  <-- Combined effect of allocation and selection" % attr['interaction_effect'])
 ```
+
+The implementation is a standard single-period Brinson-Hood-Beebower decomposition: the three effects sum **exactly** to portfolio return − benchmark return (`attr['total_active_return']`; see also `portfolio_return` / `benchmark_return` and the per-sector breakdown in `attr['sectors']`). The default benchmark is the equal-weight buy-and-hold return of the universe. Note: **without `sector_data`, all securities share one sector**, so allocation and interaction are identically zero and the entire active return is reported as selection — not a bug, but the correct BHB statement when no sector structure is known.
 
 - **Allocation effect > 0**: Your sector/industry choices were correct
 - **Selection effect > 0**: Your stock picks within each sector were correct

@@ -23,7 +23,7 @@ pip install -e .
 python examples/<file>.py
 ```
 
-示例使用统一交易成本（`examples/_defaults.py`）；示例 25 使用明确的固定日期和 CSV 快照。
+示例使用统一交易成本与滑点（`examples/_defaults.py`，回测示例默认 `FixedSlippage(0.001)`）；涨跌停成交限制默认开启（见[配置 API](../reference/api-config.md)）。示例 25 使用明确的固定日期和 CSV 快照。
 
 ---
 
@@ -102,15 +102,16 @@ python examples/<file>.py
 
 | 费用 | 费率 | 说明 |
 |------|------|------|
-| 印花税 | 0.05% | 仅卖出收取（2023年8月起减半） |
+| 印花税 | 0.05% | 仅卖出收取（2023年8月起减半；此前 0.1%，跨该日期的长历史回测请用 `close_tax=None` 走日期感知法定税率） |
 | 佣金 | 0.025% | 买卖双向（含规费） |
 | 最低佣金 | 5 元 | 每笔交易 |
+| 滑点 | 0.1% | 每笔成交（`FixedSlippage(0.001)`，回测示例在 `initialize` 中显式启用） |
 
 ---
 
 ## 共享基础设施
 
-- **`examples/_defaults.py`** — 统一的交易成本、股票代码、相对日期、数据验证
+- **`examples/_defaults.py`** — 统一的交易成本、滑点、股票代码、相对日期、数据验证
 - **`tests/test_examples_smoke.py`** — 冒烟测试：语法检查、导入检查、代码规范
 
 ---

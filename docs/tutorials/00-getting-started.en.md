@@ -319,6 +319,8 @@ set_order_cost(OrderCost(
 ))
 ```
 
+> **Note**: stamp duty is date-sensitive — 0.1% before 2023-08-28. The explicit 0.05% above suits recent windows; for long history spanning 2023-08-28, use `close_tax=None` so the engine applies the statutory rate of each trade date.
+
 ### 4.2 Look-ahead Bias
 
 ```python
@@ -381,6 +383,8 @@ avg_volume = vol['volume'].mean()
 # Orders are queued during the callback and filled at the next trading day's open.
 # In live trading, slippage of 0.1%–0.3% is typical.
 ```
+
+The examples ship with slippage built in: `examples/_defaults.py` defines `DEFAULT_SLIPPAGE = FixedSlippage(0.001)` (0.1% adverse per fill), enabled in each backtest example's `initialize` via `set_slippage(DEFAULT_SLIPPAGE)`. For illiquid small caps, consider 0.2%–0.3%.
 
 ### 4.7 Forgetting the A-Share T+1 Rule
 

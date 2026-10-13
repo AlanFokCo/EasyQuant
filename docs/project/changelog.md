@@ -24,6 +24,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`examples/18_grid_trading.py` fixed** — Original grid strategy generated 0 trades over the test period (MDD 97.4%). Rewrote `market_open` with level-crossing trigger logic (buy when price crosses DOWN to a lower grid level, sell when it crosses UP to a higher level), reduced grid levels from 10 to 8, shortened range lookback from 60 to 30 days, and added a 5% rebuild threshold to refresh the grid when the price range drifts. New result: 146 trades, MDD -19%, win rate 71.9%.
 - **Examples 21-24 normalized** — ML examples now use `examples._defaults` for trading costs and dates (instead of hardcoded values), removed `sys.path.insert(0, '.')` (provided by `pip install -e .`), and added module-level docstrings with number / title / teaching objectives / run command. Example 21 changed `target='forward_return_5d'` → `past_return_5d` to align with the honest naming above.
 
+### eqlib Core — Market Rules & Data Honesty（2026-10 审查修复轮）
+
+本轮修复源自一次覆盖用法、能力、体验、可靠性、准确性的全面对抗性审查（含独立 evaluator 复核）。以下变更会让旧回测结果发生变化，均如实标注。
+
+#### Changed（⚠️ breaking）
+
+- **⚠️ `check_price_limit` 默认从 `False` 翻转为 `True`** — 涨停价开盘的买单、跌停价开盘的卖单默认不可成交（订单取消并记录 `Order.cancel_reason`）。涨跌幅按板块与日期区分：主板 ±10%、ST ±5%（经 `set_option('st_status_map', ...)` 注入时点状态）、创业板 2020-08-24 注册制改革前 ±10% / 后 ±20%、科创板 ±20%、北交所 ±30%；限价按最近真实收盘价（停牌不更新）计算并精确到分。旧行为（不检查）会系统性抬高动量/打板类策略收益，复现旧行为请显式 `set_option('check_price_limit', False)`。
+- **⚠️ 交易日历改为交易所日历权威** — 不再由 universe 数据并集推断（内置 2020–2026 日历，越界回退在线日历）。个别股票缺数据不再让该交易日消失，回测区间不再被退市股静默截断。
+- **⚠️ 停牌语义统一为当日取消** — 停牌日订单当日取消并记录 `cancel_reason`（`"no price data"`（缺行情）/ `"suspended"`（零成交）），不再顺延至复牌成交。
+- **⚠️ 退市持仓强制清算** — 持仓超过 `delist_gap_days`（默认 30 个交易日）无行情即按最后收盘价强制清算，`trade_log` 记录 `DELIST_LIQUIDATE`；可用 `delisted_position_handling="keep"` 保留持仓、`delisted_liquidation_haircut` 模拟清算折价（如面值退市归零）。
+- **⚠️ 交易胜率/盈亏比/个股盈亏改为含双边费用口径** — FIFO 配对时买入佣金摊入成本、卖出费用（佣金+印花税）从收入扣减，与现金账一致；旧口径忽略费用，胜率与盈亏比系统性偏高。
+- **⚠️ Brinson 归因重写为真单期 BHB** — 配置/选股/交互三项之和在数学上严格等于超额收益（旧实现三项均分，数值不闭合）；`sector_data` 真正驱动行业分组；新增返回 `portfolio_return`、`benchmark_return`、`benchmark_model` 与分行业明细 `sectors`。
+- **⚠️ 基准不可用时 `alpha` / `beta` / `information_ratio` 返回 `NaN`** — 取代旧的静默默认值 0.0/1.0/0.0；HTML/MD 报告渲染为 "N/A" 并附口径提示，JSON 中对应目标记为 `pass: null`。
+- **Paper trading 增加交易时段门控** — 09:15 前与 15:00 后（CST）不撮合、不取数、不跑回调；当日首笔成交等集合竞价结束（09:25）；空行情订单保留 pending 而非取消；用户回调增加熔断（连续 3 次失败禁用该回调），异常不再逃逸主循环杀死进程。
+
+#### Fixed
+
+- **底层取数接口在回测会话内的前视泄漏** — `fetch_stock_data` / `get_money_flow` / `get_billboard_list` / `fetch_minute_data` / `check_golden_cross` 在决策期回调统一截断到 T-1（与 `get_price` 一致），纯未来请求短路返回；研究模式与模拟盘不受影响。
+- **快照类公共 API 防护铺全** — `get_valuation` / `get_extras` / `get_concept_stocks` / `get_industry_stocks` / `get_current_data` / `get_current_data_object` / `scan_market` / `get_financial_screen` / `get_restriction_release` 接入与 `get_fundamentals` 相同的会话内防护（回测中 `FutureWarning`，`avoid_future_data=True` 时报错）；此前 strict 模式下当前 PE/PB、ST 状态、全市场行情快照、板块成分与解禁日程仍会静默泄漏进历史回测。
+- **`load_stock_local` 回测会话内截断** — 本地 CSV 的未来行不再能直达运行中的回测（与 `fetch_stock_data` 同一截止日期语义）；引擎预载与回测结束后的基准读取经 `_unrestricted_fetch` 显式豁免，研究模式与模拟盘不受影响。
+- **`get_fundamentals` 非时点安全** — `date` 参数被忽略（数据源无披露日期历史）；回测会话内调用现在发出 `FutureWarning`，`set_option('avoid_future_data', True)` 时升级为 `ValueError`；`eqlib.get_fundamentals` 双定义已统一为单一实现。
+- **Paper 集合竞价窗口回调顺序** — 循环在 09:15–09:25 竞价窗口内跨日时，`before_trading_start` 不再晚于当日 `handle_data` 运行；当日首笔成交仍等竞价结束（09:25）后进行。
+- **报告基准双口径** — 报告中的基准指标统一使用引擎记录的基准净值序列（与图表同源），仅在其缺失时回退图示口径并明确标注。
+- **`use_local=True` 的静默网络回退** — 本地文件被覆盖门禁拒绝后逐证券回退网络时现在发出 WARNING，并在 `result["data_diagnostics"]["local_fallback"]` 中记录证券清单。
+- **`Order.cancel_reason`** — 取消/过期订单的取消原因现在落在 Order 对象上，可程序化溯源。
+
+#### Examples
+
+- **回测类示例默认启用滑点** — `examples/_defaults.py` 新增 `DEFAULT_SLIPPAGE = FixedSlippage(0.001)`，回测示例在 `initialize` 中显式 `set_slippage(DEFAULT_SLIPPAGE)`；示例输出因此比旧的零滑点结果更保守。
+- **示例打印对 NaN 友好** — 基准不可用时 Alpha/Beta 渲染为 `N/A` 而非 `+nan%`（`examples/_defaults.py` 新增 `format_pct` / `format_num` 助手）。
+- **印花税日期敏感性披露** — `_defaults.py` 注释与 README 说明：示例固定的 0.05% 印花税率适用于 2023-08-28 之后，长历史回测请用 `close_tax=None`（日期感知法定税率）。
+
 ### Web Strategy Studio
 
 #### Security

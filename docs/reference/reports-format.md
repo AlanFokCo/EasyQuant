@@ -20,19 +20,19 @@ m = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
 |------|------|
 | `total_return` | 全区间总收益率（基于起止组合价值） |
 | `annual_return` | 由日收益几何年化得到的年化收益 |
-| `annual_volatility` | 日收益标准差 × √252 |
+| `annual_volatility` | 日收益标准差 × √244 |
 | `sharpe_ratio` | 夏普比率（年化，扣无风险利率） |
 | `sortino_ratio` | 索提诺比率 |
 | `max_drawdown` | 最大回撤（负数） |
 | `calmar_ratio` | 年化收益 / \|最大回撤\| |
-| `alpha` | 年化 Alpha（相对基准） |
-| `beta` | Beta |
+| `alpha` | 年化 Alpha（相对基准；基准不可用时为 NaN，渲染为 N/A） |
+| `beta` | Beta（同上，可为 NaN/N/A） |
 | `information_ratio` | 信息比率 |
 | `win_rate_daily` | 日胜率 |
-| `win_rate_trade` | 配对交易胜率 |
+| `win_rate_trade` | 配对交易胜率（FIFO 往返配对，含双边费用） |
 | `trade_count` | 完成配对交易次数 |
 | `win_count` / `loss_count` | 盈利 / 亏损交易笔数 |
-| `profit_loss_ratio` | 盈亏比 |
+| `profit_loss_ratio` | 盈亏比（含双边费用） |
 | `annual_turnover` | 年化换手率（成交额相对规模） |
 | `total_commission` | 佣金合计（报告用；净值已反映成本） |
 | `net_return` | 与 `total_return` 一致含义（见源码注释） |
@@ -50,7 +50,7 @@ m = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
 | `rolling_sharpe_60d` | 60 日滚动夏普序列（`[{"date": "...", "value": ...}]`） |
 | `rolling_volatility_60d` | 60 日滚动波动率序列 |
 | `daily_returns_stats` | 日收益统计（均值、标准差、偏度、峰度、最佳/最差日、直方图） |
-| `per_stock_pnl` | 个股盈亏字典（FIFO 配对，`{"000001": 5000.0, ...}`） |
+| `per_stock_pnl` | 个股盈亏字典（FIFO 配对，含双边费用，`{"000001": 5000.0, ...}`） |
 | `drawdown_periods` | 前 5 大回撤周期（起始/谷底/恢复日期、深度、持续天数） |
 
 无风险利率默认 **`risk_free_rate=0.03`**（年化 3%），可按研究习惯修改。

@@ -4,6 +4,17 @@
 
 ---
 
+## Fill rules (A-share market conventions)
+
+The backtest engine enforces the following market rules by default (all configurable — see [Configuration API](api-config.md)):
+
+- **Price limits**: `check_price_limit` defaults to `True`. Buys opening at limit-up and sells opening at limit-down cannot fill; the order is cancelled with `Order.cancel_reason` recording `"limit-up"` / `"limit-down"`. Limits are board- and date-aware (main board ±10%, ST ±5%, ChiNext ±20% since 2020-08-24, STAR ±20%, BSE ±30%).
+- **Suspension**: on suspension days (no bar or zero volume) orders are **cancelled the same day** with `cancel_reason` recording `"no price data"` (missing bar) / `"suspended"` (zero volume) — never deferred to resumption.
+- **Delisting**: a position with no bar for more than `delist_gap_days` (default 30 trading days) is force-liquidated at the last close, recorded as `DELIST_LIQUIDATE` in the trade log. Use `delisted_position_handling="keep"` to keep the position, and `delisted_liquidation_haircut` to model a liquidation discount.
+- **Trading calendar**: driven by the exchange calendar (built-in 2020–2026 calendar, online calendars as fallback outside that range) rather than inferred from the union of available data — a missing stock's data no longer removes that day from the calendar.
+
+---
+
 ## order
 
 Place a buy or sell order by share count.

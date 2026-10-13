@@ -29,10 +29,17 @@ generate_chart(result, out_path)
 计算综合风险指标。
 
 ```python
-metrics = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
+metrics = analyze_returns(result, risk_free_rate=0.03)
 ```
 
 返回 `dict`：`total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`。
+
+口径说明：
+
+- 年化基准为 **244** 个交易日（A 股实际值，见 `eqlib/constants.py`）。
+- `alpha` / `beta` / `information_ratio` 依赖基准序列：基准数据不可用或重叠不足 10 个交易日时为 `NaN`（报告与示例渲染为 `N/A`），不再静默默认 0.0/1.0。
+- 基准收益优先复用引擎记录的基准净值序列（与报告图表同源），取不到才回退网络拉取。
+- `win_rate_trade` / `profit_loss_ratio` / `per_stock_pnl` 基于 FIFO 配对的往返盈亏，**已含双边费用**（买入佣金摊入成本、卖出费用从收入扣减），与引擎现金账一致。
 
 ## grade_strategy
 
@@ -70,7 +77,19 @@ recommendations = recommend_params(analytics, grade_info, current_params, param_
 
 ## brinson_attribution
 
-Brinson 归因分析。返回 `dict`（`allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`）。
+Brinson-Hood-Beebower 单期归因。将整个回测区间视为一个持有期，在行业层面把超额收益分解为配置、选股、交互三项，数学上严格闭合：`allocation + selection + interaction == portfolio_return − benchmark_return`。
+
+```python
+attr = brinson_attribution(result, sector_data={"601398.XSHG": "Financials", ...})
+```
+
+| 参数 | 说明 |
+|------|------|
+| `result` | `run_backtest` 返回的结果字典 |
+| `sector_data` | 证券 → 行业名映射；缺省映射的证券归入 `"Unclassified"`。不传时所有证券同属一个行业，配置与交互效应恒为 0，全部超额收益计入选股效应（这是无行业结构时 BHB 的正确表述） |
+| `benchmark_returns` | 可选的基准日收益 `pd.Series`；提供时按该标量收益作为各行业基准，否则用 universe 等权买入持有收益（基于引擎导出的 OHLCV 面板，与成交同一 qfq 口径） |
+
+返回 `dict`：`allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`, `portfolio_return`, `benchmark_return`, `benchmark_model`（`"universe_equal_weight"` / `"scalar_series"`），以及分行业明细 `sectors`（各行业权重、收益与三项效应）。
 
 ## simple_factor_analysis
 

@@ -23,7 +23,7 @@ Run an example:
 python examples/<file>.py
 ```
 
-Examples share trading costs (`examples/_defaults.py`); example 25 uses explicit fixed dates and CSV snapshots.
+Examples share trading costs and slippage (`examples/_defaults.py`; backtest examples default to `FixedSlippage(0.001)`); price-limit fill enforcement is on by default (see [Configuration API](../reference/api-config.md)). Example 25 uses explicit fixed dates and CSV snapshots.
 
 ---
 
@@ -103,15 +103,16 @@ All examples use a unified 2024 fee schedule (`examples/_defaults.py`):
 
 | Cost | Rate | Description |
 |------|------|-------------|
-| Stamp duty | 0.05% | Charged only on sells (halved from August 2023) |
+| Stamp duty | 0.05% | Charged only on sells (halved from August 2023; 0.1% before — for long history spanning 2023-08-28 use `close_tax=None` for the date-aware statutory rate) |
 | Commission | 0.025% | Both buy and sell (includes regulatory fees) |
 | Minimum commission | 5 CNY | Per trade |
+| Slippage | 0.1% | Per fill (`FixedSlippage(0.001)`, explicitly enabled in each backtest example's `initialize`) |
 
 ---
 
 ## Shared Infrastructure
 
-- **`examples/_defaults.py`** — Unified trading costs, stock codes, relative dates, data validation
+- **`examples/_defaults.py`** — Unified trading costs, slippage, stock codes, relative dates, data validation
 - **`tests/test_examples_smoke.py`** — Smoke tests: syntax checks, import checks, code conventions
 
 ---

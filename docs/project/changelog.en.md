@@ -24,6 +24,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`examples/18_grid_trading.py` fixed** — Original grid strategy generated 0 trades over the test period (MDD 97.4%). Rewrote `market_open` with level-crossing trigger logic (buy when price crosses DOWN to a lower grid level, sell when it crosses UP to a higher level), reduced grid levels from 10 to 8, shortened range lookback from 60 to 30 days, and added a 5% rebuild threshold to refresh the grid when the price range drifts. New result: 146 trades, MDD -19%, win rate 71.9%.
 - **Examples 21-24 normalized** — ML examples now use `examples._defaults` for trading costs and dates (instead of hardcoded values), removed `sys.path.insert(0, '.')` (provided by `pip install -e .`), and added module-level docstrings with number / title / teaching objectives / run command. Example 21 changed `target='forward_return_5d'` → `past_return_5d` to align with the honest naming above.
 
+### eqlib Core — Market Rules & Data Honesty (2026-10 audit fixes)
+
+This round of fixes comes from a full adversarial review of usability, capability, experience, reliability and correctness (with an independent evaluator re-check). The following changes alter backtest results produced by older versions and are labelled accordingly.
+
+#### Changed (⚠️ breaking)
+
+- **⚠️ `check_price_limit` default flipped from `False` to `True`** — buys opening at limit-up and sells opening at limit-down are unfillable by default (order cancelled with `Order.cancel_reason` recorded). Limits are board- and date-aware: main board ±10%, ST ±5% (inject point-in-time status via `set_option('st_status_map', ...)`), ChiNext ±10% before / ±20% after the 2020-08-24 registration reform, STAR ±20%, BSE ±30%; limits are computed off the last genuinely traded close (not updated during suspensions) and rounded to the fen. The old behavior (no check) systematically flattered momentum/limit-up-chasing strategies; to reproduce it, set `set_option('check_price_limit', False)` explicitly.
+- **⚠️ Trading calendar now follows the exchange calendar** instead of the union of universe data (built-in 2020–2026 calendar, online calendars as fallback outside that range). A single stock's missing data no longer removes that trading day, and backtest windows are no longer silently truncated by delisted stocks.
+- **⚠️ Suspension semantics unified to same-day cancellation** — orders on suspension days are cancelled the same day with a recorded `cancel_reason` (`"no price data"` for a missing bar, `"suspended"` for zero volume), never deferred to the resumption day.
+- **⚠️ Delisted positions are force-liquidated** — after more than `delist_gap_days` (default 30 trading days) without a bar, at the last close, recorded as `DELIST_LIQUIDATE` in the trade log; `delisted_position_handling="keep"` keeps the position and `delisted_liquidation_haircut` models a liquidation discount (e.g. total loss).
+- **⚠️ Trade win rate / profit-loss ratio / per-stock P&L now include both-side fees** — FIFO matching amortizes buy commission into cost and deducts sell fees (commission + stamp duty) from proceeds, consistent with the cash ledger; the old fee-blind accounting systematically overstated win rates and profit factors.
+- **⚠️ Brinson attribution rewritten as a true single-period BHB decomposition** — allocation + selection + interaction now equals the active return by construction (the old implementation averaged three pseudo-effects and did not close); `sector_data` genuinely drives sector grouping; new return keys `portfolio_return`, `benchmark_return`, `benchmark_model` and per-sector `sectors` breakdown.
+- **⚠️ `alpha` / `beta` / `information_ratio` return `NaN` when the benchmark is unavailable** — replacing the old silent defaults of 0.0/1.0/0.0; HTML/MD reports render "N/A" with a methodology note, and JSON marks the corresponding targets as `pass: null`.
+- **Paper trading gains market-session gating** — no matching, data fetching or user callbacks before 09:15 or after 15:00 (CST); the day's first fill waits for the open call auction to complete (09:25); orders with empty quotes stay pending instead of being cancelled; user callbacks get a circuit breaker (disabled after 3 consecutive failures) so exceptions no longer escape the main loop and kill the process.
+
+#### Fixed
+
+- **Look-ahead leaks through low-level data APIs during backtests** — `fetch_stock_data` / `get_money_flow` / `get_billboard_list` / `fetch_minute_data` / `check_golden_cross` are uniformly truncated to T-1 during decision-time callbacks (matching `get_price`), with pure-future requests short-circuited; research mode and paper trading are unaffected.
+- **Snapshot API protection rolled out to the remaining public endpoints** — `get_valuation` / `get_extras` / `get_concept_stocks` / `get_industry_stocks` / `get_current_data` / `get_current_data_object` / `scan_market` / `get_financial_screen` / `get_restriction_release` now share the `get_fundamentals` in-session guard (`FutureWarning` inside backtests, `ValueError` with `avoid_future_data=True`); previously even strict mode silently leaked current PE/PB, ST status, full-market spot snapshots, board membership and unlock schedules into historical backtests.
+- **`load_stock_local` truncated inside backtest sessions** — future rows in local CSVs can no longer reach a running backtest (same cutoff semantics as `fetch_stock_data`); engine preload and the post-loop benchmark read are explicitly exempt via `_unrestricted_fetch`, and research mode / paper trading are unaffected.
+- **`get_fundamentals` is not point-in-time safe** — the `date` parameter is ignored (the sources carry no disclosure-date history); calls inside a backtest now emit a `FutureWarning`, escalated to `ValueError` with `set_option('avoid_future_data', True)`; the duplicate `eqlib.get_fundamentals` definitions have been unified into a single implementation.
+- **Paper call-auction callback ordering** — when the loop rolls over to a new day during the 09:15–09:25 auction window, `before_trading_start` no longer runs after the day's first `handle_data`; the day's first fill still waits for the auction to complete (09:25).
+- **Dual benchmark sourcing in reports** — benchmark metrics in reports now uniformly use the engine-recorded benchmark NAV series (same source as the charts), falling back to the chart-derived series only when missing and labelling it as such.
+- **Silent network fallback with `use_local=True`** — falling back to the network per-security after the overwrite guard rejects a local file now emits a WARNING and records the securities in `result["data_diagnostics"]["local_fallback"]`.
+- **`Order.cancel_reason`** — cancellation reasons are now stored on the Order object for cancelled/expired orders, enabling programmatic auditing.
+
+#### Examples
+
+- **Backtest examples now enable slippage by default** — `examples/_defaults.py` adds `DEFAULT_SLIPPAGE = FixedSlippage(0.001)`, wired into each backtest example's `initialize` via `set_slippage(DEFAULT_SLIPPAGE)`; example outputs are therefore more conservative than the old zero-slippage results.
+- **NaN-friendly metric printing in examples** — Alpha/Beta render as `N/A` instead of `+nan%` when the benchmark is unavailable (new `format_pct` / `format_num` helpers in `examples/_defaults.py`).
+- **Stamp-duty date sensitivity disclosed** — `_defaults.py` comments and the README note that the pinned 0.05% rate applies on/after 2023-08-28; for long-history backtests use `close_tax=None` (date-aware statutory rate).
+
 ### Web Strategy Studio
 
 #### Security

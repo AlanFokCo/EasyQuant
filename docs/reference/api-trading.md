@@ -4,6 +4,17 @@
 
 ---
 
+## 成交规则（A 股市场制度）
+
+回测引擎默认执行以下市场制度（均可配置，见 [配置 API](api-config.md)）：
+
+- **涨跌停**：`check_price_limit` 默认 `True`。涨停价开盘的买单、跌停价开盘的卖单不可成交，订单取消并在 `Order.cancel_reason` 记录 `"limit-up"` / `"limit-down"`。幅度按板块与日期区分（主板 ±10%、ST ±5%、创业板 2020-08-24 起 ±20%、科创板 ±20%、北交所 ±30%）。
+- **停牌**：停牌日（无行情或零成交）订单**当日取消**，`cancel_reason` 记录 `"no price data"`（缺行情）/ `"suspended"`（零成交），不顺延到复牌。
+- **退市**：持仓超过 `delist_gap_days`（默认 30 个交易日）无行情即按最后收盘价强制清算，`trade_log` 记录 `DELIST_LIQUIDATE`；可用 `delisted_position_handling="keep"` 改为保留持仓、`delisted_liquidation_haircut` 模拟清算折价。
+- **交易日历**：以交易所日历为准（内置 2020–2026 日历，越界区间回退在线日历），不再由数据并集推断——个别股票缺数据不会让那一天从日历中消失。
+
+---
+
 ## order
 
 按股数下单买卖。

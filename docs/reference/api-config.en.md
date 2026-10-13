@@ -41,6 +41,33 @@ Set strategy options.
 set_option('use_real_price', True)
 ```
 
+### Available options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `check_price_limit` | `True` | Price-limit fill enforcement (see "Price-limit rules" below). **Flipped from `False` to `True` in 2026-10** |
+| `avoid_future_data` | `False` | Strict PIT mode: calling a snapshot API that is not point-in-time safe (e.g. `get_fundamentals`) inside a backtest raises `ValueError` instead of emitting a `FutureWarning` |
+| `st_status_map` | `None` | Point-in-time ST status mapping: `{code: bool \| (start, end) \| [(start, end), ...] \| callable(bare_code, date)}`. No network detection in backtests; without it stocks are treated as non-ST (main board ±10%) |
+| `delist_gap_days` | `30` | A held position with no bar for more than N trading days is treated as delisted and force-liquidated at the last close (`<= 0` disables) |
+| `delisted_position_handling` | `"liquidate"` | Delisting handling; `"keep"` keeps the position valued at its last price |
+| `delisted_liquidation_haircut` | `0.0` | Haircut fraction (0–1) applied to delisting liquidation, e.g. `1.0` models a total loss |
+
+### Price-limit rules
+
+With `check_price_limit=True` (default), buy orders opening at the limit-up price and sell orders opening at the limit-down price are cancelled with `Order.cancel_reason` (`"limit-up"` / `"limit-down"`). Limits are board- and date-aware:
+
+| Board | Limit |
+|-------|-------|
+| Main board (non-ST) | ±10% |
+| Main board ST / *ST | ±5% (requires `st_status_map` for point-in-time status) |
+| ChiNext (300xxx) | ±10% before 2020-08-24, ±20% after (registration reform) |
+| STAR Market (688xxx) | ±20% (since inception) |
+| BSE (codes 83/87/43/92) | ±30% |
+
+Limits are computed off the security's **last genuinely traded close** (not updated during suspensions) and rounded to the fen. New-stock limit-free windows are not modelled. Orders on suspension days are cancelled the same day with a recorded reason (`"no price data"` for a missing bar, `"suspended"` for zero volume), never deferred. Positions in delisted stocks are force-liquidated after `delist_gap_days` without bars, recorded as `DELIST_LIQUIDATE` in the trade log.
+
+> **Migration note (breaking)**: previous versions defaulted to no price-limit check (`check_price_limit=False`), so old momentum/limit-up-chasing backtest results were systematically optimistic. To reproduce the old behavior, set `set_option('check_price_limit', False)` explicitly.
+
 ## set_slippage
 
 Set the slippage model.

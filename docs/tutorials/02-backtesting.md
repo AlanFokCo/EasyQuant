@@ -188,6 +188,8 @@ result = run_strategy(
 )
 ```
 
+> **成本口径**：以上为现行费率（印花税 2023-08-28 起 0.05%，此前 0.1%）。显式固定 `close_tax` 会覆盖引擎内建的日期感知逻辑；跨 2023-08-28 的长历史回测请改用 `close_tax=None`。滑点见 [配置 API](../reference/api-config.md)（示例默认 `FixedSlippage(0.001)`）。
+
 ### 3.2 交互式 HTML 报告
 
 用浏览器打开 `reports/backtest_*.html`（无需本地 Web 服务器）。自上而下通常为：**摘要** → **指标卡片**（年化收益、夏普、最大回撤、Alpha/Beta 等，可点击看释义）→ **K 线与技术指标** → **累计收益率**（策略 vs 基准）→ **回撤** → **每日盈亏 / 每日收益率** → **成交、持仓**等标签页。
@@ -425,12 +427,14 @@ print("日胜率:     %.2f%%" % (metrics['win_rate'] * 100))
 ```python
 from eqlib import brinson_attribution
 
-attr = brinson_attribution(result)
+attr = brinson_attribution(result, sector_data={"601398.XSHG": "金融", "600519.XSHG": "消费"})
 
 print("配置效应: %.4f  ← 资产配置（选行业/板块）带来的收益" % attr['allocation_effect'])
 print("选股效应:   %.4f  ← 个股选择带来的收益" % attr['selection_effect'])
 print("交互效应:   %.4f  ← 配置与选股的交互作用" % attr['interaction_effect'])
 ```
+
+实现为标准 Brinson-Hood-Beebower 单期分解：三项之和**严格等于**组合收益 − 基准收益（`attr['total_active_return']`，另见 `portfolio_return` / `benchmark_return` / 分行业明细 `attr['sectors']`）。基准默认为 universe 等权买入持有收益。注意：**不传 `sector_data` 时所有证券同属一个行业**，配置与交互效应恒为 0，全部超额收益计入选股效应——这不是缺陷，而是无行业结构时 BHB 的正确表述。
 
 - **配置效应 > 0**：说明你的板块/行业选择是对的
 - **选股效应 > 0**：说明你在板块内选的股票是对的

@@ -29,10 +29,17 @@ Generate an interactive HTML report. The HTML report includes candlestick charts
 Calculate comprehensive risk metrics.
 
 ```python
-metrics = analyze_returns(result, risk_free_rate=0.03, trading_days=252)
+metrics = analyze_returns(result, risk_free_rate=0.03)
 ```
 
 Returns a `dict`: `total_return`, `annual_return`, `annual_volatility`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `calmar_ratio`, `alpha`, `beta`, `information_ratio`, `win_rate`, `trading_days`, `num_trades`.
+
+Conventions:
+
+- Annualization uses **244** trading days (the A-share value; see `eqlib/constants.py`).
+- `alpha` / `beta` / `information_ratio` depend on the benchmark series: they are `NaN` (rendered `N/A` in reports and examples) when benchmark data is unavailable or has fewer than 10 overlapping trading days — silent defaults of 0.0/1.0 are no longer returned.
+- Benchmark returns prefer the engine-recorded benchmark NAV series (same source as report charts), falling back to a network fetch only when unavailable.
+- `win_rate_trade` / `profit_loss_ratio` / `per_stock_pnl` are based on FIFO-matched round trips **inclusive of both-side fees** (buy commission amortized into cost, sell fees deducted from proceeds), consistent with the engine's cash ledger.
 
 ## grade_strategy
 
@@ -70,7 +77,19 @@ Suggests parameter adjustments based on diagnostics. `current_params` and `param
 
 ## brinson_attribution
 
-Brinson attribution analysis. Returns a `dict` (`allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`).
+Single-period Brinson-Hood-Beebower attribution. The whole backtest window is treated as one holding period and the active return is decomposed at the sector level into allocation, selection and interaction effects, mathematically closed: `allocation + selection + interaction == portfolio_return − benchmark_return`.
+
+```python
+attr = brinson_attribution(result, sector_data={"601398.XSHG": "Financials", ...})
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `result` | Result dict returned by `run_backtest` |
+| `sector_data` | Security → sector-name mapping; unmapped securities fall into `"Unclassified"`. Without it all securities share one sector, so allocation and interaction are identically zero and the entire active return is reported as selection (the correct BHB statement when no sector structure is known) |
+| `benchmark_returns` | Optional `pd.Series` of benchmark daily returns; when given, that scalar return is applied uniformly across sectors, otherwise the benchmark is the equal-weight buy-and-hold return of the backtest universe (from the engine-exported OHLCV panel, same qfq series the engine traded on) |
+
+Returns a `dict`: `allocation_effect`, `selection_effect`, `interaction_effect`, `total_active_return`, `portfolio_return`, `benchmark_return`, `benchmark_model` (`"universe_equal_weight"` / `"scalar_series"`), and a per-sector breakdown under `sectors` (weights, returns and the three effects per sector).
 
 ## simple_factor_analysis
 
