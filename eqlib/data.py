@@ -3,6 +3,7 @@
 import datetime
 import json
 import threading
+import warnings
 import requests
 from collections import OrderedDict
 from functools import lru_cache
@@ -664,14 +665,110 @@ def _covers_requested_start(
     return first_date <= requested_start + pd.Timedelta(days=tolerance_days)
 
 
-def fetch_stock_data(
+# ============================================================
+# Point-in-time (PIT) guards for simulation sessions
+# ============================================================
+
+
+def _session_clock() -> Optional[pd.Timestamp]:
+    """Return the exact simulated clock for intraday PIT filtering, or None.
+
+    ``None`` means unrestricted: outside a simulation (research mode, where
+    full-range fetches are legitimate), during paper/live trading (real-time
+    data is genuinely available "now"), or while the engine performs internal
+    full-range fetches (e.g. preloading the backtest window).
+    """
+    from eqlib._state import get_session
+
+    session = get_session()
+    if session._full_range_fetch_depth > 0:
+        return None
+    context = session._context
+    if context is None:
+        return None
+    if session._options.get("_is_paper_trading", False):
+        return None
+    current = getattr(context, "current_dt", None)
+    if current is None:
+        return None
+    ts = pd.Timestamp(current)
+    if ts.tzinfo is not None:
+        ts = ts.tz_convert("Asia/Shanghai").tz_localize(None)
+    return ts
+
+
+def _session_pit_cutoff() -> Optional[pd.Timestamp]:
+    """Return the latest date allowed for point-in-time-safe access, or None.
+
+    ``None`` means unrestricted (see :func:`_session_clock`).
+
+    Inside a backtest the cutoff follows the simulated clock.  The current
+    day is included only once its bar is complete — post-close callbacks and
+    post-loop reporting, detected via the recorded daily snapshot; during
+    decision-time callbacks (before_trading_start, scheduled functions,
+    handle_data) the cutoff is the previous trading day (T-1), matching
+    ``get_price`` semantics.
+    """
+    clock = _session_clock()
+    if clock is None:
+        return None
+    day = clock.normalize()
+    from eqlib._state import get_session
+
+    recorded = get_session()._recorded_values
+    if recorded and clock.date() in recorded:
+        return day
+    return day - pd.Timedelta(days=1)
+
+
+def _check_pit_snapshot_api(
+    api_name: str, stacklevel: int = 2, *, reason: Optional[str] = None
+) -> None:
+    """Warn (or raise) when a latest-snapshot API is called inside a backtest.
+
+    Snapshot APIs such as ``get_fundamentals`` always return the *current*
+    provider snapshot — the ``date`` parameter cannot be honored because the
+    underlying sources carry no disclosure-date history.  Calling them during
+    a backtest silently leaks future information, so emit a ``FutureWarning``;
+    with ``set_option('avoid_future_data', True)`` raise ``ValueError``
+    instead (strict mode, mirroring other A-share frameworks).
+
+    ``reason`` overrides the default explanation (a snapshot API whose
+    ``date`` parameter is ignored) for APIs with a different failure mode —
+    e.g. current-only index constituents causing survivorship bias.
+    """
+    from eqlib._state import get_session
+
+    session = get_session()
+    context = session._context
+    if context is None or getattr(context, "current_dt", None) is None:
+        return
+    if session._options.get("_is_paper_trading", False):
+        return
+    if reason is None:
+        message = (
+            f"{api_name}() returns the latest provider snapshot and ignores the "
+            "'date' parameter (no point-in-time disclosure filtering). Calling "
+            "it inside a backtest introduces look-ahead bias; restrict it to "
+            "research/live use, or set_option('avoid_future_data', True) to turn "
+            "this warning into an error."
+        )
+    else:
+        message = (
+            f"{api_name}() {reason} Calling it inside a backtest silently "
+            "distorts the simulation; restrict it to research/live use, or "
+            "set_option('avoid_future_data', True) to turn this warning into "
+            "an error."
+        )
+    if session._options.get("avoid_future_data", False):
+        raise ValueError(message)
+    warnings.warn(message, FutureWarning, stacklevel=stacklevel)
+
+
+def _fetch_stock_data_impl(
     code: str, start_date, end_date, adjust: str = "qfq"
 ) -> pd.DataFrame:
-    """Fetch daily OHLCV data from multiple sources with automatic fallback.
-
-    Tries data sources in priority order: EastMoney → Sina → Tencent → BaoStock.
-    Returns data from the first source that succeeds.
-    """
+    """Implementation of :func:`fetch_stock_data` (no PIT truncation)."""
     symbol = _code_to_akshare(code)
     is_idx = _is_index(code)
 
@@ -864,6 +961,33 @@ def fetch_stock_data(
         return fetch_stock_data(idx_code, start_date, end_date, adjust)
 
     return pd.DataFrame()
+
+
+def fetch_stock_data(
+    code: str, start_date, end_date, adjust: str = "qfq"
+) -> pd.DataFrame:
+    """Fetch daily OHLCV data from multiple sources with automatic fallback.
+
+    Tries data sources in priority order: EastMoney → Sina → Tencent → BaoStock.
+    Returns data from the first source that succeeds.
+
+    Point-in-time contract: inside a backtest the result is truncated at the
+    simulated clock — during decision-time callbacks (before_trading_start,
+    scheduled functions, handle_data) only rows up to the previous trading
+    day (T-1) are returned, matching ``get_price``; the current day becomes
+    visible once its bar is complete (after_trading_end and later).  Outside
+    a simulation (research mode) and in paper/live trading the full requested
+    range is returned unchanged.  Requests starting after the cutoff return
+    an empty DataFrame without touching the network.
+    """
+    cutoff = _session_pit_cutoff()
+    if cutoff is not None and start_date is not None:
+        if pd.Timestamp(start_date).normalize() > cutoff:
+            return pd.DataFrame()
+    df = _fetch_stock_data_impl(code, start_date, end_date, adjust)
+    if cutoff is None or df.empty or not isinstance(df.index, pd.DatetimeIndex):
+        return df
+    return df.loc[df.index <= cutoff]
 
 
 def get_price(
@@ -1507,7 +1631,23 @@ def _get_trading_days_range(
 def scan_market(
     min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50
 ) -> pd.DataFrame:
-    """Scan A-shares and filter by price, change, and P/E."""
+    """Scan A-shares and filter by price, change, and P/E.
+
+    .. warning:: Latest snapshot only — this screens the *current* spot
+        snapshot (today's price, pct_change, PE); the provider carries no
+        point-in-time history.  Inside a backtest this emits a
+        ``FutureWarning`` (or raises ``ValueError`` with
+        ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "scan_market",
+        stacklevel=3,
+        reason=(
+            "screens the latest full-market spot snapshot (current price, "
+            "pct_change, PE) — the provider has no point-in-time history."
+        ),
+    )
     try:
         return _filter_spot(
             {
@@ -1537,7 +1677,22 @@ def get_financial_screen(
     min_revenue=None,
     min_profit=None,
 ) -> pd.DataFrame:
-    """Screen stocks by financial criteria using real-time market data."""
+    """Screen stocks by financial criteria using real-time market data.
+
+    .. warning:: Latest snapshot only — the PE/PB filters apply to the
+        *current* spot snapshot; the provider carries no point-in-time
+        history.  Inside a backtest this emits a ``FutureWarning`` (or
+        raises ``ValueError`` with ``set_option('avoid_future_data',
+        True)``); restrict use to research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_financial_screen",
+        stacklevel=3,
+        reason=(
+            "screens the latest full-market spot snapshot (current PE/PB) "
+            "— the provider has no point-in-time history."
+        ),
+    )
     try:
         filters = {
             "pe": (min_pe, max_pe),
@@ -1590,13 +1745,24 @@ def _filter_spot(rename_map: dict, filters: dict) -> pd.DataFrame:
 
 
 def check_golden_cross(code, fast_period=5, slow_period=20, min_rows=30) -> bool:
-    """Check if a stock has a golden cross (fast MA crossing above slow MA)."""
+    """Check if a stock has a golden cross (fast MA crossing above slow MA).
+
+    Point-in-time contract: inside a backtest, the history is truncated at
+    the simulated clock (T-1 during decision-time callbacks, matching
+    ``get_price``), so the crossover is evaluated only on data visible at
+    that moment; outside a simulation the full latest history is used.
+    """
     try:
         symbol = _code_to_akshare(code)
         stock_df = ak.stock_zh_a_hist(symbol=symbol, period="daily", adjust="qfq")
     except Exception as e:
         log.debug("check_golden_cross: %s", e)
         return False
+
+    cutoff = _session_pit_cutoff()
+    if cutoff is not None and not stock_df.empty and "日期" in stock_df.columns:
+        hist_dates = pd.to_datetime(stock_df["日期"], errors="coerce")
+        stock_df = stock_df.loc[hist_dates <= cutoff]
 
     if len(stock_df) < min_rows or "收盘" not in stock_df.columns:
         return False
@@ -1655,7 +1821,15 @@ def clear_cache():
 
 
 def get_financial_abstract(code) -> pd.DataFrame:
-    """Get financial summary for a stock."""
+    """Get financial summary for a stock.
+
+    .. warning:: Latest snapshot only — the provider carries no
+        disclosure-date history, so this is not point-in-time safe.  Inside
+        a backtest this emits a ``FutureWarning`` (or raises ``ValueError``
+        with ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api("get_financial_abstract", stacklevel=3)
     try:
         df = ak.stock_financial_abstract(symbol=_code_to_akshare(code))
         if df.empty:
@@ -1669,8 +1843,22 @@ def get_financial_abstract(code) -> pd.DataFrame:
 
 
 def get_fundamentals(code, date=None) -> pd.DataFrame:
-    """Get fundamental data for a stock (alias for get_financial_abstract)."""
-    return get_financial_abstract(code)
+    """Get fundamental data for a stock.
+
+    Canonical implementation is :func:`eqlib.stock_query.get_fundamentals`
+    (exported as ``eqlib.get_fundamentals``, with a dual query/code
+    signature); this alias delegates to it so both names share identical
+    behavior.
+
+    .. warning:: ``date`` is ignored: the provider returns the latest
+        disclosure snapshot with no point-in-time filtering.  Inside a
+        backtest this emits a ``FutureWarning`` — or raises ``ValueError``
+        when ``set_option('avoid_future_data', True)`` — because using it
+        for historical factor selection introduces look-ahead bias.
+    """
+    from eqlib.stock_query import get_fundamentals as _canonical
+
+    return _canonical(code, date=date)
 
 
 # ============================================================
@@ -1679,7 +1867,25 @@ def get_fundamentals(code, date=None) -> pd.DataFrame:
 
 
 def get_index_stocks(index_code) -> pd.DataFrame:
-    """Get constituent stocks of an index."""
+    """Get constituent stocks of an index.
+
+    .. warning:: Latest snapshot only — the provider serves the *current*
+        constituents and carries no point-in-time membership history.
+        Building a historical backtest universe from this introduces
+        survivorship bias (dropped/delisted members are invisible).  Inside
+        a backtest this emits a ``FutureWarning`` (or raises ``ValueError``
+        with ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_index_stocks",
+        stacklevel=3,
+        reason=(
+            "returns only the current index constituents — the provider has "
+            "no point-in-time membership history, so a historical universe "
+            "built from it suffers survivorship bias."
+        ),
+    )
     try:
         df = ak.index_stock_cons(symbol=_code_to_akshare(index_code))
         if df.empty:
@@ -1711,7 +1917,25 @@ def get_industry_list() -> list[str]:
 
 
 def get_industry_stocks(industry_name) -> pd.DataFrame:
-    """Get constituent stocks of an industry board."""
+    """Get constituent stocks of an industry board.
+
+    .. warning:: Latest snapshot only — the provider serves the *current*
+        board members and carries no point-in-time membership history.
+        Building a historical backtest universe from this introduces
+        survivorship bias (dropped/delisted members are invisible).  Inside
+        a backtest this emits a ``FutureWarning`` (or raises ``ValueError``
+        with ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_industry_stocks",
+        stacklevel=3,
+        reason=(
+            "returns only the current industry-board constituents — the "
+            "provider has no point-in-time membership history, so a "
+            "historical universe built from it suffers survivorship bias."
+        ),
+    )
     try:
         df = ak.stock_board_industry_cons_em(symbol=industry_name)
         if df.empty:
@@ -1793,7 +2017,25 @@ def get_concept_list() -> list[str]:
 
 
 def get_concept_stocks(concept_name) -> pd.DataFrame:
-    """Get constituent stocks of a concept/theme board."""
+    """Get constituent stocks of a concept/theme board.
+
+    .. warning:: Latest snapshot only — the provider serves the *current*
+        board members and carries no point-in-time membership history.
+        Building a historical backtest universe from this introduces
+        survivorship bias (dropped/delisted members are invisible).  Inside
+        a backtest this emits a ``FutureWarning`` (or raises ``ValueError``
+        with ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_concept_stocks",
+        stacklevel=3,
+        reason=(
+            "returns only the current concept-board constituents — the "
+            "provider has no point-in-time membership history, so a "
+            "historical universe built from it suffers survivorship bias."
+        ),
+    )
     try:
         df = ak.stock_board_concept_cons_em(symbol=concept_name)
         if df.empty:
@@ -1829,7 +2071,12 @@ def get_concept_stocks(concept_name) -> pd.DataFrame:
 def fetch_minute_data(
     code, period: str = "5m", start_date=None, end_date=None, adjust: str = "qfq"
 ) -> pd.DataFrame:
-    """Fetch minute-level K-line data."""
+    """Fetch minute-level K-line data.
+
+    Point-in-time contract: inside a backtest, only bars strictly before the
+    simulated clock are returned (mirrors ``get_price_minute``); outside a
+    simulation the full requested range is returned unchanged.
+    """
     try:
         symbol = _code_to_akshare(code)
         period_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "60m": "60"}
@@ -1875,6 +2122,13 @@ def fetch_minute_data(
             if end_ts == end_ts.normalize():
                 end_ts = end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
             df = df[df.index <= end_ts]
+
+        clock = _session_clock()
+        if clock is not None and isinstance(df.index, pd.DatetimeIndex):
+            if df.index.tz is not None:
+                df = df.copy()
+                df.index = df.index.tz_convert("Asia/Shanghai").tz_localize(None)
+            df = df.loc[df.index < clock]
 
         return df
     except Exception as e:
@@ -1933,7 +2187,23 @@ def get_price_minute(
 
 
 def get_tick_data(code, trade_date=None) -> pd.DataFrame:
-    """Fetch intraday tick (transaction) data for current day."""
+    """Fetch intraday tick (transaction) data for current day.
+
+    .. warning:: Latest snapshot only — the provider serves the *current*
+        trading day's ticks and ``trade_date`` cannot be honored (no
+        historical tick history).  Inside a backtest this emits a
+        ``FutureWarning`` (or raises ``ValueError`` with
+        ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_tick_data",
+        stacklevel=3,
+        reason=(
+            "returns the current trading day's tick snapshot and ignores "
+            "'trade_date' (the provider serves no historical ticks)."
+        ),
+    )
     try:
         symbol = _code_to_akshare(code)
         ak_symbol = f"sh{symbol}" if symbol.startswith("6") else f"sz{symbol}"
@@ -1973,6 +2243,30 @@ def get_current_data() -> dict:
     Returns dict mapping code -> dict with attributes:
     code, name, price, pct_change, volume, money, high, low,
     open, prev_close, turnover, pe, pb, total_value, float_value.
+
+    .. warning:: Latest snapshot only — price/PE/PB/turnover reflect the
+        *current* spot snapshot; the provider carries no point-in-time
+        history.  Inside a backtest this emits a ``FutureWarning`` (or
+        raises ``ValueError`` with ``set_option('avoid_future_data',
+        True)``); restrict use to research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_current_data",
+        stacklevel=3,
+        reason=(
+            "returns the latest full-market spot snapshot (current price, "
+            "PE/PB, turnover) — the provider has no point-in-time history."
+        ),
+    )
+    return _current_data_impl()
+
+
+def _current_data_impl() -> dict:
+    """Implementation of :func:`get_current_data` (no PIT check).
+
+    Shared with ``stock_query.get_current_data_object``, which runs its own
+    guard first — splitting keeps each public entry point warning exactly
+    once under its own name.
     """
     try:
         df = _get_spot_data()
@@ -2050,7 +2344,24 @@ def get_security_info(code):
 
 
 def get_valuation(code) -> Optional[dict]:
-    """Get valuation data for a stock (uses cached spot data)."""
+    """Get valuation data for a stock (uses cached spot data).
+
+    .. warning:: Latest snapshot only — PE/PB/market-cap reflect the
+        *current* spot snapshot; the provider carries no point-in-time
+        valuation history.  Inside a backtest this emits a
+        ``FutureWarning`` (or raises ``ValueError`` with
+        ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_valuation",
+        stacklevel=3,
+        reason=(
+            "returns the latest spot-market valuation snapshot (current "
+            "PE/PB/market cap) — the provider has no point-in-time "
+            "valuation history."
+        ),
+    )
     try:
         symbol = _code_to_akshare(code)
         df = _get_spot_data()
@@ -2096,6 +2407,12 @@ def get_money_flow(code, start_date=None, end_date=None, count=None) -> pd.DataF
 
     Note: start_date/end_date are not supported by the underlying API;
     use `count` to limit the number of recent days returned.
+
+    Point-in-time contract: the provider only serves a recent snapshot, so
+    inside a backtest rows are truncated at the simulated clock (T-1 during
+    decision-time callbacks, matching ``get_price``) — typically yielding an
+    empty frame for historical dates, which is the honest answer.  Outside a
+    simulation the snapshot is returned unchanged.
     """
     try:
         symbol = _code_to_akshare(code)
@@ -2126,6 +2443,11 @@ def get_money_flow(code, start_date=None, end_date=None, count=None) -> pd.DataF
             },
         )
 
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None and "date" in df.columns:
+            flow_dates = pd.to_datetime(df["date"], errors="coerce")
+            df = df.loc[flow_dates <= cutoff]
+
         if count > 0:
             df = df.tail(count)
         return df.reset_index(drop=True)
@@ -2137,7 +2459,15 @@ def get_money_flow(code, start_date=None, end_date=None, count=None) -> pd.DataF
 def get_billboard_list(
     stock_list=None, date=None, start_date=None, end_date=None
 ) -> pd.DataFrame:
-    """Get dragon/tiger list (abnormal trading activity stocks)."""
+    """Get dragon/tiger list (abnormal trading activity stocks).
+
+    Point-in-time contract: inside a backtest the requested date range is
+    clamped at the simulated clock (T-1 during decision-time callbacks,
+    matching ``get_price``); ranges beyond the cutoff return an empty frame.
+    Note the ``post_*d`` columns are computed relative to each row's listing
+    date and may span days after it — treat them as reference metrics, not
+    as information available on the listing date.
+    """
     try:
         if date is not None:
             sd = ed = _normalize_date(date)
@@ -2148,6 +2478,13 @@ def get_billboard_list(
                 else _normalize_date(datetime.date.today())
             )
             ed = _normalize_date(end_date) if end_date else sd
+
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None:
+            if pd.Timestamp(sd) > cutoff:
+                return pd.DataFrame()
+            if pd.Timestamp(ed) > cutoff:
+                ed = cutoff.strftime("%Y%m%d")
 
         df = ak.stock_lhb_detail_em(start_date=sd, end_date=ed)
         if df.empty:
@@ -2202,7 +2539,25 @@ def get_billboard_list(
 
 
 def get_index_weights(index_code, date=None) -> pd.DataFrame:
-    """Get constituent stock weights for an index."""
+    """Get constituent stock weights for an index.
+
+    .. warning:: Latest snapshot only — ``date`` is ignored; the provider
+        (csindex) serves the current weights with no point-in-time history.
+        Same survivorship-bias caveat as :func:`get_index_stocks`.  Inside a
+        backtest this emits a ``FutureWarning`` (or raises ``ValueError``
+        with ``set_option('avoid_future_data', True)``); restrict use to
+        research/live contexts.
+    """
+    _check_pit_snapshot_api(
+        "get_index_weights",
+        stacklevel=3,
+        reason=(
+            "ignores the 'date' parameter and returns the latest index "
+            "weights — the provider has no point-in-time membership history, "
+            "so a historical universe built from it suffers survivorship "
+            "bias."
+        ),
+    )
     try:
         df = ak.index_stock_cons_weight_csindex(symbol=_code_to_akshare(index_code))
         if df.empty:
@@ -2226,7 +2581,22 @@ def get_extras(field: str, security_list=None, start_date=None, end_date=None) -
     """Get extra data fields (is_st, net_value, etc.) for securities.
 
     Uses vectorized operations instead of per-row iteration.
+
+    .. warning:: Latest snapshot only — e.g. ``is_st`` reflects the
+        *current* ST status; the provider carries no point-in-time
+        history.  Inside a backtest this emits a ``FutureWarning`` (or
+        raises ``ValueError`` with ``set_option('avoid_future_data',
+        True)``); restrict use to research/live contexts.  For PIT-safe
+        ST status inside backtests use ``set_option('st_status_map', ...)``.
     """
+    _check_pit_snapshot_api(
+        "get_extras",
+        stacklevel=3,
+        reason=(
+            "returns the latest spot snapshot (e.g. the current ST status) "
+            "— the provider has no point-in-time history."
+        ),
+    )
     try:
         df = _get_spot_data()
         if df.empty:
@@ -2363,6 +2733,12 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
     Note:
         使用中国时区 (UTC+8) 确定"今天"，避免跨时区服务器获取错误日期。
         缓存有效期为 1 小时（A股收盘后数据不再更新）。
+
+    Point-in-time contract: inside a backtest the requested range is clamped
+    at the simulated clock (T-1 during decision-time callbacks, matching
+    ``get_price``); ranges entirely beyond the cutoff return an empty frame
+    without touching the network.  Outside a simulation the range is used
+    as given.
     """
     try:
         # 参数标准化 - 使用中国时区
@@ -2373,6 +2749,15 @@ def get_north_money_flow(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 验证并规范化日期范围 (Bug 1, 9 fix)
         sd, ed = _validate_date_range(start_date, end_date)
+
+        # Point-in-time: clamp at the simulated clock before the cache key is
+        # computed, so a cached full-range frame cannot leak future rows.
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None:
+            if pd.Timestamp(sd) > cutoff:
+                return pd.DataFrame()
+            if pd.Timestamp(ed) > cutoff:
+                ed = cutoff.strftime("%Y-%m-%d")
 
         # 缓存检查 (带时间过期 - Bug 5, 15 fix)
         cache_key = f"north_flow_{sd}_{ed}"
@@ -2478,6 +2863,12 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
         使用中国时区 (UTC+8) 确定"今天"。
         margin_repay 第一行为 NaN（无前日余额可计算）。
         缓存有效期为 1 小时。
+
+    Point-in-time contract: inside a backtest the requested range is clamped
+    at the simulated clock (T-1 during decision-time callbacks, matching
+    ``get_price``); ranges entirely beyond the cutoff return an empty frame
+    without touching the network.  Outside a simulation the range is used
+    as given.
     """
     try:
         # 参数标准化 - 使用中国时区
@@ -2488,6 +2879,15 @@ def get_margin_data(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 验证并规范化日期范围
         sd, ed = _validate_date_range(start_date, end_date)
+
+        # Point-in-time: clamp at the simulated clock before the cache key is
+        # computed, so a cached full-range frame cannot leak future rows.
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None:
+            if pd.Timestamp(sd) > cutoff:
+                return pd.DataFrame()
+            if pd.Timestamp(ed) > cutoff:
+                ed = cutoff.strftime("%Y-%m-%d")
 
         # 缓存检查 (带时间过期)
         cache_key = f"margin_data_{sd}_{ed}"
@@ -2612,6 +3012,12 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
         API 只能获取最近 30 个交易日的数据，超出范围会发出警告。
         缓存有效期为 30 分钟（交易时段内数据会变化）。
         使用并发 API 调用提高性能。
+
+    Point-in-time contract: inside a backtest the requested range is clamped
+    at the simulated clock (T-1 during decision-time callbacks, matching
+    ``get_price``); ranges entirely beyond the cutoff return an empty frame
+    without touching the network.  Outside a simulation the range is used
+    as given.
     """
     try:
         # 参数标准化 - 使用中国时区
@@ -2622,6 +3028,15 @@ def get_limit_up_down_stats(start_date=None, end_date=None) -> pd.DataFrame:
 
         # 验证并规范化日期范围
         sd, ed = _validate_date_range(start_date, end_date)
+
+        # Point-in-time: clamp at the simulated clock before the cache key is
+        # computed, so a cached full-range frame cannot leak future rows.
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None:
+            if pd.Timestamp(sd) > cutoff:
+                return pd.DataFrame()
+            if pd.Timestamp(ed) > cutoff:
+                ed = cutoff.strftime("%Y-%m-%d")
 
         # Bug 8 fix: 验证 30 天限制
         today = _get_china_today()
@@ -2766,7 +3181,23 @@ def get_restriction_release(days=30) -> pd.DataFrame:
     Note:
         使用中国时区 (UTC+8) 确定"今天"。
         缓存有效期为 6 小时。
+
+    .. warning:: Latest snapshot only — the unlock schedule is the one
+        *announced as of the real today*, and the query window is computed
+        from the real clock; the provider carries no announcement-date
+        history.  Inside a backtest this emits a ``FutureWarning`` (or
+        raises ``ValueError`` with ``set_option('avoid_future_data',
+        True)``); restrict use to research/live contexts.
     """
+    _check_pit_snapshot_api(
+        "get_restriction_release",
+        stacklevel=3,
+        reason=(
+            "returns the unlock schedule announced as of the real today "
+            "(the window is computed from the real clock) — the provider "
+            "has no announcement-date history."
+        ),
+    )
     try:
         # Bug 2 fix: 参数标准化 - 处理 None 和无效值
         if days is None or days < 1:

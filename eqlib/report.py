@@ -1107,6 +1107,7 @@ def generate_html_report(result, out_path):
         benchmark_code=bench_code_label,
         benchmark_ret=metrics["benchmark_ret"],
         benchmark_ret_pct=metrics["benchmark_ret_pct"],
+        benchmark_note=metrics["benchmark_note"],
         alpha=metrics["alpha"],
         beta=metrics["beta"],
         excess_return=metrics["excess_return"],
@@ -1166,6 +1167,7 @@ def _calc_metrics(result, bench_data):
             "sharpe": "N/A", "sortino": "N/A", "max_dd": "N/A", "max_dd_pct": "N/A",
             "ann_ret": "N/A", "ann_ret_pct": "N/A", "win_rate": "N/A",
             "benchmark_ret": "N/A", "benchmark_ret_pct": "N/A",
+            "benchmark_note": "",
             "alpha": "N/A", "beta": "N/A",
             "excess_return": "N/A", "excess_return_pct": "N/A",
             "calmar": "N/A", "info_ratio": "N/A",
@@ -1191,15 +1193,46 @@ def _calc_metrics(result, bench_data):
         if np.isfinite(final_benchmark_pct):
             chart_benchmark_return = final_benchmark_pct / 100.0
 
-    report_analytics = dict(analytics)
-    if chart_benchmark_return is not None:
+    # ── Unified benchmark caliber ────────────────────────────────────────
+    # All quantitative benchmark metrics (headline return, excess, alpha,
+    # beta, IR) share ONE source: analyze_returns, which uses the
+    # engine-recorded benchmark series.  The chart series only backfills the
+    # headline card when analytics has no benchmark at all (e.g. <2 common
+    # days); in that case the card is explicitly marked as chart-caliber.
+    analytics_bench = analytics.get("benchmark_return")
+    if analytics_bench is not None and np.isfinite(analytics_bench):
+        bench_ret = float(analytics_bench)
+        bench_source = "engine"
+    elif chart_benchmark_return is not None:
         bench_ret = chart_benchmark_return
-        excess_ret = total_ret - bench_ret
-        report_analytics["benchmark_return"] = bench_ret
-        report_analytics["excess_return"] = excess_ret
+        bench_source = "chart"
     else:
-        bench_ret = analytics.get("benchmark_return", 0.0)
-        excess_ret = analytics.get("excess_return", total_ret - bench_ret)
+        bench_ret = None
+        bench_source = None
+
+    report_analytics = dict(analytics)
+    if bench_source == "chart":
+        report_analytics["benchmark_return"] = bench_ret
+        report_analytics["excess_return"] = total_ret - bench_ret
+
+    excess_ret = total_ret - bench_ret if bench_ret is not None else None
+
+    def _pct(value, fmt="{:.2%}"):
+        return fmt.format(value) if value is not None and np.isfinite(value) else "N/A"
+
+    def _num(value, fmt="{:.2f}"):
+        return fmt.format(value) if value is not None and np.isfinite(value) else "N/A"
+
+    if bench_source == "chart":
+        benchmark_note = "基准指标不可用，卡片值为图表口径"
+    elif bench_source is None:
+        benchmark_note = "基准数据不可用"
+    else:
+        benchmark_note = ""
+
+    alpha_v = analytics.get("alpha")
+    beta_v = analytics.get("beta")
+    info_v = analytics.get("information_ratio")
 
     return {
         "sharpe": f"{analytics['sharpe_ratio']:.2f}",
@@ -1210,23 +1243,24 @@ def _calc_metrics(result, bench_data):
         "ann_ret_pct": f"{ann_ret:+.2f}%",
         "win_rate": f"{analytics['win_rate_trade']:.0%}",
         "daily_win_rate": f"{analytics['win_rate_daily']:.1%}",
-        "benchmark_ret": f"{bench_ret:.2%}",
-        "benchmark_ret_pct": f"{bench_ret:+.2f}%",
-        "alpha": f"{analytics['alpha']:+.2%}",
-        "beta": f"{analytics['beta']:.3f}",
-        "excess_return": f"{excess_ret:.2%}",
-        "excess_return_pct": f"{excess_ret:+.2f}%",
+        "benchmark_ret": _pct(bench_ret),
+        "benchmark_ret_pct": _pct(bench_ret, "{:+.2f}%"),
+        "benchmark_note": benchmark_note,
+        "alpha": _pct(alpha_v, "{:+.2%}"),
+        "beta": _num(beta_v, "{:.3f}"),
+        "excess_return": _pct(excess_ret),
+        "excess_return_pct": _pct(excess_ret, "{:+.2f}%"),
         "calmar": f"{analytics['calmar_ratio']:.2f}",
-        "info_ratio": f"{analytics['information_ratio']:.2f}",
-        "excess_max_dd": f"{analytics.get('excess_return_max_drawdown', 0):.2%}",
-        "excess_sharpe": f"{analytics.get('excess_return_sharpe', 0):.2f}",
-        "daily_excess": f"{analytics.get('daily_excess_return', 0):+.4%}",
+        "info_ratio": _num(info_v),
+        "excess_max_dd": _pct(analytics.get('excess_return_max_drawdown')),
+        "excess_sharpe": _num(analytics.get('excess_return_sharpe')),
+        "daily_excess": _pct(analytics.get('daily_excess_return'), "{:+.4%}"),
         "profit_loss_ratio": ("∞" if analytics.get('profit_loss_ratio', 0) == float('inf')
                               else f"{analytics.get('profit_loss_ratio', 0):.2f}"),
         "win_count": str(analytics.get("win_count", 0)),
         "loss_count": str(analytics.get("loss_count", 0)),
         "ann_vol": f"{analytics['annual_volatility']:.2%}",
-        "bm_vol": f"{analytics.get('benchmark_volatility', 0):.2%}",
+        "bm_vol": _pct(analytics.get('benchmark_volatility')),
         "trade_count": str(analytics.get("trade_count", 0)),
         # For benchmark return chart (configured benchmark cumulative return %)
         "bench_last": f"{bench_data[-1]['value'] if bench_data else 0:.2f}",
@@ -1929,6 +1963,7 @@ details .detail-body {{
       <div class="title-row"><span class="mc-title">{benchmark_name} 收益</span></div>
       <div class="mc-val" id="mv-bm_ret">{benchmark_ret}</div>
       <div style="font-size:10px;color:var(--text-dim)">{benchmark_ret_pct}</div>
+      <div style="font-size:10px;color:var(--warning)">{benchmark_note}</div>
       <div class="mc-grade-row"><div id="grade-bm_ret"></div></div>
     </div>
     <div class="metric-card" onclick="showMetric('alpha')">
@@ -2087,8 +2122,9 @@ details .detail-body {{
         <li><strong>Sortino 比率</strong>同 Sharpe 但分母仅用下行波动率。</li>
         <li><strong>最大回撤</strong>max[(峰值 &minus; 谷值) / 峰值]。</li>
         <li><strong>Calmar 比率</strong>年化收益率 / |最大回撤|。</li>
-        <li><strong>Alpha / Beta</strong>基于 CAPM，以{benchmark_name}为市场基准。</li>
-        <li><strong>胜率</strong>按 FIFO 配对买卖，盈利对数 / 全部配对数。</li>
+        <li><strong>Alpha / Beta</strong>基于 CAPM，以{benchmark_name}为市场基准；基准数据不可用时显示 N/A（不会以 0 / 1.0 等默认值冒充真实计算结果）。</li>
+        <li><strong>胜率</strong>按 FIFO 配对买卖，含双边费用（佣金+印花税）后的净盈亏判定，盈利对数 / 全部配对数。</li>
+        <li><strong>基准收益口径</strong>指标卡中的基准收益、超额收益、Alpha/Beta 均基于回测区间逐日收益复利计算（与引擎记录的基准序列同源）；走势图中的基准曲线以首个交易日为 0% 锚点，仅用于可视化对比。</li>
       </ul>
     </div>
   </div>
@@ -2171,8 +2207,8 @@ details .detail-body {{
     }},
     win_rate: {{
       name: '胜率',
-      formula: '盈利配对交易数 / 全部配对交易数',
-      desc: 'FIFO配对中卖出价格高于买入价格的比例。',
+      formula: '净盈利配对交易数 / 全部配对交易数（含双边费用）',
+      desc: 'FIFO配对的往返交易中，扣除佣金与印花税后净盈亏为正的比例。',
       interp: '>60% 优秀，>50% 良好，40-50% 一般。',
       ref: 'Van Tharp (1999).',
       grader(v) {{
@@ -2209,8 +2245,8 @@ details .detail-body {{
     }},
     bm_ret: {{
       name: '{benchmark_name} 收益',
-      formula: '(期末收盘价 / 期初收盘价 − 1) × 100%',
-      desc: '基准指数在相同回测区间的累计涨跌幅。',
+      formula: 'Π(1 + 基准日收益) − 1（回测区间逐日复利）',
+      desc: '基准指数在回测区间的累计涨跌幅，与 Alpha/Beta/超额收益同源同口径。',
       interp: '将策略收益率与基准对比。',
       ref: '{benchmark_name}',
       grader(v) {{ return null; }},
@@ -3015,15 +3051,24 @@ def generate_report_md(result, out_path):
     analytics = analyze_returns(result)
     grade_info = grade_strategy(analytics) if analytics else grade_strategy(None)
 
+    # Unified benchmark caliber: prefer the analytics value (engine-recorded
+    # benchmark series, same source as alpha/beta); only when unavailable,
+    # fall back to a direct fetch for the headline benchmark return line.
     bench_data = {}
-    try:
-        bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
-        if not bench_df.empty and "close" in bench_df.columns:
-            bench_init = bench_df["close"].iloc[0]
-            bench_final = bench_df["close"].iloc[-1]
-            bench_data["return"] = (bench_final - bench_init) / bench_init * 100
-    except Exception:
-        pass
+    _analytics_bench = analytics.get("benchmark_return") if analytics else None
+    if _analytics_bench is not None and np.isfinite(_analytics_bench):
+        bench_data["return"] = float(_analytics_bench) * 100
+        bench_data["source"] = "engine"
+    else:
+        try:
+            bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
+            if not bench_df.empty and "close" in bench_df.columns:
+                bench_init = bench_df["close"].iloc[0]
+                bench_final = bench_df["close"].iloc[-1]
+                bench_data["return"] = (bench_final - bench_init) / bench_init * 100
+                bench_data["source"] = "fetch"
+        except Exception:
+            pass
 
     bench_label = benchmark.replace(".XSHG", "").replace(".XSHE", "")
     lines = []
@@ -3070,17 +3115,27 @@ def generate_report_md(result, out_path):
         lines.append("")
         lines.append("| Metric | Value | Benchmark | Delta |")
         lines.append("|--------|-------|-----------|-------|")
+
+        def _md_pct(value, fmt="{:+.2%}"):
+            return fmt.format(value) if value is not None and np.isfinite(value) else "N/A"
+
+        def _md_num(value, fmt="{:.2f}"):
+            return fmt.format(value) if value is not None and np.isfinite(value) else "N/A"
+
         ann_ret = analytics["annual_return"]
-        bench_ret_pct = bench_data.get("return", 0) / 100
-        lines.append(f"| Annual Return | {ann_ret:+.2%} | {bench_ret_pct:+.2%} | {ann_ret - bench_ret_pct:+.2%} |")
-        lines.append(f"| Annual Volatility | {analytics['annual_volatility']:.2%} | {analytics.get('benchmark_volatility', 0):.2%} | |")
+        bench_ret_pct = bench_data["return"] / 100 if "return" in bench_data else None
+        bench_cell = _md_pct(bench_ret_pct)
+        delta_cell = _md_pct(ann_ret - bench_ret_pct) if bench_ret_pct is not None else "N/A"
+        lines.append(f"| Annual Return | {ann_ret:+.2%} | {bench_cell} | {delta_cell} |")
+        bm_vol_str = _md_pct(analytics.get("benchmark_volatility"), "{:.2%}")
+        lines.append(f"| Annual Volatility | {analytics['annual_volatility']:.2%} | {bm_vol_str} | |")
         lines.append(f"| Sharpe Ratio | {analytics['sharpe_ratio']:.2f} | — | — |")
         lines.append(f"| Sortino Ratio | {analytics['sortino_ratio']:.2f} | — | — |")
         lines.append(f"| Max Drawdown | {analytics['max_drawdown']:.2%} | — | — |")
         lines.append(f"| Calmar Ratio | {analytics['calmar_ratio']:.2f} | — | — |")
-        lines.append(f"| Alpha | {analytics['alpha']:+.2%} | — | — |")
-        lines.append(f"| Beta | {analytics['beta']:.2f} | — | — |")
-        lines.append(f"| Information Ratio | {analytics['information_ratio']:.2f} | — | — |")
+        lines.append(f"| Alpha | {_md_pct(analytics.get('alpha'))} | — | — |")
+        lines.append(f"| Beta | {_md_num(analytics.get('beta'))} | — | — |")
+        lines.append(f"| Information Ratio | {_md_num(analytics.get('information_ratio'))} | — | — |")
         lines.append(f"| Win Rate (trade) | {analytics['win_rate_trade']:.1%} | — | — |")
         plr = analytics.get('profit_loss_ratio', 0)
         plr_str = '∞' if plr == float('inf') else f'{plr:.2f}'
@@ -3203,19 +3258,39 @@ def generate_report_md(result, out_path):
                 lines.append(f"| {k} | {v} |")
         lines.append("")
 
-    # ── Brinson Attribution ─────────────────────────────────────────
+    # ── Brinson Attribution (single-period BHB, mathematically closed) ────
     br = brinson_attribution(result)
     if br:
         lines.append("## Brinson Attribution")
         lines.append("")
+        model = br.get("benchmark_model", "universe_equal_weight")
+        model_label = ("universe equal-weight buy&hold"
+                       if model == "universe_equal_weight" else "caller-supplied series")
+        lines.append(f"*Single-period BHB decomposition; benchmark model: {model_label}. "
+                     "The three effects always sum to the total active return.*")
+        lines.append("")
         lines.append("| Component | Effect |")
         lines.append("|-----------|--------|")
-        for k, v in br.items():
-            if isinstance(v, float):
-                lines.append(f"| {k} | {v:+.2%} |")
-            else:
-                lines.append(f"| {k} | {v} |")
+        lines.append(f"| Allocation effect | {br['allocation_effect']:+.2%} |")
+        lines.append(f"| Selection effect | {br['selection_effect']:+.2%} |")
+        lines.append(f"| Interaction effect | {br['interaction_effect']:+.2%} |")
+        lines.append(f"| **Total active return** | **{br['total_active_return']:+.2%}** |")
+        lines.append(f"| Portfolio return | {br['portfolio_return']:+.2%} |")
+        lines.append(f"| Benchmark return | {br['benchmark_return']:+.2%} |")
         lines.append("")
+        sectors = br.get("sectors") or {}
+        if len(sectors) > 1:
+            lines.append("### Sector Breakdown")
+            lines.append("")
+            lines.append("| Sector | w_p | w_b | r_p | r_b | Allocation | Selection | Interaction |")
+            lines.append("|--------|-----|-----|-----|-----|------------|-----------|-------------|")
+            for sec_name, row in sectors.items():
+                lines.append(
+                    f"| {sec_name} | {row['weight_portfolio']:.1%} | {row['weight_benchmark']:.1%} "
+                    f"| {row['return_portfolio']:+.2%} | {row['return_benchmark']:+.2%} "
+                    f"| {row['allocation']:+.2%} | {row['selection']:+.2%} | {row['interaction']:+.2%} |"
+                )
+            lines.append("")
 
     # ── Data Sources ────────────────────────────────────────────────
     lines.append("## Data Sources")
@@ -3267,15 +3342,21 @@ def generate_report_json(result, out_path, *,
     analytics = analyze_returns(result)
     grade_info = grade_strategy(analytics) if analytics else grade_strategy(None)
 
-    # Benchmark data
+    # Benchmark data — unified caliber: prefer the analytics value (same
+    # engine-recorded benchmark series behind alpha/beta); fall back to a
+    # direct fetch only when analytics has no benchmark.
     bench_return = None
-    try:
-        from eqlib.data import fetch_stock_data
-        bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
-        if not bench_df.empty and "close" in bench_df.columns:
-            bench_return = float(bench_df["close"].iloc[-1] / bench_df["close"].iloc[0] - 1)
-    except Exception:
-        pass
+    _analytics_bench = analytics.get("benchmark_return") if analytics else None
+    if _analytics_bench is not None and np.isfinite(_analytics_bench):
+        bench_return = float(_analytics_bench)
+    else:
+        try:
+            from eqlib.data import fetch_stock_data
+            bench_df = fetch_stock_data(benchmark, ctx.start_date, ctx.end_date)
+            if not bench_df.empty and "close" in bench_df.columns:
+                bench_return = float(bench_df["close"].iloc[-1] / bench_df["close"].iloc[0] - 1)
+        except Exception:
+            pass
 
     # Cumulative return series
     pf_entries = sorted(
@@ -3312,6 +3393,17 @@ def generate_report_json(result, out_path, *,
         value = analytics.get(metric_name, 0) if analytics else 0
         op = target_def["op"]
         threshold = target_def["threshold"]
+        # Benchmark-dependent metrics may be None/NaN when the benchmark is
+        # unavailable — report them as "unknown", never as pass/fail.
+        if isinstance(value, float) and not np.isfinite(value):
+            value = None
+        if value is None:
+            targets.append({
+                "metric": metric_name, "value": None,
+                "target": target_def, "pass": None,
+                "gap": "n/a (unavailable)", "priority": None,
+            })
+            continue
         if op == ">=":
             passed = value >= threshold
             gap = f"{value - threshold:+.4f}" if isinstance(value, (int, float)) else str(value)
@@ -3338,8 +3430,8 @@ def generate_report_json(result, out_path, *,
                 "gap": gap, "priority": None,
             })
 
-    # Sort: failing first by priority, then passing
-    targets.sort(key=lambda t: (t["pass"], t.get("priority") or 999))
+    # Sort: failing first by priority, then unknown, then passing
+    targets.sort(key=lambda t: (t["pass"] is not False, t.get("priority") or 999))
 
     bottleneck = grade_info.get("weakest", "") if not all_pass else None
     action = "complete" if all_pass else "adjust_params"
@@ -3493,9 +3585,18 @@ def generate_report_json(result, out_path, *,
     br = brinson_attribution(result)
     if br:
         report["brinson_attribution"] = {
-            k: (round(v, 4) if isinstance(v, float) and np.isfinite(v) else
+            k: (round(v, 6) if isinstance(v, float) and np.isfinite(v) else
                 None if isinstance(v, float) else v)
             for k, v in br.items()
+            if k != "sectors"
+        }
+        report["brinson_attribution"]["sectors"] = {
+            sec_name: {
+                kk: (round(vv, 6) if isinstance(vv, float) and np.isfinite(vv) else
+                     None if isinstance(vv, float) else vv)
+                for kk, vv in row.items()
+            }
+            for sec_name, row in (br.get("sectors") or {}).items()
         }
 
     # ── Backward-compatible keys for existing callers ─────────────────

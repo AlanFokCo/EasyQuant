@@ -134,6 +134,11 @@ class Order:
 
         # Rejection info
         self.reject_reason = None
+        # Cancellation info: set when the order reaches STATUS_CANCELLED or
+        # STATUS_EXPIRED (e.g. "limit-up", "suspended", "no price data",
+        # "timeout").  Kept separate from reject_reason so existing code
+        # that reads reject_reason is unaffected (GAP-4).
+        self.cancel_reason = None
 
     def can_transition_to(self, new_status: str) -> bool:
         """Check if status transition is valid."""
@@ -141,12 +146,20 @@ class Order:
         return new_status in allowed
 
     def transition_to(self, new_status: str, reason: str = None):
-        """Transition to a new status with validation."""
+        """Transition to a new status with validation.
+
+        ``reason`` is retained on the order for terminal non-fill outcomes:
+        ``reject_reason`` for STATUS_REJECTED and ``cancel_reason`` for
+        STATUS_CANCELLED / STATUS_EXPIRED, so cancelled orders remain
+        programmatically traceable.
+        """
         if not self.can_transition_to(new_status):
             raise ValueError(f"Invalid transition: {self.status} → {new_status}")
         self.status = new_status
         if new_status == self.STATUS_REJECTED:
             self.reject_reason = reason
+        elif new_status in (self.STATUS_CANCELLED, self.STATUS_EXPIRED):
+            self.cancel_reason = reason
         elif new_status == self.STATUS_FILLED:
             self.fill_time = datetime.datetime.now()
 

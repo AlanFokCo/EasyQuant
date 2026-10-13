@@ -3,7 +3,7 @@
 Usage:
     from eqlib.strategies import momentum_rotation_strategy
 
-Or copy the strategy source code directly into Web Strategy Studio.
+Or copy the strategy source code into your own script and adapt it.
 """
 
 from .momentum_rotation import momentum_rotation_strategy

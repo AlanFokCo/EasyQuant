@@ -236,9 +236,13 @@ class TestC2AlphaBetaIntersection:
         result = _calc_alpha_beta(strat, "INVALID_BENCH_CODE_99999", 0.03, 244)
         assert len(result) == 6, "Should return 6-tuple"
         alpha, beta, ir, bench_series, bench_ret, bench_vol = result
-        # Default fallback values
-        assert alpha == 0.0
-        assert beta == 1.0
+        # Benchmark unavailable → explicit NaN (never plausible-looking defaults)
+        assert np.isnan(alpha)
+        assert np.isnan(beta)
+        assert np.isnan(ir)
+        assert bench_series is None
+        assert np.isnan(bench_ret)
+        assert np.isnan(bench_vol)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -369,7 +373,7 @@ class TestC4PriceLimitEnforcement:
 
         Returns the trade_log after the fill attempt.
         """
-        from eqlib._state import BacktestSession, _set_session
+        from eqlib._state import BacktestSession, _set_session, get_session
         from eqlib.engine import _fill_pending_orders, _t1_unlock
         from eqlib.context import Context
 
@@ -392,31 +396,38 @@ class TestC4PriceLimitEnforcement:
         _activate_preloaded(pre)
 
         sess = BacktestSession()
+        previous_session = get_session()
         _set_session(sess)
-        sess._options["check_price_limit"] = check_limit
+        try:
+            sess._options["check_price_limit"] = check_limit
 
-        ctx = Context(fill_day, fill_day, "daily", 1_000_000)
-        sess._context = ctx
-        object.__setattr__(sess, "_preloaded", pre)
+            ctx = Context(fill_day, fill_day, "daily", 1_000_000)
+            sess._context = ctx
+            object.__setattr__(sess, "_preloaded", pre)
 
-        amount = 100 if is_buy else -100
-        if not is_buy:
-            from eqlib.context import Position
-            pos = Position(security)
-            pos.amount = 200
-            pos.closeable_amount = 200
-            ctx.portfolio.positions[security] = pos
-            ctx.portfolio.available_cash = 1_000_000
+            amount = 100 if is_buy else -100
+            if not is_buy:
+                from eqlib.context import Position
+                pos = Position(security)
+                pos.amount = 200
+                pos.closeable_amount = 200
+                ctx.portfolio.positions[security] = pos
+                ctx.portfolio.available_cash = 1_000_000
 
-        sess._pending_orders.append({
-            "security": security,
-            "action": "ORDER",
-            "amount": amount,
-        })
+            sess._pending_orders.append({
+                "security": security,
+                "action": "ORDER",
+                "amount": amount,
+            })
 
-        _t1_unlock(sess)
-        _fill_pending_orders(sess, fill_day)
-        return sess._trade_log
+            _t1_unlock(sess)
+            _fill_pending_orders(sess, fill_day)
+            return sess._trade_log
+        finally:
+            # Restore the previous session: leaking this simulated session
+            # (fixed 2024-01-02 clock) makes later data-layer tests see PIT
+            # truncation that depends on pytest's execution order.
+            _set_session(previous_session)
 
     def test_buy_at_limit_up_is_skipped(self):
         """A buy order when open hits limit-up (10%) must be skipped."""

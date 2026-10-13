@@ -286,7 +286,8 @@ class TestMultiStockKline:
         tmp_path,
         monkeypatch,
     ):
-        """Native benchmark chart and headline must share engine data."""
+        """Benchmark headline must follow the analytics (engine) caliber and
+        the structured engine benchmark series must not be refetched."""
         import eqlib.attribution as attribution
         import eqlib.report as report_mod
 
@@ -359,7 +360,9 @@ class TestMultiStockKline:
             in html
         )
         assert f'{{"time": "{last}", "value": 10.0}}]' in html
-        assert '<div class="mc-val" id="mv-bm_ret">10.00%</div>' in html
+        # Headline follows the analytics caliber (single source of truth for
+        # benchmark metrics); the chart series stays a zero-anchored visual.
+        assert '<div class="mc-val" id="mv-bm_ret">99.00%</div>' in html
 
     def test_compute_symbol_kline_returns_tech_stats(self):
         """_compute_symbol_kline includes tech_stats dict."""

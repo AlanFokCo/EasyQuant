@@ -200,6 +200,9 @@ def test_paper_scheduled_func_fires_once_per_day(session, monkeypatch):
     # different sessions, so restore the real lookup here.
     monkeypatch.setattr(st, "get_session", _REAL_GET_SESSION)
     monkeypatch.setattr(engine, "_paper_is_trading_day", lambda day: True)
+    # The session-hours gate (INFRA-P0-01) would otherwise make this test
+    # depend on the wall-clock time it happens to run at.
+    monkeypatch.setattr(engine, "_paper_market_phase", lambda now: "continuous")
     monkeypatch.setattr(engine, "_fetch_live_prices", lambda cache, securities=None: cache)
     monkeypatch.setattr(engine, "_resolve_live_price", lambda cache, sec, default: 10.0)
 

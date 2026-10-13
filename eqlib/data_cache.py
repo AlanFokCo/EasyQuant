@@ -39,6 +39,7 @@ def _empty_load_stats() -> dict:
         "loaded": 0,
         "failed": [],
         "sources": {"local": 0, "disk_cache": 0, "network": 0},
+        "local_fallback": [],
         "elapsed_seconds": 0.0,
         "memory_mode": None,
         "memory_estimate_mb": None,
@@ -454,6 +455,15 @@ def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd
 
     Returns:
         DataFrame with OHLCV data
+
+    Point-in-time contract: inside a backtest session the disk-hit branch
+    is truncated at the simulated clock (T-1 during decision-time
+    callbacks, matching ``fetch_stock_data``), since the on-disk cache may
+    hold rows beyond the simulated date.  The network-miss branch is
+    already truncated inside ``fetch_stock_data``.  Research mode and
+    paper trading are not truncated.  No engine-internal path calls this
+    function (the preload reads ``_load_from_disk``/``load_stock_local``
+    directly), so no exemption is required.
     """
     from eqlib.data import fetch_stock_data
 
@@ -462,6 +472,12 @@ def fetch_cached(security: str, start_date, end_date, adjust: str = "qfq") -> pd
 
     cached = _load_from_disk(security, start_str, end_str, adjust)
     if cached is not None:
+        # In-session PIT truncation (see docstring) — applied to the
+        # disk-hit branch just before return, mirroring load_stock_local.
+        from eqlib.data import _session_pit_cutoff
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None:
+            cached = cached[cached.index <= cutoff]
         return cached
 
     df = fetch_stock_data(security, start_date, end_date, adjust)
@@ -613,38 +629,60 @@ class PreloadedData:
 
         def _load_one(sec: str) -> tuple:
             if use_local:
-                df = load_stock_local(sec, start_str, end_str, adjust)
+                # Engine preload legitimately needs the full requested
+                # range (warmup + whole backtest window) — exempt it from
+                # the in-session PIT truncation load_stock_local applies
+                # to user-facing reads.
+                from eqlib._state import _unrestricted_fetch
+                with _unrestricted_fetch():
+                    df = load_stock_local(sec, start_str, end_str, adjust)
                 if df is not None:
-                    return (sec, df, "local", None)
+                    return (sec, df, "local", None, False)
                 # Local file missing, try network download first then save to local
+                # GAP-2: make the silent network fallback visible — use_local
+                # promises offline reproducibility, so every per-security
+                # fallback is logged at WARNING level and recorded in
+                # load_stats["local_fallback"] (surfaced via
+                # result["data_diagnostics"]).
+                _log.warning(
+                    "use_local=True but no usable local data for %s "
+                    "(missing or rejected by the coverage gate); falling back "
+                    "to network fetch — run is no longer fully offline",
+                    sec,
+                )
                 from eqlib.data import fetch_stock_data
-                df = fetch_stock_data(sec, start_date, end_date, adjust)
-                if not df.empty:
-                    _save_to_disk(
-                        df,
-                        sec,
-                        adjust,
-                        requested_start=start_str,
-                        requested_end=end_str,
-                    )
-                    save_stock_local(sec, start_date, end_date, adjust)
-                    return (sec, df, "network", None)
-                else:
-                    return (sec, None, None, "local file not found and network fetch failed")
+                from eqlib._state import _unrestricted_fetch
+                with _unrestricted_fetch():
+                    df = fetch_stock_data(sec, start_date, end_date, adjust)
+                    if not df.empty:
+                        _save_to_disk(
+                            df,
+                            sec,
+                            adjust,
+                            requested_start=start_str,
+                            requested_end=end_str,
+                        )
+                        save_stock_local(sec, start_date, end_date, adjust)
+                        return (sec, df, "network", None, True)
+                    else:
+                        return (sec, None, None, "local file not found and network fetch failed", True)
             else:
                 df = _load_from_disk(sec, start_str, end_str, adjust)
                 if df is not None:
-                    return (sec, df, "disk_cache", None)
+                    return (sec, df, "disk_cache", None, False)
                 if _cache_starts_after_request_end(sec, end_str, adjust):
                     return (
                         sec,
                         None,
                         None,
                         "authoritative listing date is after requested end",
+                        False,
                     )
                 # Disk cache miss, try network fetch
                 from eqlib.data import fetch_stock_data
-                df = fetch_stock_data(sec, start_date, end_date, adjust)
+                from eqlib._state import _unrestricted_fetch
+                with _unrestricted_fetch():
+                    df = fetch_stock_data(sec, start_date, end_date, adjust)
                 if not df.empty:
                     _save_to_disk(
                         df,
@@ -653,9 +691,9 @@ class PreloadedData:
                         requested_start=start_str,
                         requested_end=end_str,
                     )
-                    return (sec, df, "network", None)
+                    return (sec, df, "network", None, False)
                 else:
-                    return (sec, None, None, "disk cache miss and network fetch failed")
+                    return (sec, None, None, "disk cache miss and network fetch failed", False)
 
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=min(8, total)
@@ -663,9 +701,10 @@ class PreloadedData:
             future_to_sec = {pool.submit(_load_one, sec): sec for sec in securities}
             done_count = 0
             load_errors = []
+            local_fallbacks = []
             for future in concurrent.futures.as_completed(future_to_sec):
                 try:
-                    sec, df, source, failure_reason = future.result()
+                    sec, df, source, failure_reason, local_missed = future.result()
                 except Exception as e:
                     failed_sec = future_to_sec[future]
                     failure_reason = f"{type(e).__name__}: {e}"
@@ -675,6 +714,8 @@ class PreloadedData:
                     if progress and total > 5:
                         _log.progress(done_count, total, label="Loading data")
                     continue
+                if local_missed:
+                    local_fallbacks.append(sec)
                 if df is not None and not df.empty:
                     if not isinstance(df.index, pd.DatetimeIndex):
                         try:
@@ -692,6 +733,9 @@ class PreloadedData:
                 if progress and total > 5:
                     _log.progress(done_count, total, label="Loading data")
 
+        if local_fallbacks:
+            self.load_stats["local_fallback"] = sorted(local_fallbacks)
+
         if load_errors:
             self.load_stats["failed"] = load_errors
             if progress:
@@ -705,8 +749,10 @@ class PreloadedData:
                 raise RuntimeError(
                     f"No market data available for {missing}. "
                     f"use_local=True but local CSV files not found and network fetch failed. "
-                    f"Either: (1) download data first via download_stock_data(), "
-                    f"(2) set use_local=False, or (3) uncheck 'use_local' in the web console."
+                    f"Either: (1) cache data first via save_stock_local() (which writes "
+                    f"the shares-unit sidecar metadata this loader requires), or "
+                    f"(2) set use_local=False to allow network fetching. "
+                    f"Inspect result['data_diagnostics'] for per-security load details."
                 )
             raise RuntimeError(
                 f"No market data available for {missing}. "
@@ -1216,6 +1262,15 @@ def load_stock_local(security: str, start_date, end_date,
 
     Returns:
         DataFrame filtered by date range, or None if file not found.
+
+    Point-in-time contract: inside a backtest session the result is
+    truncated at the simulated clock (T-1 during decision-time callbacks,
+    matching ``fetch_stock_data``/``get_price``), so a local CSV cannot
+    leak future rows into a running simulation.  The coverage gate below
+    intentionally validates the *requested* range, not the truncated one.
+    Research mode and paper trading are not truncated; engine-internal
+    full-range reads (preload, post-loop benchmark fetch) are exempt via
+    ``eqlib._state._unrestricted_fetch``.
     """
     path = _local_csv_path(security, adjust)
     if not path.exists():
@@ -1228,7 +1283,7 @@ def load_stock_local(security: str, start_date, end_date,
         if meta is None or meta.get("volume_unit") != "shares":
             _log.warning(
                 "load_stock_local: %s lacks shares-unit metadata (legacy lots "
-                "file); ignoring — re-download with download_stock_data()",
+                "file); ignoring — re-save with save_stock_local()",
                 path.name,
             )
             return None
@@ -1259,6 +1314,13 @@ def load_stock_local(security: str, start_date, end_date,
         start_ts = pd.Timestamp(start_date)
         end_ts = pd.Timestamp(end_date)
         df = df[(df.index >= start_ts) & (df.index <= end_ts)]
+
+        # In-session PIT truncation (see docstring) — applied after the
+        # coverage gate and the requested-range filter, just before return.
+        from eqlib.data import _session_pit_cutoff
+        cutoff = _session_pit_cutoff()
+        if cutoff is not None:
+            df = df[df.index <= cutoff]
 
         if df.empty:
             return None

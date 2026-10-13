@@ -2,11 +2,17 @@
 
 Provides:
 - Risk/return metrics (Sharpe, Sortino, max drawdown, Calmar, alpha, beta)
-- Trade-level win rate (matched round-trip buy/sell pairs)
+- Trade-level win rate (matched round-trip buy/sell pairs, net of fees)
 - Turnover and total commission cost metrics
-- Brinson attribution (allocation, selection, interaction effects)
-  with optional real benchmark_returns Series
+- Single-period Brinson-Hood-Beebower attribution (allocation, selection,
+  interaction effects) over the backtest window; mathematically closed:
+  the three effects always sum to the total active return
 - Fama-French factor analysis
+
+Benchmark-dependent metrics (alpha, beta, information_ratio, excess_return,
+benchmark_return, benchmark_volatility) are ``float("nan")`` when benchmark
+data is unavailable, so an offline/failed benchmark fetch can never be
+mistaken for a real computed value.
 """
 
 import datetime
@@ -29,7 +35,9 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
             sortino_ratio, max_drawdown, calmar_ratio, alpha, beta,
             information_ratio,
             win_rate_daily: daily win rate (fraction of profitable days),
-            win_rate_trade: round-trip trade win rate (matched buy/sell pairs),
+            win_rate_trade: round-trip trade win rate (FIFO-matched buy/sell
+                pairs, net of commissions, taxes and slippage — a round trip
+                only counts as a win when its cash-flow P&L is positive),
             trade_count: number of completed round-trip trades,
             win_count, loss_count: separate win/loss trade counts,
             profit_loss_ratio: avg winning trade P&L / avg losing trade P&L,
@@ -44,6 +52,13 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
             excess_return_sharpe: Sharpe ratio of daily excess returns,
             daily_excess_return: annualized mean daily excess return,
             benchmark_volatility: annualized benchmark volatility.
+
+    Benchmark-dependent fields (alpha, beta, information_ratio, excess_return,
+    benchmark_return, excess_return_max_drawdown, excess_return_sharpe,
+    daily_excess_return, benchmark_volatility) are NaN when benchmark data
+    cannot be obtained.  Benchmark prices are taken from
+    ``result["benchmark_values"]`` (recorded by the engine) when present;
+    otherwise a fresh ``fetch_stock_data`` call is attempted.
     """
     ctx = result["context"]
     trades = result["trade_log"]
@@ -159,23 +174,28 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     # reduced cash by commissions in the engine — do not subtract fees again.
     net_return = total_return
 
-    # Benchmark comparison
+    # Benchmark comparison.  Prefer the engine-recorded benchmark price series
+    # (result["benchmark_values"]) so that alpha/beta/IR share the exact same
+    # benchmark data the backtest ran with and no extra network fetch is made;
+    # fall back to a fresh fetch only when the engine recorded nothing.
     benchmark_name = result.get("benchmark", "000300.XSHG")
+    bench_prices = _benchmark_prices_from_result(result)
     alpha, beta, info_ratio, bench_daily_ret, bench_total_ret, bench_ann_vol = _calc_alpha_beta(
-        daily_ret, benchmark_name, risk_free_rate, ann_factor
+        daily_ret, benchmark_name, risk_free_rate, ann_factor,
+        benchmark_prices=bench_prices,
     )
 
-    # Excess return metrics
+    # Excess return metrics — NaN when the benchmark series is unavailable so
+    # that "no data" can never be mistaken for a real computed number.
     if bench_daily_ret is not None:
         excess_total, excess_max_dd, excess_sharpe, daily_excess_ret = _calc_excess_metrics(
             daily_ret, bench_daily_ret, risk_free_rate, ann_factor
         )
     else:
-        excess_total = total_return - bench_total_ret if bench_total_ret is not None else 0.0
-        excess_max_dd = 0.0
-        excess_sharpe = 0.0
-        daily_excess_ret = 0.0
-        bench_total_ret = 0.0
+        excess_total = float("nan")
+        excess_max_dd = float("nan")
+        excess_sharpe = float("nan")
+        daily_excess_ret = float("nan")
 
     # ── Monthly returns ─────────────────────────────────────────────
     monthly_returns = {}
@@ -220,38 +240,11 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
         ],
     }
 
-    # ── Per-stock P&L ───────────────────────────────────────────────
-    from collections import deque as _deque
-    _buy_q = {}
+    # ── Per-stock P&L (net of fees, same FIFO caliber as the engine cash) ──
     per_stock_pnl = {}
-    for trade in trades:
-        sec = trade["security"]
-        t_type = trade.get("type")
-        if t_type not in ("BUY", "SELL"):
-            continue
-        price = trade["price"]
-        amount = trade["amount"]
-        if t_type == "BUY":
-            _buy_q.setdefault(sec, _deque()).append((price, amount))
-        elif t_type == "SELL":
-            remaining = amount
-            q = _buy_q.get(sec, _deque())
-            total_cost = 0.0
-            total_matched = 0
-            while remaining > 0 and q:
-                bp, ba = q[0]
-                matched = min(ba, remaining)
-                total_cost += bp * matched
-                total_matched += matched
-                remaining -= matched
-                if matched == ba:
-                    q.popleft()
-                else:
-                    q[0] = (bp, ba - matched)
-            if total_matched > 0:
-                avg_buy = total_cost / total_matched
-                pnl = (price - avg_buy) * total_matched
-                per_stock_pnl[sec] = per_stock_pnl.get(sec, 0.0) + pnl
+    for rt in _match_round_trips(trades):
+        sec = rt["security"]
+        per_stock_pnl[sec] = per_stock_pnl.get(sec, 0.0) + rt["pnl"]
 
     # ── Top 5 drawdown periods ──────────────────────────────────────
     _peak = values.cummax()
@@ -338,22 +331,24 @@ def analyze_returns(result, risk_free_rate=RISK_FREE_RATE, trading_days=TRADING_
     }
 
 
-def _calc_trade_win_rate(trades):
-    """Compute win rate by completed round-trip buy/sell pairs (item 12).
+def _match_round_trips(trades):
+    """FIFO-match SELL fills against BUY lots, net of all transaction costs.
 
-    Uses FIFO matching: each sell is matched against the oldest outstanding
-    buy lot for that security.  A completed round trip is a "win" when the
-    sell price exceeds the average buy cost of the matched shares.
+    Each matched round trip uses the same cash-flow caliber as the engine:
+    the buy side costs ``price * amount + commission`` and the sell side
+    yields ``price * amount - commission`` (the engine's ``commission`` field
+    already bundles commissions, stamp duty and any transfer fees; slippage
+    is embedded in the executed price).  Fees of partially matched fills are
+    amortized pro-rata over the matched shares.
 
     Returns:
-        tuple: (win_rate, completed_trade_count, win_count, loss_count)
+        list of dicts with keys: security, amount (matched shares), pnl
+        (net profit in yuan), buy_cost, sell_proceeds.
     """
     from collections import deque
 
-    buy_queues: dict = {}    # security -> deque of (price, amount) lots
-    wins = 0
-    losses = 0
-    total = 0
+    buy_queues: dict = {}    # security -> deque of (price, amount, commission)
+    round_trips = []
 
     for trade in trades:
         sec = trade["security"]
@@ -362,35 +357,60 @@ def _calc_trade_win_rate(trades):
             continue
         price = trade["price"]
         amount = trade["amount"]
+        commission = trade.get("commission", 0.0) or 0.0
 
         if t_type == "BUY":
-            buy_queues.setdefault(sec, deque()).append((price, amount))
+            buy_queues.setdefault(sec, deque()).append((price, amount, commission))
 
         elif t_type == "SELL":
             remaining = amount
             q = buy_queues.get(sec, deque())
-            total_buy_cost = 0.0
+            matched_cost = 0.0
             total_matched = 0
 
             while remaining > 0 and q:
-                buy_price, buy_amt = q[0]
+                buy_price, buy_amt, buy_comm = q[0]
                 matched = min(buy_amt, remaining)
-                total_buy_cost += buy_price * matched
+                matched_cost += buy_price * matched
+                if buy_amt > 0 and buy_comm:
+                    matched_cost += buy_comm * (matched / buy_amt)
                 total_matched += matched
                 remaining -= matched
                 if matched == buy_amt:
                     q.popleft()
                 else:
-                    q[0] = (buy_price, buy_amt - matched)
+                    q[0] = (buy_price, buy_amt - matched,
+                            buy_comm * (1 - matched / buy_amt) if buy_amt > 0 else 0.0)
 
             if total_matched > 0:
-                avg_buy = total_buy_cost / total_matched
-                total += 1
-                if price > avg_buy:
-                    wins += 1
-                else:
-                    losses += 1
+                sell_comm = commission * (total_matched / amount) if amount > 0 else 0.0
+                proceeds = price * total_matched - sell_comm
+                round_trips.append({
+                    "security": sec,
+                    "amount": total_matched,
+                    "pnl": proceeds - matched_cost,
+                    "buy_cost": matched_cost,
+                    "sell_proceeds": proceeds,
+                })
 
+    return round_trips
+
+
+def _calc_trade_win_rate(trades):
+    """Compute win rate by completed round-trip buy/sell pairs (item 12).
+
+    Uses FIFO matching: each sell is matched against the oldest outstanding
+    buy lot for that security.  A completed round trip is a "win" only when
+    its net P&L — after both buy-side and sell-side commissions/taxes — is
+    positive, matching the engine's cash accounting exactly.
+
+    Returns:
+        tuple: (win_rate, completed_trade_count, win_count, loss_count)
+    """
+    round_trips = _match_round_trips(trades)
+    wins = sum(1 for rt in round_trips if rt["pnl"] > 0)
+    total = len(round_trips)
+    losses = total - wins
     win_rate = wins / total if total > 0 else 0.0
     return win_rate, total, wins, losses
 
@@ -398,55 +418,17 @@ def _calc_trade_win_rate(trades):
 def _calc_profit_loss_ratio(trades):
     """Compute avg win / avg loss from FIFO-matched trade pairs.
 
-    For each completed round-trip, compute the total P&L in yuan
-    (sell_proceeds - buy_cost).  Then separate wins and losses,
-    compute their averages, and return the ratio.
+    For each completed round-trip, compute the total P&L in yuan net of all
+    transaction costs (sell_proceeds - buy_cost, fees included).  Then
+    separate wins and losses, compute their averages, and return the ratio.
 
     Returns:
         tuple: (profit_loss_ratio, win_count, loss_count)
                profit_loss_ratio = avg_win / abs(avg_loss), or 0.0 if no losses.
     """
-    from collections import deque
-
-    buy_queues: dict = {}
-    win_pnls = []
-    loss_pnls = []
-
-    for trade in trades:
-        sec = trade["security"]
-        t_type = trade.get("type")
-        if t_type not in ("BUY", "SELL"):
-            continue
-        price = trade["price"]
-        amount = trade["amount"]
-
-        if t_type == "BUY":
-            buy_queues.setdefault(sec, deque()).append((price, amount))
-
-        elif t_type == "SELL":
-            remaining = amount
-            q = buy_queues.get(sec, deque())
-            total_buy_cost = 0.0
-            total_matched = 0
-
-            while remaining > 0 and q:
-                buy_price, buy_amt = q[0]
-                matched = min(buy_amt, remaining)
-                total_buy_cost += buy_price * matched
-                total_matched += matched
-                remaining -= matched
-                if matched == buy_amt:
-                    q.popleft()
-                else:
-                    q[0] = (buy_price, buy_amt - matched)
-
-            if total_matched > 0:
-                avg_buy = total_buy_cost / total_matched
-                pnl = (price - avg_buy) * total_matched
-                if pnl > 0:
-                    win_pnls.append(pnl)
-                else:
-                    loss_pnls.append(pnl)
+    round_trips = _match_round_trips(trades)
+    win_pnls = [rt["pnl"] for rt in round_trips if rt["pnl"] > 0]
+    loss_pnls = [rt["pnl"] for rt in round_trips if rt["pnl"] <= 0]
 
     win_count = len(win_pnls)
     loss_count = len(loss_pnls)
@@ -487,46 +469,104 @@ def _calc_excess_metrics(strategy_daily_ret, benchmark_daily_ret, risk_free_rate
     return excess_total, float(excess_dd), excess_sharpe, excess_daily_mean
 
 
-def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
+def _benchmark_prices_from_result(result):
+    """Build a benchmark close-price Series from ``result["benchmark_values"]``.
+
+    The engine records benchmark_values as ``[{"date": ..., "value": close}]``
+    at the end of each backtest.  Returns a sorted, de-duplicated pd.Series of
+    float closes indexed by Timestamp, or None when unavailable/insufficient.
+    """
+    raw_values = result.get("benchmark_values")
+    if not isinstance(raw_values, list) or not raw_values:
+        return None
+    rows = []
+    for item in raw_values:
+        if not isinstance(item, dict):
+            continue
+        try:
+            date = pd.Timestamp(item.get("date"))
+            value = float(item.get("value"))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if pd.isna(date) or not np.isfinite(value) or value <= 0:
+            continue
+        rows.append((date, value))
+    if len(rows) < 2:
+        return None
+    series = pd.Series(
+        [value for _date, value in rows],
+        index=pd.DatetimeIndex([date for date, _value in rows]),
+    )
+    return series[~series.index.duplicated(keep="last")].sort_index()
+
+
+def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor,
+                     benchmark_prices=None):
     """Calculate alpha, beta, information ratio vs benchmark, plus benchmark series.
 
-    Requires at least 10 overlapping trading days between the strategy and the
-    benchmark return series.  When fewer data points are available this function
-    returns ``(0.0, 1.0, 0.0, None, 0.0, 0.0)`` as safe defaults.
+    Args:
+        strategy_returns: pd.Series of strategy daily returns.
+        benchmark_code: e.g. "000300.XSHG" — only used for the fallback fetch.
+        rf_rate: annual risk-free rate.
+        ann_factor: trading days per year.
+        benchmark_prices: optional pd.Series of benchmark close prices indexed
+            by date (typically from ``result["benchmark_values"]``).  When
+            given, no network fetch is attempted.
+
+    Alpha/beta/information ratio require at least 10 overlapping trading days.
+    When benchmark data is unavailable or the overlap is insufficient, the
+    affected statistics are returned as NaN (never as plausible-looking
+    defaults such as alpha=0.0/beta=1.0) so callers can render them as "N/A".
 
     Returns:
         tuple: (alpha_annual, beta, info_ratio, benchmark_daily_ret,
                 benchmark_total_return, benchmark_annual_volatility)
+        Unavailable scalar fields are NaN; an unavailable daily series is None.
     """
-    default = (0.0, 1.0, 0.0, None, 0.0, 0.0)
+    nan = float("nan")
+    default = (nan, nan, nan, None, nan, nan)
     try:
-        from eqlib.data import fetch_stock_data
+        if benchmark_prices is not None and len(benchmark_prices) >= 2:
+            bench_close = benchmark_prices
+        else:
+            from eqlib.data import fetch_stock_data
 
-        start = strategy_returns.index[0] - datetime.timedelta(days=30)
-        end = strategy_returns.index[-1]
+            start = strategy_returns.index[0] - datetime.timedelta(days=30)
+            end = strategy_returns.index[-1]
 
-        bench_df = fetch_stock_data(benchmark_code, start, end)
-        if bench_df.empty or "close" not in bench_df.columns:
-            return default
+            bench_df = fetch_stock_data(benchmark_code, start, end)
+            if bench_df.empty or "close" not in bench_df.columns:
+                return default
+            bench_close = bench_df["close"]
 
-        bench_ret = bench_df["close"].pct_change().dropna()
+        bench_ret = bench_close.pct_change().dropna()
 
         # Use the intersection of dates — fillna(0) would treat missing days
         # as "benchmark returned 0%" which biases beta low and alpha high.
         common = strategy_returns.index.intersection(bench_ret.index)
-        strat = strategy_returns.loc[common].values
-        bench = bench_ret.loc[common].values
-
-        if len(strat) < 10:
+        if len(common) < 2:
             return default
+
+        # Benchmark series statistics are meaningful with any >= 2 points.
+        bench_daily_ret = pd.Series(bench_ret.loc[common].values, index=common)
+        bench_total_ret = float((1 + bench_daily_ret).prod() - 1)
+        bench_std = bench_daily_ret.std()
+        bench_ann_vol = (float(bench_std * np.sqrt(ann_factor))
+                         if pd.notna(bench_std) else nan)
+
+        if len(common) < 10:
+            return nan, nan, nan, bench_daily_ret, bench_total_ret, bench_ann_vol
+
+        strat = strategy_returns.loc[common].values
+        bench = bench_daily_ret.values
 
         cov_matrix = np.cov(strat, bench, ddof=1)
         # Handle NaN in covariance matrix (can occur with NaN inputs)
         if not np.isfinite(cov_matrix).all():
-            return default
+            return nan, nan, nan, bench_daily_ret, bench_total_ret, bench_ann_vol
         bench_var = cov_matrix[1, 1]
         if bench_var < 1e-15:
-            return default
+            return nan, nan, nan, bench_daily_ret, bench_total_ret, bench_ann_vol
 
         beta = cov_matrix[0, 1] / bench_var
         # D1: Include risk-free rate in CAPM alpha computation
@@ -540,29 +580,57 @@ def _calc_alpha_beta(strategy_returns, benchmark_code, rf_rate, ann_factor):
         info_ratio = (active_mean / active_std * np.sqrt(ann_factor)
                       if active_std > 0 else 0.0)
 
-        # Benchmark total and annualized volatility
-        bench_daily_ret = pd.Series(bench, index=common)
-        bench_total_ret = float((1 + bench_daily_ret).prod() - 1)
-        bench_ann_vol = float(bench_daily_ret.std() * np.sqrt(ann_factor))
-
         return alpha_annual, beta, info_ratio, bench_daily_ret, bench_total_ret, bench_ann_vol
     except Exception:
         return default
 
 
 def brinson_attribution(result, sector_data=None, benchmark_returns=None):
-    """Brinson attribution: allocation + selection + interaction effects.
+    """Single-period Brinson-Hood-Beebower attribution over the backtest window.
+
+    Decomposes the total active return (portfolio return minus benchmark
+    return) into the three classic BHB effects at the sector level:
+
+        allocation  = Σ_i (w_p_i − w_b_i) · r_b_i
+        selection   = Σ_i w_b_i · (r_p_i − r_b_i)
+        interaction = Σ_i (w_p_i − w_b_i) · (r_p_i − r_b_i)
+
+    The decomposition is mathematically closed by construction:
+    allocation + selection + interaction == portfolio_return − benchmark_return.
 
     Parameters:
         result: dict returned by run_backtest
-        sector_data: dict mapping security -> sector (optional)
-        benchmark_returns: optional pd.Series with benchmark daily returns
-            indexed by date, used for realistic benchmark comparison.
-            When None, falls back to an equal-weight universe approximation.
+        sector_data: dict mapping security -> sector name.  Genuinely drives
+            the grouping; securities missing from the mapping fall into
+            "Unclassified".  When None, every security sits in a single
+            sector, so allocation and interaction are identically zero and
+            the whole active return is reported as selection — that is the
+            correct BHB statement when no sector structure is known.
+        benchmark_returns: optional pd.Series of benchmark daily returns
+            indexed by date.  When given, the benchmark is this scalar total
+            return applied uniformly across sectors (benchmark sector weights
+            still come from the universe composition); without per-sector
+            benchmark returns the allocation effect is zero by construction.
+            When None, the benchmark is the equal-weight buy-and-hold return
+            of the backtest universe per sector.
+
+    Portfolio-side notes: per-security holding-period returns come from the
+    trade log (realized cash flows, net of fees) plus the terminal market
+    value of open positions; sector weights use cumulative buy-cost shares —
+    a documented approximation, since the result dict carries no daily
+    position weights.
+
+    Benchmark-side notes: per-constituent buy-and-hold returns prefer the
+    engine-exported OHLCV panel (result["ohlcv_data"], first→last close of
+    the same qfq series the engine traded on); constituents without data
+    contribute a 0.0 return.
 
     Returns:
         dict with allocation_effect, selection_effect, interaction_effect,
-        total_active_return; or None if no trades or positions exist.
+        total_active_return, portfolio_return, benchmark_return,
+        benchmark_model ("universe_equal_weight" or "scalar_series") and a
+        per-sector breakdown under "sectors"; or None if no trades or
+        positions exist.
     """
     ctx = result["context"]
     trade_log = result.get("trade_log", [])
@@ -575,7 +643,7 @@ def brinson_attribution(result, sector_data=None, benchmark_returns=None):
     if total_value <= 0:
         return None
 
-    # Compute per-security returns from trade log + final open positions
+    # ── Portfolio side: per-security holding-period returns ──────────────
     buy_cost_by_sec: dict = {}
     sell_proceeds_by_sec: dict = {}
     for trade in trade_log:
@@ -614,39 +682,102 @@ def brinson_attribution(result, sector_data=None, benchmark_returns=None):
             for sec, pos in positions.items()
         }
 
-    # ── Benchmark return (item 14) ────────────────────────────────────────
-    # Use caller-supplied benchmark_returns if available, otherwise fall back
-    # to the equal-weight universe approximation.
+    # ── Sectors ───────────────────────────────────────────────────────────
+    universe = list(ctx.universe or sorted(all_secs))
+    sector_of = {}
+    for sec in set(universe) | all_secs:
+        sector = sector_data.get(sec) if sector_data else None
+        sector_of[sec] = str(sector) if sector else "Unclassified"
+    sectors = sorted(set(sector_of.values()))
+
+    # ── Benchmark side ────────────────────────────────────────────────────
+    ohlcv_data = result.get("ohlcv_data") or {}
     if benchmark_returns is not None and isinstance(benchmark_returns, pd.Series):
-        bench_return = float((1 + benchmark_returns).prod() - 1)
-        bench_weight = 1.0 / len(all_secs) if all_secs else 0.0
+        bench_model = "scalar_series"
+        bench_total = float((1 + benchmark_returns).prod() - 1)
+        # Scalar benchmark: every sector shares the same benchmark return.
+        bench_sec_return = {sec: bench_total for sec in universe}
     else:
-        universe = ctx.universe or sorted(all_secs)
-        bench_weight = 1.0 / len(universe) if universe else 0.0
-        bench_return = (
-            sum(sec_returns.get(s, 0.0) for s in universe) / len(universe)
-            if universe else 0.0
+        bench_model = "universe_equal_weight"
+        bench_sec_return = {}
+        for sec in universe:
+            df = ohlcv_data.get(sec)
+            ret = None
+            if df is not None and hasattr(df, "empty") and not df.empty and "close" in df.columns:
+                closes = df["close"].dropna()
+                closes = closes[closes > 0]
+                if len(closes) >= 2:
+                    ret = float(closes.iloc[-1] / closes.iloc[0] - 1.0)
+            if ret is None:
+                # Constituent without price data: fall back to its traded
+                # return when available, else 0.0 (documented limitation).
+                ret = sec_returns.get(sec, 0.0)
+            bench_sec_return[sec] = ret
+        bench_total = (
+            sum(bench_sec_return.values()) / len(bench_sec_return)
+            if bench_sec_return else 0.0
         )
 
+    # Sector benchmark weights: equal-weight universe composition.
+    n_universe = len(universe)
+    w_b = {s: 0.0 for s in sectors}
+    if n_universe > 0:
+        for sec in universe:
+            w_b[sector_of[sec]] += 1.0 / n_universe
+
+    # Sector portfolio weights and returns (cost-weighted aggregates).
+    w_p = {s: 0.0 for s in sectors}
+    for sec, w in weights.items():
+        w_p[sector_of[sec]] = w_p.get(sector_of[sec], 0.0) + w
+
+    r_b = {}
+    for s in sectors:
+        members = [sec for sec in universe if sector_of[sec] == s]
+        r_b[s] = (sum(bench_sec_return.get(sec, 0.0) for sec in members) / len(members)
+                  if members else 0.0)
+
+    r_p = {}
+    for s in sectors:
+        members = [sec for sec in weights if sector_of.get(sec) == s]
+        w_sum = sum(weights[sec] for sec in members)
+        r_p[s] = (sum(weights[sec] * sec_returns.get(sec, 0.0) for sec in members) / w_sum
+                  if w_sum > 0 else 0.0)
+
+    # ── BHB effects (closed by construction) ──────────────────────────────
+    sector_rows = {}
     allocation = 0.0
     selection = 0.0
     interaction = 0.0
+    for s in sectors:
+        a = (w_p.get(s, 0.0) - w_b.get(s, 0.0)) * r_b[s]
+        sel = w_b.get(s, 0.0) * (r_p.get(s, 0.0) - r_b[s])
+        inter = (w_p.get(s, 0.0) - w_b.get(s, 0.0)) * (r_p.get(s, 0.0) - r_b[s])
+        allocation += a
+        selection += sel
+        interaction += inter
+        sector_rows[s] = {
+            "weight_portfolio": w_p.get(s, 0.0),
+            "weight_benchmark": w_b.get(s, 0.0),
+            "return_portfolio": r_p.get(s, 0.0),
+            "return_benchmark": r_b[s],
+            "allocation": a,
+            "selection": sel,
+            "interaction": inter,
+        }
 
-    universe_set = set(ctx.universe or all_secs)
-    for sec in all_secs:
-        w = weights.get(sec, 0.0)
-        wb = bench_weight if sec in universe_set else 0.0
-        r_sec = sec_returns.get(sec, 0.0)
-
-        allocation += (w - wb) * bench_return
-        selection += wb * (r_sec - bench_return)
-        interaction += (w - wb) * (r_sec - bench_return)
+    portfolio_return = sum(w_p[s] * r_p.get(s, 0.0) for s in sectors)
+    benchmark_return = sum(w_b[s] * r_b[s] for s in sectors)
+    total_active = portfolio_return - benchmark_return
 
     return {
         "allocation_effect": allocation,
         "selection_effect": selection,
         "interaction_effect": interaction,
-        "total_active_return": allocation + selection + interaction,
+        "total_active_return": total_active,
+        "portfolio_return": portfolio_return,
+        "benchmark_return": benchmark_return,
+        "benchmark_model": bench_model,
+        "sectors": sector_rows,
     }
 
 
@@ -773,6 +904,15 @@ def fama_french_analysis(result, factors=None):
     return simple_factor_analysis(result, factors=factors)
 
 
+def _finite_or(value, default=0.0):
+    """Return float(value) when it is finite, else default (None/NaN/inf-safe)."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    return v if np.isfinite(v) else default
+
+
 def grade_strategy(analytics) -> dict:
     """Compute 6-dimension scores, overall grade, and summary text.
 
@@ -789,8 +929,10 @@ def grade_strategy(analytics) -> dict:
     dims = []
 
     # --- Return Capability (weight 0.20) ---
-    ann_ret = analytics.get("annual_return", 0)
-    alpha = analytics.get("alpha", 0)
+    ann_ret = _finite_or(analytics.get("annual_return", 0))
+    # Benchmark-dependent metrics may be NaN (benchmark unavailable); they
+    # contribute zero bonus rather than crashing or faking a real value.
+    alpha = _finite_or(analytics.get("alpha", 0))
     ret_score = max(0, min(100, ann_ret / 0.25 * 100))
     alpha_bonus = max(0, min(15, alpha / 0.01 * 5))
     ret_score = min(100, ret_score + alpha_bonus)
@@ -834,9 +976,9 @@ def grade_strategy(analytics) -> dict:
                          "trade_count": trade_count}})
 
     # --- Excess Capability (weight 0.15) ---
-    excess_ret = analytics.get("excess_return", 0)
-    info_ratio = analytics.get("information_ratio", 0)
-    bench_ret = analytics.get("benchmark_return", 0)
+    excess_ret = _finite_or(analytics.get("excess_return", 0))
+    info_ratio = _finite_or(analytics.get("information_ratio", 0))
+    bench_ret = _finite_or(analytics.get("benchmark_return", 0))
     bench_ref = abs(bench_ret) if abs(bench_ret) > 0.01 else 0.05
     excess_score = max(0, min(100, excess_ret / (bench_ref * 2.0) * 100))
     ir_bonus = max(0, min(10, info_ratio / 0.5 * 5))
@@ -890,25 +1032,32 @@ def grade_strategy(analytics) -> dict:
 
 def _build_summary_text(analytics, grade, score, dims, weakest):
     """Generate one-sentence strategy summary based on grade and metrics."""
-    ann_ret = analytics.get("annual_return", 0)
-    max_dd = analytics.get("max_drawdown", 0)
-    sharpe = analytics.get("sharpe_ratio", 0)
-    bench_ret = analytics.get("benchmark_return", 0)
-    excess = analytics.get("excess_return", 0)
+    ann_ret = _finite_or(analytics.get("annual_return", 0))
+    max_dd = _finite_or(analytics.get("max_drawdown", 0))
+    sharpe = _finite_or(analytics.get("sharpe_ratio", 0))
+    bench_raw = analytics.get("benchmark_return")
+    excess_raw = analytics.get("excess_return")
+    bench_known = (bench_raw is not None and np.isfinite(bench_raw)
+                   and excess_raw is not None and np.isfinite(excess_raw))
+    bench_ret = _finite_or(bench_raw)
+    excess = _finite_or(excess_raw)
 
     if grade in ("S", "A"):
         prefix = "策略表现优异" if grade == "S" else "策略表现良好"
         body = (f"年化 {ann_ret:+.1%}，最大回撤 {max_dd:.1%}，"
                 f"Sharpe {sharpe:.2f} 体现出色的风险调整收益")
-        if excess > 0:
+        if bench_known and excess > 0:
             body += f"，超额收益 {excess:+.1%} 跑赢基准"
         return f"{prefix}：{body}。"
     elif grade == "B":
         return (f"策略表现中等：年化 {ann_ret:+.1%}，但回撤 {max_dd:.1%} 偏大。"
                 f"Sharpe {sharpe:.2f}，建议关注{weakest['name']}维度。")
     else:
-        beat = "跑赢" if excess > 0 else "未能跑赢"
-        return (f"策略表现欠佳：年化 {ann_ret:+.1%} {beat}基准 ({bench_ret:+.1%})，"
+        if bench_known:
+            beat = "跑赢" if excess > 0 else "未能跑赢"
+            return (f"策略表现欠佳：年化 {ann_ret:+.1%} {beat}基准 ({bench_ret:+.1%})，"
+                    f"最大回撤 {max_dd:.1%}。优先改善{weakest['name']}维度。")
+        return (f"策略表现欠佳：年化 {ann_ret:+.1%}（基准数据不可用），"
                 f"最大回撤 {max_dd:.1%}。优先改善{weakest['name']}维度。")
 
 
@@ -999,9 +1148,10 @@ def diagnose_bottleneck(analytics, grade_info) -> list:
             },
         })
 
-    # Alpha check
-    alpha_val = analytics.get("alpha", 0)
-    if alpha_val < 0:
+    # Alpha check — skipped when benchmark data was unavailable (NaN alpha)
+    alpha_raw = analytics.get("alpha", 0)
+    alpha_val = _finite_or(alpha_raw, default=float("nan"))
+    if np.isfinite(alpha_val) and alpha_val < 0:
         diagnostics.append({
             "metric": "alpha",
             "severity": "warning",
@@ -1009,8 +1159,8 @@ def diagnose_bottleneck(analytics, grade_info) -> list:
             "root_cause": "入场信号或持仓周期需优化，当前策略相对基准无信息优势",
             "affected_period": "full period",
             "related_metrics": {
-                "beta": round(analytics.get("beta", 0), 3),
-                "excess_return": round(analytics.get("excess_return", 0), 4),
+                "beta": round(_finite_or(analytics.get("beta", 0)), 3),
+                "excess_return": round(_finite_or(analytics.get("excess_return", 0)), 4),
             },
         })
 

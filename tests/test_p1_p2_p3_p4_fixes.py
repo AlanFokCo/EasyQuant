@@ -3,7 +3,7 @@
 Coverage:
 - H3: simple_factor_analysis rename + deprecated fama_french_analysis alias
 - H5: attribute_history fq validation in backtest mode
-- H7: _get_trading_days prefers sina calendar
+- H7: _get_trading_days uses the exchange calendar (never the data union)
 - M3: Thread-safe data._cache
 - M7: walk_forward framework
 - M8: StrategyConfig.use_local field
@@ -378,42 +378,69 @@ class TestE7ApiStabilityMarkers:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# H7: _get_trading_days uses sina calendar
+# H7: _get_trading_days uses the exchange calendar (never the data union)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestH7TradingDays:
-    """H7: _get_trading_days should prefer sina calendar over stock history."""
+    """The trading calendar is exchange-authoritative (INFRA-P1-01).
 
-    def test_preloaded_dates_take_priority(self):
-        """When preloaded._dates is available, skip all network calls."""
+    Universe data coverage must NOT define the calendar: suspension days stay
+    in the schedule and a delisted series cannot truncate the run.
+    """
+
+    def test_data_gap_does_not_remove_exchange_day(self):
+        """A missing bar day stays in the calendar (bundled calendar path)."""
         import pandas as pd
         from eqlib.engine import _get_trading_days
 
         preloaded = MagicMock()
-        preloaded._dates = pd.date_range("2024-01-01", "2024-03-31", freq="B").tolist()
+        # 2024-01-04 (Thursday, a real trading day) is missing from the data.
+        preloaded._dates = pd.DatetimeIndex(
+            ["2024-01-02", "2024-01-03", "2024-01-05"]
+        )
 
-        start = date(2024, 1, 2)
-        end = date(2024, 1, 31)
+        result = _get_trading_days(date(2024, 1, 2), date(2024, 1, 31),
+                                   preloaded=preloaded)
 
-        # Should not call akshare at all
-        with patch("akshare.tool_trade_date_hist_sina") as mock_sina, \
-             patch("akshare.stock_zh_a_hist") as mock_stock:
-            result = _get_trading_days(start, end, preloaded=preloaded)
-            mock_sina.assert_not_called()
-            mock_stock.assert_not_called()
+        assert date(2024, 1, 4) in result
+        assert all(date(2024, 1, 2) <= d <= date(2024, 1, 31) for d in result)
 
-        assert len(result) > 0
-        assert all(start <= d <= end for d in result)
+    def test_bundled_calendar_excludes_lunar_new_year_eve_2024(self):
+        """2024-02-09 (Lunar New Year's Eve, Friday) is not a trading day."""
+        from eqlib.engine import _get_trading_days
 
-    def test_falls_back_to_sina_when_no_preloaded(self):
-        """Without preloaded data, should attempt sina calendar."""
+        result = _get_trading_days(date(2024, 2, 1), date(2024, 2, 20))
+
+        assert date(2024, 2, 9) not in result
+        assert date(2024, 2, 8) in result
+        assert date(2024, 2, 19) in result
+
+    def test_sina_used_outside_bundled_coverage(self):
+        """Ranges beyond the bundled calendar (2020–2026) fall back to sina."""
         import pandas as pd
         from eqlib.engine import _get_trading_days
 
-        mock_df = pd.DataFrame({"trade_date": pd.date_range("2024-01-02", "2024-01-31", freq="B")})
+        mock_df = pd.DataFrame(
+            {"trade_date": pd.date_range("2030-01-02", periods=3, freq="B")}
+        )
 
-        with patch("akshare.tool_trade_date_hist_sina", return_value=mock_df) as mock_sina:
-            result = _get_trading_days(date(2024, 1, 2), date(2024, 1, 31), preloaded=None)
+        with patch("akshare.tool_trade_date_hist_sina",
+                   return_value=mock_df) as mock_sina:
+            result = _get_trading_days(date(2030, 1, 1), date(2030, 1, 31))
             mock_sina.assert_called_once()
 
-        assert len(result) > 0
+        assert result == [d.date() for d in
+                          pd.date_range("2030-01-02", periods=3, freq="B")]
+
+    def test_inferred_calendar_when_offline_and_out_of_coverage(self):
+        """No sina + out of bundled coverage → weekday/holiday inference."""
+        from eqlib.engine import _get_trading_days
+
+        with patch("akshare.tool_trade_date_hist_sina",
+                   side_effect=RuntimeError("offline")):
+            result = _get_trading_days(date(2030, 1, 1), date(2030, 1, 14))
+
+        # New Year's Day is a fixed-rule holiday; weekdays otherwise.
+        assert date(2030, 1, 1) not in result
+        assert date(2030, 1, 2) in result
+        assert all(d.weekday() < 5 for d in result)

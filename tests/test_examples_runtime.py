@@ -43,10 +43,21 @@ def _synthetic_ohlcv() -> pd.DataFrame:
 
     Three deterministic trend segments (down, up, down) ensure the example's
     10/30 moving-average crossover produces at least one buy and one sell.
-    Dates track ``examples/_defaults.py`` so the frame always lies inside the
-    example's backtest window regardless of when the test runs.
+    Dates are real exchange trading days (the engine's calendar is
+    exchange-authoritative: bars dated on Chinese holidays would be skipped,
+    and the one-day crossover event would fall between calendar days).
+    The frame always lies inside the example's backtest window regardless of
+    when the test runs.
     """
-    dates = pd.bdate_range(end=defaults.END_DATE, periods=_DAYS)
+    from eqlib import engine as _engine
+
+    end = pd.Timestamp(defaults.END_DATE).date()
+    start = end - pd.Timedelta(days=int(_DAYS * 1.7))
+    dates = pd.DatetimeIndex(
+        pd.to_datetime([str(d) for d in
+                        _engine._get_trading_days(start, end)[-_DAYS:]])
+    )
+    assert len(dates) == _DAYS, "exchange calendar must yield enough days"
     closes = (
         [15.0 - 0.08 * i for i in range(60)]  # downtrend: fast MA below slow
         + [10.2 + 0.10 * i for i in range(80)]  # uptrend: golden cross

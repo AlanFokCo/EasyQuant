@@ -11,6 +11,24 @@ import pytest
 import eqlib.data as data_mod
 
 
+@pytest.fixture(autouse=True)
+def _clean_session_state():
+    """Keep provider-contract tests independent of ambient session state.
+
+    ``fetch_stock_data`` applies point-in-time truncation when a backtest
+    session is active; some engine tests leave a thread-local session behind,
+    which must not leak into these offline provider contracts.
+    """
+    from eqlib import _state
+
+    previous = _state.get_session()
+    _state._set_session(_state.BacktestSession())
+    data_mod.clear_cache()
+    yield
+    data_mod.clear_cache()
+    _state._set_session(previous)
+
+
 _FIXTURE = Path(__file__).parent / "fixtures" / "data_sources" / "tencent_qfqday.json"
 TENCENT_PAYLOAD = json.loads(_FIXTURE.read_text(encoding="utf-8"))
 

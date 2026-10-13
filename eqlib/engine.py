@@ -12,6 +12,19 @@ from eqlib.data_cache import PreloadedData
 from eqlib.objects import GlobalObject, Order, LimitOrder, MarketOrder
 import eqlib._state as st
 from eqlib._state import BacktestSession, _set_session, _clear_session, reset_all
+from eqlib.constants import (
+    BSE_PRICE_LIMIT,
+    CHINEXT_PRICE_LIMIT,
+    CHINEXT_PRICE_LIMIT_REFORM_DATE,
+    DEFAULT_DELIST_GAP_DAYS,
+    MAIN_BOARD_PRICE_LIMIT,
+    PAPER_CALLBACK_MAX_FAILURES,
+    PAPER_FIRST_FILL_TIME,
+    PAPER_SESSION_END,
+    PAPER_SESSION_START,
+    ST_PRICE_LIMIT,
+    STAR_MARKET_PRICE_LIMIT,
+)
 from eqlib.logger import log
 
 
@@ -437,6 +450,41 @@ def _get_volume_fast(security, day) -> Optional[float]:
     return float(bar.get("volume", 0))
 
 
+def _get_last_close_before(security, day) -> Optional[float]:
+    """Return the security's last available close strictly before *day*.
+
+    Unlike ``get_prev_trading_day`` + ``get_close`` (which only looks at the
+    immediately preceding union-calendar day), this walks back over the
+    security's own bar series, so a stock resuming from suspension still
+    compares against its last genuinely traded close — which is exactly the
+    reference price the exchange uses for the post-suspension price limit.
+
+    O(number of bars for the security); called at most once per pending
+    order per day.
+    """
+    preloaded = _get_preloaded()
+    if preloaded is None or not getattr(preloaded, "_close_dict", None):
+        return None
+    ts_day = pd.Timestamp(day)
+    for sec in (security, _bare_code(security)):
+        sec_dict = preloaded._close_dict.get(sec)
+        if not sec_dict:
+            continue
+        best_ts = None
+        best_val = None
+        for ts, val in sec_dict.items():
+            try:
+                key = ts if isinstance(ts, pd.Timestamp) else pd.Timestamp(ts)
+            except Exception:
+                continue
+            if key < ts_day and (best_ts is None or key > best_ts):
+                if val is not None and val == val:  # skip NaN
+                    best_ts, best_val = key, val
+        if best_val is not None:
+            return float(best_val)
+    return None
+
+
 def set_handle_data(func):
     """Register the user's handle_data function."""
     st.get_session()._handle_data_func = func
@@ -506,81 +554,187 @@ def _t1_unlock(sess: BacktestSession):
         pos.closeable_amount = pos.amount
 
 
+def _as_date(dt_like) -> Optional[datetime.date]:
+    """Normalize date/datetime/Timestamp-like input to ``datetime.date``."""
+    if dt_like is None:
+        return None
+    if isinstance(dt_like, datetime.datetime):
+        return dt_like.date()
+    if isinstance(dt_like, datetime.date):
+        return dt_like
+    return pd.Timestamp(dt_like).date()
+
+
+def _lookup_st_status(session: Optional[BacktestSession], security: str,
+                      context_dt) -> Optional[bool]:
+    """Resolve ST status for *security* as of *context_dt* (point-in-time).
+
+    Resolution order:
+      1. User-injected PIT map ``set_option('st_status_map', ...)``, mapping a
+         bare or suffixed code to one of:
+           - ``bool`` — static ST flag for the whole run;
+           - ``(start_date, end_date_or_None)`` tuple or list of such tuples —
+             ST while ``start <= context_dt <= end`` (``None`` end = ongoing);
+           - ``callable(bare_code, date) -> bool`` — full user PIT logic.
+      2. Paper/live sessions only: network detection via ``get_extras`` and a
+         spot-name fallback (akshare).  Never called in backtests.
+
+    Returns ``None`` when the status is unknown.  Callers then assume non-ST
+    (documented conservative approximation: without a PIT source we do not
+    tighten a stock to ±5 %, which would otherwise wrongly reject legitimate
+    main-board fills).
+    """
+    if session is not None:
+        st_map = session._options.get("st_status_map")
+        if st_map:
+            bare = _bare_code(security)
+            key = security if security in st_map else bare
+            if key in st_map:
+                entry = st_map[key]
+                day = _as_date(context_dt) or datetime.date.today()
+                if callable(entry):
+                    try:
+                        return bool(entry(bare, day))
+                    except Exception as exc:
+                        log.warn(f"st_status_map callable failed for {bare}: {exc}")
+                        return None
+                if isinstance(entry, bool):
+                    return entry
+                intervals = entry
+                if isinstance(intervals, tuple) and len(intervals) == 2:
+                    intervals = [intervals]
+                try:
+                    for start, end in intervals:
+                        s = _as_date(start)
+                        e = _as_date(end)
+                        if (s is None or day >= s) and (e is None or day <= e):
+                            return True
+                    return False
+                except (TypeError, ValueError):
+                    log.warn(f"st_status_map entry for {key} not understood: {entry!r}")
+                    return None
+
+    # Network detection is only allowed in paper/live sessions.
+    if session is None or not session._options.get("_is_paper_trading", False):
+        return None
+    bare = _bare_code(security)
+    try:
+        from eqlib.data import get_extras
+        st_map = get_extras("is_st", security_list=[bare])
+        if bare in st_map:
+            return bool(st_map[bare])
+    except Exception:
+        pass
+    try:
+        import akshare as ak
+        spot = ak.stock_zh_a_spot_em()
+        row = spot[spot["代码"] == bare]
+        if len(row) > 0:
+            name = str(row.iloc[0]["名称"])
+            return "ST" in name.upper()
+    except Exception:
+        pass
+    return None
+
+
+def _st_map_covers(session: Optional[BacktestSession], security: str) -> bool:
+    """True when the user-injected st_status_map has an entry for *security*.
+
+    Map-covered securities bypass the 30-day date-stamped limit cache so the
+    ST on/off boundary is point-in-time exact instead of blurred by caching.
+    """
+    if session is None:
+        return False
+    st_map = session._options.get("st_status_map")
+    if not st_map:
+        return False
+    return security in st_map or _bare_code(security) in st_map
+
+
 def _get_price_limit_ratio(security: str, context_dt: datetime.date = None,
                            session: BacktestSession = None) -> float:
     """Return the daily price-limit ratio (one-sided) for a security.
 
-    Board classification:
-        688xxx.XSHG  → STAR Market: ±20 %
-        300xxx.XSHE  → ChiNext: ±20 %
-        ST stocks    → ±5 % (checked via get_extras if available)
+    Board classification (date-aware):
+        688xxx.XSHG  → STAR Market: ±20 % (since inception 2019-07-22)
+        300xxx.XSHE  → ChiNext: ±10 % before 2020-08-24, ±20 % on/after
+                       (registration-based reform; ST stocks on ChiNext keep
+                       the same board-wide limit)
+        83/87/43/92x → Beijing Stock Exchange: ±30 %
+        ST / *ST     → ±5 % (main board only; see ST resolution below)
         All others   → Main board / SME: ±10 %
 
     Parameters:
         security: stock code (e.g., "601390.XSHG")
-        context_dt: optional date for ST status lookup in backtest mode
+        context_dt: date of the trade being evaluated.  Drives the ChiNext
+            regime switch and the PIT ST lookup.  ``None`` means "current
+            rules" (ChiNext ±20 %).
         session: optional BacktestSession for caching and mode detection
+
+    Documented assumptions / approximations:
+        - New-stock limit-free windows are NOT modelled (first 5 sessions for
+          registration-board IPOs, day-1 +44 %/−36 % for main-board IPOs):
+          the listing date is not available offline, and during a genuine
+          no-limit window no price limit exists to enforce anyway.
+        - ST status without a PIT source assumes non-ST (±10 % main board).
+          Inject ``set_option('st_status_map', {...})`` for PIT-correct ST
+          handling in backtests; paper/live sessions detect ST via akshare.
+        - ``context_dt`` before the ChiNext reform yields ±10 % for 300xxx.
     """
-    # ── Check session cache first (with 30-day expiry for ST lookups) ────
+    context_day = _as_date(context_dt)
+
+    # ── Check session cache first ─────────────────────────────────────────
+    # Plain-float entries are date-independent overrides (user-injected) or
+    # structural limits (STAR/BSE).  Dict entries carry a date stamp and
+    # expire after 30 days (ST / main-board results are date-dependent).
     if session is not None:
         cache = session._options.get("_price_limit_cache")
         if cache is not None and security in cache:
             entry = cache[security]
-            # Structural limits (STAR/ChiNext/BSE/Main) never expire
             if isinstance(entry, (int, float)):
                 return entry
-            # ST-based limits expire after 30 days
             if isinstance(entry, dict):
                 cached_date = entry.get("date")
-                if cached_date and context_dt and (context_dt - cached_date).days < 30:
+                # Map-covered securities skip the dated cache (PIT-exact).
+                if _st_map_covers(session, security):
+                    pass
+                elif cached_date and context_day and \
+                        abs((context_day - cached_date).days) < 30:
                     return entry["ratio"]
 
     bare = _bare_code(security)
     # BSE (Beijing Stock Exchange): ±30%
-    if bare.startswith("83") or bare.startswith("87") or bare.startswith("43") or bare.startswith("92"):
-        ratio = 0.30
-        _cache_price_limit(session, security, ratio)
-        return ratio
-    # STAR Market and ChiNext: ±20%
-    if bare.startswith("688") or bare.startswith("300"):
-        ratio = 0.20
-        _cache_price_limit(session, security, ratio)
-        return ratio
+    if bare.startswith(("83", "87", "43", "92")):
+        _cache_price_limit(session, security, BSE_PRICE_LIMIT)
+        return BSE_PRICE_LIMIT
+    # STAR Market: ±20% since inception (2019-07-22)
+    if bare.startswith("688"):
+        _cache_price_limit(session, security, STAR_MARKET_PRICE_LIMIT)
+        return STAR_MARKET_PRICE_LIMIT
+    # ChiNext: ±10% before the 2020-08-24 reform, ±20% on/after.
+    # Date-dependent → deliberately not stored in the never-expiring
+    # structural float cache.
+    if bare.startswith("300"):
+        if context_day is not None and context_day < CHINEXT_PRICE_LIMIT_REFORM_DATE:
+            return MAIN_BOARD_PRICE_LIMIT
+        return CHINEXT_PRICE_LIMIT
 
-    # Determine if we should skip network calls (backtest or no session)
-    skip_network_calls = session is None or not session._options.get("_is_paper_trading", False)
+    # Main board: ST stocks trade at ±5%.  ST status is point-in-time and
+    # only applies to the main board (ChiNext/STAR/BSE returned above).
+    st_status = _lookup_st_status(session, security, context_day)
+    if _st_map_covers(session, security):
+        # User-injected PIT map: return the exact result uncached so the
+        # ST on/off boundary is honoured to the day.
+        return ST_PRICE_LIMIT if st_status is True else MAIN_BOARD_PRICE_LIMIT
+    if st_status is True:
+        _cache_price_limit_st(session, security, ST_PRICE_LIMIT, context_day)
+        return ST_PRICE_LIMIT
 
-    if not skip_network_calls:
-        # Paper trading mode: allow network calls for ST check
-        # Check ST status via get_extras (requires akshare)
-        try:
-            from eqlib.data import get_extras
-            st_map = get_extras("is_st", security_list=[bare])
-            if st_map.get(bare, False):
-                ratio = 0.05
-                _cache_price_limit_st(session, security, ratio, context_dt)
-                return ratio
-        except Exception:
-            pass
-
-        # Fallback: check if stock name contains "ST" via live data
-        try:
-            import akshare as ak
-            spot = ak.stock_zh_a_spot_em()
-            row = spot[spot["代码"] == bare]
-            if len(row) > 0:
-                name = row.iloc[0]["名称"]
-                if "ST" in name or "st" in name.lower():
-                    ratio = 0.05
-                    _cache_price_limit_st(session, security, ratio, context_dt)
-                    return ratio
-        except Exception:
-            pass
-
-    # Backtest/non-paper mode or fallback: use conservative default 10%
-    ratio = 0.10
-    _cache_price_limit(session, security, ratio)
-    return ratio
+    # Non-ST (or unknown → documented non-ST assumption): ±10%.  Cache with
+    # a date stamp so a later ST onset within the same run is not masked by
+    # a stale permanent entry.
+    _cache_price_limit_st(session, security, MAIN_BOARD_PRICE_LIMIT, context_day)
+    return MAIN_BOARD_PRICE_LIMIT
 
 
 def _cache_price_limit(session, security, ratio):
@@ -655,6 +809,19 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
       filled; remaining amount stays in pending queue.
     - Order status tracking: pending→submitted→partial_fill→filled.
 
+    Market-rule semantics (declared 2026-10-12):
+    - Price-limit enforcement is ON by default in every mode
+      (``set_option('check_price_limit', False)`` disables): buys whose open
+      touches the fen-rounded limit-up price and sells touching limit-down
+      are cancelled (reason "limit-up" / "limit-down").
+    - Suspension: a security with no bar today (or a zero-volume bar with
+      ``treat_missing_bar_as_suspended``) cannot trade; the order is
+      cancelled the same day (reason "no price data" / "suspended") — it is
+      never deferred to a later day.
+    - Paper/live (``exec_prices is not None``): a missing quote is transient,
+      so the order stays pending instead of being cancelled (the order
+      timeout governs expiry).
+
     Parameters:
         sess: the active BacktestSession
         day: the fill date (used for preloaded price lookup)
@@ -721,12 +888,21 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                             submit_date = submit_stamp
                         else:
                             submit_date = submit_stamp
-                        # Count trading days between submit_date and current day
-                        if hasattr(_get_preloaded(), '_dates') and len(_get_preloaded()._dates) > 0:
-                            all_dates = [d.date() if hasattr(d, 'date') else d for d in _get_preloaded()._dates]
+                        # Count trading days between submit_date and current day.
+                        # Prefer the exchange calendar captured at backtest
+                        # start; fall back to the preloaded union (legacy) and
+                        # finally to calendar days.
+                        calendar = sess._options.get("_exchange_trading_days")
+                        if not calendar:
+                            preloaded = _get_preloaded()
+                            if preloaded is not None and getattr(preloaded, "_dates", None) is not None \
+                                    and len(preloaded._dates) > 0:
+                                calendar = [d.date() if hasattr(d, "date") else d
+                                            for d in preloaded._dates]
+                        if calendar:
                             try:
-                                submit_idx = next(i for i, d in enumerate(all_dates) if d >= submit_date)
-                                current_idx = next(i for i, d in enumerate(all_dates) if d >= day)
+                                submit_idx = next(i for i, d in enumerate(calendar) if d >= submit_date)
+                                current_idx = next(i for i, d in enumerate(calendar) if d >= day)
                                 days_elapsed = current_idx - submit_idx
                             except StopIteration:
                                 days_elapsed = 0
@@ -775,6 +951,15 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                        (exec_prices or {}).get(_bare_code(security)) or
                        _get_open_fast(security, day))
             if not open_px or (isinstance(open_px, float) and math.isnan(open_px)):
+                if exec_prices is not None:
+                    # Live/paper: today's quote may simply not have arrived
+                    # yet (pre-open poll, provider hiccup).  Keep the order
+                    # pending instead of cancelling it — the session-level
+                    # order timeout remains the cleanup path.
+                    log.warn(f"fill_pending: no open price for {security} on {day} "
+                             f"(ORDER_VALUE kept pending)")
+                    still_pending.append(order_req)
+                    continue
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_VALUE skipped)")
                 if order_obj:
                     order_obj.transition_to(Order.STATUS_CANCELLED, reason="no open price")
@@ -792,6 +977,11 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                        (exec_prices or {}).get(_bare_code(security)) or
                        _get_open_fast(security, day))
             if not open_px or (isinstance(open_px, float) and math.isnan(open_px)):
+                if exec_prices is not None:
+                    log.warn(f"fill_pending: no open price for {security} on {day} "
+                             f"(ORDER_TARGET_VALUE kept pending)")
+                    still_pending.append(order_req)
+                    continue
                 log.warn(f"fill_pending: no open price for {security} on {day} (ORDER_TARGET_VALUE skipped)")
                 if order_obj:
                     order_obj.transition_to(Order.STATUS_CANCELLED, reason="no open price")
@@ -834,6 +1024,14 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
         if not base_price:
             base_price = _get_open_fast(security, day)
         if not base_price:
+            if exec_prices is not None:
+                # Live/paper: no quote for this security right now — keep the
+                # order pending (order timeout governs expiry) rather than
+                # cancelling on a transient data gap.
+                log.warn(f"fill_pending: no price for {security} on {day} "
+                         f"— order kept pending")
+                still_pending.append(order_req)
+                continue
             log.warn(f"fill_pending: no open price for {security} on {day} — order skipped")
             if order_obj:
                 order_obj.transition_to(Order.STATUS_CANCELLED, reason="no price data")
@@ -869,20 +1067,16 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
         # a limit-hit or suspension scenario; shares-based orders (order())
         # handle this more predictably than value-based ones.
         if exec_prices is None and action in ("ORDER_VALUE", "ORDER_TARGET_VALUE"):
-            preloaded = _get_preloaded()
-            if preloaded is not None and preloaded._dates is not None:
-                prev_day = preloaded.get_prev_trading_day(day)
-                if prev_day is not None:
-                    prev_close = _get_price_fast(security, prev_day)
-                    if prev_close and prev_close > 0:
-                        gap_ratio = base_price / prev_close
-                        if gap_ratio > 1.1 or gap_ratio < 0.9:
-                            log.warn(
-                                f"fill_pending {action} {security}: today's open ({base_price:.3f}) "
-                                f"has a large gap vs yesterday's close ({prev_close:.3f}, "
-                                f"ratio={gap_ratio:.2%}). Consider using order() with explicit "
-                                "share counts for more predictable execution."
-                            )
+            prev_close = _get_last_close_before(security, day)
+            if prev_close and prev_close > 0:
+                gap_ratio = base_price / prev_close
+                if gap_ratio > 1.1 or gap_ratio < 0.9:
+                    log.warn(
+                        f"fill_pending {action} {security}: today's open ({base_price:.3f}) "
+                        f"has a large gap vs its last traded close ({prev_close:.3f}, "
+                        f"ratio={gap_ratio:.2%}). Consider using order() with explicit "
+                        "share counts for more predictable execution."
+                    )
 
         # ── Suspension check (HIGH-12) ─────────────────────────────────────
         # Distinguish "missing bar" (None) from "zero-volume bar" (0.0).
@@ -905,17 +1099,15 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
             continue
 
         # ── Price-limit check (A-share circuit breaker) ─────────────────────
-        # Enabled via set_option('check_price_limit', True/False).
-        # Default: True for live/paper trading (broker rejects anyway), False for backtest.
+        # Enabled by default in ALL modes (set_option('check_price_limit', False)
+        # to disable).  An order marketable only at the limit price cannot
+        # execute in reality: buys at a sealed limit-up and sells at a sealed
+        # limit-down are impossible, so ignoring this systematically flatters
+        # momentum/breakout backtests.
         # Buys at limit-up are unfillable; sells at limit-down are also blocked.
-        check_limit_default = exec_prices is not None  # True for live/paper, False for backtest
-        if sess._options.get("check_price_limit", check_limit_default):
-            prev_day_date = None
-            preloaded = _get_preloaded()
-            if preloaded is not None and preloaded._dates is not None:
-                prev_day_date = preloaded.get_prev_trading_day(day)
+        if sess._options.get("check_price_limit", True):
             # For live/paper trading, use previous close from exec_prices or fetch it
-            if exec_prices is not None and prev_day_date is None:
+            if exec_prices is not None:
                 # Live mode: fetch previous close via akshare
                 try:
                     bare = _bare_code(security)
@@ -932,20 +1124,23 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                 except Exception as exc:
                     log.warn(f"fill_pending: prev_close fetch failed for {security}: {exc}")
                     prev_close = None
-            elif prev_day_date is not None:
-                prev_close = _get_price_fast(security, prev_day_date)
             else:
-                prev_close = None
+                # Backtest: the limit is computed off the security's last
+                # genuinely traded close (suspension-aware), which is the
+                # reference the exchange uses when trading resumes.
+                prev_close = _get_last_close_before(security, day)
 
             if prev_close:
-                ratio = _get_price_limit_ratio(security, session=sess)
-                limit_up = prev_close * (1 + ratio)
-                limit_down = prev_close * (1 - ratio)
+                ratio = _get_price_limit_ratio(security, context_dt=day, session=sess)
+                # Exchange rule: the limit price is rounded to the fen (0.01).
+                limit_up = round(prev_close * (1 + ratio), 2)
+                limit_down = round(prev_close * (1 - ratio), 2)
                 # A small tolerance (0.1%) absorbs floating-point rounding
-                # in price data (e.g. adjusted-price inaccuracies) so that
-                # a price of 10.999 is not incorrectly treated as exactly
-                # limit-up (11.000).  The same tolerance is applied to both
-                # sides for symmetry.
+                # in price data (e.g. qfq adjusted-price inaccuracies, where
+                # a corporate action between the two bars breaks the exact
+                # multiplicative relation) so that a price of 10.999 is not
+                # incorrectly treated as exactly limit-up (11.000).  The same
+                # tolerance is applied to both sides for symmetry.
                 _LIMIT_TOL = 0.001
                 if is_buy and base_price >= limit_up * (1 - _LIMIT_TOL):
                     log.warn(
@@ -1232,6 +1427,162 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
     sess._pending_orders.extend(still_pending)
 
 
+def _last_bar_date(preloaded, security) -> Optional[datetime.date]:
+    """Return the last date with a bar for *security* (cached per session).
+
+    The preloaded panel is immutable for the duration of a backtest, so the
+    per-security series end is computed once and memoised in
+    ``session._options['_series_last_bar']``.
+    """
+    sess = st.get_session()
+    cache = sess._options.setdefault("_series_last_bar", {})
+    bare = _bare_code(security)
+    if security in cache:
+        return cache[security]
+    result = None
+    bar_cache = getattr(preloaded, "_bar_cache", None) or {}
+    for sec in (security, bare):
+        sec_dict = bar_cache.get(sec)
+        if not sec_dict:
+            continue
+        try:
+            last = max(pd.Timestamp(k) for k in sec_dict.keys())
+        except (TypeError, ValueError):
+            continue
+        if result is None or last > result:
+            result = last
+    result_date = result.date() if result is not None else None
+    cache[security] = result_date
+    return result_date
+
+
+def _handle_delisted_positions(sess: BacktestSession, day: datetime.date,
+                                day_pos: dict, trading_days: list) -> None:
+    """Force-liquidate positions whose data series has ended (delisting rule).
+
+    Semantics (declared behaviour):
+      - A security that stops trading mid-backtest is first treated as
+        *suspended*: it stays in the portfolio, valued at its last traded
+        close (``Position.update`` fallback), and orders against it are
+        cancelled day-by-day with a recorded reason.
+      - Once no bar has appeared for more than ``delist_gap_days`` exchange
+        trading days (default ``DEFAULT_DELIST_GAP_DAYS`` = 30), the security
+        is treated as *delisted* and the position is force-liquidated at the
+        last available close, less ``delisted_liquidation_haircut``
+        (default 0.0; set to 1.0 to model delisting-to-zero).  Sale costs
+        follow the configured OrderCost.  The liquidation is logged loudly
+        and recorded in the trade log as ``DELIST_LIQUIDATE``.
+
+    Rationale: post-2019 exchange rules cap most suspensions at ~25 trading
+    days, so a longer unbroken gap almost always means the listing (and the
+    data series) has ended.  This is a documented heuristic — OHLCV alone
+    cannot distinguish a genuine multi-month suspension from a delisting.
+
+    Options (set_option):
+      - ``delisted_position_handling``: "liquidate" (default) or "keep"
+        (legacy behaviour: hold at last price forever).
+      - ``delist_gap_days``: trading-day gap before liquidation (<=0 disables).
+      - ``delisted_liquidation_haircut``: fraction of last close deducted
+        from liquidation proceeds (0.0 = full last close).
+    """
+    if sess._options.get("delisted_position_handling", "liquidate") != "liquidate":
+        return
+    gap_days = sess._options.get("delist_gap_days", DEFAULT_DELIST_GAP_DAYS)
+    if gap_days is None or gap_days <= 0:
+        return
+    haircut = float(sess._options.get("delisted_liquidation_haircut", 0.0))
+    haircut = min(max(haircut, 0.0), 1.0)
+
+    portfolio = sess._context.portfolio
+    if not portfolio.positions:
+        return
+    preloaded = _get_preloaded()
+    if preloaded is None:
+        return
+
+    done = sess._options.setdefault("_delisted_liquidated", set())
+    current_idx = day_pos.get(day)
+    if current_idx is None:
+        return
+
+    from eqlib.objects import OrderCost
+    cost_cfg: OrderCost = sess._order_cost or OrderCost()
+
+    for security in list(portfolio.positions):
+        if security in done:
+            continue
+        pos = portfolio.positions[security]
+        if pos.amount <= 0:
+            continue
+        last_date = _last_bar_date(preloaded, security)
+        if last_date is None:
+            continue
+        # Trading days elapsed since the last bar.  The last bar date is
+        # normally itself an exchange trading day; use the calendar position
+        # when present, else count from the first calendar day after it.
+        last_idx = day_pos.get(last_date)
+        if last_idx is None:
+            last_idx = -1
+            for i, d in enumerate(trading_days):
+                if d <= last_date:
+                    last_idx = i
+                else:
+                    break
+        if current_idx - last_idx <= gap_days:
+            continue
+
+        # ── Force liquidation at the last available close ─────────────────
+        price = _get_price_fast(security, last_date)
+        if not price or price <= 0:
+            price = pos.avg_cost if pos.avg_cost > 0 else 0.0
+        exec_price = round(price * (1.0 - haircut), 4)
+        amount = pos.amount
+        proceeds = round(exec_price * amount, 2)
+        commission = round(
+            cost_cfg.calc_close_cost(exec_price, amount, trade_date=day), 2
+        ) if exec_price > 0 else 0.0
+        net = round(proceeds - commission, 2)
+        portfolio.available_cash = round(portfolio.available_cash + net, 2)
+        del portfolio.positions[security]
+        done.add(security)
+        log.warn(
+            f"DELISTING {security}: no bar for {current_idx - last_idx} trading days "
+            f"(last bar {last_date}); force-liquidated {amount} shares @ {exec_price:.3f} "
+            f"(last close {price:.3f}, haircut={haircut:.0%}), net={net:.2f} on {day}"
+        )
+        sess._trade_log.append({
+            "type": "DELIST_LIQUIDATE",
+            "date": day,
+            "security": security,
+            "price": exec_price,
+            "amount": amount,
+            "commission": commission,
+            "order_id": None,
+            "partial": False,
+            "reason": f"no bar for {current_idx - last_idx} trading days (last bar {last_date})",
+        })
+        # Cancel any residual pending orders for the delisted security: no
+        # future fills are possible, and leaving them queued would spam
+        # per-day cancellation attempts.
+        kept = []
+        for req in sess._pending_orders:
+            req_sec = req.get("security")
+            obj = req.get("order_obj")
+            if req_sec and _bare_code(req_sec) == _bare_code(security):
+                if obj is not None and obj.status not in (
+                    obj.STATUS_FILLED, obj.STATUS_CANCELLED,
+                    obj.STATUS_EXPIRED, obj.STATUS_REJECTED,
+                ):
+                    try:
+                        obj.transition_to(obj.STATUS_CANCELLED, reason="delisted")
+                    except ValueError:
+                        pass
+                    sess._order_timestamps.pop(obj.order_id, None)
+                continue
+            kept.append(req)
+        sess._pending_orders[:] = kept
+
+
 def _round_lot(amount) -> int:
     """Round down to nearest 100 shares (A-share lot size)."""
     return int(amount // 100) * 100
@@ -1356,6 +1707,10 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
     if not trading_days:
         log.error("No trading days found")
         return None
+    # Exchange calendar is authoritative for this run (see _get_trading_days);
+    # keep it on the session for order-timeout day counting and delisting.
+    session._options["_exchange_trading_days"] = trading_days
+    _trading_day_pos = {d: i for i, d in enumerate(trading_days)}
 
     # Pick up selection config from session (set via run_selection in initialize)
     # Parameter takes precedence over session-level config
@@ -1397,6 +1752,10 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
 
         # ── Fill pending orders from previous day at today's open ──────────
         _fill_pending_orders(session, day)
+
+        # ── Delisting rule: force-liquidate positions whose data series ───
+        # ended more than `delist_gap_days` trading days ago (see docstring).
+        _handle_delisted_positions(session, day, _trading_day_pos, trading_days)
 
         # ── Portfolio pre-update with open prices (item 17) ────────────────
         open_prices = {}
@@ -1486,9 +1845,14 @@ def _run_backtest_core(session, initialize_func, start_date, end_date, frequency
             # Fallback to local data if network fetch fails
             try:
                 from eqlib.data_cache import load_stock_local
-                bench_df = load_stock_local(session._benchmark,
-                                            start_date.strftime("%Y-%m-%d")[:10],
-                                            end_date.strftime("%Y-%m-%d")[:10], "qfq")
+                from eqlib._state import _unrestricted_fetch
+                # Engine-internal full-range read: exempt from the
+                # in-session PIT truncation load_stock_local applies to
+                # user-facing reads.
+                with _unrestricted_fetch():
+                    bench_df = load_stock_local(session._benchmark,
+                                                start_date.strftime("%Y-%m-%d")[:10],
+                                                end_date.strftime("%Y-%m-%d")[:10], "qfq")
             except Exception:
                 bench_df = None
         if bench_df is not None and not bench_df.empty and "close" in bench_df.columns:
@@ -1617,22 +1981,44 @@ def _run_minute_bars(context: Context, session: BacktestSession,
 def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datetime.date]:
     """Get list of trading days between start and end.
 
-    Priority:
-    1. Preloaded panel dates (fastest, no network call).
-    2. ``ak.tool_trade_date_hist_sina()`` — the canonical A-share trading
-       calendar, used by data.py:get_trade_days().  This avoids the previous
-       stock-history approach (601390 is listed since 2007, so early dates
-       were incomplete; the stock could also be suspended or delisted).
-    3. Weekday approximation fallback.
-    """
-    if preloaded is not None and preloaded._dates is not None and len(preloaded._dates) > 0:
-        start_ts = pd.Timestamp(start)
-        end_ts = pd.Timestamp(end)
-        return sorted(
-            (pd.Timestamp(d).date() for d in preloaded._dates
-             if start_ts <= pd.Timestamp(d) <= end_ts)
-        )
+    The EXCHANGE CALENDAR is authoritative: it is deliberately independent of
+    the universe's data coverage.  Deriving the calendar from market data
+    (the previous behaviour) made suspension days silently vanish from the
+    schedule — the same suspension then produced "order deferred", "order
+    cancelled", or "day missing entirely" depending on universe composition,
+    and a delisted security truncated the whole backtest early.
 
+    With the exchange calendar as the backbone:
+      - Suspension days stay in the calendar; orders targeting a security
+        with no bar that day are cancelled the same day with a recorded
+        reason ("no price data" for a missing bar, "suspended" for a
+        zero-volume bar).
+      - A security whose data ends early no longer truncates the run; see
+        :func:`_handle_delisted_positions` for the delisting rule.
+
+    Source priority:
+    1. The bundled exchange calendar (``eqlib/static/ashare_trading_days.json``,
+       coverage 2020-01-01..2026-12-31) — deterministic and offline.
+    2. ``ak.tool_trade_date_hist_sina()`` — the canonical A-share trading
+       calendar from akshare, for ranges outside the bundled coverage.
+    3. Inferred calendar via ``data._get_trading_days_range``
+       (chinese_calendar workday tiers + bundled holiday rules).
+
+    ``preloaded`` is accepted for backward compatibility and ignored.
+    """
+    start_d = _as_date(start)
+    end_d = _as_date(end)
+
+    # 1. Bundled exchange calendar (offline, deterministic).
+    try:
+        from eqlib.data import _bundled_ashare_trading_days
+        days = _bundled_ashare_trading_days(start_d, end_d)
+        if days:
+            return list(days)
+    except Exception:
+        pass
+
+    # 2. akshare canonical calendar (network) for out-of-coverage ranges.
     try:
         import akshare as ak
         df = ak.tool_trade_date_hist_sina()
@@ -1641,27 +2027,15 @@ def _get_trading_days(start, end, preloaded: PreloadedData = None) -> list[datet
             dates = pd.to_datetime(df[col])
             result = [
                 d.date() for d in dates
-                if start <= d.date() <= end
+                if start_d <= d.date() <= end_d
             ]
             if result:
                 return sorted(result)
     except Exception:
         pass
 
-    # Legacy fallback: fetch from single stock (less reliable)
-    try:
-        import akshare as ak
-        df = ak.stock_zh_a_hist(symbol="601390", period="daily",
-                                start_date=start.strftime("%Y%m%d"),
-                                end_date=end.strftime("%Y%m%d"),
-                                adjust="qfq")
-        if not df.empty:
-            df["日期"] = pd.to_datetime(df["日期"])
-            return sorted(df["日期"].dt.date.unique().tolist())
-    except Exception:
-        pass
-
-    return list(_get_trading_days_range(start, end))
+    # 3. Inferred calendar (chinese_calendar tiers + holiday rules).
+    return list(_get_trading_days_range(start_d, end_d))
 
 
 # ── Paper trading ──────────────────────────────────────────────────────────────
@@ -1683,9 +2057,84 @@ def _paper_is_trading_day(day: datetime.date) -> bool:
     return day in days
 
 
+def _paper_market_phase(now: datetime.datetime) -> str:
+    """Classify *now* into the A-share paper-trading session phases.
+
+    Returns one of:
+      ``"closed"``     — before 09:15 (no fills, no callbacks, no fetch)
+      ``"auction"``    — 09:15–09:25 open call auction (callbacks may run and
+                         queue orders, but nothing is matched yet)
+      ``"continuous"`` — 09:25–15:00 continuous trading (fills allowed)
+      ``"after"``      — 15:00 and later (after_trading_end hooks fire here)
+    """
+    t = now.time()
+    if t < PAPER_SESSION_START:
+        return "closed"
+    if t < PAPER_FIRST_FILL_TIME:
+        return "auction"
+    if t < PAPER_SESSION_END:
+        return "continuous"
+    return "after"
+
+
+def _paper_run_callback(session: BacktestSession, func, *args,
+                        label: str = "callback") -> bool:
+    """Run a user callback in paper mode with a consecutive-failure breaker.
+
+    A user exception is logged and counted; after
+    ``PAPER_CALLBACK_MAX_FAILURES`` consecutive failures the callback is
+    disabled for the rest of the run (circuit breaker) instead of killing
+    the paper-trading process.  Returns True when the callback ran cleanly.
+    """
+    failures = session._options.setdefault("_paper_cb_failures", {})
+    disabled = session._options.setdefault("_paper_cb_disabled", set())
+    key = id(func)
+    if key in disabled:
+        return False
+    try:
+        func(*args)
+    except Exception as exc:
+        count = failures.get(key, 0) + 1
+        failures[key] = count
+        if count >= PAPER_CALLBACK_MAX_FAILURES:
+            disabled.add(key)
+            log.error(
+                f"paper: {label} {getattr(func, '__name__', func)} failed {count} "
+                f"times in a row — disabling it for the rest of the run. "
+                f"Last error: {exc}"
+            )
+        else:
+            log.warn(
+                f"paper: {label} {getattr(func, '__name__', func)} raised "
+                f"({count}/{PAPER_CALLBACK_MAX_FAILURES}): {exc}"
+            )
+        return False
+    failures.pop(key, None)
+    return True
+
+
 def run_paper_trade(initialize_func, starting_cash=100000.0,
                     benchmark: str = "000300.XSHG", interval: int = 60):
-    """Run a strategy in paper trading mode with live market data."""
+    """Run a strategy in paper trading mode with live market data.
+
+    Session semantics (declared behaviour):
+      - Nothing is matched outside the 09:15–15:00 session window
+        (``PAPER_SESSION_START``/``PAPER_SESSION_END``); the loop idles.
+      - The first fill of a trading day waits for the open call auction to
+        complete (``PAPER_FIRST_FILL_TIME``, 09:25) so fills use real traded
+        prices rather than stale quotes.
+      - ``before_trading_start`` hooks run before any scheduled function or
+        ``handle_data`` of the day — including when the loop first wakes
+        during the call auction (09:15–09:25), matching backtest ordering.
+        Orders queued during the auction are matched the next trading day
+        under the unified T→T+1 model (they do not participate in the
+        09:25 auction match).
+      - When no live price is available for a security the order stays
+        pending (it is NOT cancelled); the order timeout governs expiry.
+      - User callbacks (scheduled funcs / handle_data) are protected by a
+        circuit breaker: after several consecutive failures the callback is
+        disabled with an error log instead of killing the process.
+    """
     from eqlib.objects import OrderCost
 
     session = BacktestSession()
@@ -1717,6 +2166,7 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
     spot_cache: dict = {}
     prev_day: Optional[datetime.date] = None
     _warmup_done: bool = False  # True after the first iteration is complete
+    _deferred_fill_day: Optional[datetime.date] = None  # day whose first fill waits for the auction to end
     _paper_day_checked: Optional[datetime.date] = None
     _paper_day_is_trading: bool = True
     try:
@@ -1733,6 +2183,25 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                     log.info(f"paper: {today} is not a trading day — idling")
             if not _paper_day_is_trading:
                 time.sleep(max(interval, 300))
+                continue
+
+            # ── Market-hours gate (INFRA-P0-01) ──────────────────────────
+            # No matching, callbacks, or price fetches outside the session
+            # window.  Without this, the first poll after midnight matched
+            # yesterday's orders against stale/empty quotes.
+            phase = _paper_market_phase(context.current_dt)
+            if phase in ("closed", "after"):
+                # Fire after_trading_end hooks once, just after the close.
+                if (phase == "after" and prev_day == today
+                        and not session._after_trading_end_done):
+                    context.current_dt = datetime.datetime.combine(
+                        today, datetime.time(15, 0))
+                    for func in session._after_trading_end_funcs:
+                        _paper_run_callback(
+                            session, func, context, _LazyData(context),
+                            label="after_trading_end")
+                    session._after_trading_end_done = True
+                time.sleep(max(interval, 60))
                 continue
 
             # Restrict live price fetch to only the securities in the user's
@@ -1758,22 +2227,47 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             # produced any orders yet, and pre-filling an empty queue is
             # harmless now but would incorrectly fill persisted orders after a
             # restart (e.g., reloading yesterday's unfilled orders from SQLite).
-            if today != prev_day:
+            # The day-rollover block also runs during the open call auction
+            # (09:15–09:25) so before_trading_start hooks always precede the
+            # day's first scheduled function / handle_data — matching the
+            # backtest loop's ordering.  Order matching still waits for the
+            # continuous phase: the day's first fill happens once the auction
+            # completes (09:25).
+            if today != prev_day and phase in ("auction", "continuous"):
                 if _warmup_done:
-                    _t1_unlock(session)
-                    _fill_pending_orders(session, today, exec_prices=live_prices)
+                    if phase == "continuous":
+                        _t1_unlock(session)
+                        _fill_pending_orders(session, today, exec_prices=live_prices)
+                    else:
+                        # Auction phase: hooks run now but nothing is matched
+                        # yet — defer the day's first fill (and T+1 unlock)
+                        # to the first continuous iteration.
+                        _deferred_fill_day = today
                     # Call before_trading_start hooks at market open (09:30)
+                    real_now = context.current_dt
                     context.current_dt = datetime.datetime.combine(today, datetime.time(9, 30))
                     for func in session._before_trading_start_funcs:
-                        try:
-                            func(context, _LazyData(context))
-                        except Exception as e:
-                            log.warn(f"before_trading_start hook error: {e}")
+                        _paper_run_callback(
+                            session, func, context, _LazyData(context),
+                            label="before_trading_start")
+                    # Restore the wall clock: the ±60s scheduled-time match
+                    # below must compare against *now*, not the 09:30 hook
+                    # timestamp — otherwise a day whose first in-market
+                    # iteration is, say, 14:50 would wrongly fire the 09:30
+                    # schedule (and skip the 14:50 one) on that iteration.
+                    context.current_dt = real_now
                 else:
                     _warmup_done = True
                 # Reset after_trading_end flag for the new day
                 session._after_trading_end_done = False
                 prev_day = today
+
+            # A day that rolled over during the call auction still needs its
+            # first fill once continuous trading begins.
+            if phase == "continuous" and _deferred_fill_day == today:
+                _t1_unlock(session)
+                _fill_pending_orders(session, today, exec_prices=live_prices)
+                _deferred_fill_day = None
 
             prices = {sec: _resolve_live_price(spot_cache, sec, None)
                       for sec, pos in context.portfolio.positions.items()}
@@ -1784,7 +2278,8 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                     t = _get_sched_time(sched)
                     func = _get_sched_func(sched)
                     if t == "every_bar":
-                        func(context)
+                        _paper_run_callback(session, func, context,
+                                            label="scheduled(every_bar)")
                     else:
                         # Parse scheduled time and check if within ±60 seconds.
                         # Run at most once per (func, time) per day: the
@@ -1794,17 +2289,30 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
                             continue
                         try:
                             hour, minute = map(int, t.split(":"))
-                            scheduled_dt = datetime.datetime.combine(today, datetime.time(hour, minute))
-                            current_dt = context.current_dt
-                            if abs((current_dt - scheduled_dt).total_seconds()) <= 60:
-                                session._sched_last_run[sched_key] = today
-                                func(context)
-                        except Exception:
-                            # Fallback: run on every iteration if time parse fails
-                            func(context)
+                        except (ValueError, AttributeError, TypeError):
+                            # Unparseable schedule time: run once today with a
+                            # loud warning instead of silently retrying every
+                            # iteration (previously this branch also re-ran
+                            # user callbacks that had raised — INFRA-P1-03).
+                            session._sched_last_run[sched_key] = today
+                            log.warn(f"paper: unparseable schedule time {t!r} for "
+                                     f"{getattr(func, '__name__', func)} — running once today")
+                            _paper_run_callback(session, func, context,
+                                                label="scheduled")
+                            continue
+                        scheduled_dt = datetime.datetime.combine(today, datetime.time(hour, minute))
+                        current_dt = context.current_dt
+                        if abs((current_dt - scheduled_dt).total_seconds()) <= 60:
+                            session._sched_last_run[sched_key] = today
+                            # User-callback exceptions are contained by the
+                            # circuit breaker; they never reach the main loop.
+                            _paper_run_callback(session, func, context,
+                                                label="scheduled")
 
             if session._handle_data_func is not None:
-                session._handle_data_func(context, _LazyData(context))
+                _paper_run_callback(session, session._handle_data_func,
+                                    context, _LazyData(context),
+                                    label="handle_data")
 
             context.portfolio._sync_total_value(prices)
             total = context.portfolio.total_value
@@ -1812,17 +2320,6 @@ def run_paper_trade(initialize_func, starting_cash=100000.0,
             pnl_pct = (pnl / starting_cash * 100) if starting_cash > 0 else 0.0
             log.info(f"[{context.current_dt:%H:%M:%S}] total={total:,.2f} "
                      f"PnL={pnl:+,.2f} ({pnl_pct:+.2f}%)")
-
-            # Call after_trading_end hooks at market close (15:00)
-            if context.current_dt.hour >= 15 and context.current_dt.minute >= 0:
-                if not session._after_trading_end_done:
-                    context.current_dt = datetime.datetime.combine(today, datetime.time(15, 0))
-                    for func in session._after_trading_end_funcs:
-                        try:
-                            func(context, _LazyData(context))
-                        except Exception as e:
-                            log.warn(f"after_trading_end hook error: {e}")
-                    session._after_trading_end_done = True
 
             time.sleep(interval)
     except KeyboardInterrupt:

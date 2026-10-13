@@ -317,10 +317,19 @@ def get_fundamentals(query_or_code, date=None):
     Parameters:
         query_or_code: a Query object (from query()) or a stock code string
         date: optional date parameter (ignored in V1; spot data is always current)
+
+    .. warning:: Not point-in-time safe.  Both the query form (current
+        valuation snapshot) and the single-code form (latest financial
+        abstract) return present-day data regardless of ``date``.  Inside a
+        backtest this emits a ``FutureWarning`` — or raises ``ValueError``
+        when ``set_option('avoid_future_data', True)`` — because it leaks
+        future information into historical simulations.
     """
     if isinstance(query_or_code, Query):
+        from eqlib.data import _check_pit_snapshot_api
+        _check_pit_snapshot_api("get_fundamentals(query)", stacklevel=3)
         return _execute_query(query_or_code)
-    # Fallback: original EasyQuant behavior
+    # Fallback: original EasyQuant behavior (warns via get_financial_abstract)
     from eqlib.data import get_financial_abstract
     return get_financial_abstract(query_or_code)
 
@@ -375,10 +384,29 @@ def get_current_data_object() -> dict[str, _StockDataObj]:
     Returns dict mapping code -> _StockDataObj with .paused attribute.
     In backtest mode, checks preloaded volume to determine paused status.
     In live mode, checks spot volume == 0.
-    """
-    from eqlib.data import get_current_data as _get_current_data_eq
 
-    eq_data = _get_current_data_eq()
+    .. warning:: Latest snapshot only — the market fields (price, PE/PB,
+        turnover, ST status derived from the current name) reflect the
+        *current* spot snapshot; the provider carries no point-in-time
+        history.  Inside a backtest this emits a ``FutureWarning`` (or
+        raises ``ValueError`` with ``set_option('avoid_future_data',
+        True)``); restrict use to research/live contexts.
+    """
+    from eqlib.data import _check_pit_snapshot_api, _current_data_impl
+
+    _check_pit_snapshot_api(
+        "get_current_data_object",
+        stacklevel=3,
+        reason=(
+            "returns the latest full-market spot snapshot (current price, "
+            "PE/PB, ST status) — the provider has no point-in-time history."
+        ),
+    )
+
+    # Route through the check-free implementation: the guard above already
+    # fired under this entry point's name, so calling the public
+    # get_current_data() here would double-warn.
+    eq_data = _current_data_impl()
     if not eq_data:
         return {}
 

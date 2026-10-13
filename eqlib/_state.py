@@ -8,6 +8,7 @@ Provides:
   transparently delegated to the active session via a module wrapper class.
 """
 
+import contextlib
 import sys
 import threading
 import types
@@ -55,6 +56,8 @@ class BacktestSession:
         '_notification_events',
         # Paper-trading: after_trading_end one-shot flag
         '_after_trading_end_done',
+        # Engine-internal full-range fetch guard (PIT truncation bypass)
+        '_full_range_fetch_depth',
         # Scheduled-func dedup: {(func_id, time_str): last run datetime.date}
         '_sched_last_run',
     )
@@ -99,6 +102,27 @@ class BacktestSession:
         # Paper-trading: after_trading_end one-shot flag
         self._after_trading_end_done = False
         self._sched_last_run = {}
+        # >0 while the engine performs internal full-range data fetches
+        self._full_range_fetch_depth = 0
+
+
+# ── Engine-internal full-range data fetch guard ──────────────────────────────
+#
+# Public data accessors (eqlib.data.fetch_stock_data, get_money_flow, ...)
+# truncate results at the active backtest's simulated clock for point-in-time
+# safety.  Engine internals that legitimately need the full requested range
+# (e.g. preloading the whole backtest window) wrap their fetches with this
+# guard instead of disabling the protection globally.
+
+@contextlib.contextmanager
+def _unrestricted_fetch():
+    """Temporarily disable PIT truncation for engine-internal data fetches."""
+    session = get_session()
+    session._full_range_fetch_depth += 1
+    try:
+        yield
+    finally:
+        session._full_range_fetch_depth -= 1
 
 
 # ── Thread-local session management ───────────────────────────────────────────
