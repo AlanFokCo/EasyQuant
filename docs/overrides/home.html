@@ -6,8 +6,24 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
 {{ super() }}
+{% include "partials/og_meta.html" %}
 {% endblock %}
 
 {% block content %}
+<script>
+(function(){
+  var body = document.body;
+  var force = function(){
+    if (body.getAttribute('data-md-color-scheme') !== 'slate') {
+      body.setAttribute('data-md-color-scheme', 'slate');
+    }
+  };
+  force();
+  new MutationObserver(force).observe(body, {
+    attributes: true,
+    attributeFilter: ['data-md-color-scheme']
+  });
+})();
+</script>
 {{ page.content }}
 {% endblock %}

@@ -1025,3 +1025,208 @@ body, .md-container, .md-main {
     display: none !important;
   }
 }
+
+/* ============================================================================
+   TYPOGRAPHY REFINEMENT (polish pass)
+   Tables, code blocks, links, quotes, kbd, footnotes — detail-level finish.
+   All colors route through --eq-* tokens; light scheme keeps working.
+   ============================================================================ */
+
+/* ----- Global text rendering ----- */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ----- Tables: hairline grid, tabular numerals, hover, sticky header ----- */
+.md-typeset table:not([class]) {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  background: var(--eq-bg);
+  box-shadow: var(--eq-shadow-sm);
+}
+
+.md-typeset table:not([class]) tr {
+  border-bottom: none;
+}
+
+.md-typeset table:not([class]) th {
+  background: var(--eq-surface);
+  background-clip: padding-box;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--eq-border) !important;
+  white-space: nowrap;
+}
+
+.md-typeset table:not([class]) td {
+  border-bottom: 1px solid var(--eq-border);
+}
+
+.md-typeset table:not([class]) tr:last-child td {
+  border-bottom: none;
+}
+
+.md-typeset table:not([class]) tbody tr {
+  transition: background 0.12s ease;
+}
+
+.md-typeset table:not([class]) tbody tr:hover {
+  background: var(--eq-accent-soft);
+}
+
+/* Rounded corners survive without overflow clipping */
+.md-typeset table:not([class]) th:first-child {
+  border-top-left-radius: var(--eq-radius);
+}
+.md-typeset table:not([class]) th:last-child {
+  border-top-right-radius: var(--eq-radius);
+}
+.md-typeset table:not([class]) tr:last-child td:first-child {
+  border-bottom-left-radius: var(--eq-radius);
+}
+.md-typeset table:not([class]) tr:last-child td:last-child {
+  border-bottom-right-radius: var(--eq-radius);
+}
+
+/* Sticky table header (desktop only; mobile keeps block-scroll behavior) */
+@media screen and (min-width: 44.01em) {
+  .md-typeset table:not([class]) {
+    overflow: visible;
+  }
+  .md-typeset table:not([class]) th {
+    position: sticky;
+    top: 2.4rem;
+    z-index: 2;
+  }
+}
+@media screen and (min-width: 76.25em) {
+  .md-typeset table:not([class]) th {
+    top: 4.8rem;
+  }
+}
+
+/* ----- Code: copy button, highlighted lines, hover hairline ----- */
+.md-typeset pre > code {
+  transition: border-color 0.2s ease;
+}
+
+.md-typeset pre:hover > code {
+  border-color: var(--eq-border-hover);
+}
+
+.md-typeset .highlight .hll {
+  background-color: var(--eq-accent-soft);
+}
+
+.md-clipboard {
+  color: var(--eq-text-3);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.md-clipboard:hover {
+  color: var(--eq-text);
+}
+
+.md-clipboard:active {
+  transform: scale(0.88);
+}
+
+/* Inline code inside links inherits the link color */
+.md-typeset a > code:not(pre > code) {
+  color: inherit;
+}
+
+/* ----- Links: refined underline with animated accent ----- */
+.md-typeset a:not(.md-button):not(.hero-card):not(.headerlink):not(.footnote-backref) {
+  text-decoration: underline;
+  text-decoration-color: rgba(91, 141, 239, 0.4);
+  text-decoration-color: color-mix(in srgb, var(--eq-accent) 38%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  border-bottom: none;
+  transition: text-decoration-color 0.18s ease, color 0.18s ease;
+}
+
+.md-typeset a:not(.md-button):not(.hero-card):not(.headerlink):not(.footnote-backref):hover {
+  text-decoration-color: var(--eq-accent);
+}
+
+/* ----- Blockquote: accent-tinted panel ----- */
+.md-typeset blockquote {
+  border-left: 3px solid var(--eq-accent);
+  background: var(--eq-accent-soft);
+  padding: 0.75rem 1.25rem;
+}
+
+/* ----- Keyboard keys, marks, definition lists ----- */
+.md-typeset kbd {
+  background: var(--eq-surface);
+  border: 1px solid var(--eq-border);
+  border-bottom-width: 2px;
+  border-radius: 0.3rem;
+  padding: 0.05em 0.42em;
+  font-size: 0.78em;
+  color: var(--eq-text);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.md-typeset mark {
+  background: rgba(201, 164, 92, 0.28);
+  color: inherit;
+  padding: 0 0.2em;
+  border-radius: 0.2em;
+}
+
+.md-typeset dt {
+  font-weight: 600;
+  margin-top: 1rem;
+}
+
+.md-typeset dd {
+  margin-left: 1.5rem;
+  color: var(--eq-text-2);
+}
+
+/* ----- Admonitions: subtle elevation + title tracking ----- */
+.md-typeset .admonition,
+.md-typeset details {
+  box-shadow: var(--eq-shadow-sm) !important;
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  letter-spacing: 0.01em;
+}
+
+/* ----- Tabbed code sets: match radius tokens ----- */
+.md-typeset .tabbed-set {
+  border-radius: var(--eq-radius);
+}
+
+/* ----- Footnotes: quiet, separated ----- */
+.md-typeset .footnote {
+  font-size: 0.8rem;
+  color: var(--eq-text-2);
+  border-top: 1px solid var(--eq-border);
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+}
+
+/* ----- Anchor jumps clear the sticky header ----- */
+.md-typeset h1[id],
+.md-typeset h2[id],
+.md-typeset h3[id],
+.md-typeset h4[id] {
+  scroll-margin-top: 5rem;
+}
+
+/* ----- Light scheme: header source link legibility ----- */
+[data-md-color-scheme="default"] .md-header__source {
+  color: var(--eq-text-2) !important;
+}
+
+[data-md-color-scheme="default"] .md-header__source:hover {
+  color: var(--eq-text) !important;
+}

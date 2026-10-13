@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>404 · {{ config.site_name }}</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="{{ config.site_url }}assets/logo-icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07090c; --bg2:#0b0f13; --line:rgba(237,242,243,.09);
+  --text:#edf2f3; --mute:#97a3ab; --faint:#5d6a72;
+  --red:#e63946; --green:#17a974; --gold:#c9a45c;
+  --serif:"Fraunces","Noto Serif SC","Songti SC",serif;
+  --mono:"JetBrains Mono","SF Mono",monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Noto Sans SC",-apple-system,"PingFang SC",sans-serif;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  display:flex; flex-direction:column; min-height:100vh;
+}
+::selection{background:rgba(230,57,70,.32); color:#fff}
+
+/* ---- backdrop: grid + glows + chart ---- */
+.stage{position:fixed; inset:0; z-index:0; pointer-events:none}
+.stage::before{
+  content:""; position:absolute; inset:0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 90% 80% at 50% 42%, #000 30%, transparent 78%);
+  -webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 42%, #000 30%, transparent 78%);
+  opacity:.55;
+}
+.glow{position:absolute; border-radius:50%; filter:blur(90px)}
+.glow-r{width:44vw;height:44vw;right:-12vw;top:-14vw;background:radial-gradient(circle,rgba(230,57,70,.16),transparent 65%)}
+.glow-g{width:38vw;height:38vw;left:-10vw;bottom:-12vw;background:radial-gradient(circle,rgba(23,169,116,.13),transparent 65%)}
+.glow-a{width:26vw;height:26vw;left:38vw;top:30vh;background:radial-gradient(circle,rgba(201,164,92,.08),transparent 65%)}
+
+.chart{position:absolute; left:50%; bottom:-10vh; transform:translateX(-50%);
+  width:min(1100px,120vw); opacity:.48;
+  mask-image:linear-gradient(to top,#000 52%,transparent 92%);
+  -webkit-mask-image:linear-gradient(to top,#000 52%,transparent 92%)}
+.chart svg{display:block; width:100%; height:auto}
+
+.cd{transform-origin:center bottom; opacity:0; animation:cdIn .7s var(--ease) forwards}
+@keyframes cdIn{from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none}}
+.crash{transform-origin:center top; animation:crashIn 1.1s var(--ease) .9s both, crashPulse 2.6s ease-in-out 2.2s infinite}
+@keyframes crashIn{from{opacity:0; transform:translateY(-46px)} to{opacity:1; transform:none}}
+@keyframes crashPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(23,169,116,0))}50%{filter:drop-shadow(0 0 14px rgba(23,169,116,.55))}}
+.crashline{stroke-dasharray:6 8; opacity:0;
+  animation:lineIn .6s var(--ease) 1.5s forwards, crawl 2.4s linear 1.5s infinite}
+@keyframes lineIn{to{opacity:.8}}
+@keyframes crawl{to{stroke-dashoffset:-28}}
+
+/* ---- content ---- */
+main{position:relative; z-index:1; flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center;
+  padding:clamp(2rem,6vh,4rem) 1.5rem}
+
+.brand{display:flex; align-items:center; gap:.6rem; font-family:var(--mono);
+  font-size:.78rem; letter-spacing:.34em; color:var(--mute); text-transform:uppercase;
+  animation:rise .8s var(--ease) both}
+.brand svg{width:22px;height:22px}
+
+.code{
+  font-family:var(--serif); font-weight:600;
+  font-size:clamp(6rem, 22vw, 13rem); line-height:.95; letter-spacing:-.02em;
+  margin:1.2rem 0 0;
+  background:linear-gradient(178deg,#fff 30%,#8fa0a8 90%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:rise .8s var(--ease) .08s both;
+}
+.code em{font-style:normal;
+  background:linear-gradient(178deg,#3ddc97,#0f7a52);
+  -webkit-background-clip:text; background-clip:text; color:transparent}
+
+.ticker{display:inline-flex; align-items:center; gap:.7rem; margin-top:1.6rem;
+  font-family:var(--mono); font-size:.8rem;
+  border:1px solid var(--line); border-radius:999px; padding:.45rem 1rem;
+  background:rgba(16,22,28,.66); backdrop-filter:blur(8px);
+  animation:rise .8s var(--ease) .16s both}
+.ticker .sym{color:var(--text); letter-spacing:.08em}
+.ticker .down{color:var(--green); font-weight:600}
+.ticker .tag{color:var(--green); border:1px solid rgba(23,169,116,.4); border-radius:4px;
+  padding:.05rem .38rem; font-size:.68rem; letter-spacing:.12em}
+.ticker .dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.25}}
+
+h1{font-family:var(--serif); font-weight:700; font-size:clamp(1.6rem,4.4vw,2.6rem);
+  margin-top:1.8rem; letter-spacing:.01em; animation:rise .8s var(--ease) .24s both}
+h1 .hl{color:var(--green)}
+.sub{margin-top:.9rem; max-width:34rem; color:var(--mute); font-size:.98rem; line-height:1.9;
+  animation:rise .8s var(--ease) .32s both}
+.sub .en{display:block; margin-top:.35rem; color:var(--faint); font-size:.8rem;
+  font-family:var(--mono); letter-spacing:.04em}
+
+.cta{display:flex; flex-wrap:wrap; gap:.8rem; justify-content:center; margin-top:2.4rem;
+  animation:rise .8s var(--ease) .4s both}
+.btn{display:inline-flex; align-items:center; gap:.5rem; text-decoration:none;
+  font-size:.9rem; padding:.78rem 1.5rem; border-radius:10px;
+  transition:transform .35s var(--ease), box-shadow .35s var(--ease), border-color .35s}
+.btn-p{background:var(--red); color:#fff; font-weight:600;
+  box-shadow:0 8px 28px -10px rgba(230,57,70,.55)}
+.btn-p:hover{transform:translateY(-2px); box-shadow:0 14px 34px -10px rgba(230,57,70,.65)}
+.btn-g{border:1px solid var(--line); color:var(--mute); background:rgba(16,22,28,.5)}
+.btn-g:hover{transform:translateY(-2px); border-color:rgba(237,242,243,.28); color:var(--text)}
+.btn .m{font-family:var(--mono); font-size:.78rem}
+
+.foot{position:relative; z-index:1; text-align:center; padding:1.4rem 1rem 1.8rem;
+  font-family:var(--mono); font-size:.72rem; color:var(--faint); letter-spacing:.05em}
+.foot b{color:var(--gold); font-weight:600}
+
+@keyframes rise{from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:none}}
+
+@media (max-width:640px){
+  .chart{opacity:.32; bottom:-6vh}
+  .cta .btn{width:100%; justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important}
+  .cd,.crash{opacity:1 !important; transform:none !important}
+  .crashline{opacity:.8 !important}
+}
+</style>
+</head>
+<body>
+
+<div class="stage" aria-hidden="true">
+  <div class="glow glow-r"></div>
+  <div class="glow glow-g"></div>
+  <div class="glow glow-a"></div>
+  <div class="chart">
+    <svg viewBox="0 0 1100 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g class="cd" style="animation-delay:.05s"><rect x="40"  y="120" width="18" height="46" fill="#e63946"/><line x1="49" y1="106" x2="49" y2="180" stroke="#e63946" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.12s"><rect x="95"  y="108" width="18" height="52" fill="#e63946"/><line x1="104" y1="96"  x2="104" y2="172" stroke="#e63946" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.19s"><rect x="150" y="118" width="18" height="30" fill="#17a974"/><line x1="159" y1="100" x2="159" y2="158" stroke="#17a974" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.26s"><rect x="205" y="96"  width="18" height="48" fill="#e63946"/><line x1="214" y1="84"  x2="214" y2="156" stroke="#e63946" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.33s"><rect x="260" y="80"  width="18" height="44" fill="#e63946"/><line x1="269" y1="66"  x2="269" y2="136" stroke="#e63946" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.40s"><rect x="315" y="88"  width="18" height="26" fill="#17a974"/><line x1="324" y1="72"  x2="324" y2="124" stroke="#17a974" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.47s"><rect x="370" y="62"  width="18" height="46" fill="#e63946"/><line x1="379" y1="50"  x2="379" y2="120" stroke="#e63946" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:.54s"><rect x="425" y="48"  width="18" height="40" fill="#e63946"/><line x1="434" y1="36"  x2="434" y2="98"  stroke="#e63946" stroke-width="2"/></g>
+      <g class="crash">
+        <line x1="489" y1="30" x2="489" y2="282" stroke="#17a974" stroke-width="3"/>
+        <rect x="478" y="44" width="22" height="210" fill="#17a974"/>
+      </g>
+      <g class="cd" style="animation-delay:1.7s"><rect x="530" y="212" width="18" height="34" fill="#17a974"/><line x1="539" y1="200" x2="539" y2="258" stroke="#17a974" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:1.85s"><rect x="585" y="206" width="18" height="30" fill="#e63946"/><line x1="594" y1="192" x2="594" y2="246" stroke="#e63946" stroke-width="2"/></g>
+      <g class="cd" style="animation-delay:2.0s"><rect x="640" y="196" width="18" height="26" fill="#17a974"/><line x1="649" y1="184" x2="649" y2="232" stroke="#17a974" stroke-width="2"/></g>
+      <path class="crashline" d="M440 40 L489 250 L640 210" stroke="#c9a45c" stroke-width="2" opacity=".8"/>
+      <line x1="0" y1="284" x2="1100" y2="284" stroke="rgba(237,242,243,.14)" stroke-width="1"/>
+    </svg>
+  </div>
+</div>
+
+<main>
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#10161c" stroke="rgba(237,242,243,.14)"/><path d="M5 16l4-6 3 4 4-7 3 5" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    EASYQUANT · EQLIB
+  </div>
+
+  <div class="code">4<em>0</em>4</div>
+
+  <div class="ticker">
+    <span class="dot"></span>
+    <span class="sym">EQ·404</span>
+    <span class="down">▼ -10.00%</span>
+    <span class="tag">已退市</span>
+  </div>
+
+  <h1>这一页，已经<span class="hl">退市</span>了。</h1>
+
+  <p class="sub">
+    您访问的地址不存在、已迁移，或从未上市。别担心，本金安全 —— 本站其他页面均正常交易。
+    <span class="en">ERR_PAGE_NOT_FOUND · The requested page has been delisted or never IPO'd.</span>
+  </p>
+
+  <nav class="cta">
+    <a class="btn btn-p" href="{{ config.site_url }}">← 返回首页</a>
+    <a class="btn btn-g" href="{{ config.site_url }}tutorials/00-getting-started/"><span class="m">00</span> 快速上手</a>
+    <a class="btn btn-g" href="{{ config.site_url }}reference/"><span class="m">API</span> 接口参考</a>
+  </nav>
+</main>
+
+<footer class="foot">
+  本次 404 已被事件总线捕获并完成清算 · captured by the event bus, <b>liquidated</b> at market open
+</footer>
+
+</body>
+</html>

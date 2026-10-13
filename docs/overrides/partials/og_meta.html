@@ -1,0 +1,22 @@
+{%- set og_desc_zh = "事件驱动的中国 A 股回测框架：涨跌停拦截、PIT 数据契约、交易所日历、含费用口径 —— 让 A 股回测的每一分钱都算数。" -%}
+{%- set og_desc_en = "Event-driven backtesting for China A-shares: price-limit interception, PIT data contracts, exchange calendar, cost-aware accounting." -%}
+{%- set is_en = page and page.file and page.file.src_uri.endswith('.en.md') -%}
+{%- set og_desc = og_desc_en if is_en else og_desc_zh -%}
+{%- set is_home = page and (page.title in ("Home", config.site_name) or page.url in ("", "en", "en/")) -%}
+{%- if is_home -%}
+{%- set og_title = "EasyQuant — A-Share Event-Driven Backtesting" if is_en else "EasyQuant — A 股事件驱动回测框架" -%}
+{%- else -%}
+{%- set og_title = (page.title ~ " — " ~ config.site_name) if (page and page.title) else config.site_name -%}
+{%- endif -%}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ config.site_name }}">
+<meta property="og:url" content="{{ page.canonical_url }}">
+<meta property="og:title" content="{{ og_title }}">
+<meta property="og:description" content="{{ og_desc }}">
+<meta property="og:image" content="{{ config.site_url }}assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ og_title }}">
+<meta name="twitter:description" content="{{ og_desc }}">
+<meta name="twitter:image" content="{{ config.site_url }}assets/og-card.png">
