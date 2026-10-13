@@ -32,14 +32,15 @@ if _REPO_ROOT not in sys.path:
 import os
 
 from eqlib import (
-    run_backtest, set_benchmark, set_order_cost,
+    run_backtest, set_benchmark, set_order_cost, set_slippage,
     run_daily, attribute_history, order_value, order_target,
     record, log, g, analyze_returns,
 )
 from examples._defaults import (
     STOCKS, STOCKS_TRADE, INDEX_HS300,
-    DEFAULT_ORDER_COST, INITIAL_CASH,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, INITIAL_CASH,
     START_DATE, END_DATE, verify_data_available,
+    format_pct, format_num,
 )
 
 
@@ -57,6 +58,7 @@ def initialize(context):
     """Strategy initialization."""
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     g.security = SECURITY
     g.security_trade = SECURITY_TRADE
@@ -193,7 +195,9 @@ if __name__ == "__main__":
         print(f"  Calmar ratio:      {metrics.get('calmar_ratio', 0):>10.2f}")
         print(f"  Win rate:          {metrics.get('win_rate_trade', 0):>10.1%}")
         print(f"  Trade count:       {metrics.get('trade_count', 0):>10.0f}")
-        print(f"  Alpha:             {metrics.get('alpha', 0):>+10.2%}")
-        print(f"  Beta:              {metrics.get('beta', 0):>10.2f}")
+        # Alpha/beta are NaN when the benchmark series is unavailable —
+        # render as N/A instead of the misleading "nan%".
+        print(f"  Alpha:             {format_pct(metrics.get('alpha'), sign=True):>10}")
+        print(f"  Beta:              {format_num(metrics.get('beta')):>10}")
     else:
         print("  Could not compute metrics (insufficient recorded data)")

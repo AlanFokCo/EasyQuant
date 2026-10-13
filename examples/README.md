@@ -9,7 +9,12 @@ Intermediate (08-14), Practical (15-20), ML (21-24), and risk-budgeted S/R resea
 pip install -e .
 ```
 
-Examples share configuration from `_defaults.py`. Example 25 uses explicit fixed dates and immutable CSV inputs.
+Examples share configuration from `_defaults.py` (trading costs, slippage,
+stock codes, relative dates). Backtest examples enable
+`set_slippage(DEFAULT_SLIPPAGE)` (0.1% per fill) explicitly; the engine
+enforces A-share price-limit fill rules by default
+(`set_option('check_price_limit', False)` opts out). Example 25 uses
+explicit fixed dates and immutable CSV inputs.
 
 ## Foundation (01-07): Learn the Basics
 
@@ -89,18 +94,15 @@ Downloads convert stock volume from lots to shares; supplied CSVs must use share
 
 ## Shared Infrastructure
 
-- `examples/_defaults.py` — Trading costs (2024 rates), stock codes, relative dates
+- `examples/_defaults.py` — Trading costs (2024 rates), slippage, stock codes, relative dates
 - `tests/test_examples_smoke.py` — Smoke tests: syntax, imports, code standards
 
-## Bonus: Web Studio Ready Strategies
+## Bonus: Ready-to-Adapt Strategies
 
-Additional strategies optimized for **Web Strategy Studio** (browser-based editing and backtesting):
-
-| File | Strategy | Key Techniques |
-|------|----------|----------------|
-| `eqlib/examples/multi_factor_momentum.py` | Multi-factor momentum rotation | 10-stock universe, daily rebalancing, equal-weight position sizing |
-
-These strategies use `from eqlib import *` directly and are designed to be copy-pasted into the Web Studio editor.
+Additional self-contained strategies live under `eqlib/examples/` (e.g.
+`multi_factor_momentum.py`: 10-stock universe, daily rebalancing,
+equal-weight position sizing). They use `from eqlib import *` directly and
+are designed to be copied and adapted freely.
 
 ## Trading Cost Standards
 
@@ -108,9 +110,15 @@ All examples use consistent 2024 rates:
 
 | Cost | Rate | Notes |
 |------|------|-------|
-| Stamp duty | 0.05% | Sell only, halved since Aug 2023 |
+| Stamp duty | 0.05% | Sell only, halved since Aug 2023 (0.1% before; see note below) |
 | Commission | 0.025% | Buy + sell, includes regulatory fees |
 | Minimum | 5 CNY | Per trade |
+| Slippage | 0.1% | Per fill, via `set_slippage(DEFAULT_SLIPPAGE)` in backtest examples |
+
+**Stamp duty is date-sensitive.** The examples pin the current 0.05% sell-side
+rate for teaching clarity. For backtests spanning 2023-08-28, either set
+`close_tax=None` (engine then applies the statutory rate of each trade date)
+or evaluate the pre/post periods separately.
 
 Example 25 accepts `--allow-breakout` as an experimental opt-in.
 Three rounds and 11 configurations did not pass the development/validation gate.

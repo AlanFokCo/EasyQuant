@@ -38,7 +38,7 @@ if _REPO_ROOT not in sys.path:
 import pandas as pd
 
 from eqlib import (
-    run_backtest, set_benchmark, set_order_cost,
+    run_backtest, set_benchmark, set_order_cost, set_slippage,
     run_daily, run_weekly, attribute_history,
     order_value, order_target,
     record, log, g, utils,
@@ -47,7 +47,7 @@ from eqlib import (
 )
 from examples._defaults import (
     STOCKS, STOCKS_TRADE, INDEX_HS300,
-    DEFAULT_ORDER_COST, INITIAL_CASH,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, INITIAL_CASH,
     START_DATE, END_DATE, verify_data_available,
 )
 
@@ -66,6 +66,7 @@ def initialize_trend(context):
     """MA 10/30 golden-cross / death-cross trend follower."""
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     g.security = TREND_SECURITY
     g.security_trade = TREND_SECURITY_TRADE
@@ -139,6 +140,7 @@ def initialize_mean_revert(context):
     """Bollinger Band mean reversion — weekly rebalance."""
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     g.security = MR_SECURITY
     g.security_trade = MR_SECURITY_TRADE

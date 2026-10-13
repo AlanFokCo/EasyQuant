@@ -35,6 +35,7 @@ from eqlib import (
     StrategyConfig,
     PortfolioRiskMonitor,
     set_order_cost,
+    set_slippage,
     attribute_history,
     order_value,
     order_target,
@@ -47,6 +48,7 @@ from examples._defaults import (
     STOCKS_TRADE,
     INDEX_HS300,
     DEFAULT_ORDER_COST,
+    DEFAULT_SLIPPAGE,
     INITIAL_CASH,
     START_DATE,
     END_DATE,
@@ -83,6 +85,15 @@ def momentum_strategy(context):
     run_portfolio_backtest.  ``context.universe`` is set
     automatically from StrategyConfig.securities.
     """
+    # run_portfolio_backtest builds its own initialize() internally, so
+    # trading costs and slippage are configured here on the first call
+    # (the engine's defaults already match these 2024 rates — being
+    # explicit keeps the example reproducible if defaults ever change).
+    if not getattr(context, "_costs_configured", False):
+        set_order_cost(DEFAULT_ORDER_COST)
+        set_slippage(DEFAULT_SLIPPAGE)
+        context._costs_configured = True
+
     # Score each stock in the universe by 20-day momentum
     scores = {}
     for sec in context.universe:

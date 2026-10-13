@@ -11,15 +11,20 @@ configuration and to guarantee uniform trading cost assumptions.
 import sys
 from datetime import datetime, timedelta
 
-from eqlib import OrderCost, get_price, log
+from eqlib import FixedSlippage, OrderCost, get_price, log
 
 
 # ============================================================
 # A-share trading costs (2024 current standards)
 # ============================================================
-# Note: OrderCost.calc_close_cost() applies date-aware stamp duty
-# internally (0.05% after 2023-08-28, 0.1% before). We set
-# close_tax=0.0005 explicitly for clarity in educational code.
+# Stamp duty disclosure: the sell-side stamp duty is 0.05% since
+# 2023-08-28 (0.1% before that date). Setting close_tax=0.0005
+# explicitly FIXES the rate for the entire backtest window and
+# overrides OrderCost's built-in date-aware statutory rate — fine for
+# recent windows, but for long history spanning 2023-08-28 the pre-cut
+# period is undercharged by 50%. For such windows either pass
+# close_tax=None (falls back to the date-aware statutory rate) or
+# evaluate pre/post periods separately.
 DEFAULT_ORDER_COST = OrderCost(
     open_tax=0,
     close_tax=0.0005,        # Stamp duty 0.05% (halved since Aug 2023)
@@ -28,6 +33,17 @@ DEFAULT_ORDER_COST = OrderCost(
     close_today_commission=0, # T+1 settlement, no intraday commission
     min_commission=5,         # Minimum 5 CNY per trade
 )
+
+
+# ============================================================
+# Slippage
+# ============================================================
+# Examples fill at the next trading day's open; real fills deviate from
+# that price. FixedSlippage(0.001) applies a 0.1% adverse adjustment per
+# fill — the conservative end of the usual 0.1%-0.3% estimate for liquid
+# large caps. Backtest examples enable it via set_slippage(DEFAULT_SLIPPAGE)
+# in initialize(). Illiquid small caps may warrant 0.002-0.003.
+DEFAULT_SLIPPAGE = FixedSlippage(0.001)
 
 
 # ============================================================
@@ -79,6 +95,26 @@ START_DATE = (datetime.now() - timedelta(days=365 * BACKTEST_YEARS + 30)).strfti
 # ============================================================
 # Utilities shared across examples
 # ============================================================
+
+def format_pct(value, digits=2, sign=False):
+    """Format a ratio as a percentage, rendering None/NaN as 'N/A'.
+
+    Benchmark-dependent metrics (alpha, beta, information_ratio) are NaN
+    when the benchmark series is unavailable — printing them with a plain
+    ``.2%`` format would show the misleading string "nan%".
+    """
+    if value is None or value != value:  # None or NaN
+        return "N/A"
+    spec = f"{{:{'+' if sign else ''}.{digits}%}}"
+    return spec.format(value)
+
+
+def format_num(value, digits=2):
+    """Format a float with fixed digits, rendering None/NaN as 'N/A'."""
+    if value is None or value != value:  # None or NaN
+        return "N/A"
+    return f"{value:.{digits}f}"
+
 
 def verify_data_available(security, start_date, end_date, max_extensions=2):
     """Verify data is obtainable with automatic lookback extension.
@@ -140,8 +176,8 @@ def print_evaluation(result, strategy_name="Strategy"):
     print(f"  Win Rate:        {metrics.get('win_rate_trade', 0):>10.1%}")
     print(f"  Profit/Loss:     {metrics.get('profit_loss_ratio', 0):>10.2f}")
     print(f"  Trade Count:     {metrics.get('trade_count', 0):>10.0f}")
-    print(f"  Alpha:           {metrics.get('alpha', 0):>+10.2%}")
-    print(f"  Beta:            {metrics.get('beta', 0):>10.2f}")
+    print(f"  Alpha:           {format_pct(metrics.get('alpha'), sign=True):>10}")
+    print(f"  Beta:            {format_num(metrics.get('beta')):>10}")
     print(f"{'='*55}")
 
     # Scientific rigor warnings

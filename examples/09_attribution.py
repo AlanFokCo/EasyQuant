@@ -42,7 +42,7 @@ if _REPO_ROOT not in sys.path:
 import os
 
 from eqlib import (
-    run_backtest, set_benchmark, set_order_cost,
+    run_backtest, set_benchmark, set_order_cost, set_slippage,
     run_weekly, attribute_history, order_value, order_target,
     record, log, g,
     analyze_returns, brinson_attribution, simple_factor_analysis,
@@ -51,8 +51,9 @@ from eqlib import (
 )
 from examples._defaults import (
     STOCKS, STOCKS_TRADE, INDEX_HS300,
-    DEFAULT_ORDER_COST, INITIAL_CASH,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, INITIAL_CASH,
     START_DATE, END_DATE, verify_data_available,
+    format_pct, format_num,
 )
 
 
@@ -68,6 +69,23 @@ UNIVERSE_TRADE = [STOCKS_TRADE[k] for k in UNIVERSE_KEYS]
 LOOKBACK = 20   # 20-day momentum window
 TOP_N = 3       # Buy top 3 by momentum
 
+# Sector mapping for Brinson attribution (BHB decomposition is done at
+# the sector level; without it every security falls into a single
+# "Unclassified" sector and all active return lands in selection).
+# Both bare and suffixed codes are mapped, since the trade log carries
+# suffixed codes while context.universe holds bare ones.
+SECTOR_MAP = {
+    code: sector
+    for key, sector in [
+        ("bank", "Financials"),
+        ("liquor", "Consumer Staples"),
+        ("ev", "New Energy"),
+        ("pharma", "Healthcare"),
+        ("cement", "Materials"),
+    ]
+    for code in (STOCKS[key], STOCKS_TRADE[key])
+}
+
 
 # ============================================================
 # Strategy: multi-stock momentum (weekly rebalance)
@@ -77,6 +95,7 @@ def initialize(context):
     """Set up benchmark, costs, universe, and weekly schedule."""
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     g.universe_bare = UNIVERSE_BARE
     g.universe_trade = UNIVERSE_TRADE
@@ -208,13 +227,15 @@ if __name__ == "__main__":
     print("2. Brinson Attribution")
     print(f"{'=' * 60}")
 
-    brinson = brinson_attribution(result)
+    brinson = brinson_attribution(result, sector_data=SECTOR_MAP)
     if brinson:
         alloc = brinson["allocation_effect"]
         select = brinson["selection_effect"]
         interact = brinson["interaction_effect"]
         total_active = brinson["total_active_return"]
 
+        # True Brinson-Hood-Beebower decomposition: the three effects sum
+        # exactly to (portfolio_return - benchmark_return) by construction.
         print(f"  Allocation effect:    {alloc:>+10.4f}  "
               f"({'positive' if alloc > 0 else 'negative'} — "
               f"did overweighting outperformers help?)")
@@ -226,6 +247,23 @@ if __name__ == "__main__":
               f"combined weight+selection synergy)")
         print(f"  Total active return:  {total_active:>+10.4f}  "
               f"(sum of all three effects)")
+        print(f"  Portfolio return:     {brinson['portfolio_return']:>+10.4f}  "
+              f"(cost-weighted holding-period return)")
+        print(f"  Benchmark return:     {brinson['benchmark_return']:>+10.4f}  "
+              f"(model: {brinson['benchmark_model']})")
+
+        # Per-sector breakdown (weights + effects)
+        sectors = brinson.get("sectors") or {}
+        if sectors:
+            print(f"\n  {'Sector':<18} {'w_p':>7} {'w_b':>7} {'r_p':>9} "
+                  f"{'r_b':>9} {'alloc':>8} {'select':>8}")
+            for name, row in sorted(sectors.items()):
+                print(f"  {name:<18} {row['weight_portfolio']:>7.1%} "
+                      f"{row['weight_benchmark']:>7.1%} "
+                      f"{row['return_portfolio']:>+9.2%} "
+                      f"{row['return_benchmark']:>+9.2%} "
+                      f"{row['allocation']:>+8.4f} {row['selection']:>+8.4f}")
+
         print(f"\n  Interpretation:")
         dominant = max(
             ("Allocation", abs(alloc)),
@@ -248,14 +286,30 @@ if __name__ == "__main__":
 
     ff = simple_factor_analysis(result)
     if ff:
-        print(f"  Market beta:          {ff['market_beta']:>10.2f}  "
-              f"({'aggressive' if ff['market_beta'] > 1.0 else 'defensive' if ff['market_beta'] < 0.8 else 'market-like'} — "
-              f"sensitivity to market moves)")
-        print(f"  Market exposure:      {ff.get('market_exposure', 0):>+10.2f}  "
+        # market_beta / alpha_annual are NaN when the benchmark series is
+        # unavailable — guard every comparison and render N/A explicitly.
+        beta = ff["market_beta"]
+        alpha_ann = ff["alpha_annual"]
+        if beta != beta:  # NaN
+            beta_label = "N/A — benchmark unavailable"
+        elif beta > 1.0:
+            beta_label = "aggressive"
+        elif beta < 0.8:
+            beta_label = "defensive"
+        else:
+            beta_label = "market-like"
+        if alpha_ann != alpha_ann:  # NaN
+            alpha_label = "N/A — benchmark unavailable"
+        elif alpha_ann > 0:
+            alpha_label = "positive alpha — strategy adds value"
+        else:
+            alpha_label = "negative alpha — underperforms on risk-adjusted basis"
+        print(f"  Market beta:          {format_num(beta):>10}  "
+              f"({beta_label} — sensitivity to market moves)")
+        print(f"  Market exposure:      {format_num(ff.get('market_exposure', 0), 2):>10}  "
               f"(raw market factor loading)")
-        print(f"  Alpha (annual):       {ff['alpha_annual']:>+10.2%}  "
-              f"({'positive alpha — strategy adds value' if ff['alpha_annual'] > 0 else 'negative alpha — underperforms on risk-adjusted basis'} "
-              f"beyond market exposure)")
+        print(f"  Alpha (annual):       {format_pct(alpha_ann, sign=True):>10}  "
+              f"({alpha_label} beyond market exposure)")
         print(f"  Momentum corr:        {ff['momentum_correlation']:>10.2f}  "
               f"({'significant' if abs(ff['momentum_correlation']) > 0.1 else 'weak'} — "
               f"lag-5 return autocorrelation)")

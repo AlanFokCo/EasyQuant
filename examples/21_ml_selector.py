@@ -30,11 +30,13 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from eqlib import (
-    run_strategy, set_benchmark, set_order_cost,
+    run_strategy, set_benchmark, set_order_cost, set_slippage,
     run_weekly, before_trading_start, order_target, order_value,
     MLSelector, log, g,
 )
-from examples._defaults import DEFAULT_ORDER_COST, START_DATE, END_DATE
+from examples._defaults import (
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, START_DATE, END_DATE,
+)
 
 
 UNIVERSE = [
@@ -46,6 +48,7 @@ UNIVERSE = [
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     context.universe = UNIVERSE
 

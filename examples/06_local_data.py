@@ -36,14 +36,14 @@ import os
 from datetime import datetime, timedelta
 
 from eqlib import (
-    run_backtest, set_benchmark, set_order_cost,
+    run_backtest, set_benchmark, set_order_cost, set_slippage,
     run_daily, attribute_history, order_value, order_target,
     record, g,
     save_stock_local, has_local_data, list_local_stocks,
 )
 from examples._defaults import (
     STOCKS, STOCKS_TRADE, INDEX_HS300,
-    DEFAULT_ORDER_COST, INITIAL_CASH,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, INITIAL_CASH,
     START_DATE, END_DATE, verify_data_available, print_evaluation,
 )
 
@@ -118,6 +118,7 @@ def demo_local_backtest():
     def init(ctx):
         set_benchmark(INDEX_HS300)
         set_order_cost(DEFAULT_ORDER_COST)
+        set_slippage(DEFAULT_SLIPPAGE)
         g.security = security
         g.security_trade = security_trade
         ctx.universe = [security]

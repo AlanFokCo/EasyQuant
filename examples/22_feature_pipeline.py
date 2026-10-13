@@ -31,12 +31,14 @@ if _REPO_ROOT not in sys.path:
 import pandas as pd
 
 from eqlib import (
-    run_backtest, set_benchmark, set_order_cost,
+    run_backtest, set_benchmark, set_order_cost, set_slippage,
     run_weekly, attribute_history, order_target, order_value,
     log, g,
 )
 from eqlib.ml import FeaturePipeline
-from examples._defaults import DEFAULT_ORDER_COST, START_DATE, END_DATE
+from examples._defaults import (
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, START_DATE, END_DATE,
+)
 
 
 UNIVERSE = ['601390', '600519', '000858', '002594', '601398']
@@ -45,6 +47,7 @@ UNIVERSE = ['601390', '600519', '000858', '002594', '601398']
 def initialize(context):
     set_benchmark('000300.XSHG')
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     context.universe = UNIVERSE
 

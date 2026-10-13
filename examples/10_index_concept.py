@@ -13,10 +13,22 @@ Demonstrates A-share index and classification APIs:
 
 Also includes a simple index constituent rotation strategy.
 
+.. note::
+    KNOWN LIMITATION (survivorship bias): the rotation demo below builds its
+    universe from *current* CSI 300 constituents, fetched in research mode
+    before the backtest starts.  The data provider serves no point-in-time
+    membership history, so members that were dropped or delisted during the
+    backtest window are invisible — results are optimistically biased.  The
+    in-session FutureWarning for get_index_stocks does not fire here because
+    the universe is assembled outside the backtest session.  For serious
+    research, use an explicit historical universe and handle delistings
+    yourself.
+
 Teaching Objectives:
     - Using index constituents as a stock pool
     - Industry and concept board exploration
     - Weighted portfolio construction from index weights
+    - Recognizing survivorship bias in snapshot-based universes
 
 Expected Output:
     - CSI 300 constituent list and top weights
@@ -45,7 +57,7 @@ from eqlib import (
     get_industry,
     run_backtest,
     set_benchmark,
-    set_order_cost,
+    set_order_cost, set_slippage,
     run_monthly,
     attribute_history,
     order_value,
@@ -58,7 +70,7 @@ from examples._defaults import (
     STOCKS,
     STOCKS_TRADE,
     INDEX_HS300,
-    DEFAULT_ORDER_COST,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE,
     INITIAL_CASH,
     START_DATE,
     END_DATE,
@@ -214,6 +226,7 @@ def initialize_rotation(context):
     """Initialize the rotation strategy."""
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     g.lookback = MOMENTUM_LOOKBACK
     g.max_picks = MAX_PICKS
@@ -270,6 +283,15 @@ def demo_rotation_strategy(constituent_codes):
     if not constituent_codes:
         print("  No constituent codes available — skipping backtest.")
         return
+
+    # SURVIVORSHIP BIAS CAVEAT: `constituent_codes` is the *current* CSI 300
+    # membership, fetched above in research mode (outside the backtest
+    # session, so the in-session FutureWarning does not fire).  Members
+    # dropped or delisted during the backtest window are silently missing,
+    # which flatters the strategy's returns.  Treat this demo's numbers as
+    # API teaching material, not a validated strategy result.
+    print("  ⚠ Survivorship bias: universe = today's constituents; dropped/")
+    print("    delisted members are missing — results are optimistically biased.")
 
     # Use a manageable subset for preloading
     universe = constituent_codes[:UNIVERSE_SIZE]

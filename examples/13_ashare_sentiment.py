@@ -41,7 +41,7 @@ import pandas as pd
 from eqlib import (
     run_backtest,
     set_benchmark,
-    set_order_cost,
+    set_order_cost, set_slippage,
     run_daily,
     attribute_history,
     order_value,
@@ -61,7 +61,7 @@ from examples._defaults import (
     STOCKS,
     STOCKS_TRADE,
     INDEX_HS300,
-    DEFAULT_ORDER_COST,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE,
     INITIAL_CASH,
     START_DATE,
     END_DATE,
@@ -291,6 +291,7 @@ def _init_common(context):
     g.slow_period = SLOW_PERIOD
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
     context.universe = [SECURITY]
 
 

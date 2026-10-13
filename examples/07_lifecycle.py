@@ -38,7 +38,7 @@ import os
 from datetime import datetime, timedelta
 
 from eqlib import (
-    run_backtest, set_benchmark, set_order_cost,
+    run_backtest, set_benchmark, set_order_cost, set_slippage,
     run_daily, run_monthly,
     before_trading_start, after_trading_end,
     set_universe, get_universe,
@@ -48,7 +48,7 @@ from eqlib import (
 )
 from examples._defaults import (
     STOCKS, STOCKS_TRADE, INDEX_HS300,
-    DEFAULT_ORDER_COST, INITIAL_CASH,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, INITIAL_CASH,
     START_DATE, END_DATE, verify_data_available, print_evaluation,
 )
 
@@ -132,6 +132,7 @@ def initialize(context):
     """Strategy initialization with lifecycle hooks."""
     set_benchmark(INDEX_HS300)
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     # Set initial universe
     set_universe(UNIVERSE_CODES)

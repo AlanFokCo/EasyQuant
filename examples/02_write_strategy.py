@@ -37,13 +37,13 @@ if _REPO_ROOT not in sys.path:
 import os
 
 from eqlib import (
-    run_strategy, set_benchmark, set_order_cost,
+    run_strategy, set_benchmark, set_order_cost, set_slippage,
     run_daily, attribute_history, order_value, order_target,
     record, log, g,
 )
 from examples._defaults import (
     STOCKS, STOCKS_TRADE, INDEX_HS300,
-    DEFAULT_ORDER_COST, INITIAL_CASH,
+    DEFAULT_ORDER_COST, DEFAULT_SLIPPAGE, INITIAL_CASH,
     START_DATE, END_DATE, verify_data_available, print_evaluation,
 )
 
@@ -79,6 +79,7 @@ def initialize(context):
 
     # Trading costs — use shared defaults for consistency
     set_order_cost(DEFAULT_ORDER_COST)
+    set_slippage(DEFAULT_SLIPPAGE)
 
     # Store parameters on g (global state object)
     # g persists across all callbacks throughout the backtest
