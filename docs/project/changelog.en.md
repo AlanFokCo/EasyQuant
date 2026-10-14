@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-10-14
+
+> ⚠️ This release contains several breaking changes (each marked ⚠️ below: price-limit interception on by default, authoritative exchange calendar, same-day cancellation on suspension, forced delisting liquidation, fee-inclusive win-rate accounting, true single-period Brinson attribution, NaN for benchmark-less metrics, and the `AlertLevel.NORMAL` baseline). Per semantic versioning we jump from 1.0.3 straight to 2.0.0; every old behavior can be restored via its documented option.
+
 ### Removed
 
 - **Removed Web Strategy Studio** (2026-10-10) — `web_strategy_studio/` (FastAPI backend + React frontend) has been removed from the repository; the project refocuses on the core backtesting library `eqlib`. Related documentation (user guide, deployment guide, FAQ entries, homepage card, and navigation) has been removed as well.

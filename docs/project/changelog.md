@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-10-14
+
+> ⚠️ 本版本含多项不兼容变更（下文以 ⚠️ 逐条标注：涨跌停拦截默认开启、交易日历权威化、停牌当日取消、退市强制清算、胜率含费用口径、Brinson 归因重写、基准缺失指标返回 NaN、`AlertLevel.NORMAL` 基线）。按语义化版本规范从 1.0.3 直升 2.0.0；旧行为均可通过对应选项恢复。
+
 ### Removed
 
 - **移除 Web 策略工作室**（2026-10-10）— `web_strategy_studio/`（FastAPI 后端 + React 前端）已从仓库中移除，项目重新聚焦于核心回测库 `eqlib`。相关文档（使用指南、部署指南、FAQ 条目、首页入口与导航）已同步删除。
