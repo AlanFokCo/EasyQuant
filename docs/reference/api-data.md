@@ -73,7 +73,7 @@ get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None,
                      min_roe=None, min_revenue=None, min_profit=None)
 ```
 
-注意：当前实现仅 `min_pe` / `max_pe` / `min_pb` / `max_pb` 参与过滤；`min_roe` / `min_revenue` / `min_profit` 保留在签名中但暂不生效（现货快照数据源无对应字段）。
+`min_pe` / `max_pe` / `min_pb` / `max_pb` 作用于实时现货快照；`min_roe`（单位：%，如 `10` 表示 ROE ≥ 10%）、`min_revenue`（单位：元）、`min_profit`（单位：元）作用于最近一期披露基本完整的季报（业绩报表），传入任一者后结果会附带 `roe` / `revenue` / `profit` 列。季报数据不可用时函数按失败关闭处理：返回空 `DataFrame` 并记录警告，不会假装过滤已生效。两类数据均为最新快照，回测中使用会触发 `FutureWarning`（见函数文档字符串）。
 
 ## get_all_securities
 

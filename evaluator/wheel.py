@@ -36,6 +36,15 @@ from .models import Finding, Severity
 # hosts (e.g. small cloud instances whose PyPI throughput is ~300 kB/s) should
 # set the env override even higher.
 _COMMAND_TIMEOUT_SECONDS = int(os.environ.get("EQ_WHEEL_COMMAND_TIMEOUT", "600"))
+
+# The isolated install deliberately ignores pip config files and PIP_* env
+# vars (--isolated), so hosts that can only reach PyPI through a mirror get
+# an explicit, auditable override instead: EQ_WHEEL_PIP_INDEX_URL is passed
+# as --index-url, and EQ_WHEEL_PIP_TRUSTED_HOST as --trusted-host (needed
+# for plain-HTTP mirrors). Both are recorded in the install command evidence.
+_PIP_INDEX_URL = os.environ.get("EQ_WHEEL_PIP_INDEX_URL", "").strip()
+_PIP_TRUSTED_HOST = os.environ.get("EQ_WHEEL_PIP_TRUSTED_HOST", "").strip()
+
 _MAX_EVIDENCE_CHARS = 4_000
 _STREAM_CHUNK_SIZE = 64 * 1024
 _TERMINATION_GRACE_SECONDS = 1.0
@@ -190,19 +199,21 @@ def build_and_audit_wheel(
         )
         return _evidence(wheel_path, metadata, build=build, venv=venv), [finding]
 
-    install = _run(
-        [
-            str(venv_python),
-            "-m",
-            "pip",
-            "install",
-            "--isolated",
-            "--no-cache-dir",
-            "--disable-pip-version-check",
-            str(wheel_path),
-        ],
-        check=False,
-    )
+    install_cmd = [
+        str(venv_python),
+        "-m",
+        "pip",
+        "install",
+        "--isolated",
+        "--no-cache-dir",
+        "--disable-pip-version-check",
+    ]
+    if _PIP_INDEX_URL:
+        install_cmd.extend(["--index-url", _PIP_INDEX_URL])
+    if _PIP_TRUSTED_HOST:
+        install_cmd.extend(["--trusted-host", _PIP_TRUSTED_HOST])
+    install_cmd.append(str(wheel_path))
+    install = _run(install_cmd, check=False)
     pip_check = _run(
         [str(venv_python), "-m", "pip", "check", "--isolated"],
         check=False,

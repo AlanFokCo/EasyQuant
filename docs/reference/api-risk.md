@@ -92,7 +92,7 @@ report = monitor.daily_check()
 | 属性 | 说明 |
 |------|------|
 | `timestamp` | 检查时间 |
-| `alert_level` | 预警级别：`YELLOW` / `RED` / `KILL_SWITCH` |
+| `alert_level` | 预警级别：`NORMAL` / `YELLOW` / `RED` / `KILL_SWITCH` |
 | `triggers` | 触发的预警信息列表 |
 | `portfolio_var` | 组合 VaR（金额） |
 | `portfolio_var_pct` | 组合 VaR（百分比） |
@@ -137,6 +137,7 @@ RiskThresholds(
 
 | 值 | 说明 |
 |------|------|
+| `NORMAL` | 正常，无预警（未触发任何条件） |
 | `YELLOW` | 监控关注，不触发动作 |
 | `RED` | 需要人工介入 |
 | `KILL_SWITCH` | 自动熔断 + 人工确认 |

@@ -92,7 +92,7 @@ Returns a `RiskReport` object:
 | Attribute | Description |
 |-----------|-------------|
 | `timestamp` | Check time |
-| `alert_level` | Alert level: `YELLOW` / `RED` / `KILL_SWITCH` |
+| `alert_level` | Alert level: `NORMAL` / `YELLOW` / `RED` / `KILL_SWITCH` |
 | `triggers` | List of triggered alert messages |
 | `portfolio_var` | Portfolio VaR (amount) |
 | `portfolio_var_pct` | Portfolio VaR (percentage) |
@@ -137,6 +137,7 @@ Alert level enumeration.
 
 | Value | Description |
 |-------|-------------|
+| `NORMAL` | Normal — nothing triggered |
 | `YELLOW` | Monitor — no action triggered |
 | `RED` | Requires human intervention |
 | `KILL_SWITCH` | Automatic kill switch + manual confirmation required |

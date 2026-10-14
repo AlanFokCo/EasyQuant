@@ -10,7 +10,7 @@
 ---
 ## 1. 组合风控
 
-`PortfolioRiskMonitor` 回答的问题是"把这几个策略放在一起跑，组合层面风险有多大"：整体 VaR、策略间相关性、持仓集中度、三级预警（黄/红/熔断）。
+`PortfolioRiskMonitor` 回答的问题是"把这几个策略放在一起跑，组合层面风险有多大"：整体 VaR、策略间相关性、持仓集中度、四级预警（正常/黄/红/熔断）。
 
 它的工作方式是**事后审查**：先把每个策略各跑一次 `run_backtest()`，把返回的 result dict 喂给监控器，再调 `daily_check()` 出报告。它不是盘中实时监测器——没有 `update()`，没有回调，不接模拟盘。可运行的完整示例是 `examples/14_portfolio_risk.py`。
 
@@ -28,7 +28,7 @@ monitor.add_strategy("趋势策略", result_a)
 monitor.add_strategy("均值回复", result_b)
 
 report = monitor.daily_check()
-print(report.alert_level)     # AlertLevel.YELLOW / RED / KILL_SWITCH
+print(report.alert_level)     # AlertLevel.NORMAL / YELLOW / RED / KILL_SWITCH
 print(report.triggers)        # 触发的预警列表
 print(report.recommendations) # 建议操作
 ```
@@ -107,7 +107,7 @@ print(conc["top3_concentration"])  # 前三大持仓合计占比
 | 字段 | 内容 |
 |------|------|
 | `timestamp` | 报告时间 |
-| `alert_level` | `AlertLevel.YELLOW` / `RED` / `KILL_SWITCH` |
+| `alert_level` | `AlertLevel.NORMAL` / `YELLOW` / `RED` / `KILL_SWITCH` |
 | `triggers` | 触发的预警文案列表 |
 | `portfolio_var` / `portfolio_var_pct` | 组合 VaR 金额与占比 |
 | `correlation_matrix` | 相关性矩阵（不足时 None） |
@@ -115,7 +115,7 @@ print(conc["top3_concentration"])  # 前三大持仓合计占比
 | `regime` | 市场状态：`'bull'` / `'bear'` / `'oscillation'` / `'unknown'` |
 | `recommendations` | 建议操作列表 |
 
-级别语义：未触发任何升级条件时也是 `YELLOW`（基线，不代表有事）；`RED` 需要人工介入；`KILL_SWITCH` 表示组合回撤 ≥ `max_drawdown_kill` 或最高相关性 ≥ `correlation_kill`，建议停策略等人工确认。单股票占比超 `single_stock_max` 两倍也会升到 `RED`。
+级别语义：未触发任何预警条件时为 `NORMAL`；有任何触发项（哪怕只是"当前是震荡市"）至少为 `YELLOW`；`RED` 需要人工介入；`KILL_SWITCH` 表示组合回撤 ≥ `max_drawdown_kill` 或最高相关性 ≥ `correlation_kill`，建议停策略等人工确认。单股票占比超 `single_stock_max` 两倍也会升到 `RED`。
 
 `check_kill_switch(report)` 把报告翻译成待办动作列表，空列表表示无需动作：
 

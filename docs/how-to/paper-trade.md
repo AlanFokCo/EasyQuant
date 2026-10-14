@@ -63,7 +63,7 @@ def initialize(context):
 
 `set_notification_webhook(platform, url, secret=None)`：`platform` 取 `"dingtalk"` 或 `"feishu"`；传 `None` 关闭通知。钉钉加签由库内自动完成（HMAC-SHA256 签名并 URL 编码后拼到 webhook 上）。
 
-`enable_notification(events=None)`：`events` 接受 `"signal"` / `"queued"` / `"filled"`，默认 `["signal"]`。当前版本只在策略主动调用 `notify_signal` 时发送通知，引擎不会为挂单、成交自动推送。
+`enable_notification(events=None)`：`events` 接受 `"signal"` / `"queued"` / `"filled"`，默认 `["signal"]`。`"signal"` 在策略调用 `notify_signal` 时发送；`"queued"`（订单排队）与 `"filled"`（订单成交，含成交价、数量、佣金、是否部分成交）由引擎在模拟/实盘会话中自动推送。无论配置什么，回测期间都不会发送任何通知。
 
 !!! tip "获取 Webhook"
 

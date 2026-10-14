@@ -39,7 +39,7 @@ val = get_valuation('601390')
 
 ```python
 candidates = scan_market(min_price=10, min_pct_change=3, max_pct_change=5, max_pe=50)
-screened = get_financial_screen(min_pe=5, max_pe=30, min_roe=0.1)
+screened = get_financial_screen(min_pe=5, max_pe=30, min_roe=10)  # ROE ≥ 10%（最近一期季报）
 ```
 
 ### 1.4 指数与行业成分股

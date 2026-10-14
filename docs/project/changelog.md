@@ -60,6 +60,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **示例打印对 NaN 友好** — 基准不可用时 Alpha/Beta 渲染为 `N/A` 而非 `+nan%`（`examples/_defaults.py` 新增 `format_pct` / `format_num` 助手）。
 - **印花税日期敏感性披露** — `_defaults.py` 注释与 README 说明：示例固定的 0.05% 印花税率适用于 2023-08-28 之后，长历史回测请用 `close_tax=None`（日期感知法定税率）。
 
+### eqlib Core — 通知与数据接口修复（2026-10-13）
+
+#### Fixed
+
+- **订单事件通知真正生效** — `enable_notification(["queued", "filled"])` 此前接受配置但引擎从不推送；现在模拟/实盘会话中订单排队、订单成交（含成交价、数量、佣金、是否部分成交）会自动推送到已配置的钉钉/飞书 webhook。回测期间一律静默，无论配置什么事件。通知发送任何失败都只记日志、返回 `False`，不影响交易主流程。
+- **`get_financial_screen` 的 `min_roe` / `min_revenue` / `min_profit` 生效** — 这三个参数此前被接受但静默忽略；现在按最近一期披露基本完整的季报（业绩报表）过滤：`min_roe` 单位为 %，`min_revenue` / `min_profit` 单位为元，传入任一者后结果附带 `roe` / `revenue` / `profit` 列。披露期早期（不足 2000 家）自动回退上一报告期；季报完全不可用时按失败关闭返回空 `DataFrame` 并记录警告，不再假装过滤已生效。
+- **`AlertLevel` 新增 `NORMAL` 级别** — `daily_check()` 在零触发项时返回 `NORMAL`（旧基线恒为 `YELLOW`，干净报告也显示黄色，长期使用会造成预警疲劳）；有任何触发项时至少为 `YELLOW`，升级规则不变。⚠️ 行为变化：用 `report.alert_level == AlertLevel.YELLOW` 判断"一切正常"的代码应改判 `NORMAL`。
+
+#### Tests
+
+- **`tests/evaluator/test_wheel.py` 离线环境语义** — 隔离安装审计在包索引不可达（DEP-004）时按 `pytest.skip` 处理而非失败；慢网络环境可用 `EQ_WHEEL_COMMAND_TIMEOUT`（秒）放宽单命令超时（默认 600）；只能经镜像访问 PyPI 的主机可用 `EQ_WHEEL_PIP_INDEX_URL` / `EQ_WHEEL_PIP_TRUSTED_HOST` 显式指定隔离安装所用的索引（`--isolated` 本身忽略 pip 配置文件）。
+
 ### Web Strategy Studio
 
 #### Security

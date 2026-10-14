@@ -1,7 +1,7 @@
 """Portfolio-level risk monitoring for multi-strategy combinations.
 
 Provides VaR, correlation analysis, concentration risk, regime detection,
-and three-level alert system (YELLOW/RED/KILL_SWITCH).
+and four-level alert system (NORMAL/YELLOW/RED/KILL_SWITCH).
 """
 
 from __future__ import annotations
@@ -20,15 +20,17 @@ from eqlib.utils.equity import daily_returns, normalize_recorded_values
 class AlertLevel(Enum):
     """预警级别"""
 
+    NORMAL = "normal"  # 正常，无预警
     YELLOW = "yellow"  # 监控关注，不触发动作
     RED = "red"  # 需要人工介入
     KILL_SWITCH = "kill"  # 自动熔断 + 人工确认
 
 
 _ALERT_RANK = {
-    AlertLevel.YELLOW: 0,
-    AlertLevel.RED: 1,
-    AlertLevel.KILL_SWITCH: 2,
+    AlertLevel.NORMAL: 0,
+    AlertLevel.YELLOW: 1,
+    AlertLevel.RED: 2,
+    AlertLevel.KILL_SWITCH: 3,
 }
 
 
@@ -336,7 +338,7 @@ class PortfolioRiskMonitor:
         """
         triggers: List[str] = []
         recommendations: List[str] = []
-        alert_level = AlertLevel.YELLOW
+        alert_level = AlertLevel.NORMAL
 
         # 1. 计算 VaR
         var_amount, var_pct = self.portfolio_var()
@@ -407,6 +409,10 @@ class PortfolioRiskMonitor:
         if not self._strategy_results:
             triggers.append("无策略数据")
             recommendations.append("请先添加策略回测结果")
+
+        # 任何触发项都至少构成黄色预警；无触发项时保持 NORMAL
+        if triggers:
+            alert_level = _escalate(alert_level, AlertLevel.YELLOW)
 
         return RiskReport(
             timestamp=pd.Timestamp.now(),

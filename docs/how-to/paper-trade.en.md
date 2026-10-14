@@ -63,7 +63,7 @@ def initialize(context):
 
 `set_notification_webhook(platform, url, secret=None)`: `platform` is `"dingtalk"` or `"feishu"`; pass `None` to disable notifications. DingTalk signing is handled internally (HMAC-SHA256, URL-encoded onto the webhook URL).
 
-`enable_notification(events=None)`: `events` accepts `"signal"` / `"queued"` / `"filled"` and defaults to `["signal"]`. In the current version notifications are only sent when the strategy calls `notify_signal` itself — the engine does not automatically push order-queued or order-filled events.
+`enable_notification(events=None)`: `events` accepts `"signal"` / `"queued"` / `"filled"` and defaults to `["signal"]`. `"signal"` fires when the strategy calls `notify_signal`; `"queued"` (order queued) and `"filled"` (order filled, with price, amount, commission and partial-fill flag) are pushed automatically by the engine in paper/live sessions. No notification is ever sent during a backtest, regardless of configuration.
 
 !!! tip "Getting a Webhook URL"
 

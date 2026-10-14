@@ -73,7 +73,7 @@ get_financial_screen(min_pe=None, max_pe=None, min_pb=None, max_pb=None,
                      min_roe=None, min_revenue=None, min_profit=None)
 ```
 
-Note: only `min_pe` / `max_pe` / `min_pb` / `max_pb` are applied today; `min_roe` / `min_revenue` / `min_profit` remain in the signature but are not yet effective (the spot-snapshot source carries no such fields).
+`min_pe` / `max_pe` / `min_pb` / `max_pb` filter on the real-time spot snapshot; `min_roe` (percent — `10` means ROE ≥ 10%), `min_revenue` (yuan) and `min_profit` (yuan) filter on the most recent essentially-complete quarterly report, and passing any of them adds `roe` / `revenue` / `profit` columns to the result. When the quarterly report is unavailable the function fails closed: it returns an empty `DataFrame` with a warning rather than pretending the filters were applied. Both data sources are latest snapshots; calling inside a backtest raises a `FutureWarning` (see the function docstring).
 
 ## get_all_securities
 

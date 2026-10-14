@@ -483,14 +483,14 @@ result = run_backtest(initialize, start_date="2022-01-01",
 monitor.add_strategy("AllWeatherAlpha", result)   # result must contain recorded_values, else ValueError
 
 report = monitor.daily_check()
-print(report.alert_level)      # AlertLevel.YELLOW / RED / KILL_SWITCH
+print(report.alert_level)      # AlertLevel.NORMAL / YELLOW / RED / KILL_SWITCH
 print(report.triggers)         # triggered alerts
 print(report.recommendations)  # recommended actions
 ```
 
 | `RiskReport` field | Meaning |
 |--------------------|---------|
-| `alert_level` | `AlertLevel` enum: starts at `YELLOW` even with no triggers; escalates to `RED` / `KILL_SWITCH` past thresholds |
+| `alert_level` | `AlertLevel` enum: `NORMAL` when nothing triggered, at least `YELLOW` with any trigger, escalating to `RED` / `KILL_SWITCH` past thresholds |
 | `triggers` | Triggered alerts (drawdown, correlation, concentration, regime) |
 | `portfolio_var` / `portfolio_var_pct` | Portfolio VaR (amount / percentage, historical simulation, needs >= 30 days of daily returns) |
 | `correlation_matrix` | Daily-return correlation across strategies (None with fewer than 2 strategies) |

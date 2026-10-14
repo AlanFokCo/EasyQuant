@@ -182,10 +182,14 @@ def enable_notification(events: list = None):
     Parameters:
         events: list of event names to enable notifications for.
             Supported events:
-            - "signal": when strategy generates a trading signal (recommended)
-            - "queued": when order is queued
-            - "filled": when order is filled
+            - "signal": when the strategy calls ``notify_signal`` (recommended)
+            - "queued": when an order is queued (paper/live trading only)
+            - "filled": when an order is filled (paper/live trading only)
             Default: ["signal"]
+
+    Order-event notifications ("queued" / "filled") are sent automatically
+    by the engine during paper/live trading. They never fire during
+    backtests, no matter what is configured.
 
     Example::
 
@@ -1316,6 +1320,9 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                         func(order_obj, sess._context, trade_info)
                     except Exception as e:
                         log.warn(f"on_order_filled callback error: {e}")
+                # Webhook notification (filled): paper/live only, never raises
+                from eqlib.notification import notify_order_event
+                notify_order_event("filled", order_obj, trade_info)
 
         else:
             # Sell
@@ -1396,6 +1403,9 @@ def _fill_order_batch(sess: BacktestSession, day: datetime.date,
                         func(order_obj, sess._context, trade_info)
                     except Exception as e:
                         log.warn(f"on_order_filled callback error: {e}")
+                # Webhook notification (filled): paper/live only, never raises
+                from eqlib.notification import notify_order_event
+                notify_order_event("filled", order_obj, trade_info)
 
         # ── Keep remaining amount in pending queue for partial fills ───────────
         if is_partial_fill and remaining_amount > 0 and order_obj:

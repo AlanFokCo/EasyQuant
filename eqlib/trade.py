@@ -161,6 +161,10 @@ def _buffer_order(action: str, **kwargs) -> Order:
         except Exception as e:
             log.warn(f"on_order_queued callback error: {e}")
 
+    # ── Webhook notification (queued): paper/live only, never raises ──────
+    from eqlib.notification import notify_order_event
+    notify_order_event("queued", order_obj)
+
     return order_obj
 
 

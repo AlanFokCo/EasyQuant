@@ -117,12 +117,13 @@ class TestAlertLevel:
     """Tests for AlertLevel enum."""
 
     def test_enum_values(self):
+        assert AlertLevel.NORMAL.value == "normal"
         assert AlertLevel.YELLOW.value == "yellow"
         assert AlertLevel.RED.value == "red"
         assert AlertLevel.KILL_SWITCH.value == "kill"
 
     def test_enum_count(self):
-        assert len(list(AlertLevel)) == 3
+        assert len(list(AlertLevel)) == 4
 
 
 class TestRiskThresholds:
@@ -477,6 +478,7 @@ class TestDailyCheck:
         report = monitor.daily_check()
         assert isinstance(report, RiskReport)
         assert report.alert_level in [
+            AlertLevel.NORMAL,
             AlertLevel.YELLOW,
             AlertLevel.RED,
             AlertLevel.KILL_SWITCH,
@@ -489,6 +491,29 @@ class TestDailyCheck:
         report = monitor.daily_check()
         assert report.alert_level == AlertLevel.YELLOW
         assert "无策略数据" in report.triggers or len(report.triggers) == 0
+
+    def test_daily_check_clean_report_is_normal(self):
+        """No triggers at all -> NORMAL (not YELLOW)."""
+        from eqlib.portfolio_risk import PortfolioRiskMonitor, AlertLevel
+
+        monitor = PortfolioRiskMonitor()
+        monitor.add_strategy(
+            "steady", _result_from_values([100.0 + i for i in range(40)]))
+        monitor.portfolio_var = lambda confidence=0.95: (0.0, 0.0)
+        monitor.correlation_matrix = lambda: pd.DataFrame()
+        monitor.concentration_risk = lambda: {
+            "max_single_stock": 0.0,
+            "max_single_sector": 0.0,
+            "small_cap_pct": 0.0,
+            "num_holdings": 0,
+            "top3_concentration": 0.0,
+        }
+        monitor.regime_detection = lambda: "unknown"
+
+        report = monitor.daily_check()
+
+        assert report.triggers == []
+        assert report.alert_level is AlertLevel.NORMAL
 
     def test_daily_check_high_correlation_trigger(self):
         from eqlib.portfolio_risk import PortfolioRiskMonitor, AlertLevel

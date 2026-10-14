@@ -1679,6 +1679,14 @@ def get_financial_screen(
 ) -> pd.DataFrame:
     """Screen stocks by financial criteria using real-time market data.
 
+    ``min_pe``/``max_pe``/``min_pb``/``max_pb`` filter on the spot snapshot;
+    ``min_roe`` (percent), ``min_revenue`` (yuan) and ``min_profit`` (yuan)
+    filter on the most recent essentially-complete quarterly financial
+    report (业绩报表). When any of the latter three is requested, the
+    result gains ``roe``/``revenue``/``profit`` columns. If the financial
+    report is unavailable the function fails closed: it returns an empty
+    DataFrame rather than silently skipping the requested filters.
+
     .. warning:: Latest snapshot only — the PE/PB filters apply to the
         *current* spot snapshot; the provider carries no point-in-time
         history.  Inside a backtest this emits a ``FutureWarning`` (or
@@ -1698,7 +1706,7 @@ def get_financial_screen(
             "pe": (min_pe, max_pe),
             "pb": (min_pb, max_pb),
         }
-        return _filter_spot(
+        df = _filter_spot(
             {
                 "代码": "code",
                 "名称": "name",
@@ -1714,6 +1722,78 @@ def get_financial_screen(
     except Exception as e:
         log.debug("get_financial_screen: %s", e)
         return pd.DataFrame()
+
+    requested = {
+        "roe": min_roe,
+        "revenue": min_revenue,
+        "profit": min_profit,
+    }
+    requested = {k: v for k, v in requested.items() if v is not None}
+    if df.empty or not requested:
+        return df
+
+    fin = _latest_financial_report()
+    if fin.empty:
+        # Fail closed: never return rows that pretend the financial
+        # filters were applied when they could not be.
+        log.warn(
+            "get_financial_screen: quarterly financial report unavailable; "
+            "cannot apply %s filters" % sorted(requested)
+        )
+        return pd.DataFrame()
+
+    merged = df.merge(fin, on="code", how="inner")
+    for col, minimum in requested.items():
+        merged = merged[merged[col] >= minimum]
+    return merged.reset_index(drop=True)
+
+
+# A report period counts as usable only when disclosure is well under way —
+# early in the disclosure window only a handful of companies have reported,
+# and merging that partial snapshot would silently drop most of the market.
+_MIN_FINANCIAL_REPORT_ROWS = 2000
+
+
+def _recent_report_periods(count=5) -> list:
+    """Recent quarter-end report dates ("YYYY0331" style), newest first."""
+    today = datetime.date.today()
+    month = ((today.month - 1) // 3) * 3  # most recent ended quarter
+    year = today.year
+    quarter_end_day = {3: 31, 6: 30, 9: 30, 12: 31}
+    periods = []
+    for _ in range(count):
+        if month == 0:
+            year -= 1
+            month = 12
+        periods.append(f"{year}{month:02d}{quarter_end_day[month]}")
+        month -= 3
+    return periods
+
+
+def _latest_financial_report() -> pd.DataFrame:
+    """Fetch the most recent essentially-complete quarterly financial report.
+
+    Returns a DataFrame with columns ``code`` (bare 6-digit), ``roe``
+    (percent), ``revenue`` (yuan) and ``profit`` (yuan); empty when no
+    usable period is available.
+    """
+    for period in _recent_report_periods():
+        try:
+            report = ak.stock_yjbb_em(date=period)
+        except Exception as e:
+            log.debug("stock_yjbb_em(%s): %s", period, e)
+            continue
+        if report is None or len(report) < _MIN_FINANCIAL_REPORT_ROWS:
+            continue
+        log.debug("financial report period %s: %d rows", period, len(report))
+        return pd.DataFrame({
+            "code": report["股票代码"].astype(str),
+            "roe": pd.to_numeric(report["净资产收益率"], errors="coerce"),
+            "revenue": pd.to_numeric(
+                report["营业总收入-营业总收入"], errors="coerce"),
+            "profit": pd.to_numeric(report["净利润-净利润"], errors="coerce"),
+        })
+    return pd.DataFrame()
 
 
 def _filter_spot(rename_map: dict, filters: dict) -> pd.DataFrame:

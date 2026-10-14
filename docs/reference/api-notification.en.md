@@ -59,8 +59,10 @@ enable_notification([])
 | Event | Description |
 |-------|-------------|
 | `"signal"` | Notify when the strategy triggers a trade signal (recommended) |
-| `"filled"` | Notify when an order is filled |
-| `"queued"` | Notify when an order is generated |
+| `"filled"` | Engine automatically notifies when an order is filled (price, amount, commission, partial-fill flag) |
+| `"queued"` | Engine automatically notifies when an order is queued |
+
+`"queued"` / `"filled"` are only sent in paper/live sessions; the engine stays silent during backtests regardless of the configured events.
 
 ## notify_signal
 

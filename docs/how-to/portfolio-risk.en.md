@@ -10,7 +10,7 @@
 ---
 ## 1. Portfolio Risk Monitoring
 
-`PortfolioRiskMonitor` answers one question: "if I run these strategies together, how risky is the combined portfolio?" It covers portfolio VaR, cross-strategy correlation, position concentration, and a three-level alert system (yellow / red / kill-switch).
+`PortfolioRiskMonitor` answers one question: "if I run these strategies together, how risky is the combined portfolio?" It covers portfolio VaR, cross-strategy correlation, position concentration, and a four-level alert system (normal / yellow / red / kill-switch).
 
 It works as a **post-backtest review**: run each strategy through `run_backtest()`, feed the returned result dicts into the monitor, then call `daily_check()` for a report. It is not a live intraday monitor — there is no `update()`, no callbacks, and no paper-trading hookup. The runnable end-to-end demo is `examples/14_portfolio_risk.py`.
 
@@ -28,7 +28,7 @@ monitor.add_strategy("trend", result_a)
 monitor.add_strategy("mean_reversion", result_b)
 
 report = monitor.daily_check()
-print(report.alert_level)     # AlertLevel.YELLOW / RED / KILL_SWITCH
+print(report.alert_level)     # AlertLevel.NORMAL / YELLOW / RED / KILL_SWITCH
 print(report.triggers)        # triggered alerts
 print(report.recommendations) # suggested actions
 ```
@@ -107,7 +107,7 @@ Take two fields with a grain of salt:
 | Field | Content |
 |-------|---------|
 | `timestamp` | Report time |
-| `alert_level` | `AlertLevel.YELLOW` / `RED` / `KILL_SWITCH` |
+| `alert_level` | `AlertLevel.NORMAL` / `YELLOW` / `RED` / `KILL_SWITCH` |
 | `triggers` | Triggered alert messages |
 | `portfolio_var` / `portfolio_var_pct` | Portfolio VaR amount and percentage |
 | `correlation_matrix` | Correlation matrix (None if insufficient) |
@@ -115,7 +115,7 @@ Take two fields with a grain of salt:
 | `regime` | Market regime: `'bull'` / `'bear'` / `'oscillation'` / `'unknown'` |
 | `recommendations` | Suggested actions |
 
-Level semantics: `YELLOW` is the baseline even when nothing escalated (it does not imply a problem); `RED` calls for human review; `KILL_SWITCH` means portfolio drawdown reached `max_drawdown_kill` or the maximum correlation reached `correlation_kill` — pause strategies and wait for manual confirmation. A single-stock weight beyond twice `single_stock_max` also escalates to `RED`.
+Level semantics: `NORMAL` when no condition triggered at all; any trigger (even "choppy market right now") means at least `YELLOW`; `RED` calls for human review; `KILL_SWITCH` means portfolio drawdown reached `max_drawdown_kill` or the maximum correlation reached `correlation_kill` — pause strategies and wait for manual confirmation. A single-stock weight beyond twice `single_stock_max` also escalates to `RED`.
 
 `check_kill_switch(report)` translates the report into a list of action items; an empty list means no action needed:
 

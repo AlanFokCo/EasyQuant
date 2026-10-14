@@ -60,6 +60,18 @@ The following changes alter backtest results produced by older versions and are 
 - **NaN-friendly metric printing in examples** — Alpha/Beta render as `N/A` instead of `+nan%` when the benchmark is unavailable (new `format_pct` / `format_num` helpers in `examples/_defaults.py`).
 - **Stamp-duty date sensitivity disclosed** — `_defaults.py` comments and the README note that the pinned 0.05% rate applies on/after 2023-08-28; for long-history backtests use `close_tax=None` (date-aware statutory rate).
 
+### eqlib Core — Notification & Data Interface Fixes (2026-10-13)
+
+#### Fixed
+
+- **Order-event notifications actually fire** — `enable_notification(["queued", "filled"])` previously accepted the configuration but the engine never pushed anything; in paper/live sessions, order-queued and order-filled events (with fill price, amount, commission and partial-fill flag) are now pushed automatically to the configured DingTalk/Feishu webhook. Backtests stay completely silent regardless of the configured events. Any notification failure is logged and returns `False` — it never interrupts trading.
+- **`get_financial_screen` `min_roe` / `min_revenue` / `min_profit` now effective** — these parameters were accepted but silently ignored; they now filter on the most recent essentially-complete quarterly report: `min_roe` in percent, `min_revenue` / `min_profit` in yuan, and passing any of them adds `roe` / `revenue` / `profit` columns to the result. Early in a disclosure window (fewer than 2000 reporters) the previous period is used instead; when no report is available the function fails closed with an empty `DataFrame` and a warning instead of pretending the filters were applied.
+- **New `AlertLevel.NORMAL`** — `daily_check()` returns `NORMAL` when nothing triggered (the old baseline was always `YELLOW`, so even a clean report displayed a warning — a recipe for alert fatigue); any trigger implies at least `YELLOW`, and escalation rules are unchanged. ⚠️ Behavior change: code treating `report.alert_level == AlertLevel.YELLOW` as "all clear" should check `NORMAL` instead.
+
+#### Tests
+
+- **`tests/evaluator/test_wheel.py` offline semantics** — the isolated-install audit now skips via `pytest.skip` when the package index is unavailable (DEP-004) instead of failing; slow networks can raise the per-command timeout (default 600s) via `EQ_WHEEL_COMMAND_TIMEOUT`; hosts that can only reach PyPI through a mirror can set `EQ_WHEEL_PIP_INDEX_URL` / `EQ_WHEEL_PIP_TRUSTED_HOST` to pick the index used for the isolated install explicitly (`--isolated` itself ignores pip config files).
+
 ### Web Strategy Studio
 
 #### Security

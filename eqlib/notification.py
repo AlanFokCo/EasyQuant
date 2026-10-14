@@ -37,6 +37,8 @@ import urllib.parse
 import requests
 from typing import Optional, Dict, Any, Tuple, TYPE_CHECKING
 
+from eqlib.logger import log
+
 if TYPE_CHECKING:
     from eqlib.context import Context
     import eqlib._state as st
@@ -298,3 +300,96 @@ def notify_signal(
     title = f"{side_emoji} EasyQuant {side.upper()} 建议"
 
     return sender.send(message, title=title, event_type=side)
+
+
+_ORDER_EVENT_META = {
+    "queued": ("📋", "订单已排队"),
+    "filled": ("✅", "订单已成交"),
+}
+
+
+def _order_event_side(order_obj, trade_info: Optional[Dict[str, Any]]) -> str:
+    """Resolve buy/sell for an order event.
+
+    Target-based orders carry ``side=None`` until the engine computes the
+    actual delta at fill time, so queued events fall back to the sign of
+    the requested amount.
+    """
+    if trade_info and trade_info.get("type"):
+        return "buy" if trade_info["type"] == "BUY" else "sell"
+    side = getattr(order_obj, "side", None)
+    if side in ("buy", "sell"):
+        return side
+    return "buy" if getattr(order_obj, "amount", 0) > 0 else "sell"
+
+
+def format_order_message(
+    event: str,
+    order_obj,
+    trade_info: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Format an order event ("queued" / "filled") as a markdown message."""
+    emoji, label = _ORDER_EVENT_META.get(event, ("🔔", event))
+    bare = str(getattr(order_obj, "security", ""))
+    bare = bare.replace(".XSHG", "").replace(".XSHE", "")
+
+    side = _order_event_side(order_obj, trade_info)
+    side_label = "买入" if side == "buy" else "卖出"
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    lines = [f"## {emoji} EasyQuant {label}", ""]
+    lines.append(f"**股票**: {bare}")
+    lines.append(f"**方向**: {side_label}")
+
+    if event == "filled" and trade_info:
+        price = trade_info.get("price")
+        if price:
+            lines.append(f"**成交价格**: ¥{price:.3f}")
+        lines.append(f"**成交数量**: {trade_info.get('amount', 0):,} 股")
+        commission = trade_info.get("commission")
+        if commission is not None:
+            lines.append(f"**佣金**: ¥{commission:.2f}")
+        if trade_info.get("partial"):
+            lines.append("**部分成交**: 是（剩余数量继续排队）")
+    else:
+        lines.append(f"**委托数量**: {getattr(order_obj, 'amount', 0):,} 股")
+        lines.append("**状态**: 已排队，等待撮合")
+
+    lines.append(f"**时间**: {now}")
+    return "\n".join(lines)
+
+
+def notify_order_event(
+    event: str,
+    order_obj,
+    trade_info: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Send a webhook notification for an order event ("queued" / "filled").
+
+    Engine-internal hook: fired automatically when the event has been
+    enabled via ``enable_notification`` and a webhook is configured.
+    Notifications fire in paper/live trading sessions only — backtests
+    never send, no matter what is configured.
+
+    Never raises; returns True only when a notification was actually sent.
+    """
+    import eqlib._state as st
+
+    try:
+        sess = st.get_session()
+        sender = getattr(sess, "_notification_sender", None)
+        if not sender:
+            return False
+        if event not in getattr(sess, "_notification_events", []):
+            return False
+        if not sess._options.get("_is_paper_trading", False):
+            return False
+
+        message = format_order_message(event, order_obj, trade_info)
+        emoji, label = _ORDER_EVENT_META.get(event, ("🔔", event))
+        side = _order_event_side(order_obj, trade_info)
+        return sender.send(message, title=f"{emoji} EasyQuant {label}",
+                           event_type=side)
+    except Exception as e:
+        log.warn(f"notify_order_event({event}) failed: {e}")
+        return False

@@ -492,14 +492,14 @@ result = run_backtest(initialize, start_date="2022-01-01",
 monitor.add_strategy("全天候Alpha", result)   # result 必须含 recorded_values，否则 ValueError
 
 report = monitor.daily_check()
-print(report.alert_level)      # AlertLevel.YELLOW / RED / KILL_SWITCH
+print(report.alert_level)      # AlertLevel.NORMAL / YELLOW / RED / KILL_SWITCH
 print(report.triggers)         # 触发的预警列表
 print(report.recommendations)  # 建议操作列表
 ```
 
 | `RiskReport` 字段 | 含义 |
 |------------------|------|
-| `alert_level` | `AlertLevel` 枚举：无触发时也是 `YELLOW` 起步，触发阈值后升级为 `RED` / `KILL_SWITCH` |
+| `alert_level` | `AlertLevel` 枚举：无触发项时为 `NORMAL`，有触发项至少 `YELLOW`，触发阈值后升级为 `RED` / `KILL_SWITCH` |
 | `triggers` | 触发的预警信息（回撤、相关性、集中度、regime） |
 | `portfolio_var` / `portfolio_var_pct` | 组合 VaR（金额 / 百分比，历史模拟法，需 ≥ 30 天日收益） |
 | `correlation_matrix` | 策略间日收益相关性矩阵（策略数 < 2 时为 None） |
