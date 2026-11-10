@@ -1,0 +1,295 @@
+{
+  "plan": "research/regime_momentum_2026/PLAN.md",
+  "recorded_at_utc": "2026-11-09T16:25:56.488738+00:00",
+  "outcome": "failed_development_selection",
+  "selection": {
+    "rule": {
+      "max_drawdown_floor": -0.25,
+      "min_round_trips_per_year": 3.0,
+      "must_beat_benchmark": true,
+      "pick": "highest development Sharpe, ties alphabetical"
+    },
+    "candidates": {
+      "base": {
+        "sharpe": -1.4492204070416006,
+        "total_return": -0.11897404999999994,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.1212649036089406,
+        "round_trips_per_year": 25.21,
+        "checks": {
+          "drawdown_above_floor": true,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      },
+      "breadth": {
+        "sharpe": -1.4492204070416006,
+        "total_return": -0.11897404999999994,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.1212649036089406,
+        "round_trips_per_year": 25.21,
+        "checks": {
+          "drawdown_above_floor": true,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      },
+      "inverse_vol": {
+        "sharpe": -1.1721295420032978,
+        "total_return": -0.09151874999999976,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.1071623986788992,
+        "round_trips_per_year": 32.77,
+        "checks": {
+          "drawdown_above_floor": true,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      },
+      "monthly": {
+        "sharpe": -0.5009918010184363,
+        "total_return": -0.008606580000000141,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.07911806358906903,
+        "round_trips_per_year": 10.08,
+        "checks": {
+          "drawdown_above_floor": true,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      },
+      "no_regime": {
+        "sharpe": -1.169822700499199,
+        "total_return": -0.3293504199999998,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.40797357712418525,
+        "round_trips_per_year": 168.88,
+        "checks": {
+          "drawdown_above_floor": false,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      },
+      "risk_adjusted": {
+        "sharpe": -1.5286421681048796,
+        "total_return": -0.10716612000000003,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.10801264276164002,
+        "round_trips_per_year": 25.21,
+        "checks": {
+          "drawdown_above_floor": true,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      },
+      "slow_10_1": {
+        "sharpe": -0.7123247477820374,
+        "total_return": -0.05603917999999941,
+        "benchmark_return": 0.016344537055454023,
+        "max_drawdown": -0.07503667450216123,
+        "round_trips_per_year": 35.29,
+        "checks": {
+          "drawdown_above_floor": true,
+          "round_trips_sufficient": true,
+          "beat_benchmark": false
+        },
+        "qualified": false
+      }
+    },
+    "qualified": [],
+    "selected": null
+  },
+  "promotion_gate": null,
+  "later_check": null,
+  "development_yearly_slices": {
+    "base": [
+      {
+        "year": 2023,
+        "total_return": -0.03475602,
+        "sharpe": -2.1578797268180874,
+        "max_drawdown": -0.03726585828012241,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": -0.0872505104875142,
+        "sharpe": -1.403000756638407,
+        "max_drawdown": -0.1187807633726381,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ],
+    "breadth": [
+      {
+        "year": 2023,
+        "total_return": -0.03475602,
+        "sharpe": -2.1578797268180874,
+        "max_drawdown": -0.03726585828012241,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": -0.0872505104875142,
+        "sharpe": -1.403000756638407,
+        "max_drawdown": -0.1187807633726381,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ],
+    "inverse_vol": [
+      {
+        "year": 2023,
+        "total_return": -0.011177180000000009,
+        "sharpe": -1.337548568943809,
+        "max_drawdown": -0.028204275277705082,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": -0.08124971266338687,
+        "sharpe": -1.2858608870333361,
+        "max_drawdown": -0.10707354667544267,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ],
+    "monthly": [
+      {
+        "year": 2023,
+        "total_return": -0.009839730000000158,
+        "sharpe": -1.1861005117221846,
+        "max_drawdown": -0.024129162702833162,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": 0.0012454044434651035,
+        "sharpe": -0.2960007420603027,
+        "max_drawdown": -0.0791180635890687,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ],
+    "no_regime": [
+      {
+        "year": 2023,
+        "total_return": -0.21387279999999964,
+        "sharpe": -1.678071598756822,
+        "max_drawdown": -0.2672736089936445,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": -0.14689431939258668,
+        "sharpe": -0.8101161299743687,
+        "max_drawdown": -0.2002310409019208,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ],
+    "risk_adjusted": [
+      {
+        "year": 2023,
+        "total_return": -0.04498274999999985,
+        "sharpe": -2.443978314623718,
+        "max_drawdown": -0.04588823069242598,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": -0.06511230032755977,
+        "sharpe": -1.3061906992507193,
+        "max_drawdown": -0.08300453665468122,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ],
+    "slow_10_1": [
+      {
+        "year": 2023,
+        "total_return": -0.023557219999999823,
+        "sharpe": -1.6923105486289525,
+        "max_drawdown": -0.03617833934940351,
+        "benchmark_return": -0.11378153387591283,
+        "benchmark_max_drawdown": -0.2151332309852787
+      },
+      {
+        "year": 2024,
+        "total_return": -0.03326560517965005,
+        "sharpe": -0.5477122232825474,
+        "max_drawdown": -0.0709742501877455,
+        "benchmark_return": 0.14683294910393552,
+        "benchmark_max_drawdown": -0.14405737260766838
+      }
+    ]
+  },
+  "known_loser_attribution_development": {
+    "002460": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": -0.48335315101070153
+    },
+    "002466": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": -0.56
+    },
+    "002714": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": -0.15764222069910905
+    },
+    "300750": {
+      "strategy_pnl": -644.8209999999672,
+      "buy_and_hold_return": 0.26723276723276723
+    },
+    "600009": {
+      "strategy_pnl": -4189.041999999958,
+      "buy_and_hold_return": -0.3889095645701526
+    },
+    "600104": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": 0.5150375939849623
+    },
+    "600585": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": -0.053796095444685554
+    },
+    "601012": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": -0.6165486941664633
+    },
+    "601111": {
+      "strategy_pnl": 0.0,
+      "buy_and_hold_return": -0.24306220095693776
+    },
+    "603259": {
+      "strategy_pnl": -9881.165999999997,
+      "buy_and_hold_return": -0.3003054854562359
+    }
+  },
+  "inputs_sha256": {
+    "reports/regime_momentum/development/base/summary.json": "2210ab6244aa1977eac1cb991c767e1db4e0374fedeaefe3144659d4a4d596ba",
+    "reports/regime_momentum/development/breadth/summary.json": "4a6274fa6354f64c5d1464814cdba96ea2a6f210cff2a2169ff6635a59e81fc1",
+    "reports/regime_momentum/development/inverse_vol/summary.json": "897b83ed71c5fe49a15884b9c7f1a2c68b00118f9459094771198135e15f697c",
+    "reports/regime_momentum/development/monthly/summary.json": "b15df8697c1007d3477f8263a0e0e1fa4da4b631b2231618c474ea4c1beae41c",
+    "reports/regime_momentum/development/no_regime/summary.json": "ec42265eb1304c9ef143fc39233629fb1dd94571e9e1e0dd94edbe4a7dcdff87",
+    "reports/regime_momentum/development/risk_adjusted/summary.json": "bf5e2aa3242eff3ab3db77b3107309502467d6de86f20feac96206e485e77867",
+    "reports/regime_momentum/development/slow_10_1/summary.json": "ddba3411cb9ddb315c7279d8e06f2026a1ed38a5deffb953b658ec4de02a7f63"
+  },
+  "source_sha256": {
+    "research/regime_momentum_2026/aggregate.py": "7179e1ea9994e119929b9aec9c0e670b430241255e790441f9759737da19855a",
+    "research/regime_momentum_2026/runner.py": "a4be085877f4df159a23bdcc43ba14101cf8d1b2c4127d44af4b23e91f44ed2f",
+    "research/regime_momentum_2026/strategy.py": "4e34de732c9308302ae982a39ec4f29b766921f0d286bf578c738add610ebf89",
+    "research/regime_momentum_2026/universe.py": "395933126e14d4459c6f159d92626d7fe81a00ffd19b6480ad5e4a857650fa01"
+  }
+}
