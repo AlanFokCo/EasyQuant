@@ -27,6 +27,15 @@ def test_ensure_new_destination_rejects_existing(tmp_path):
         ensure_new_destination(tmp_path, "run_a")
 
 
+def test_ensure_new_destination_allows_sibling_label_in_same_period(tmp_path):
+    used = ensure_new_destination(tmp_path, "validation/pit_value")
+    used.mkdir(parents=True)
+
+    free = ensure_new_destination(tmp_path, "validation/pit_value_stress")
+
+    assert not free.exists()
+
+
 def test_apply_stress_doubles_commission_and_triples_slippage():
     from examples._defaults import DEFAULT_ORDER_COST
     from pit_value_strategy import PITValueConfig

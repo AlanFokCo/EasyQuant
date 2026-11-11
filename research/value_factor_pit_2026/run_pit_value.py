@@ -202,13 +202,9 @@ def run(period: str, cash: float, stress: bool, data_dir: Path,
             "One regime sequence (2013-2015 gate) is not universal proof.",
         ],
     }
-    destination = ensure_new_destination(output, period) / (
-        label + ("_stress" if stress else "")
+    destination = ensure_new_destination(
+        output, f"{period}/{label}" + ("_stress" if stress else "")
     )
-    if destination.exists():
-        raise FileExistsError(
-            f"output exists; never overwrite earlier evidence: {destination}"
-        )
     destination.mkdir(parents=True, exist_ok=False)
     (destination / "summary.json").write_text(
         json.dumps(payload, indent=2, allow_nan=False) + "\n", encoding="utf-8"
