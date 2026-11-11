@@ -28,9 +28,11 @@ def pit_equal_weight_reference(
     """Daily-rebalanced mean member return over ``dates`` (frictionless).
 
     Membership applies from its sample date forward; a member contributes on
-    a day only when it has a bar for both that day and the previous calendar
-    slot, so delisted names stop contributing and later listings start only
-    after they are members.
+    a day when its frame has a computable return there (consecutive rows —
+    on this dataset BaoStock pads suspensions with flat volume=0 bars, so
+    suspended members contribute 0%; a vendor that omitted those rows would
+    silently change the caliber). Delisted names stop contributing after
+    their last bar.
     """
     member_dates = sorted(
         (pd.Timestamp(d), set(codes)) for d, codes in membership.items()

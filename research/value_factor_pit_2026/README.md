@@ -62,8 +62,11 @@ the drawdown control through the bubble crash (−20.3% vs −43.5%).
 ## Attribution and execution (validation window)
 
 - 30 rebalances, 93 round trips (31.2/yr), costs 15.2k CNY (1.5pp); win rate
-  55.9%. 110/110 entry orders filled at first attempt — the entry-retry path
-  existed but was never needed.
+  55.9%. All 110 entry orders filled at first attempt (no cancels, no retries
+  needed) — but two were engine-downsized on cash grounds: 600036 filled at
+  52% of target (2013-03-11; the budget had counted a suspended name's mark as
+  phantom sell proceeds — the engine's cash check enforced reality) and
+  600016 at 40% (2015-10-29).
 - Eligible names per rebalance: min 189, median 221, max 271 of 300.
 - Most-held names: 600000 浦发 (29/30 rebalances), 600015 华夏, 601166 兴业,
   600036 招商, 000001 平安 — the cheap-bank cohort, now selected from the
@@ -88,15 +91,66 @@ contaminated by prior studies and were not rerun here); capacity beyond
 independence from the known bank-heavy value regimes of 2014. One clean gate
 pass after five honest failures is evidence, not proof.
 
+## Adversarial review (independent subagent, 2026-11-12)
+
+**Verdict: the pass survives the audit.** No critical or major findings. All
+load-bearing numbers reproduce from artifacts to full float precision; all 72
+rebalances were independently re-derived from raw CSVs with zero mismatches;
+all 203 validation fills match next-day open × (1±slippage) exactly; the
+amendment timeline is corroborated by artifact timestamps (DESIGN frozen
+before data existed; amendment committed before the first run; the runner
+hard-requires the sha256 manifest, so no pre-amendment backtest was possible
+with this pipeline). Gate-metric caliber choices were checked both directions
+(benchmark day-1 inclusion penalizes the strategy; analyze_returns' own
+Sharpe 1.116 ≥ 1.0 corroborates the runner's 1.115).
+
+Minor findings and dispositions (full list in REVIEW.md):
+
+- README/DESIGN/ledger wording errors (partial fills, coverage calibers,
+  smoke eligible range) — corrected in this revision.
+- Runner source_sha256 mismatch: a post-run cosmetic destination-path fix
+  changed the runner file after the runs recorded its hash. Verified via git
+  diff to be behaviorally identical (same paths, same immutability guard;
+  stress selections are byte-identical to base). Disclosed; results
+  unaffected. Lesson adopted: commit again immediately after any post-run
+  edit, however small.
+- Latent design gap (benign here): cancelled non-halt exits are not
+  resubmitted until the next rebalance.
+- Equal-weight reference docstring/implementation nuance (byte-identical on
+  this data because BaoStock pads suspensions with flat bars); docstring
+  corrected.
+- Frozen CSVs' inner code column lost zero-padding on resume (results
+  unaffected; disclosed in Limitations).
+
+**Strongest remaining caveats (the reviewer's, endorsed):** (1) 2014 alone
+supplied +92.91% of the return and the final book is 8/8 banks — this gate
+proves "cheap CSI300 names in 2013–2015", heavily leveraged to the 2014
+low-valuation rally, not a durable premium; (2) floor sensitivity was never
+stress-tested — 3 validation picks sat in the [2e7, 3e7) turnover band and
+contributed ≈8% of total PnL (the +84.7pp margin makes a gate flip unlikely);
+(3) single-vendor BaoStock for both membership and valuations.
+
 ## Limitations
 
 BaoStock is a secondary vendor (adjustment/restatement conventions differ
-from akshare — overlap correlation vs the akshare freeze: 0.9999999 on CSI300
-daily returns, 0.990 on a spot-checked member); membership is sampled at
-rebalance dates only; the equal-weight reference is frictionless and not
-investable at 1M CNY; qfq-based price-limit checks and next-open fills are
-approximations disclosed in prior studies; entry sizing estimates use signal
-closes, actual fills gap (one "insufficient cash" skip observed).
+from akshare; the ad-hoc 2022 overlap check — 0.9999999 index-return / 0.990
+single-name correlation — was not preserved as an artifact, treat as
+indicative only); membership is sampled at rebalance dates only; the
+equal-weight reference is frictionless and not investable at 1M CNY;
+qfq-based price-limit checks and next-open fills are approximations disclosed
+in prior studies; entry sizing estimates use signal closes (two cash-driven
+partial fills occurred, see above). Adversarial-review additions: (a) a
+cancelled rank-out/index-removal exit is not resubmitted until the next
+rebalance — benign here (one occurrence, the name later re-entered the picks)
+but a latent gap if a rank-out name delists mid-window; (b) frozen history
+CSVs' inner `code` column lost zero-padding on resume re-write (hashes
+self-consistent, filename keys drive all logic, results unaffected — refreeze
+with dtype=str before any consumer reads that column); (c) the equal-weight
+reference counts suspended members at flat 0% during mass-suspension days
+(July 2015: up to 96/300) — same mark-to-last caliber as the strategy's own
+equity, but its drawdown path is smoothed by design; (d) the participation
+premise of the floor amendment uses starting equity — by 2015 target values
+reached ~268k CNY (still ≤2.1% of fill-day volume, trivially executable).
 
 ## Reproduction
 

@@ -65,9 +65,14 @@ are reported only as already-contaminated context, not rerun for selection.
 
 The first coverage check failed: the `min_avg_turnover = 1e8 CNY` floor —
 copied from the 2022–2026 pool studies — excluded up to 80% of CSI300 members
-in mid-2014 (only 69/300 passed on 2014-06-06), while PE/PB and status
-coverage were fine (285/300). That absolute floor is a miscalibration of the
+in mid-2014 (on 2014-06-06, the worst date: 69/300 passed the turnover filter
+alone, and 57/300 passed full eligibility with the 1e8 floor; PE/PB coverage
+itself was fine). That absolute floor is a miscalibration of the
 execution-feasibility filter across eras, not part of the alpha hypothesis.
+(Caliber note added after adversarial review: an earlier draft of this
+paragraph quoted filter-stage counts of different calibers — "285/300" —
+which do not reproduce exactly; the counts above are the reviewer's
+recomputed figures.)
 
 Amended rule: `min_avg_turnover = 2e7 CNY`, derived from position size, not
 from window statistics: the largest position is 15% × 1,000,000 = 150k CNY,
