@@ -30,7 +30,7 @@ class PITValueConfig:
     entry_retry_max: int = 1
     min_price: float = 3.0
     turnover_window: int = 20
-    min_avg_turnover: float = 100_000_000.0
+    min_avg_turnover: float = 20_000_000.0  # pre-run amendment, see DESIGN.md
     max_stock_weight: float = 0.15
     max_exposure: float = 0.95
     min_order_value: float = 20_000.0

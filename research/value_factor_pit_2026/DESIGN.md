@@ -61,6 +61,22 @@ and are therefore part of eligibility, rather than an unverified disclaimer.
 No post-2015 window is needed for the gate. Existing 2016–2026 factor results
 are reported only as already-contaminated context, not rerun for selection.
 
+## Pre-run amendment (2026-11-12, before any backtest on these windows)
+
+The first coverage check failed: the `min_avg_turnover = 1e8 CNY` floor —
+copied from the 2022–2026 pool studies — excluded up to 80% of CSI300 members
+in mid-2014 (only 69/300 passed on 2014-06-06), while PE/PB and status
+coverage were fine (285/300). That absolute floor is a miscalibration of the
+execution-feasibility filter across eras, not part of the alpha hypothesis.
+
+Amended rule: `min_avg_turnover = 2e7 CNY`, derived from position size, not
+from window statistics: the largest position is 15% × 1,000,000 = 150k CNY,
+which is 0.75% participation of a 2e7 CNY/day name — already conservative.
+This change was made before any backtest run on the PIT windows, observed only
+the liquidity distribution (not returns), and is disclosed here and in the
+ledger. Re-checked coverage with the amended floor: development min 156
+eligible, gate min 189, gate median 221 — the data gate now passes.
+
 ## Gate
 
 On the 2013–2015 validation window:
