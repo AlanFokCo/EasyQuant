@@ -355,14 +355,25 @@ class TestMultiStockKline:
         report_mod.generate_html_report(result, out_path)
 
         html = out_path.read_text(encoding="utf-8")
-        assert (
-            'benchmarkLine.setData([{"time": "2024-01-02", "value": 0.0}'
-            in html
+        # The redesigned report embeds one JSON payload parsed by the SVG
+        # chart engine; assert the same guarantees against that payload.
+        import json as _json
+        import re as _re
+        m = _re.search(
+            r'<script id="eq-report-data" type="application/json">(.*?)</script>',
+            html, _re.S,
         )
-        assert f'{{"time": "{last}", "value": 10.0}}]' in html
+        assert m, "report payload missing"
+        payload = _json.loads(m.group(1).replace("<\\/", "</"))
+        bench = payload["equity"]["benchmark"]
+        # Structured engine benchmark series, zero-anchored, never refetched.
+        assert bench[0] == 0.0
+        assert bench[-1] == pytest.approx(10.0)
+        assert payload["dates"][0] == "2024-01-02"
+        assert payload["dates"][-1] == str(last)
         # Headline follows the analytics caliber (single source of truth for
         # benchmark metrics); the chart series stays a zero-anchored visual.
-        assert '<div class="mc-val" id="mv-bm_ret">99.00%</div>' in html
+        assert '基准 99.00%' in html
 
     def test_compute_symbol_kline_returns_tech_stats(self):
         """_compute_symbol_kline includes tech_stats dict."""

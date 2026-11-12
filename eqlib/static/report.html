@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>%%TITLE%%</title>
+<style>%%CSS%%</style>
+</head>
+<body>
+
+<header class="topbar">
+  %%BRAND_LOCKUP%%
+  <div class="topbar-subject">
+    <span class="topbar-symbol">%%SYMBOL%%</span>
+    <span class="topbar-period">%%START_DATE%% → %%END_DATE%%</span>
+  </div>
+  <nav class="topbar-nav" aria-label="报告章节">
+    <a href="#sec-overview" class="active">概览</a>
+    <a href="#sec-returns">收益</a>
+    <a href="#sec-risk">风险</a>
+    <a href="#sec-trades">交易</a>
+    <a href="#sec-method">方法</a>
+  </nav>
+  <span class="topbar-badge %%PNL_BADGE_CLASS%%" title="回测区间总收益率">%%PNL_PCT%%</span>
+</header>
+
+<main class="page">
+
+  <!-- ==================== 概览 OVERVIEW ==================== -->
+  <section class="report-section" id="sec-overview">
+    <div class="identity-strip">
+      %%IDENTITY_ITEMS%%
+    </div>
+
+    <div class="hero-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="seg" role="tablist" aria-label="主图表类型">
+            <button class="active" data-maintab="equity" role="tab" aria-selected="true">净值曲线</button>
+            <button data-maintab="kline" role="tab" aria-selected="false">K 线 · 交易信号</button>
+          </div>
+          <div class="panel-tools" id="equityTools">
+            <span class="range-presets" id="equityPresets" aria-label="时间范围"></span>
+            <div class="seg" id="benchSwitch" aria-label="对比基准"></div>
+          </div>
+          <div class="panel-tools" id="klineTools" hidden>
+            <div class="seg" id="symbolSwitch" aria-label="标的选择"></div>
+            <button class="chip active" data-ktoggle="ma">MA</button>
+            <button class="chip" data-ktoggle="bb">BOLL</button>
+            <button class="chip" data-ktoggle="macd">MACD</button>
+            <button class="chip" data-ktoggle="rsi">RSI</button>
+          </div>
+        </div>
+        <div id="mainChartHost"></div>
+        <noscript><div class="noscript-note">图表需要启用 JavaScript；全部数值见各表格与下方数据表。</div></noscript>
+      </div>
+
+      <aside class="panel scorecard" aria-label="策略评级">
+        %%SCORECARD%%
+      </aside>
+    </div>
+
+    %%KPI_BAND%%
+  </section>
+
+  <!-- ==================== 收益 RETURNS ==================== -->
+  <section class="report-section" id="sec-returns">
+    <div class="section-head">
+      <h2>收益分析</h2><span class="en">Returns</span>
+      <span class="section-note">月度热力 · 年度对比 · 分布 · 滚动稳健性</span>
+    </div>
+    <div class="grid-21">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">月度收益热力图<span class="sub">单月收益率 %</span></span></div>
+        <div class="panel-body">%%MONTHLY_HEATMAP%%</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">日收益分布<span class="sub">直方图</span></span></div>
+        <div id="distChartHost"></div>
+        %%DIST_STATS%%
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:12px">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">年度收益对比<span class="sub">逐年</span></span>
+          <span class="panel-legend">
+            <span class="lg-item"><span class="lg-key" style="background:#2962ff"></span><span class="lg-name">策略</span></span>
+            <span class="lg-item"><span class="lg-key" style="background:#d95926"></span><span class="lg-name">基准</span></span>
+            <span class="lg-item"><span class="lg-key" style="background:#26a69a"></span><span class="lg-name">超额(下排)</span></span>
+          </span>
+        </div>
+        <div id="annualChartHost"></div>
+        %%ANNUAL_TWIN%%
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">滚动指标<span class="sub">60 个交易日窗口</span></span></div>
+        <div id="rollingChartHost"></div>
+        %%ROLLING_TWIN%%
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <div class="panel-head"><span class="panel-title">累计超额收益<span class="sub">策略累计 − 基准累计</span></span></div>
+      <div id="excessChartHost"></div>
+      %%EXCESS_TWIN%%
+    </div>
+  </section>
+
+  <!-- ==================== 风险 RISK ==================== -->
+  <section class="report-section" id="sec-risk">
+    <div class="section-head">
+      <h2>风险分析</h2><span class="en">Risk</span>
+      <span class="section-note">回撤区间 · 波动结构 · 仓位暴露</span>
+    </div>
+    <div class="grid-12">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">风险指标<span class="sub">点击指标查看定义</span></span></div>
+        %%RISK_METRICS%%
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Top 5 回撤区间<span class="sub">按深度排序</span></span></div>
+        %%DD_PERIODS%%
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <div class="panel-head"><span class="panel-title">资产构成<span class="sub">每日收盘</span></span>
+        <span class="panel-legend">
+          <span class="lg-item"><span class="lg-key" style="background:#2962ff"></span><span class="lg-name">持仓市值</span></span>
+          <span class="lg-item"><span class="lg-key" style="background:#4c5265"></span><span class="lg-name">现金</span></span>
+        </span>
+      </div>
+      <div id="allocChartHost"></div>
+      %%ALLOC_TWIN%%
+    </div>
+  </section>
+
+  <!-- ==================== 交易 TRADES ==================== -->
+  <section class="report-section" id="sec-trades">
+    <div class="section-head">
+      <h2>交易分析</h2><span class="en">Trades</span>
+      <span class="section-note">%%TRADE_HEAD_NOTE%%</span>
+    </div>
+    %%TRADE_STATS%%
+    <div class="grid-2" style="margin-top:12px">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">个股盈亏<span class="sub">FIFO 配对 · 净额</span></span></div>
+        <div id="stockPnlHost"></div>
+        %%PER_STOCK_TWIN%%
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">期末持仓<span class="sub">%%POSITIONS_SUB%%</span></span></div>
+        %%POSITIONS%%
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <div class="panel-head"><span class="panel-title">成交明细<span class="sub">点击表头排序</span></span></div>
+      %%TRADE_TABLE%%
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <details class="twin">
+        <summary>交易日历 · 每日收益 / 回撤 / 操作</summary>
+        <div class="twin-body">%%CALENDAR%%</div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ==================== 方法 METHOD ==================== -->
+  <section class="report-section" id="sec-method">
+    <div class="section-head">
+      <h2>数据来源与计算方法</h2><span class="en">Methodology</span>
+    </div>
+    <div class="panel"><div class="panel-body method-grid">
+      %%METHOD_BLOCKS%%
+    </div></div>
+  </section>
+
+  <footer class="footer">
+    %%BRAND_FOOTER%%
+    <span>数据源：AKShare · 复权：前复权 qfq</span>
+    <span class="spacer"></span>
+    <span>生成时间 %%GENERATED_AT%%</span>
+    <span>本报告仅供研究，不构成投资建议</span>
+  </footer>
+</main>
+
+<!-- Metric glossary drawer -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="metricDrawer" role="dialog" aria-modal="true" aria-label="指标说明">
+  <div class="drawer-head">
+    <span class="drawer-title" id="drawerTitle">指标</span>
+    <span class="drawer-value" id="drawerValue"></span>
+    <button class="drawer-close" id="drawerClose" aria-label="关闭">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<script id="eq-report-data" type="application/json">%%DATA_JSON%%</script>
+<script>%%JS%%</script>
+</body>
+</html>

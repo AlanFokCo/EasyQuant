@@ -1,0 +1,596 @@
+/* ============================================================================
+   EasyQuant Backtest Report — Terminal Design System
+   TradingView-grade dark theme. Self-contained, no external requests.
+   Palette validated for CVD / contrast on --bg-1 (dataviz six-checks).
+   ========================================================================== */
+
+:root {
+  /* Surfaces */
+  --bg-0: #131722;            /* page */
+  --bg-1: #1e222d;            /* panel / chart surface */
+  --bg-2: #262b39;            /* elevated / hover */
+  --bg-3: #2e3344;            /* active control */
+  --border: #2a2e39;          /* hairline */
+  --border-strong: #363c4e;
+
+  /* Ink */
+  --ink-1: #d1d4dc;           /* primary text */
+  --ink-2: #959cab;           /* secondary text */
+  --ink-3: #6a7183;           /* muted: axis, hints */
+  --ink-4: #4c5265;           /* de-emphasis */
+
+  /* Brand / semantic */
+  --accent: #2962ff;          /* strategy series, interactive */
+  --accent-hover: #3b74ff;
+  --accent-dim: rgba(41, 98, 255, 0.14);
+  --up: #26a69a;
+  --up-dim: rgba(38, 166, 154, 0.14);
+  --down: #ef5350;
+  --down-dim: rgba(239, 83, 80, 0.14);
+  --bench: #d95926;           /* benchmark series */
+  --bench-dim: rgba(217, 89, 38, 0.14);
+  --warn: #e0a32e;
+
+  /* Chart chrome */
+  --gridline: #252a37;
+  --axis-line: #2e3344;
+  --crosshair: #59617a;
+  --neutral-mid: #3a3f52;     /* diverging midpoint */
+
+  /* MA ordinal ramp (validated: one hue, monotone L) */
+  --ma5: #6da7ec;
+  --ma20: #3987e5;
+  --ma60: #1c5cab;
+
+  /* Grade status */
+  --grade-s: #26a69a;
+  --grade-a: #3987e5;
+  --grade-b: #c99700;
+  --grade-c: #d95926;
+  --grade-d: #ef5350;
+
+  --radius: 4px;
+  --radius-lg: 6px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --mono: ui-monospace, "SF Mono", "SFMono-Regular", "JetBrains Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-0);
+  color: var(--ink-1);
+  font-size: 12px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--accent-hover); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+::selection { background: rgba(41, 98, 255, 0.32); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Numeric alignment: tabular only where numbers stack */
+.num, td, th, .axis-text, .kpi-value, .tt-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+   TOP BAR — sticky, 48px, terminal chrome
+   ========================================================================== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 20px;
+  background: rgba(19, 23, 34, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.eq-brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; color: inherit; }
+.eq-brand:hover { text-decoration: none; opacity: 0.85; }
+.eq-brand svg { display: block; }
+.eq-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.eq-brand-name { font-size: 14px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink-1); }
+.eq-brand-tag { font-size: 9px; font-weight: 500; color: var(--ink-3); letter-spacing: 0.05em; }
+
+.topbar-subject {
+  display: flex; align-items: baseline; gap: 10px; min-width: 0; flex-shrink: 1;
+  overflow: hidden; white-space: nowrap;
+}
+.topbar-symbol { font-size: 14px; font-weight: 650; color: var(--ink-1); letter-spacing: -0.01em; }
+.topbar-period { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.topbar-nav { display: flex; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.topbar-nav a {
+  padding: 5px 10px; font-size: 11px; color: var(--ink-2); border-radius: var(--radius);
+  transition: color 0.12s, background 0.12s;
+}
+.topbar-nav a:hover { color: var(--ink-1); background: var(--bg-2); text-decoration: none; }
+.topbar-nav a.active { color: var(--ink-1); background: var(--bg-3); }
+
+.topbar-badge {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.topbar-badge.pos { color: var(--up); background: var(--up-dim); }
+.topbar-badge.neg { color: var(--down); background: var(--down-dim); }
+
+/* ============================================================================
+   LAYOUT
+   ========================================================================== */
+.page { max-width: 1520px; margin: 0 auto; padding: 16px 20px 64px; }
+
+section.report-section { margin-top: 28px; scroll-margin-top: 60px; }
+section.report-section:first-of-type { margin-top: 16px; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.section-head h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.section-head .en {
+  font-size: 10px; font-weight: 500; color: var(--ink-4);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.section-head .section-note { margin-left: auto; font-size: 11px; color: var(--ink-3); }
+
+/* ============================================================================
+   HERO — identity strip + chart/scorecard grid
+   ========================================================================== */
+.identity-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 28px;
+  padding: 14px 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+}
+.id-item { display: flex; align-items: baseline; gap: 7px; }
+.id-label { font-size: 10px; color: var(--ink-3); }
+.id-value { font-size: 13px; font-weight: 600; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.id-value.up { color: var(--up); }
+.id-value.down { color: var(--down); }
+.id-sep { color: var(--ink-4); }
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 316px;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ============================================================================
+   PANELS — hairline, near-square, no decorative shadow
+   ========================================================================== */
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.panel-title { font-size: 12px; font-weight: 650; color: var(--ink-1); }
+.panel-title .sub { font-weight: 400; color: var(--ink-3); font-size: 11px; margin-left: 8px; }
+.panel-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.panel-tools[hidden] { display: none; }
+.panel-body { padding: 12px 14px; }
+.panel-body-flush { padding: 0; }
+
+/* Segmented control + toggle chips (TradingView toolbar vernacular) */
+.seg { display: inline-flex; background: var(--bg-0); border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; }
+.seg button, .chip {
+  appearance: none; border: 0; background: transparent; color: var(--ink-2);
+  font-family: var(--font); font-size: 11px; font-weight: 550;
+  padding: 4px 10px; border-radius: 3px; cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+  white-space: nowrap;
+}
+.seg button:hover, .chip:hover { color: var(--ink-1); }
+.seg button.active { background: var(--bg-3); color: var(--ink-1); }
+.chip { border: 1px solid var(--border); background: var(--bg-0); }
+.chip.active { border-color: var(--accent); color: var(--accent-hover); background: var(--accent-dim); }
+.chip .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+
+/* ============================================================================
+   MAIN CHART GROUP — legend, crosshair, linked panes, range slider
+   ========================================================================== */
+.chart-wrap { position: relative; }
+.chart-wrap svg { display: block; width: 100%; }
+.chart-wrap:focus-visible { outline-offset: -2px; }
+
+.chart-legend {
+  position: absolute;
+  top: 8px; left: 12px;
+  display: flex; gap: 14px; align-items: baseline;
+  pointer-events: none;
+  font-size: 11px;
+  z-index: 5;
+  flex-wrap: wrap;
+}
+.chart-legend .lg-item { display: inline-flex; align-items: baseline; gap: 5px; }
+.chart-legend .lg-key { width: 14px; height: 3px; border-radius: 2px; align-self: center; }
+.chart-legend .lg-name { color: var(--ink-3); }
+.chart-legend .lg-val { color: var(--ink-1); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Panel-head legend chips (static, server-rendered) */
+.panel-legend { display: inline-flex; gap: 12px; align-items: center; margin-left: 12px; font-size: 10px; }
+.panel-legend .lg-item { display: inline-flex; align-items: center; gap: 5px; }
+.panel-legend .lg-key { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.panel-legend .lg-name { color: var(--ink-3); }
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(30, 34, 45, 0.97);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.08s;
+  max-width: 280px;
+}
+.chart-tooltip.on { opacity: 1; }
+.tt-title { color: var(--ink-3); font-size: 10px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.tt-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tt-key { width: 12px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.tt-name { color: var(--ink-2); }
+.tt-value { margin-left: auto; padding-left: 14px; font-weight: 600; color: var(--ink-1); }
+.tt-value.up { color: var(--up); }
+.tt-value.down { color: var(--down); }
+
+/* Range slider */
+.range-slider { position: relative; border-top: 1px solid var(--border); user-select: none; }
+.range-slider svg { display: block; width: 100%; cursor: default; }
+.rs-handle {
+  position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+}
+.range-slider .rs-mask { position: absolute; top: 0; bottom: 0; background: rgba(19, 23, 34, 0.62); pointer-events: none; }
+.range-slider .rs-frame {
+  position: absolute; top: 0; bottom: 0;
+  border-left: 1px solid var(--accent); border-right: 1px solid var(--accent);
+  pointer-events: none;
+}
+.rs-grip { width: 3px; height: 14px; border-radius: 2px; background: var(--accent); }
+.range-presets { display: inline-flex; gap: 2px; }
+.range-presets button {
+  appearance: none; border: 0; background: transparent; color: var(--ink-3);
+  font: 550 10px/1 var(--font); padding: 4px 7px; border-radius: 3px; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.range-presets button:hover { color: var(--ink-1); }
+.range-presets button.active { color: var(--accent-hover); background: var(--accent-dim); }
+
+/* Tech strip under K-line */
+.tech-strip {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  padding: 8px 14px; border-top: 1px solid var(--border);
+  font-size: 10px; color: var(--ink-3);
+}
+.tech-strip b { color: var(--ink-1); font-weight: 600; font-variant-numeric: tabular-nums; margin-left: 4px; }
+
+/* ============================================================================
+   SCORECARD — grade gauge + dimension meters
+   ========================================================================== */
+.scorecard { display: flex; flex-direction: column; }
+.scorecard-top {
+  display: flex; align-items: center; gap: 16px; padding: 16px 16px 12px;
+}
+.grade-gauge { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+.grade-gauge svg { display: block; transform: rotate(-90deg); }
+.grade-gauge .gg-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.grade-gauge .gg-grade { font-size: 30px; font-weight: 750; letter-spacing: -0.02em; line-height: 1; }
+.grade-gauge .gg-score { font-size: 10px; color: var(--ink-3); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.scorecard-headline { min-width: 0; }
+.scorecard-headline .sh-label { font-size: 10px; color: var(--ink-3); margin-bottom: 2px; }
+.scorecard-headline .sh-text { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+
+.dim-list { padding: 4px 16px 8px; }
+.dim-row { display: grid; grid-template-columns: 92px 1fr 34px; align-items: center; gap: 10px; padding: 5px 0; }
+.dim-name { font-size: 11px; color: var(--ink-2); }
+.dim-track { height: 5px; background: var(--bg-0); border-radius: 3px; overflow: hidden; }
+.dim-fill { height: 100%; border-radius: 3px; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+.dim-score { font-size: 11px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+.scorecard-tags { display: flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; }
+.sc-tag { font-size: 10px; color: var(--ink-3); }
+.sc-tag b { color: var(--ink-1); font-weight: 600; }
+
+/* Diagnostics list */
+.diag-list { border-top: 1px solid var(--border); padding: 10px 16px 14px; }
+.diag-title { font-size: 10px; color: var(--ink-3); margin-bottom: 8px; letter-spacing: 0.04em; }
+.diag-item { display: flex; gap: 8px; padding: 5px 0; font-size: 11px; line-height: 1.5; }
+.diag-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.diag-item.critical .diag-dot { background: var(--down); }
+.diag-item.warning .diag-dot { background: var(--warn); }
+.diag-item .diag-finding { color: var(--ink-1); font-weight: 550; }
+.diag-item .diag-cause { color: var(--ink-3); }
+.diag-empty { font-size: 11px; color: var(--up); padding: 4px 0; }
+
+/* ============================================================================
+   KPI BAND
+   ========================================================================== */
+.kpi-band {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.kpi {
+  background: var(--bg-1);
+  padding: 12px 14px 11px;
+  cursor: default;
+  position: relative;
+  transition: background 0.12s;
+}
+.kpi:hover { background: var(--bg-2); }
+.kpi[data-metric] { cursor: help; }
+.kpi-label { font-size: 10px; color: var(--ink-3); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+.kpi-value {
+  font-size: 20px; font-weight: 680; letter-spacing: -0.02em; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-value.up { color: var(--up); }
+.kpi-value.down { color: var(--down); }
+.kpi-sub { font-size: 10px; color: var(--ink-3); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.kpi-sub .up { color: var(--up); }
+.kpi-sub .down { color: var(--down); }
+.kpi-target {
+  display: inline-block; margin-top: 5px; font-size: 9px; padding: 1px 6px; border-radius: 3px;
+  font-weight: 550; letter-spacing: 0.02em;
+}
+.kpi-target.pass { color: var(--up); background: var(--up-dim); }
+.kpi-target.fail { color: var(--down); background: var(--down-dim); }
+.kpi-target.na { color: var(--ink-3); background: var(--bg-3); }
+
+/* ============================================================================
+   GRIDS
+   ========================================================================== */
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.grid-21 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.grid-12 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; align-items: start; }
+.stack { display: grid; gap: 12px; }
+
+/* ============================================================================
+   TABLES — terminal density, sticky heads, zebra on hover only
+   ========================================================================== */
+.tbl-wrap { overflow-x: auto; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.tbl th {
+  text-align: right; font-weight: 550; color: var(--ink-3); font-size: 10px;
+  padding: 7px 10px; border-bottom: 1px solid var(--border-strong);
+  position: sticky; top: 0; background: var(--bg-1); z-index: 2;
+  white-space: nowrap;
+}
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl th.l, .tbl td.l { text-align: left; }
+.tbl td {
+  text-align: right; padding: 6px 10px; color: var(--ink-1);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.tbl tbody tr { transition: background 0.1s; }
+.tbl tbody tr:hover { background: var(--bg-2); }
+.tbl .up { color: var(--up); }
+.tbl .down { color: var(--down); }
+.tbl .muted { color: var(--ink-3); }
+.tbl th.sortable { cursor: pointer; user-select: none; }
+.tbl th.sorted-asc::after { content: " ↑"; color: var(--accent-hover); }
+.tbl th.sorted-desc::after { content: " ↓"; color: var(--accent-hover); }
+.tbl-scroll { max-height: 420px; overflow-y: auto; }
+
+/* ============================================================================
+   MONTHLY HEATMAP — table IS the chart (cells carry values)
+   ========================================================================== */
+table.heatmap { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 11px; }
+.heatmap th {
+  font-weight: 550; color: var(--ink-3); font-size: 10px; text-align: center;
+  padding: 4px 2px;
+}
+.heatmap th.year-h { text-align: right; padding-right: 8px; }
+.heatmap td {
+  text-align: center; padding: 7px 2px; border-radius: 3px;
+  color: var(--ink-1); font-variant-numeric: tabular-nums;
+  cursor: default; transition: transform 0.08s;
+  font-size: 10.5px;
+}
+.heatmap td:hover { transform: scale(1.06); z-index: 2; position: relative; }
+.heatmap td.empty { background: transparent !important; }
+.heatmap td.year-total { font-weight: 650; }
+
+/* ============================================================================
+   DETAILS / TABLE TWINS
+   ========================================================================== */
+details.twin { border-top: 1px solid var(--border); }
+details.twin summary {
+  list-style: none; cursor: pointer; padding: 8px 14px;
+  font-size: 10px; color: var(--ink-3); user-select: none;
+  display: flex; align-items: center; gap: 6px;
+}
+details.twin summary::-webkit-details-marker { display: none; }
+details.twin summary::before { content: "▸"; transition: transform 0.15s; font-size: 9px; }
+details.twin[open] summary::before { transform: rotate(90deg); }
+details.twin summary:hover { color: var(--ink-1); }
+details.twin .twin-body { padding: 0 14px 12px; }
+
+/* ============================================================================
+   STATS RAIL (distribution sidecar) + METRIC RAIL (risk / trade stats)
+   ========================================================================== */
+.stat-rail { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border); border-top: 1px solid var(--border); }
+.metric-rail { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border); }
+.metric-rail-4 { grid-template-columns: repeat(4, 1fr); }
+.stat-cell { background: var(--bg-1); padding: 8px 12px; }
+.stat-cell[data-metric] { cursor: help; transition: background 0.12s; }
+.stat-cell[data-metric]:hover { background: var(--bg-2); }
+.stat-cell .sc-k { font-size: 10px; color: var(--ink-3); }
+.stat-cell .sc-v { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
+
+/* ============================================================================
+   METHOD / SOURCES
+   ========================================================================== */
+.method-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.method-block h4 { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.method-block p, .method-block li { font-size: 11px; color: var(--ink-2); line-height: 1.7; }
+.method-block ul { padding-left: 16px; }
+.method-block code {
+  font-family: var(--mono); font-size: 10.5px; background: var(--bg-0);
+  padding: 1px 5px; border-radius: 3px; color: var(--accent-hover);
+}
+
+/* ============================================================================
+   METRIC DRAWER — glossary side panel
+   ========================================================================== */
+.drawer-overlay {
+  position: fixed; inset: 0; background: rgba(10, 12, 18, 0.55); z-index: 300;
+  opacity: 0; pointer-events: none; transition: opacity 0.18s;
+}
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 92vw;
+  background: var(--bg-1); border-left: 1px solid var(--border-strong);
+  z-index: 301; transform: translateX(100%); transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex; flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head {
+  display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-title { font-size: 15px; font-weight: 650; }
+.drawer-value { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; }
+.drawer-close {
+  appearance: none; border: 0; background: var(--bg-2); color: var(--ink-2);
+  width: 26px; height: 26px; border-radius: var(--radius); cursor: pointer; font-size: 13px;
+}
+.drawer-close:hover { color: var(--ink-1); background: var(--bg-3); }
+.drawer-body { padding: 14px 18px; overflow-y: auto; }
+.drawer-sec { margin-bottom: 14px; }
+.drawer-sec h5 { font-size: 10px; color: var(--ink-3); letter-spacing: 0.06em; margin-bottom: 5px; font-weight: 600; }
+.drawer-sec p { font-size: 12px; color: var(--ink-2); line-height: 1.7; }
+.drawer-formula {
+  font-family: var(--mono); font-size: 11px; color: var(--accent-hover);
+  background: var(--bg-0); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 10px; overflow-x: auto; white-space: nowrap;
+}
+.drawer-grade { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 3px; margin-top: 4px; }
+.drawer-grade.excellent { color: var(--up); background: var(--up-dim); }
+.drawer-grade.good { color: var(--accent-hover); background: var(--accent-dim); }
+.drawer-grade.fair { color: var(--warn); background: rgba(224, 163, 46, 0.14); }
+.drawer-grade.poor { color: var(--down); background: var(--down-dim); }
+.drawer-ref { font-size: 10px; color: var(--ink-4); margin-top: 10px; }
+
+/* ============================================================================
+   FOOTER
+   ========================================================================== */
+.footer {
+  margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  font-size: 10px; color: var(--ink-4);
+}
+.eq-footer-brand { display: inline-flex; align-items: center; gap: 6px; }
+.eq-footer-name { font-weight: 600; color: var(--ink-3); }
+.footer .spacer { flex: 1; }
+
+/* ============================================================================
+   CHART SVG SHARED (classed so print can restyle)
+   ========================================================================== */
+.axis-text { fill: var(--ink-3); font-size: 10px; font-family: var(--font); }
+.grid-line { stroke: var(--gridline); stroke-width: 1; }
+.axis-line { stroke: var(--axis-line); stroke-width: 1; }
+.cross-line { stroke: var(--crosshair); stroke-width: 1; }
+.ref-line { stroke: var(--ink-4); stroke-width: 1; }
+.zero-line { stroke: var(--border-strong); stroke-width: 1; }
+
+.noscript-note {
+  padding: 24px; text-align: center; color: var(--ink-3); font-size: 11px;
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media (max-width: 1200px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .kpi-band { grid-template-columns: repeat(4, 1fr); }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-21, .grid-12, .grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .topbar { gap: 10px; padding: 0 12px; }
+  .topbar-nav { display: none; }
+  .topbar-period { display: none; }
+  .kpi-band { grid-template-columns: repeat(2, 1fr); }
+  .metric-rail-4 { grid-template-columns: repeat(2, 1fr); }
+  .page { padding: 12px 12px 48px; }
+  .method-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================================
+   PRINT — flatten to light; charts keep series colors
+   ========================================================================== */
+@media print {
+  :root {
+    --bg-0: #ffffff; --bg-1: #ffffff; --bg-2: #f4f5f7; --bg-3: #e8eaef;
+    --border: #d7dae0; --border-strong: #b9bec9;
+    --ink-1: #131722; --ink-2: #3c4250; --ink-3: #5d6472; --ink-4: #8a90a0;
+    --gridline: #eceef2; --axis-line: #d7dae0;
+    --accent-dim: rgba(41, 98, 255, 0.08);
+    --up-dim: rgba(38, 166, 154, 0.10); --down-dim: rgba(239, 83, 80, 0.10);
+  }
+  .topbar { position: static; backdrop-filter: none; background: #fff; }
+  .topbar-nav, .range-slider, .drawer, .drawer-overlay, details.twin summary { display: none !important; }
+  details.twin { display: block; }
+  details.twin .twin-body { display: block !important; }
+  section.report-section { break-inside: avoid-page; }
+  .chart-wrap { break-inside: avoid; }
+  body { font-size: 11px; }
+}

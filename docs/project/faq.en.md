@@ -200,9 +200,9 @@ It's used to calculate **alpha, beta, information ratio, and excess returns**, a
 
 ### Q: Charts in HTML report are blank?
 
-**Cause:** The interactive HTML loads **Lightweight Charts** scripts via **CDN** (such as jsDelivr / unpkg). Corporate intranets, proxies, or offline environments may block external scripts, causing **candlestick charts, cumulative returns, and drawdown charts to appear blank**. The header, summary, and metric cards are typically embedded data and usually remain visible.
+**Cause:** Since 2026-11 the HTML report is a **fully offline single file** (charts are hand-rolled inline SVG; no CDN scripts are loaded), so the network never affects rendering. Blank chart areas have only two realistic causes: **JavaScript is disabled** in the browser (the charts are rendered by the embedded script), or **the backtest has no data for that panel** (e.g. no candlesticks when nothing traded, no excess curve without a benchmark) — in which case the panel shows an explicit "no data" note rather than a blank area.
 
-**Solution:** Switch to a network with internet access; or whitelist `cdn.jsdelivr.net` and `unpkg.com` and refresh; or open in an internet-connected environment and take screenshots for archival.
+**Solution:** Enable JavaScript and reload; on very old browsers, switch to a modern one. If the backtest itself has no data, check whether the strategy actually traded.
 
 <a id="faq-json-num-trades"></a>
 

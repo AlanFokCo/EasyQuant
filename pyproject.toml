@@ -64,7 +64,7 @@ Repository = "https://github.com/AlanFokCo/EasyQuant"
 include = ["eqlib*"]
 
 [tool.setuptools.package-data]
-eqlib = ["static/logo-icon.png", "static/*.json"]
+eqlib = ["static/logo-icon.png", "static/*.json", "static/report.css", "static/report.js", "static/report.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

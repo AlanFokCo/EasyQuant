@@ -55,7 +55,7 @@ Event-driven backtest engine with JoinQuant/Zipline-compatible API.
 - `data.py` — Data API: `get_price`, `attribute_history`, `fetch_stock_data`, fundamentals, indices, A-share specifics (`get_north_money_flow`, `get_margin_data`, `get_limit_up_down_stats`, `get_restriction_release`)
 - `trade.py` — Order execution: `order`, `order_target`, `order_value`
 - `attribution.py` — Performance analysis: `analyze_returns`, `brinson_attribution`, `simple_factor_analysis`, `grade_strategy`, `diagnose_bottleneck`, `recommend_params`
-- `report.py` — HTML/PNG/Markdown/JSON report generation (dark theme, Agent-First JSON)
+- `report.py` — HTML/PNG/Markdown/JSON report generation. The HTML is a fully self-contained single file (hand-rolled inline-SVG chart engine in `eqlib/static/report.{html,css,js}`, TradingView-style dark theme, zero CDN/network dependency); all numbers are computed in Python and embedded as a single JSON payload (`#eq-report-data`), JS renders geometry only
 - `notification.py` — DingTalk/Feishu webhook alerts for paper trading
 - `stock_query.py` — Fluent query API: `query()`, `valuation()`, `get_fundamentals()`
 - `selection.py` — Periodic stock selection with factor screening
