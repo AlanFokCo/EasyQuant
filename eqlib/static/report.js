@@ -819,7 +819,7 @@
       function v(a) { return idx >= 0 && idx < a.length ? a[idx] : null; }
       var o = v(kd.o), h2 = v(kd.h), l = v(kd.l), c2 = v(kd.c), vol = v(kd.v);
       var chg = isNum(c2) && isNum(o) ? (c2 - o) / o * 100 : null;
-      var htm = '<span class="lg-item"><span class="lg-name">' + symbol + ' · ' + dates[idx] + '</span></span>';
+      var htm = '<span class="lg-item"><span class="lg-name">' + symbol.replace(/\.(XSHG|XSHE)$/, '') + ' · ' + dates[idx] + '</span></span>';
       htm += '<span class="lg-item"><span class="lg-name">开</span><span class="lg-val">' + fmtNum(o) + '</span></span>';
       htm += '<span class="lg-item"><span class="lg-name">高</span><span class="lg-val">' + fmtNum(h2) + '</span></span>';
       htm += '<span class="lg-item"><span class="lg-name">低</span><span class="lg-val">' + fmtNum(l) + '</span></span>';
@@ -1569,7 +1569,8 @@
     var syms = DATA.meta.symbols || [DATA.meta.symbol];
     syms.forEach(function (s) {
       var b = document.createElement('button');
-      b.type = 'button'; b.textContent = s;
+      b.type = 'button'; b.textContent = s.replace(/\.(XSHG|XSHE)$/, '');
+      b.title = s;
       if (s === currentSymbol) b.classList.add('active');
       b.addEventListener('click', function () {
         currentSymbol = s;

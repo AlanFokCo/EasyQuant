@@ -91,7 +91,7 @@ A real backtest writes four sets of files (`.html` / `.png` / `.md` / `.json`) u
 
 The abstract "strategy vs benchmark" line chart is still available at: `../assets/tutorials/sample_equity_vs_benchmark.svg`.
 
-**Cross-referencing the HTML header and metric card readings:** After opening your locally generated `.html`, cross-reference each item against the metric definitions in the [Report Format Guide](../reference/reports-format.md); if the chart area is blank, it's likely due to CDN blocking — see the [FAQ](../project/faq.md).
+**Cross-referencing the HTML header and metric card readings:** After opening your locally generated `.html`, cross-reference each item against the metric definitions in the [Report Format Guide](../reference/reports-format.md); the report is a fully offline single file (no CDN), so if a chart area is empty, first check that JavaScript is enabled — see the [FAQ](../project/faq.md).
 
 ---
 

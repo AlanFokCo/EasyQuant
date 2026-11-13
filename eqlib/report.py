@@ -1206,7 +1206,7 @@ def _build_report_payload(result, chart, metrics, bench_data):
 
     return {
         "meta": {
-            "symbol": chart.get("symbol") or "",
+            "symbol": (chart.get("symbol") or "").replace(".XSHG", "").replace(".XSHE", ""),
             "symbols": chart.get("symbols_list") or [],
             "start": str(ctx.start_date),
             "end": str(ctx.end_date),

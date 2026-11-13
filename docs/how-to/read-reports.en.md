@@ -135,7 +135,7 @@ Open the `.html` file **directly in your browser** (double-click or File → Ope
 
 ### 3.1 HTML Report Page Overview
 
-After opening the `.html` file, the page is roughly divided into the following sections (screenshot below is from an Example 22 stock selection strategy backtest):
+After opening the `.html` file, the page is roughly divided into the following sections (the screenshot below is from a real single-stock moving-average strategy backtest on 002384 using local data):
 
 ![Stock selection strategy HTML report screenshot](../assets/tutorials/example_report_html_stock_selection.png)
 

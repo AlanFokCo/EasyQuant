@@ -135,7 +135,7 @@ result = run_strategy(
 
 ### 3.1 HTML 报告页面概览
 
-打开 `.html` 文件后，你看到的页面大致分为以下区块（以下为 Example 22 选股策略的回测截图）：
+打开 `.html` 文件后，你看到的页面大致分为以下区块（下图为单标的均线策略（002384，本地数据）的一次真实回测截图）：
 
 ![选股策略 HTML 报告截图](../assets/tutorials/example_report_html_stock_selection.png)
 

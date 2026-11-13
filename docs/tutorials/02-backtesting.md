@@ -91,7 +91,7 @@
 
 抽象「策略 vs 基准」折线示意见仍保留：`../assets/tutorials/sample_equity_vs_benchmark.svg`。
 
-**对照 HTML 页眉与指标卡片读数：**打开本地生成的 `.html` 后，按 [报告格式详解](../reference/reports-format.md) 的指标说明逐条对照；若图区空白，多为 CDN 被拦，见 [FAQ](../project/faq.md)。
+**对照 HTML 页眉与指标卡片读数：**打开本地生成的 `.html` 后，按 [报告格式详解](../reference/reports-format.md) 的指标说明逐条对照；报告为全离线单文件（无 CDN 依赖），图区为空时先确认浏览器启用了 JavaScript，见 [FAQ](../project/faq.md)。
 
 ---
 
