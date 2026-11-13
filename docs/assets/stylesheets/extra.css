@@ -1090,22 +1090,9 @@ body {
   border-bottom-right-radius: var(--eq-radius);
 }
 
-/* Sticky table header (desktop only; mobile keeps block-scroll behavior) */
-@media screen and (min-width: 44.01em) {
-  .md-typeset table:not([class]) {
-    overflow: visible;
-  }
-  .md-typeset table:not([class]) th {
-    position: sticky;
-    top: 2.4rem;
-    z-index: 2;
-  }
-}
-@media screen and (min-width: 76.25em) {
-  .md-typeset table:not([class]) th {
-    top: 4.8rem;
-  }
-}
+/* Table headers render in normal flow. A previous sticky-header rule used a
+   fixed `top` offset, which displaced the thead downward over the first body
+   rows whenever the table top sat near the viewport top — removed. */
 
 /* ----- Code: copy button, highlighted lines, hover hairline ----- */
 .md-typeset pre > code {
